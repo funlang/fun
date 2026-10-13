@@ -5,9 +5,14 @@
 // libtcc.dll next to fun.exe; on Linux the build produces libtcc.so from
 // src/3rd/tcc and places it next to funcmd, and funcmd is linked with
 // -rpath $ORIGIN so the bare name resolves (see art/notes/library-port-plan.md).
+// macOS would need libtcc.dylib (cross-built with Zig; not produced yet), so
+// `tcc` stays nil there and the JIT C path raises.
 var tccdll = 'libtcc.dll';
-if 'host'.arg().getJson(fd: true).os = 'linux' then
+var _tccos = 'host'.arg().getJson(fd: true).os;
+if _tccos = 'linux' then
   tccdll = 'libtcc.so';
+elsif _tccos = 'macos' then
+  tccdll = 'libtcc.dylib';
 end if;
 var tcc = nil;
 var tcc_error = nil;

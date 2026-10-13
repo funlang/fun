@@ -19,6 +19,12 @@
 // SOFTWARE.
 unit libase;
 
+// LinuxFFI (Linux) and DarwinFFI (macOS) both mean "libffi-backed getapi".
+{$IfNDef UnixFFI}
+  {$IfDef LinuxFFI}{$Define UnixFFI}{$EndIf}
+  {$IfDef DarwinFFI}{$Define UnixFFI}{$EndIf}
+{$EndIf}
+
 interface
 
 uses fun, base, core, host;
@@ -43,7 +49,7 @@ uses SysUtils, Variants,
      io, parse
      {$IfDef WinCOM}  , winole  {$EndIf}
      {$IfDef WinAPI}  , winapi  {$EndIf}
-     {$IfDef LinuxFFI}, lffi    {$EndIf}
+     {$IfDef UnixFFI}, lffi    {$EndIf}
      {$IfDef Regex}   , regex   {$EndIf}
      ;
 type PValue = base.PValue;
@@ -1729,8 +1735,8 @@ begin
   ids['GetApi']  := CExp.new(nil).parse(Int64(fun.uintptr(@_getapi)));
   {$EndIf}
   
-  // Linux: dlopen/dlsym via libffi (winapi unit stays Windows-only)
-  {$IfDef LinuxFFI}
+  // Unix: dlopen/dlsym via libffi (winapi unit stays Windows-only)
+  {$IfDef UnixFFI}
   ids['GetApi']  := CExp.new(nil).parse(Int64(fun.uintptr(@_lgetapi)));
   {$EndIf}
 

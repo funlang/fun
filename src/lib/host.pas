@@ -19,6 +19,15 @@
 // SOFTWARE.
 unit host;
 
+// Unix FFI (getapi via FPC's bundled libffi unit) is requested by make-linux-x86_64.sh
+// as -dLinuxFFI and by make-darwin.sh as -dDarwinFFI. Both map to the single
+// UnixFFI symbol used throughout the engine. Guarded because FPC keeps a defined
+// symbol globally across the units of one build.
+{$IfNDef UnixFFI}
+  {$IfDef LinuxFFI}{$Define UnixFFI}{$EndIf}
+  {$IfDef DarwinFFI}{$Define UnixFFI}{$EndIf}
+{$EndIf}
+
 interface
 
 uses fun, base, core;
@@ -71,7 +80,7 @@ implementation
 uses libase, libset
      {$IfDef WinCOM}, winole{$EndIf}
      {$IfDef WinAPI}, winapi{$EndIf}
-     {$IfDef LinuxFFI}, lffi  {$EndIf}
+     {$IfDef UnixFFI}, lffi  {$EndIf}
      {$IfDef Regex} , regex {$EndIf}
      {$IfDef FunUI} , ui    {$EndIf}
      ;
@@ -152,7 +161,7 @@ begin
   {$EndIf}
   
   // linux ffi
-  {$IfDef LinuxFFI}
+  {$IfDef UnixFFI}
   libs.add(CLffiApi.Create());
   {$EndIf}
 
@@ -237,7 +246,7 @@ begin
   {$IfDef WinAPI}
   ids['@toCallback'] := CExp.new(nil).parse(Int64(fun.uintptr(@_toCallback)));
   {$EndIf}
-  {$IfDef LinuxFFI}
+  {$IfDef UnixFFI}
   ids['@toCallback'] := CExp.new(nil).parse(Int64(fun.uintptr(@_ltoCallback)));
   {$EndIf}
 end;

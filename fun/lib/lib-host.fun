@@ -20,7 +20,7 @@
 //
 // Linux note: an OUT buffer must be passed as the Fun string's real address
 // (buf.toNum(-1)), not as an 's'/'p' string argument - the engine would hand C
-// a pointer to a temporary copy and the writes would be lost.
+// a pointer to a temporary copy and the writes would be lost. (Same on macOS.)
 //
 // Built-in methods used here (see also lib-cmdline-lnx.fun):
 ########################################
@@ -36,6 +36,8 @@ var _hostFacts  = 'host'.arg().getJson(fd: true);
 var _hostOs     = _hostFacts.os;
 var _isWindows  = _hostOs = 'windows';
 var _isLinux    = _hostOs = 'linux';
+var _isMac      = _hostOs = 'macos';
+var _isUnix     = _isLinux or _isMac;   // both POSIX, share the libc branch
 var _hostSep    = '/';
 
 fun IsWindows()
@@ -44,6 +46,42 @@ end fun;
 
 fun IsLinux()
   result = _isLinux;
+end fun;
+
+fun IsMac()
+  result = _isMac;
+end fun;
+
+// Linux or macOS: the POSIX branch (no Windows handles, '/' separator).
+fun IsUnix()
+  result = _isUnix;
+end fun;
+
+//--------------------------------------------------------------
+// native library names (for getapi)
+//
+// The *-unx backends differ from their Windows counterparts mostly in the
+// library they dlopen, so the two host-dependent strings are resolved here
+// once. Callers pass both spellings explicitly: Apple's compat libraries keep
+// their version inside the name (libz.1.dylib, libcurl.4.dylib,
+// libxml2.2.dylib) instead of after '.so' as on Linux, so a single
+// (base, soname) pair cannot express both.
+//--------------------------------------------------------------
+
+// The C library: glibc's stable runtime soname on Linux; macOS folds libc
+// (and much else) into libSystem.
+fun LibC()
+  if _isMac then result = 'libSystem.B.dylib'; else result = 'libc.so.6'; end if;
+end fun;
+
+// One shared-object name per host.
+fun DyLib(lnx, mac)
+  if _isMac then result = mac; else result = lnx; end if;
+end fun;
+
+// A candidate list per host (e.g. several libcrypto versions to probe).
+fun DyLibList(lnx, mac)
+  if _isMac then result = mac; else result = lnx; end if;
 end fun;
 
 // Path separator of the running host.
@@ -60,14 +98,14 @@ var _hostGetCurrPath;   // Windows: kernel32.GetCurrentDirectory
 var _hostGetTempPath;   // Windows: kernel32.GetTempPath
 var _hostGetFullPath;   // Windows: kernel32.GetFullPathName
 var _hostGetCmdLine;    // Windows: kernel32.GetCommandLine
-var _hostGetCwd;        // Linux: libc.getcwd
-var _hostGetenv;        // Linux: libc.getenv
-var _hostStrlen;        // Linux: libc.strlen
+var _hostGetCwd;        // Unix: LibC().getcwd
+var _hostGetenv;        // Unix: LibC().getenv
+var _hostStrlen;        // Unix: LibC().strlen
 
-if _isLinux then
-  _hostGetCwd  = 'libc.so.6'.getapi('getcwd',  'pi:p');
-  _hostGetenv  = 'libc.so.6'.getapi('getenv',  's:p');
-  _hostStrlen  = 'libc.so.6'.getapi('strlen',  'p:i');
+if _isUnix then
+  _hostGetCwd  = LibC().getapi('getcwd',  'pi:p');
+  _hostGetenv  = LibC().getapi('getenv',  's:p');
+  _hostStrlen  = LibC().getapi('strlen',  'p:i');
 else
   _hostSep = '\';
   _hostGetCmdLine  = 'kernel32'.getapi('GetCommandLine',       ':s');
@@ -85,7 +123,7 @@ end if;
 // tokenizer keeps working unchanged on both hosts.
 //--------------------------------------------------------------
 fun HostCommandLine()
-  if _isLinux then
+  if _isUnix then
     result = '';
     var i = 0;
     while i.arg() <> '' do
@@ -107,7 +145,7 @@ end fun;
 // current directory
 //--------------------------------------------------------------
 fun HostCurrPath()
-  if _isLinux then
+  if _isUnix then
     var buf = ' '.x(4097);
     var p = _hostGetCwd(buf.toNum(-1), 4096);
     if p = nil then
@@ -127,7 +165,7 @@ end fun;
 // (same contract as lib-os.GetTempPath)
 //--------------------------------------------------------------
 fun HostTempPath(extra)
-  if _isLinux then
+  if _isUnix then
     var t = _hostGetenv('TMPDIR');
     if t = nil then
       result = '/tmp/';
@@ -150,7 +188,7 @@ end fun;
 // works for paths that do not exist yet (matching GetFullPathName's contract).
 //--------------------------------------------------------------
 fun HostFullPath(f)
-  if _isLinux then
+  if _isUnix then
     var s = f;
     if s = '' then
       result = HostCurrPath();

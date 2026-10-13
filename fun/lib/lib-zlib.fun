@@ -4,20 +4,21 @@
 use 'lib-utils.fun';
 use 'lib-math.fun';
 
-// lib-zlib: zlib (deflate/inflate) on Windows and Linux.
+// lib-zlib: zlib (deflate/inflate) on Windows, Linux and macOS.
 //
-// The algorithm is identical on both hosts; only three things differ, so they
+// The algorithm is identical on all hosts; only three things differ, so they
 // are resolved once at load time instead of splitting the module:
-//   1. the library name ('zlib.dll' vs 'libz.so.1');
+//   1. the library name ('zlib.dll' / 'libz.so.1' / 'libz.1.dylib');
 //   2. the z_stream layout: 56 bytes / 4-byte fields on Win32, 112 bytes with
-//      8-byte pointers and uLong on Linux x86_64;
-//   3. how an OUT buffer is passed. On Linux the FFI hands C a temporary copy
+//      8-byte pointers and uLong on Linux/macOS x86_64/aarch64;
+//   3. how an OUT buffer is passed. On unix the FFI hands C a temporary copy
 //      of a Fun string, so the real address must be passed as a number
 //      (`buf.toNum(-1)`); on Windows the plain string already is the buffer.
 //      `_zp()` returns whichever form this host needs.
 
 var _zlib_facts = 'host'.arg().getJson(fd: true);
-var _zlib_linux = _zlib_facts.os = 'linux';
+var _zlib_unix  = _zlib_facts.os = 'linux' or _zlib_facts.os = 'macos';
+var _zlib_mac   = _zlib_facts.os = 'macos';
 var _zlib_ptr   = _zlib_facts.bits div 8;
 
 var ZLIB_VERSION = "1.2.11";
@@ -26,12 +27,12 @@ var ZLIB_MAX     = 2 ^ 30;
 var ZLIB_BLOCK   = 256*1024;
 var zlibdll = 'zlib.dll';
 var zlib = nil;
-if _zlib_linux then
-  zlibdll  = 'libz.so.1';
+if _zlib_unix then
+  if _zlib_mac then zlibdll = 'libz.1.dylib'; else zlibdll = 'libz.so.1'; end if;
   ZLIB_SIZE = 112;          // sizeof(z_stream) on LP64
 end if;
 try
-  if _zlib_linux then
+  if _zlib_unix then
     zlib = [
       compress:     zlibdll.getapi('compress',      'ppsi:i'),
       uncompress:   zlibdll.getapi('uncompress',    'ppsi:i'),
@@ -63,10 +64,10 @@ fun _bound(n)
   result = n + (n >> 12) + (n >> 14) + (n >> 25) + 13;
 end fun;
 
-// OUT-buffer argument: the real address on Linux, the plain string on Windows.
+// OUT-buffer argument: the real address on unix, the plain string on Windows.
 fun _zp(x)
   result = x;
-  if _zlib_linux then result = x.toNum(-1); end if;
+  if _zlib_unix then result = x.toNum(-1); end if;
 end fun;
 
 // Pointer-width little-endian pack/unpack. lib-utils' int2str/str2int are
@@ -129,7 +130,7 @@ var @LI = 4;  // len of in,  avail_in (uInt, always 4 bytes)
 var @PO = 12; // ptr of out, next_out
 var @LO = 16; // len of out, avail_out (uInt, always 4 bytes)
 var @LA = 20; // len of all, total_out (uLong, pointer width)
-if _zlib_linux then
+if _zlib_unix then
   @PI = 0; @LI = 8; @PO = 24; @LO = 32; @LA = 40;
 end if;
 

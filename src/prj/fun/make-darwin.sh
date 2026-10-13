@@ -19,8 +19,10 @@
 #     bin/ppcrossx64          bin/ppcrossa64        # FPC darwin cross compilers
 #     units/x86_64-darwin/    units/aarch64-darwin/ # RTL
 #     units-objpas/<cpu>-darwin/                    # variants, dateutils
-#     units-hash/<cpu>-darwin/                      # md5, sha1   (optional)
-#     pcre/<cpu>-darwin/libpcre.a                   # regex       (optional)
+#     units-hash/<cpu>-darwin/                      # md5, sha1      (optional)
+#     units-libffi/<cpu>-darwin/                    # ffi            (optional)
+#     libffi/libffi.tbd                             # libffi stub    (optional)
+#     pcre/<cpu>-darwin/libpcre.a                   # regex          (optional)
 #     zig/zig                                       # Mach-O assembler+linker
 #
 # Usage:
@@ -54,6 +56,8 @@ build_cpu() {
   UNITS="${DARWIN_UNITS:-$ROOT/units/$cpu-darwin}"
   UNITS_OBJPAS="${DARWIN_UNITS_OBJPAS:-$ROOT/units-objpas/$cpu-darwin}"
   UNITS_HASH="${DARWIN_UNITS_HASH:-$ROOT/units-hash/$cpu-darwin}"
+  UNITS_FFI="${DARWIN_UNITS_FFI:-$ROOT/units-libffi/$cpu-darwin}"
+  FFI_LIBDIR="${DARWIN_LIBFFI_DIR:-$ROOT/libffi}"
   PCRE_LIB="${PCRE_LIB:-$ROOT/pcre/$cpu-darwin}"
 
   [ -x "$PPCROSS" ] || { echo "FPC darwin cross compiler not found: $PPCROSS" >&2
@@ -95,6 +99,18 @@ build_cpu() {
     echo "md5/sha1 units not found - building without -dMD5." >&2
   fi
   [ -d "$UNITS_OBJPAS" ] && FU_EXTRA="$FU_EXTRA -Fu$UNITS_OBJPAS"
+  # --- Optional: Fun getapi() on macOS via libffi (opt-in, like Linux) ------
+  # Needs FPC's ffi unit and a libffi linker stub. Both come from
+  # bootstrap-darwin-cross.sh when DARWIN_SDK points at a MacOSX*.sdk; without
+  # them the interpreter still builds, just without getapi.
+  if [ -f "$UNITS_FFI/ffi.ppu" ] && [ -f "$FFI_LIBDIR/libffi.tbd" ]; then
+    FEATURES="$FEATURES -dDarwinFFI"
+    FU_EXTRA="$FU_EXTRA -Fu$UNITS_FFI -Fu$HERE/../../lib"
+    FL_EXTRA="$FL_EXTRA -Fl$FFI_LIBDIR"
+    echo "FFI enabled (getapi via libffi)."
+  else
+    echo "libffi units/stub not found - building WITHOUT FFI (getapi disabled on macOS)." >&2
+  fi
   if [ -f "$PCRE_LIB/libpcre.a" ]; then
     FEATURES="$FEATURES -dRegex"
     FL_EXTRA="$FL_EXTRA -Fl$PCRE_LIB"

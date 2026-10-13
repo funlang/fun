@@ -6,6 +6,21 @@
 
 ## [未发布]
 
+- macOS 的 Fun 层库适配（引擎 FFI + `-unx` 后端）。Darwin 上现在可用 `getapi`：
+  把 `-dLinuxFFI` 泛化为单一的 `UnixFFI` 符号（macOS 构建传 `-dDarwinFFI`），
+  `bootstrap-darwin-cross.sh` 为两个 darwin CPU 编译 FPC 自带的 `ffi` 单元，并从
+  `DARWIN_SDK` 拷入 `libffi.tbd` 链接桩，于是 `make-darwin.sh` 会链到
+  `/usr/lib/libffi.dylib`（已在两个 Mach-O 产物中确认）。Fun 层把**只差库名**
+  的后端改成 `lib-*-unx.fun`（Linux + macOS），`lib-*-lnx.fun` 保留为 `use` 薄包装：
+  os、cmdline、unicode、ado、ado-schema、xml、crypt、ajax、winsock、jsonrpc、orm-rpc。
+  `lib-host.fun` 新增 `IsMac()`/`IsUnix()` 与库名助手 `LibC()`（`libc.so.6` vs
+  `libSystem.B.dylib`）、`DyLib()`、`DyLibList()`。Darwin 专门修正：`.dylib`
+  库名、`GetProcName` 改用 `proc_pidpath`、256 字节的 `struct utsname` 布局、
+  Darwin 的 `sockaddr_in`（8 位 `sin_len`/`sin_family`）与套接字选项值、
+  `__error`（而非 glibc 的 `__errno_location`）、`addrinfo` 的 `ai_addr` 偏移。
+  `lib-zlib`、`lib-tcc` 补上 macOS 库名。仍为 Linux 专有：`lib-proc`（需
+  sysctl/libproc）与 `lib-asm`（JIT/可执行内存；Apple Silicon 需 `MAP_JIT`）。
+  本机无 macOS，运行时正确性未经验证；Linux 回归仍 91/91。
 - macOS (Darwin) 交叉编译。新增 `src/prj/fun/bootstrap-darwin-cross.sh`（在 Linux 上
   搭出 FPC 3.2.2 的 x86_64-darwin / aarch64-darwin 交叉工具链）与
   `src/prj/fun/make-darwin.sh`（产出 `fun/funcmd-darwin-<cpu>`）。Mach-O 的汇编与
@@ -13,8 +28,8 @@
   因此不需要 macOS SDK。引擎侧把只表示"非 Windows"的 `{$IfDef Linux}` 统一改为 FPC
   内建的 `UNIX`（Linux 行为不变，Darwin 也走同一分支），`'host'.arg()` 上报
   `os macos`，并让随仓库的 PCRE 外部声明在 Darwin 下加 `cdecl` 以生成 Mach-O 的
-  前导下划线。本次只是"能编能链"的里程碑：Fun 层 `-lnx` 库与 `getapi` 的 FFI 后端
-  尚未移植（见 `art/notes/macos-port.md`）。
+  前导下划线。该步只是"能编能链"的里程碑；Fun 层后端与 `getapi` 的 FFI 已在上面
+  那条完成（见 `art/notes/macos-port.md`）。
 - 手写汇编新增 AArch64 (ARM64) 后端。新增 `lib-asm-a64.fun` 及其指令表
   `asm-list-a64.fd`（仍走 `fun/lib/tools/make-asm-list.fun` 同一条构建链），
   输出定长、位域编码的 aarch64 指令：add/sub（立即数与移位寄存器）、逻辑

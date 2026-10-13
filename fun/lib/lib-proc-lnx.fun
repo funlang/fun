@@ -8,6 +8,10 @@
 // identical - `proc.ProcList(...)` / `proc.SearchMem(...)` - so Linux callers
 // `use 'lib-proc-lnx.fun'`.
 //
+// macOS is NOT supported: it has no /proc, and the equivalent needs sysctl
+// KERN_PROC + libproc (proc_pidinfo) plus a Mach-O/dyld image walk instead of
+// /proc/<pid>/maps. That is a separate port, so this backend stays -lnx.
+//
 // There is deliberately no shared base: the two backends have nothing in common
 // beyond the shape of their results, and a base would only add indirection.
 

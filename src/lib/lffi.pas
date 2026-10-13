@@ -19,12 +19,19 @@
 // SOFTWARE.
 unit lffi;
 
-// Linux FFI: load a native shared object and call an exported function by
-// signature, backed by libffi (FPC's bundled `ffi` unit). This is the Linux
+// Unix FFI: load a native shared object and call an exported function by
+// signature, backed by libffi (FPC's bundled `ffi` unit). This is the Unix
 // counterpart of the Windows winapi unit. winapi.pas stays Windows-only and is
-// isolated behind the WinAPI define; this unit is built only for Linux.
+// isolated behind the WinAPI define; this unit is built only for Unix hosts
+// (Linux with -dLinuxFFI, macOS with -dDarwinFFI), which the engine exposes as
+// the single UnixFFI symbol.
 
 interface
+
+// libffi is linked explicitly: FPC does not always surface the library name
+// recorded by the bundled ffi unit (its externals use a const, `external 'ffi'`),
+// and the darwin cross link needs -lffi against the seeded libffi.tbd stub.
+{$LINKLIB ffi}
 
 uses fun, base, core, host,
      dynlibs,
@@ -123,8 +130,15 @@ begin
   if libname <> '' then
   begin
     hlib := LoadLibrary(libname);
-    if (hlib = NilHandle) and (Pos('/', libname) = 0) and (Pos('.so', libname) = 0) then
-      hlib := LoadLibrary(libname + '.so'); // bare name, e.g. 'libc'
+    // bare name, e.g. 'libc': try the platform's shared-object suffix.
+    // Windows-style '.dll' is never appended here.
+    if (hlib = NilHandle) and (Pos('/', libname) = 0) and (Pos('.so', libname) = 0)
+       and (Pos('.dylib', libname) = 0) then
+      {$IfDef Darwin}
+      hlib := LoadLibrary(libname + '.dylib')
+      {$Else}
+      hlib := LoadLibrary(libname + '.so')
+      {$EndIf};
   end;
 
   hfun := nil;

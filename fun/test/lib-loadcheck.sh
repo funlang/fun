@@ -7,19 +7,22 @@
 # progress and to catch accidental load regressions in ported modules.
 #
 # Platform split convention: a Windows implementation keeps the plain module
-# name (so existing code is untouched) and the Linux one is <name>-lnx.fun.
-# On this host the -lnx sibling is what gets loaded for such a module.
+# name (so existing code is untouched) and the Unix one is <name>-unx.fun. The
+# old Linux name <name>-lnx.fun is kept as a thin wrapper (it just `use`s the
+# -unx file), so on Linux either name loads the same code.
 #
 # Usage: fun/test/lib-loadcheck.sh   (from the repo root)
 cd "$(dirname "$0")/../.." || exit 2
 ok=0; bad=0
 for f in fun/lib/*.fun; do
   n=$(basename "$f" .fun)
-  # skip backend units: <name>-lnx is the Linux implementation and
-  # lib-unicode-base / lib-winsock-base are the shared bases of a Windows/Linux
-  # split -- neither is a standalone stdlib module. (lib-base *is* a module.)
-  case "$n" in *-lnx|lib-unicode-base|lib-winsock-base) continue;; esac
+  # skip backend units: <name>-unx / <name>-lnx are the Unix implementation and
+  # its Linux alias, and lib-unicode-base / lib-winsock-base are the shared
+  # bases of a Windows/Unix split -- neither is a standalone stdlib module.
+  # (lib-base *is* a module.)
+  case "$n" in *-lnx|*-unx|lib-unicode-base|lib-winsock-base) continue;; esac
   t="$f"
+  if [ -f "fun/lib/${n}-unx.fun" ]; then t="fun/lib/${n}-unx.fun"; fi
   if [ -f "fun/lib/${n}-lnx.fun" ]; then t="fun/lib/${n}-lnx.fun"; fi
   printf "use '%s';\n?. 'loaded';\n" "$t" > fun/test/.loadcheck-one.fun
   out=$(src/prj/fun/funcmd fun/test/.loadcheck-one.fun 2>&1 | tr -d '\r')

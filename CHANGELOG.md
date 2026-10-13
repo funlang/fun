@@ -6,6 +6,24 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- macOS Fun-level library port (engine FFI + `-unx` backends). `getapi` now works
+  on Darwin: `-dLinuxFFI` is generalised to one `UnixFFI` symbol (macOS builds
+  pass `-dDarwinFFI`), `bootstrap-darwin-cross.sh` builds FPC's bundled `ffi`
+  unit for both darwin CPUs and seeds the `libffi.tbd` linker stub from
+  `DARWIN_SDK`, so `make-darwin.sh` links `/usr/lib/libffi.dylib` (verified in
+  both Mach-O binaries). On the Fun side, the backends that differed *only* by
+  library name became `lib-*-unx.fun` (Linux + macOS) with `lib-*-lnx.fun` kept
+  as thin `use` wrappers: os, cmdline, unicode, ado, ado-schema, xml, crypt,
+  ajax, winsock, jsonrpc and orm-rpc. `lib-host.fun` gained `IsMac()`/`IsUnix()`
+  and the library-name helpers `LibC()` (`libc.so.6` vs `libSystem.B.dylib`),
+  `DyLib()` and `DyLibList()`. Darwin-specific fixes: `.dylib` library names,
+  `proc_pidpath` for `GetProcName`, the 256-byte `struct utsname` layout, the
+  Darwin `sockaddr_in` (8-bit `sin_len`/`sin_family`) and socket-option values,
+  `__error` (not glibc's `__errno_location`) and the Darwin `addrinfo`
+  `ai_addr` offset. `lib-zlib` and `lib-tcc` gained macOS library names. Still
+  Linux-only: `lib-proc` (needs sysctl/libproc) and `lib-asm` (JIT / executable
+  memory; needs `MAP_JIT` on Apple Silicon). Runtime correctness on macOS is
+  unverified here (no macOS host); Linux regression stays 91/91.
 - macOS (Darwin) cross build. `src/prj/fun/bootstrap-darwin-cross.sh` assembles an
   FPC 3.2.2 cross toolchain (x86_64-darwin and aarch64-darwin) on Linux, and
   `src/prj/fun/make-darwin.sh` produces `fun/funcmd-darwin-<cpu>`. Mach-O assembly
@@ -14,9 +32,9 @@ This project records notable changes in the style of [Keep a Changelog](https://
   side the `{$IfDef Linux}` guards that only meant "not Windows" were generalised
   to FPC's built-in `UNIX` (identical on Linux, now also true on Darwin),
   `'host'.arg()` reports `os macos`, and the vendored PCRE externals take `cdecl`
-  on Darwin so the Mach-O leading underscore is emitted. This is a compile/link
-  milestone: the Fun-level `-lnx` libraries and the `getapi` FFI backend are not
-  ported yet (see `art/notes/macos-port.md`).
+  on Darwin so the Mach-O leading underscore is emitted. That step was a
+  compile/link milestone only; the Fun-level backends and the `getapi` FFI were
+  added in the entry above (see `art/notes/macos-port.md`).
 - Hand-written assembly gains an AArch64 (ARM64) backend. `lib-asm-a64.fun`,
   with its own table `asm-list-a64.fd` built by the same
   `fun/lib/tools/make-asm-list.fun` chain, emits the fixed-width,

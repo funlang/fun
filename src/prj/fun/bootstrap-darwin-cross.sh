@@ -17,6 +17,8 @@
 #     units/{x86_64,aarch64}-darwin/        RTL
 #     units-objpas/{...}/                   variants, dateutils
 #     units-hash/{...}/                     md5, sha1
+#     units-libffi/{...}/                   ffi (optional; needs DARWIN_SDK stub)
+#     libffi/libffi.tbd                     libffi linker stub (from DARWIN_SDK)
 #     pcre/{x86_64,aarch64}-darwin/libpcre.a
 #     zig/zig
 #
@@ -33,6 +35,10 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 ROOT="${DARWIN_FPC_ROOT:-$HOME/.fun/darwin-cross}"
 WORK="${WORK:-$HOME/.fun/darwin-cross-build}"
+# Optional: path to a MacOSX*.sdk (or just its usr/lib). Only used to seed the
+# libffi linker stubs (usr/lib/libffi.tbd + libffi-trampolines.tbd) so that
+# -dDarwinFFI (Fun getapi on macOS) can link. Zig ships libSystem only.
+DARWIN_SDK="${DARWIN_SDK:-}"
 JOBS="${JOBS:-2}"
 FPC_TAG="${FPC_TAG:-release_3_2_2}"
 FPC_VER="3.2.2"
@@ -139,6 +145,28 @@ for cpu in $CPUS; do
       || echo "warning: could not build $u for $cpu" >&2
   done
   cp -f "$TMPH"/*.ppu "$TMPH"/*.o "$ROOT/units-hash/$cpu-darwin/" 2>/dev/null || true
+
+  # --- libffi unit (for -dDarwinFFI: Fun getapi on macOS) ------------------
+  # FPC's ffi unit declares its externals as `external 'ffi'`, so linking the
+  # interpreter needs -lffi. Zig only ships a libSystem stub, so the libffi
+  # stubs are seeded from a MacOSX*.sdk when DARWIN_SDK points at one.
+  TMPF="$WORK/libffi-$cpu"; mkdir -p "$TMPF"
+  ( cd "$FPCSRC/packages/libffi/src" && PATH="$ASMTOOLS:$PATH" \
+      "$CROSS" ffi.pp -n -B -Tdarwin \
+        -Fu"$FPCSRC/rtl/units/$cpu-darwin" \
+        -FU"$TMPF" -FE"$TMPF" >/dev/null ) \
+    || echo "warning: could not build ffi for $cpu" >&2
+  mkdir -p "$ROOT/units-libffi/$cpu-darwin"
+  cp -f "$TMPF"/*.ppu "$TMPF"/*.o "$ROOT/units-libffi/$cpu-darwin/" 2>/dev/null || true
+
+  if [ -n "$DARWIN_SDK" ]; then
+    mkdir -p "$ROOT/libffi"
+    for t in libffi.tbd libffi-trampolines.tbd; do
+      src="$DARWIN_SDK/usr/lib/$t"
+      [ -f "$src" ] || src="$DARWIN_SDK/$t"
+      [ -f "$src" ] && cp -f "$src" "$ROOT/libffi/" && echo "libffi stub: $t"
+    done
+  fi
 
   # --- PCRE 8 (for -dRegex) ------------------------------------------------
   if [ -f "$PCRE_SRC/pcre_compile.c" ]; then
