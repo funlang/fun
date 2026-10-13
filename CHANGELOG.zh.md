@@ -6,6 +6,13 @@
 
 ## [未发布]
 
+- macOS 交叉编译产物缩小约 67%。FPC 的 Darwin 目标会向 ld64 传 `-dead_strip` 与
+  剥除（`-x`，来自 `-Xs`），但 `darwin/ld` shim 原先把两者都丢掉，而 Apple 单独的
+  `strip` 步骤在 Linux 上也跑不了——于是链出的 Mach-O 带着完整符号表
+  （__LINKEDIT 约 1.4 MB、3.8 万个符号）。现在 shim 把它们转给 lld
+  （`-Wl,-dead_strip`，剥除请求用 `-Wl,-s`），结果 `funcmd-darwin-x86_64`
+  2.62 MB -> 858 KB、`funcmd-darwin-aarch64` 2.69 MB -> 939 KB，arm64 的
+  ad-hoc 签名依然有效。
 - macOS 的 Fun 层库适配（引擎 FFI + `-unx` 后端）。Darwin 上现在可用 `getapi`：
   把 `-dLinuxFFI` 泛化为单一的 `UnixFFI` 符号（macOS 构建传 `-dDarwinFFI`），
   `bootstrap-darwin-cross.sh` 为两个 darwin CPU 编译 FPC 自带的 `ffi` 单元，并从

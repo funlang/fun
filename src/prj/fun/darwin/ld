@@ -13,8 +13,11 @@
 #   -filelist <f>                 -> inlined: each line is an object/archive path
 #   -o <out>                      -> passthrough
 #   *.o *.a -l<lib> -L<dir> -F<dir> -framework <f>   -> passthrough
-#   -syslibroot, -multiply_defined, -macosx_version_min, -order_file, -map,
-#   -static, -dead_strip, -no_dead_strip_inits_and_terms, -x, -no_new_main
+#   -dead_strip                   -> -Wl,-dead_strip (lld/ld64 dead-code stripping)
+#   -x                            -> -Wl,-s (FPC's -Xs strip request; Apple's strip
+#                                    tool is absent, so strip all at link time)
+#   -syslibroot, -multiply_defined, -macosx_version_min, -map, -order_file,
+#   -static, -no_dead_strip_inits_and_terms, -no_new_main
 #                                 -> dropped (zig picks its own SDK/flags)
 #
 # Zig must be on $ZIG (make-darwin.sh exports it).
@@ -40,7 +43,12 @@ while [ $# -gt 0 ]; do
     -macosx_version_min|-iphoneos_version_min) shift ;;
     -framework) libs="$libs -framework $2"; shift ;;
     -F*|-L*|-l*) libs="$libs $1" ;;
-    -static|-x|-dead_strip|-no_dead_strip_inits_and_terms|-no_new_main) ;;
+    # FPC drives ld64 with -dead_strip + -x (strip). lld honours both; -x is
+    # mapped to a full strip (-s) because Apple's separate `strip` step cannot
+    # run in a cross build, and without it the symbol table alone is ~1 MB.
+    -dead_strip) libs="$libs -Wl,-dead_strip" ;;
+    -x)          libs="$libs -Wl,-s" ;;
+    -static|-no_dead_strip_inits_and_terms|-no_new_main) ;;
     -map|-order_file) shift ;;
     -*) ;;
     *) objs="$objs $1" ;;

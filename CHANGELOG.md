@@ -6,6 +6,14 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- macOS cross-build binaries shrink ~67%. FPC's Darwin target asks ld64 to
+  `-dead_strip` and to strip (`-x`, from `-Xs`), but the `darwin/ld` shim used to
+  drop both, and Apple's separate `strip` step cannot run on Linux either - so
+  the linked Mach-O kept a full symbol table (__LINKEDIT ~1.4 MB, 38k symbols).
+  The shim now forwards them to lld (`-Wl,-dead_strip`, and `-Wl,-s` for the
+  strip request), giving `funcmd-darwin-x86_64` 2.62 MB -> 858 KB and
+  `funcmd-darwin-aarch64` 2.69 MB -> 939 KB, with the arm64 ad-hoc signature
+  still valid.
 - macOS Fun-level library port (engine FFI + `-unx` backends). `getapi` now works
   on Darwin: `-dLinuxFFI` is generalised to one `UnixFFI` symbol (macOS builds
   pass `-dDarwinFFI`), `bootstrap-darwin-cross.sh` builds FPC's bundled `ffi`
