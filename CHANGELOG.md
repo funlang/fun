@@ -6,6 +6,17 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- macOS (Darwin) cross build. `src/prj/fun/bootstrap-darwin-cross.sh` assembles an
+  FPC 3.2.2 cross toolchain (x86_64-darwin and aarch64-darwin) on Linux, and
+  `src/prj/fun/make-darwin.sh` produces `fun/funcmd-darwin-<cpu>`. Mach-O assembly
+  and linking go through two shims (`src/prj/fun/darwin/{clang,ld}`) over the
+  clang/lld bundled with Zig 0.13, so no macOS SDK is required. On the engine
+  side the `{$IfDef Linux}` guards that only meant "not Windows" were generalised
+  to FPC's built-in `UNIX` (identical on Linux, now also true on Darwin),
+  `'host'.arg()` reports `os macos`, and the vendored PCRE externals take `cdecl`
+  on Darwin so the Mach-O leading underscore is emitted. This is a compile/link
+  milestone: the Fun-level `-lnx` libraries and the `getapi` FFI backend are not
+  ported yet (see `art/notes/macos-port.md`).
 - Hand-written assembly gains an AArch64 (ARM64) backend. `lib-asm-a64.fun`,
   with its own table `asm-list-a64.fd` built by the same
   `fun/lib/tools/make-asm-list.fun` chain, emits the fixed-width,

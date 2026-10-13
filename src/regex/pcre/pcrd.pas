@@ -12,7 +12,7 @@ type
 
 {$WEAKPACKAGEUNIT ON}
 
-//{$IfNDef Linux}
+//{$IfNDef UNIX}
 {$DEFINE PCRE_STATICLINK}
 //{$EndIf}
 
@@ -537,7 +537,7 @@ uses
 
 {$IFDEF PCRE_STATICLINK}
 
-{$IfNDef Linux}
+{$IfNDef UNIX}
 // make the linker happy with PCRE 8.00
 procedure _pcre_find_bracket; external;
 
@@ -576,27 +576,27 @@ var
   pcre_stack_free_user: pcre_stack_free_callback;
   pcre_callout_user: pcre_callout_callback;
 
-function pcre_compile; external;
-function pcre_compile2; external;
-function pcre_config; external;
-function pcre_copy_named_substring; external;
-function pcre_copy_substring; external;
-function pcre_dfa_exec; external;
-function pcre_exec; external;
-procedure pcre_free_substring; external;
-procedure pcre_free_substring_list; external;
-function pcre_fullinfo; external;
-function pcre_get_named_substring; external;
-function pcre_get_stringnumber; external;
-function pcre_get_stringtable_entries; external;
-function pcre_get_substring; external;
-function pcre_get_substring_list; external;
-function pcre_maketables; external;
-function pcre_refcount; external;
-function pcre_study; external;
-function pcre_version; external;
+function pcre_compile; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_compile2; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_config; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_copy_named_substring; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_copy_substring; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_dfa_exec; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_exec; {$IfDef Darwin}cdecl;{$EndIf} external;
+procedure pcre_free_substring; {$IfDef Darwin}cdecl;{$EndIf} external;
+procedure pcre_free_substring_list; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_fullinfo; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_get_named_substring; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_get_stringnumber; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_get_stringtable_entries; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_get_substring; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_get_substring_list; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_maketables; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_refcount; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_study; {$IfDef Darwin}cdecl;{$EndIf} external;
+function pcre_version; {$IfDef Darwin}cdecl;{$EndIf} external;
 
-{$IfNDef Linux}
+{$IfNDef UNIX}
 procedure __llmul;
 asm
   JMP System.__llmul
@@ -620,7 +620,7 @@ function _strncmp(s1: PAnsiChar; s2: PAnsiChar; n: size_t): Integer; cdecl; exte
 function _strlen(s: PAnsiChar): size_t; cdecl; external szMSVCRT name 'strlen';
 function _isdigit(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isdigit';
 }
-{$IfNDef Linux}
+{$IfNDef UNIX}
 {$I 'pcrd_c.inc'}
 
 function __ltolower(__ch: Integer): Integer; cdecl; external szMSVCRT name 'tolower';

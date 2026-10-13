@@ -35,7 +35,11 @@ implementation
 
 {$IfDef Unicode}{$WARN WIDECHAR_REDUCED OFF}{$EndIf}
 
-uses SysUtils, Variants, {$IfNDef Linux}Windows,{$Else}Linux, unixtype, baseunix, termio,{$EndIf}
+uses SysUtils, Variants,
+     {$IfNDef UNIX}Windows,{$Else}
+       {$IfDef Linux}Linux,{$EndIf}
+       unixtype, baseunix, termio,
+     {$EndIf}
      io, parse
      {$IfDef WinCOM}  , winole  {$EndIf}
      {$IfDef WinAPI}  , winapi  {$EndIf}
@@ -43,6 +47,15 @@ uses SysUtils, Variants, {$IfNDef Linux}Windows,{$Else}Linux, unixtype, baseunix
      {$IfDef Regex}   , regex   {$EndIf}
      ;
 type PValue = base.PValue;
+
+// macOS has clock_gettime(2) since 10.12, but FPC exposes it only through the
+// Linux unit. Declare it here so the monotonic-clock probes below work on
+// Darwin too (CLOCK_MONOTONIC == 6 there).
+{$IfDef Darwin}
+const
+  CLOCK_MONOTONIC = 6;
+function clock_gettime(clk_id: LongInt; tp: Pointer): LongInt; cdecl; external name 'clock_gettime';
+{$EndIf}
 
 //==============================================================
 // 'I am'.@uthor()
@@ -92,6 +105,9 @@ begin
   {$IfDef WinCE}
   result := 'wince';
   {$Else}
+  {$IfDef Darwin}
+  result := 'macos';
+  {$Else}
   {$IfDef Linux}
   result := 'linux';
   {$Else}
@@ -111,7 +127,7 @@ begin
   result := 'windows';
   {$Else}
   result := 'unknown';
-  {$EndIf}{$EndIf}{$EndIf}{$EndIf}{$EndIf}{$EndIf}{$EndIf}
+  {$EndIf}{$EndIf}{$EndIf}{$EndIf}{$EndIf}{$EndIf}{$EndIf}{$EndIf}
 end;
 
 function _hostCompiler: fun.str;
@@ -571,7 +587,7 @@ var
   e: CExp;
   t: fun.time;
   i64: fun.int64;
-  {$IfDef Linux}
+  {$IfDef UNIX}
   ts: timespec;
   {$EndIf}
 begin
@@ -584,7 +600,7 @@ begin
       val^ := funVersion // from core/fun.pas: one source for both probes
     else if i < 0 then
     begin
-    {$IfNDef Linux}
+    {$IfNDef UNIX}
       if i = -1 then QueryPerformanceFrequency(i64)
                 else QueryPerformanceCounter  (i64);
     {$Else}
@@ -690,7 +706,7 @@ end;
 
 // One byte from standard input. raw = true asks the terminal for a single
 // keypress (no echo, no Enter). Returns false at end of input.
-{$IfDef Linux}
+{$IfDef UNIX}
 function _inputCh(var c: fun.str; raw: fun.bool): fun.bool;
 var
   t0, t1: termios;
@@ -718,7 +734,7 @@ var
   prompt, s: fun.str;
   has: fun.bool;
   e: CExp;
-{$IfDef Linux}
+{$IfDef UNIX}
   mode, c: fun.str;
 {$EndIf}
 begin
@@ -730,7 +746,7 @@ begin
   has := false;
   s   := '';
 
-{$IfDef Linux}
+{$IfDef UNIX}
   mode := LowerCase(exp.asStr);
   if mode = 'all' then
   begin

@@ -108,12 +108,12 @@ type
 
 implementation
 
-uses SysUtils, {$IfNDef Linux}Windows, {$ENDIF}
+uses SysUtils, {$IfNDef UNIX}Windows, {$ENDIF}
      pcrd;
 
 function FirstCap(const S: string): string;
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
   if S = '' then Result := ''
   else begin
     Result := AnsiLowerCase(S);
@@ -131,7 +131,7 @@ var
   I: Integer;
   Up: Boolean;
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
   Result := AnsiLowerCase(S);
   Up := True;
 {$IFDEF UNICODE}

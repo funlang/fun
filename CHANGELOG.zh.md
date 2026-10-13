@@ -6,6 +6,15 @@
 
 ## [未发布]
 
+- macOS (Darwin) 交叉编译。新增 `src/prj/fun/bootstrap-darwin-cross.sh`（在 Linux 上
+  搭出 FPC 3.2.2 的 x86_64-darwin / aarch64-darwin 交叉工具链）与
+  `src/prj/fun/make-darwin.sh`（产出 `fun/funcmd-darwin-<cpu>`）。Mach-O 的汇编与
+  链接经 `src/prj/fun/darwin/{clang,ld}` 两个 shim 转交 Zig 0.13 自带的 clang/lld，
+  因此不需要 macOS SDK。引擎侧把只表示"非 Windows"的 `{$IfDef Linux}` 统一改为 FPC
+  内建的 `UNIX`（Linux 行为不变，Darwin 也走同一分支），`'host'.arg()` 上报
+  `os macos`，并让随仓库的 PCRE 外部声明在 Darwin 下加 `cdecl` 以生成 Mach-O 的
+  前导下划线。本次只是"能编能链"的里程碑：Fun 层 `-lnx` 库与 `getapi` 的 FFI 后端
+  尚未移植（见 `art/notes/macos-port.md`）。
 - 手写汇编新增 AArch64 (ARM64) 后端。新增 `lib-asm-a64.fun` 及其指令表
   `asm-list-a64.fd`（仍走 `fun/lib/tools/make-asm-list.fun` 同一条构建链），
   输出定长、位域编码的 aarch64 指令：add/sub（立即数与移位寄存器）、逻辑

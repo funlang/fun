@@ -12,7 +12,7 @@
 // from the caller is copied into a local array first.
 //
 // Windows is unaffected: it keeps the advapi32 implementation in libmd5.inc,
-// and this unit is only pulled in under {$IfDef MD5}{$IfDef Linux}.
+// and this unit is only pulled in under {$IfDef MD5}{$IfDef UNIX}.
 
 unit funhash;
 

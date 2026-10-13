@@ -72,8 +72,8 @@ const
 
 implementation
 
-uses {$IfNDef Linux}Windows,{$Else}DateUtils,{$EndIf}
-     {$IfDef MD5}{$IfDef Linux}funhash,{$EndIf}{$EndIf}
+uses {$IfNDef UNIX}Windows,{$Else}DateUtils,{$EndIf}
+     {$IfDef MD5}{$IfDef UNIX}funhash,{$EndIf}{$EndIf}
      SysUtils;
 
 {$IfDef WinCE}
@@ -122,7 +122,7 @@ class procedure CIO.Check(err: fun.int; const msg: fun.str = '');
 begin
   if err < 0 then
   begin
-  {$IfNDef Linux}
+  {$IfNDef UNIX}
     raise EBase.Create(msg + SysErrorMessage(GetLastError));
   {$Else}
     raise EBase.Create(msg + SysErrorMessage(GetLastOSError));
@@ -136,7 +136,7 @@ begin
 end;
 
 class procedure CIO.Copy(f1, f2: fun.str; overwrite: fun.bool = true);
-{$IfDef Linux}
+{$IfDef UNIX}
 var
   fin, fout: fun.int;
   buf: array[0..65535] of byte;
@@ -145,7 +145,7 @@ var
 begin
   f1 := Norm(f1);
   f2 := Norm(f2);
-  {$IfNDef Linux}
+  {$IfNDef UNIX}
   CopyFile(PChar(f1), PChar(f2), not overwrite);
   {$Else}
   if (not overwrite) and FileExists(f2) then
@@ -199,7 +199,7 @@ var
               _act(f2, tag, sz);
             end
             else
-              {$IfDef Linux}
+              {$IfDef UNIX}
 _find(_fp + sr.Name + '/')
 {$Else}
 _find(_fp + sr.Name + '\')
@@ -373,7 +373,7 @@ begin
   else
   begin
     DeleteFile(f1);
-  {$IfNDef Linux}
+  {$IfNDef UNIX}
     RemoveDirectory(PChar(f1));
   {$Else}
     // DeleteFile above handles plain files; RemoveDir drops an empty directory.
@@ -384,7 +384,7 @@ end;
 
 class function CIO.Norm(const fn: fun.str): fun.str;
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
   result := fn;
 {$Else}
   result := StringReplace(fn, '\', '/', [rfReplaceAll]);
@@ -420,7 +420,7 @@ begin
   
   if result < 0 then
   begin
-  {$IfNDef Linux}
+  {$IfNDef UNIX}
     raise EBase.Create(Format(err, [ExpandFileName(fn), SysErrorMessage(GetLastError)]));
   {$Else}
     raise EBase.Create(Format(err, [ExpandFileName(fn), SysErrorMessage(GetLastOSError)]));
@@ -441,7 +441,7 @@ var
   s: AnsiString;
   
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
   h := Open(StringReplace(fn, '/', '\', [rfReplaceAll]), true);
 {$Else}
   h := Open(fn, true);
@@ -455,7 +455,7 @@ begin
     else
     begin
       FileSeek(h, 0, Seek_Begin);
-      {$IfNDef Linux}
+      {$IfNDef UNIX}
       SetEndOfFile(h);
       {$Else}
       FileTruncate(h, 0);
@@ -555,7 +555,7 @@ end;
 class function CIO.Time(fn: fun.str; flag: fun.byte = 0; dt: fun.time = 0): fun.time;
 var
   Handle: THandle;
-  {$IfNDef Linux}
+  {$IfNDef UNIX}
   FindData: TWin32FindData;
   SystemTime: TSystemTime;
   ft: TFileTime;
@@ -571,7 +571,7 @@ begin
   //  1 - LastWriteTime
   //  8 - Size
   result := 0.0;
-  {$IfNDef Linux}
+  {$IfNDef UNIX}
   Handle := FindFirstFile(PChar(fn), FindData);
   if Handle <> INVALID_HANDLE_VALUE then
   begin
@@ -644,7 +644,7 @@ end;
 //==============================================================
 function LoadLib(const fn: fun.str): fun.uint;
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
   result := LoadLibrary(PChar(fn));
   if result = 0 then CIO.Check(-1, 'LoadLibrary(' + fn + '): ');
 {$EndIf}
@@ -652,14 +652,14 @@ end;
 
 procedure FreeLib(const h: fun.uint);
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
   FreeLibrary(h);
 {$EndIf}
 end;
 
 function GetProc(hlib: fun.uint; const name: fun.str): fun.ptr;
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
   result := GetProcAddress(hlib, PChar(name));
   if result = nil then
   begin

@@ -34,7 +34,7 @@ library funcmd;
 //{$APPTYPE CONSOLE}
 
 uses
-{$IfDef Linux}{$IfNDef FunDll}
+{$IfDef UNIX}{$IfNDef FunDll}
 {$IfDef UseCThreads}
   // Thread-safe FPC heap. Only needed when a C library invokes a @toCallback
   // closure from a pthread it created itself, i.e. when Fun evaluates on a
@@ -50,7 +50,7 @@ uses
   base in '..\..\core\base.pas',
   core in '..\..\core\core.pas',
   flow in '..\..\core\flow.pas',
-{$IfNDef Linux}
+{$IfNDef UNIX}
   atom in '..\..\core\atom.pas',
 {$EndIf}
   calc in '..\..\core\calc.pas',
@@ -73,7 +73,7 @@ uses
   ie in '..\..\lib\ui\ie.pas',
   ui in '..\..\lib\ui\ui.pas',
 {$EndIf}
-  {$IfDef MD5}{$IfDef Linux}
+  {$IfDef MD5}{$IfDef UNIX}
   funhash in '..\..\lib\funhash.pas',
   {$EndIf}{$EndIf}
   host in '..\..\lib\host.pas',

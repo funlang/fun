@@ -1,0 +1,20 @@
+#!/bin/sh
+# ============================================================
+# clang shim: the darwin assembler driver for the macOS cross build.
+#
+# Free Pascal's Darwin target assembles through clang
+#   clang -x assembler -c -target x86_64-apple-macosx10.x -o out.o in.s
+# Apple's clang is not available when cross-compiling from Linux, so this shim
+# rewrites the Apple triple into one the bundled Zig toolchain accepts
+# (x86_64-macos / aarch64-macos) and hands the assembly to `zig cc`.
+#
+# Zig must be on $ZIG (make-darwin.sh exports it). ZIG_ARG lets the caller pin
+# the binary from a variable without exporting it.
+# ============================================================
+ZIG="${ZIG:-${ZIG_ARG:-zig}}"
+
+newargs=$(printf '%s\n' "$@" | sed -E \
+  -e 's/^([a-z0-9_]+)-apple-(macosx|macos|darwin)[0-9.]*$/\1-macos/' \
+  -e 's/^arm64-(macos)$/aarch64-\1/')
+# shellcheck disable=SC2086
+exec "$ZIG" cc $newargs

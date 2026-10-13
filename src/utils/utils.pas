@@ -42,7 +42,11 @@ procedure WriteErr(const s: fun.str);
 implementation
 
 uses SysUtils
-     {$IfNDef Linux}, Windows{$Else}, Linux, unixtype{$EndIf}
+     {$IfNDef UNIX}, Windows{$Else}
+       {$IfDef Linux}, Linux{$EndIf}
+       , unixtype
+       {$IfDef Darwin}, unix{$EndIf}
+     {$EndIf}
      , io
      ;
 
@@ -50,7 +54,7 @@ uses SysUtils
 // '/switch', so the prefix set keeps '/' there; on Linux (and other Unixes)
 // '/' starts an absolute path, and treating it as a switch would silently
 // drop path arguments such as '/etc/x'. Isolated by a compile-time condition.
-{$IfDef Linux}
+{$IfDef UNIX}
 const
   SwitchPrefix: set of AnsiChar = ['-'];
 {$Else}
@@ -68,19 +72,31 @@ var
   tick: fun.uint;
 
 function GetTickCount: fun.uint;
-{$IfDef Linux}
+{$IfDef UNIX}
 var
+  {$IfDef Darwin}
+  tv: timeval;
+  {$Else}
   ts: timespec;
+  {$EndIf}
 {$EndIf}
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
   result := Windows.GetTickCount;
 {$Else}
+  {$IfDef Darwin}
+  // macOS has clock_gettime only since 10.12; gettimeofday is always present.
+  if fpgettimeofday(@tv, nil) = 0 then
+    result := fun.uint(int64(tv.tv_sec) * 1000 + tv.tv_usec div 1000)
+  else
+    result := 0;
+  {$Else}
   // Monotonic clock in ms; modular (uint32) wraparound mirrors GetTickCount.
   if clock_gettime(CLOCK_MONOTONIC, @ts) = 0 then
     result := fun.uint(int64(ts.tv_sec) * 1000 + ts.tv_nsec div 1000000)
   else
     result := 0;
+  {$EndIf}
 {$EndIf}
 end;
 
@@ -152,7 +168,7 @@ begin
 end;
 
 //==============================================================
-{$IfNDef Linux}
+{$IfNDef UNIX}
 {$IfNDef WinCE}
 //function AttachConsole(dwProcessId: fun.int): fun.int; stdcall;
 //         external kernel32 name 'AttachConsole';
@@ -163,7 +179,7 @@ var  AttachConsole: AttachConsoleProc;
 
 function FindCmdLine: fun.bool;
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
 {$IfNDef WinCE}
   try
     AttachConsole := GetProc(LoadLib(kernel32), 'AttachConsole');
@@ -181,7 +197,7 @@ end;
 
 procedure FreeCmdLine;
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
 {$IfNDef WinCE}
   FreeConsole;
   // Press Enter Key
@@ -192,7 +208,7 @@ end;
 
 function SetStdOut(const fn: fun.str): fun.int;
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
   result := FileCreate(fn);
 {$IfNDef WinCE}
   SetStdHandle(STD_OUTPUT_HANDLE, result);
@@ -203,7 +219,7 @@ begin
 end;
 
 procedure WriteErr(const s: fun.str);
-{$IfDef Linux}
+{$IfDef UNIX}
 begin
   if s <> '' then
   begin

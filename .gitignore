@@ -77,6 +77,11 @@ src/parse/bnf/yacc.lst
 # fun/*.exe
 # fun/*.dll
 
+# macOS cross-build outputs (make-darwin.sh) and its scratch tools dir
+fun/funcmd-darwin-*
+src/prj/fun/.darwin-tools/
+src/prj/fun/libtcc.dylib
+
 # Vendored PCRE C source uploaded under src/3rd (build from source; not tracked)
 src/3rd/pcre-8/
 

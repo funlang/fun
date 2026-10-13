@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-{$IfDef Linux}
+{$IfDef UNIX}
 // Portable MD5/SHA1 from FPC's bundled hash units. The Windows branch below
 // wraps advapi32.dll (MD5Init/A_SHAInit), which does not exist on Linux, so
 // the shared library could not even be linked there. Linux-only: Windows keeps

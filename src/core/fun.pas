@@ -90,14 +90,14 @@ var defaultCodePage: int = 0;
 
 implementation
 
-uses Variants, {$IfNDef Linux}Windows,{$EndIf} Math,
+uses Variants, {$IfNDef UNIX}Windows,{$EndIf} Math,
      base{$IfNDef Alone}, core{$EndIf}
      {$IfDef Regex}, regex{$EndIf}
      ;
 
 
 function StrToOleStr(const s: str): PWideChar;
-{$IfDef Linux}
+{$IfDef UNIX}
 begin
   result := PWideChar(s);
 {$Else}

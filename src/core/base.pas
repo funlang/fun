@@ -196,7 +196,7 @@ var
   yy, mm, dd, hh, nn, ss: fun.int;
   t: fun.time;
 begin
-{$IfNDef Linux}
+{$IfNDef UNIX}
   result := VarToDateTime(s);
 {$Else}
   yy := 0; mm := 0; dd := 0;

@@ -1,0 +1,53 @@
+#!/bin/sh
+# ============================================================
+# ld shim: the darwin linker driver for the macOS cross build.
+#
+# Free Pascal's Darwin target drives Apple's ld64 with a pile of ld64-specific
+# flags. Apple's linker and SDK are not available when cross-compiling from
+# Linux, so this shim translates the usable subset into a `zig cc` invocation
+# (Zig bundles lld's Mach-O linker plus a libSystem stub, which is enough for a
+# console interpreter that only needs libc).
+#
+# Handled:
+#   -arch x86_64|arm64|aarch64    -> choose the zig target
+#   -filelist <f>                 -> inlined: each line is an object/archive path
+#   -o <out>                      -> passthrough
+#   *.o *.a -l<lib> -L<dir> -F<dir> -framework <f>   -> passthrough
+#   -syslibroot, -multiply_defined, -macosx_version_min, -order_file, -map,
+#   -static, -dead_strip, -no_dead_strip_inits_and_terms, -x, -no_new_main
+#                                 -> dropped (zig picks its own SDK/flags)
+#
+# Zig must be on $ZIG (make-darwin.sh exports it).
+# ============================================================
+set -eu
+ZIG="${ZIG:-${ZIG_ARG:-zig}}"
+
+arch=x86_64
+objs=""
+libs=""
+out=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -arch) shift; case "$1" in
+             arm64|aarch64) arch=aarch64 ;;
+             *) arch=x86_64 ;;
+           esac ;;
+    -o) shift; out="$1" ;;
+    -filelist) shift; f="$1"
+        objs="$objs $(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$f" | grep -v '^$' | tr '\n' ' ')" ;;
+    -syslibroot) shift ;;
+    -multiply_defined) shift ;;
+    -macosx_version_min|-iphoneos_version_min) shift ;;
+    -framework) libs="$libs -framework $2"; shift ;;
+    -F*|-L*|-l*) libs="$libs $1" ;;
+    -static|-x|-dead_strip|-no_dead_strip_inits_and_terms|-no_new_main) ;;
+    -map|-order_file) shift ;;
+    -*) ;;
+    *) objs="$objs $1" ;;
+  esac
+  shift || true
+done
+
+[ -n "$out" ] || { echo "darwin ld shim: no -o given" >&2; exit 1; }
+# shellcheck disable=SC2086
+exec "$ZIG" cc -target "${arch}-macos" -o "$out" $objs $libs
