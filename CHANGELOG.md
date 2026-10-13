@@ -14,10 +14,10 @@ This project records notable changes in the style of [Keep a Changelog](https://
   linking go through `src/prj/fun/linux-aarch64/{as,ld}` (Zig clang/lld), so no
   aarch64 binutils or glibc is required. Not enabled yet: `-dRegex` (needs a
   libc) and `getapi`/`-dLinuxFFI` (needs an aarch64 libffi).
-- Interpreter CLI: running with no script file now prints a short hint plus the
-  usage and exits 0. Previously it tried to run the executable itself as a script,
-  which only reported `syntax error[ELF]` from the ELF/PE/Mach-O header and exited
-  1. A named-but-missing script is still a non-zero error, and the
+- Interpreter CLI: running with no script file now prints the usage and exits
+  0. Previously it tried to run the executable itself as a script, which only
+  reported `syntax error[ELF]` from the ELF/PE/Mach-O header and exited 1. A
+  named-but-missing script is still a non-zero error, and the
   `<exe>.fun`-next-to-the-binary fallback still runs. The usage line now prints
   `fun` instead of `fun.exe` on non-Windows hosts.
 - macOS cross-build binaries shrink ~67%. FPC's Darwin target asks ld64 to

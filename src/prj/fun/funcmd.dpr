@@ -313,13 +313,10 @@ begin
 
 _Error:
     // A named-but-missing script file is an error (non-zero exit); no argument
-    // at all is a help request: print a short hint and exit 0. (Running with no
+    // at all is a help request: print the usage and exit 0. (Running with no
     // file used to try the executable itself as a script, which only produced a
-    // syntax error from its ELF/PE/Mach-O header and no hint.)
-    if fnGiven = '' then
-      Println('No script file given.')
-    else
-      hadError := true;
+    // syntax error from its ELF/PE/Mach-O header.)
+    if fnGiven <> '' then hadError := true;
     if not v then PrintVer();
     goto _Exit;
   end;
