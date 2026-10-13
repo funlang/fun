@@ -159,11 +159,16 @@ begin
 end;
 
 procedure PrintVer();
+{$IfDef UNIX}
+const exeName = 'fun';
+{$Else}
+const exeName = 'fun.exe';
+{$EndIf}
 begin
   Println('');
   Println('Fun ' + funRelease + ', Copyright (c) 2026, https://funlang.org');
   Println('Usage:');
-  Println('  fun.exe [-fun:]<file.fun or .foo/.fxx> [-key:<key.ini>] [-log[:<log.txt>]] [-gui] [-v]');
+  Println('  ' + exeName + ' [-fun:]<file.fun or .foo/.fxx> [-key:<key.ini>] [-log[:<log.txt>]] [-gui] [-v]');
   Println('');
 end;
 
@@ -295,28 +300,27 @@ begin
   p   := nil;
   f   := FindParam('fun', 1);
   fnGiven := f;
-  // A named-but-missing script is a user error: do not fall through to the
-  // executable's embedded-script / <exe>.fun fallback (which parses the binary
-  // as a script and exits 0). That fallback is only for the no-argument case.
+  // A named-but-missing script is a user error (non-zero exit).
   if (f <> '') and not FileExists(f) then goto _Error;
   if (f = '') or not FileExists(f) then
   begin
-    try
-      p := CFunParser.ParseOrLoad(ParamStr(0));
-    except
+    // No script argument: a shipped app sits next to its own "<exe>.fun".
+    if FileExists(ChangeFileExt(ParamStr(0), '.fun')) then
+    begin
+      f := ChangeFileExt(ParamStr(0), '.fun');
+      goto _Run;
     end;
-    if p <> nil then goto _Run;
-    
-    f := ParamStr(0);
-    if FileExists(ChangeFileExt(f, '.fun')) then f := ChangeFileExt(f, '.fun')
-    else goto _Error;
-    goto _Run;
-    
+
 _Error:
     // A named-but-missing script file is an error (non-zero exit); no argument
-    // at all is a help request, which stays 0.
-    hadError := fnGiven <> '';
-    PrintVer();
+    // at all is a help request: print a short hint and exit 0. (Running with no
+    // file used to try the executable itself as a script, which only produced a
+    // syntax error from its ELF/PE/Mach-O header and no hint.)
+    if fnGiven = '' then
+      Println('No script file given.')
+    else
+      hadError := true;
+    if not v then PrintVer();
     goto _Exit;
   end;
 

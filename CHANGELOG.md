@@ -6,6 +6,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Interpreter CLI: running with no script file now prints a short hint plus the
+  usage and exits 0. Previously it tried to run the executable itself as a script,
+  which only reported `syntax error[ELF]` from the ELF/PE/Mach-O header and exited
+  1. A named-but-missing script is still a non-zero error, and the
+  `<exe>.fun`-next-to-the-binary fallback still runs. The usage line now prints
+  `fun` instead of `fun.exe` on non-Windows hosts.
 - macOS cross-build binaries shrink ~67%. FPC's Darwin target asks ld64 to
   `-dead_strip` and to strip (`-x`, from `-Xs`), but the `darwin/ld` shim used to
   drop both, and Apple's separate `strip` step cannot run on Linux either - so
