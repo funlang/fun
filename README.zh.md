@@ -296,20 +296,44 @@ fun/
 
 Fun 核心为 Pascal，源码入口为 `src/prj/fun/funcmd.dpr`。
 
-工具链路径集中在一个文件里：[`src/prj/fun/setenv.bat`](src/prj/fun/setenv.bat)。只需修改一次，指向你安装的 Delphi / Free Pascal；或在构建前预先设置 `FPC`、`DELPHI2006`、`DELPHI2009` 环境变量——每个 `make-*.bat` 脚本都会调用它并读取这些路径。支持的工具链：
+Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/fun/setenv.bat`](src/prj/fun/setenv.bat)。只需修改一次，指向你安装的 Delphi / Free Pascal；或在构建前预先设置 `FPC`、`DELPHI2006`、`DELPHI2009` 环境变量——每个 `make-*.bat` 脚本都会调用它并读取这些路径。
 
-| 目标                | 脚本                                   | 工具链        |
-| ------------------- | -------------------------------------- | ------------- |
-| Windows 32 位       | `src/prj/fun/make-2006.bat` / `-2009.bat` | Delphi 2006 / 2009 |
-| Linux（i386）       | `make-linux.bat`                       | FPC 2.4.0     |
-| Linux x86_64（原生） | `src/prj/fun/make-linux-x86_64.sh`     | FPC（本机）+ gcc |
-| Linux / ARM         | `make-arm-linux.bat`                   | FPC 交叉      |
-| Windows 64 位       | `make-win64.bat`                       | FPC 交叉      |
-| Windows CE / ARM    | `make-wince.bat`                       | FPC 交叉      |
+每个脚本名为 `<工具链>-<目标>`；**构建机**指脚本运行所在的机器，交叉编译各行与目标并不相同：
+
+| 目标                   | 构建机       | 脚本                                     | 工具链             |
+| ---------------------- | ------------ | ---------------------------------------- | ------------------ |
+| Windows 32 位          | Windows      | `src/prj/fun/make-2006.bat` / `-2009.bat` | Delphi 2006 / 2009 |
+| Windows 64 位          | Windows      | `make-win64.bat`                         | FPC 交叉           |
+| Windows CE / ARM       | Windows      | `make-wince.bat`                         | FPC 交叉           |
+| Linux（i386）          | Windows      | `make-linux.bat`                         | FPC 2.4.0 交叉     |
+| Linux / ARM            | Windows      | `make-arm-linux.bat`                     | FPC 交叉           |
+| Linux x86_64（原生）   | Linux x86_64 | `src/prj/fun/make-linux-x86_64.sh`      | FPC（本机）+ gcc   |
+| Linux aarch64（arm64） | Linux x86_64 | `src/prj/fun/make-linux-aarch64.sh`     | FPC 交叉 + Zig     |
+| macOS x86_64 / aarch64 | Linux x86_64 | `src/prj/fun/make-darwin.sh`            | FPC 交叉 + Zig     |
 
 以 `-DFunDll` 编译可生成嵌入运行时 `fun.dll`，导出 `Run` 接口。构建产物已由 `.gitignore` 覆盖，不纳入版本控制。
 
 完整文法定义见 [`src/parse/bnf/fun.ebnf`](src/parse/bnf/fun.ebnf)。
+
+### 交叉构建（在 Linux x86_64 上构建 macOS 与 Linux aarch64）
+
+最后两行是仅有的、需要先搭交叉工具链的构建。二者都在 **Linux x86_64 构建机**
+上运行，产物是目标平台的原生二进制，无需目标 SDK、也无需目标平台 binutils——
+Mach-O 与 aarch64 的汇编器/链接器来自 Zig 0.13 自带的 clang/lld：
+
+```sh
+cd src/prj/fun
+./bootstrap-darwin-cross.sh     # 一次性：FPC darwin 交叉工具链 + Zig（~/.fun/darwin-cross，约 2 GB）
+CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
+
+./bootstrap-linux-aarch64.sh    # 一次性：aarch64-linux RTL，复用 darwin 工具链里的 ppcrossa64 + Zig
+./make-linux-aarch64.sh         # -> fun/funcmd-linux-aarch64
+```
+
+- **构建机要求**：Linux x86_64、宿主 FPC 3.2.x、`make`、`curl` 或 `wget`、`tar`，约 2 GB 空闲磁盘。Zig 由 bootstrap 下载（钉在 0.13；0.14 在较旧的 glibc 上会 panic）。**不需要** macOS 真机、Apple SDK 或 `osxcross`——Zig 自带 libSystem stub。
+- `bootstrap-linux-aarch64.sh` 复用 darwin 工具链的 `ppcrossa64` 与 Zig：FPC 编译器二进制与 CPU 绑定，但只要目标 OS 的单元齐备，就能编译该 OS。
+- 可选特性照例降级：缺 PCRE → 无正则；缺 libffi 单元/stub → 无 `getapi`。Linux aarch64 产物是核心解释器（其 `-dRegex` 与 `-dLinuxFFI` 需要 libc / libffi，尚未交叉构建）。
+- 移植细节见 [`art/notes/macos-port.md`](art/notes/macos-port.md)。
 
 ### 第三方依赖（仓库未携带）
 

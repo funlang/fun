@@ -40,7 +40,7 @@
 
 ## 构建
 
-构建脚本位于 `src/prj/fun/`（Delphi 2006/2009 与 Free Pascal 2.4.0，支持 Windows/Linux/ARM/WinCE 交叉编译）；本机 x86_64 Linux 用 `src/prj/fun/make-linux-x86_64.sh`。改动解析器后，请确保语法定义 `src/parse/bnf/fun.ebnf`、`yacc.y`、`lex.l` 同步更新。
+构建脚本位于 `src/prj/fun/`（Delphi 2006/2009 与 Free Pascal 2.4.0，支持 Windows/Linux/ARM/WinCE 交叉编译）；本机 x86_64 Linux 用 `src/prj/fun/make-linux-x86_64.sh`，macOS / Linux aarch64 交叉构建（同样在 x86_64 Linux 构建机上）见[构建 → 交叉构建](README.zh.md#交叉构建在-linux-x86_64-上构建-macos-与-linux-aarch64)。改动解析器后，请确保语法定义 `src/parse/bnf/fun.ebnf`、`yacc.y`、`lex.l` 同步更新。
 
 > 仓库**不携带**第三方源码/二进制（PCRE、Tiny C Compiler、Windows 运行期 DLL）。构建前请按 README 的[构建 → 第三方依赖](README.zh.md#第三方依赖仓库未携带)一节下载并放到指定目录；缺失只会**降级**，不会中断构建。
 

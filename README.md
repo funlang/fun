@@ -296,20 +296,45 @@ fun/
 
 The Fun core is Pascal; the source entry point is `src/prj/fun/funcmd.dpr`.
 
-Toolchain locations are centralized in one file: [`src/prj/fun/setenv.bat`](src/prj/fun/setenv.bat). Edit it once to point at your installed Delphi / Free Pascal, or set the `FPC`, `DELPHI2006`, `DELPHI2009` environment variables beforehand — every `make-*.bat` script calls it and picks up the paths. Supported toolchains:
+Toolchain locations for the Windows-hosted `.bat` scripts are centralized in one file: [`src/prj/fun/setenv.bat`](src/prj/fun/setenv.bat). Edit it once to point at your installed Delphi / Free Pascal, or set the `FPC`, `DELPHI2006`, `DELPHI2009` environment variables beforehand — every `make-*.bat` script calls it and picks up the paths.
 
-| Target                 | Script                                    | Toolchain      |
-| ---------------------- | ----------------------------------------- | -------------- |
-| Windows 32-bit         | `src/prj/fun/make-2006.bat` / `-2009.bat` | Delphi 2006 / 2009 |
-| Linux (i386)           | `make-linux.bat`                          | FPC 2.4.0      |
-| Linux x86_64 (native)  | `src/prj/fun/make-linux-x86_64.sh`       | FPC + gcc      |
-| Linux / ARM            | `make-arm-linux.bat`                      | FPC cross      |
-| Windows 64-bit         | `make-win64.bat`                          | FPC cross      |
-| Windows CE / ARM       | `make-wince.bat`                          | FPC cross      |
+Each script is `<toolchain>-<target>`; the **build machine** is where it runs, which differs from the target for the cross rows:
+
+| Target                  | Build machine | Script                                    | Toolchain          |
+| ----------------------- | ------------- | ----------------------------------------- | ------------------ |
+| Windows 32-bit          | Windows       | `src/prj/fun/make-2006.bat` / `-2009.bat` | Delphi 2006 / 2009 |
+| Windows 64-bit          | Windows       | `make-win64.bat`                          | FPC cross          |
+| Windows CE / ARM        | Windows       | `make-wince.bat`                          | FPC cross          |
+| Linux (i386)            | Windows       | `make-linux.bat`                          | FPC 2.4.0 cross    |
+| Linux / ARM             | Windows       | `make-arm-linux.bat`                      | FPC cross          |
+| Linux x86_64 (native)   | Linux x86_64  | `src/prj/fun/make-linux-x86_64.sh`       | FPC + gcc          |
+| Linux aarch64 (arm64)   | Linux x86_64  | `src/prj/fun/make-linux-aarch64.sh`      | FPC cross + Zig    |
+| macOS x86_64 / aarch64  | Linux x86_64  | `src/prj/fun/make-darwin.sh`             | FPC cross + Zig    |
 
 Building with `-DFunDll` produces the embeddable runtime `fun.dll`, which exports the `Run` interface. Build artifacts are covered by `.gitignore` and are not versioned.
 
 The full grammar is defined in [`src/parse/bnf/fun.ebnf`](src/parse/bnf/fun.ebnf).
+
+### Cross builds (macOS and Linux aarch64, from Linux x86_64)
+
+The last two rows are the only builds that need a bootstrapped toolchain. Both
+run on a **Linux x86_64 build machine** and produce a native target binary with
+no target SDK and no target binutils — the Mach-O and aarch64 assembler/linker
+come from the clang/lld bundled with Zig 0.13:
+
+```sh
+cd src/prj/fun
+./bootstrap-darwin-cross.sh     # once: FPC darwin cross toolchain + Zig (~/.fun/darwin-cross, ~2 GB)
+CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
+
+./bootstrap-linux-aarch64.sh    # once: aarch64-linux RTL, reusing ppcrossa64 + Zig from the darwin tree
+./make-linux-aarch64.sh         # -> fun/funcmd-linux-aarch64
+```
+
+- **Build machine requirements**: Linux x86_64, host FPC 3.2.x, `make`, `curl` or `wget`, `tar`, and ~2 GB free disk. Zig is fetched by the bootstrap (pinned to 0.13; 0.14 panics on older glibc). No macOS host, Apple SDK, or `osxcross` is required — Zig ships a libSystem stub.
+- `bootstrap-linux-aarch64.sh` reuses the `ppcrossa64` and Zig from the darwin toolchain: an FPC compiler binary is CPU-specific but can target any OS it has units for.
+- Optional features degrade as usual: no PCRE -> no regex, no libffi unit/stub -> no `getapi`. The Linux aarch64 artifact is the core interpreter (its `-dRegex` and `-dLinuxFFI` need a libc / libffi that are not cross-built yet).
+- Porting details: [`art/notes/macos-port.md`](art/notes/macos-port.md).
 
 ### Third-party dependencies (not carried in the repo)
 

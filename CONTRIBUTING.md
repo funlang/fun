@@ -40,7 +40,7 @@ For modules in `fun/lib`:
 
 ## Building
 
-Build scripts live in `src/prj/fun/` (Delphi 2006/2009 and Free Pascal 2.4.0, with Windows/Linux/ARM/WinCE cross-compilation); on a native x86_64 Linux host use `src/prj/fun/make-linux-x86_64.sh`. After touching the parser, keep the grammar definitions `src/parse/bnf/fun.ebnf`, `yacc.y`, and `lex.l` in sync.
+Build scripts live in `src/prj/fun/` (Delphi 2006/2009 and Free Pascal 2.4.0, with Windows/Linux/ARM/WinCE cross-compilation); on a native x86_64 Linux host use `src/prj/fun/make-linux-x86_64.sh`, and for the macOS / Linux-aarch64 cross builds (also from an x86_64 Linux build machine) see [Building -> Cross builds](README.md#cross-builds-macos-and-linux-aarch64-from-linux-x86_64). After touching the parser, keep the grammar definitions `src/parse/bnf/fun.ebnf`, `yacc.y`, and `lex.l` in sync.
 
 > The repo does **not** carry third-party sources/binaries (PCRE, the Tiny C Compiler, the Windows runtime DLLs). Before building, fetch them and drop them in the documented locations - see [Building -> Third-party dependencies](README.md#third-party-dependencies-not-carried-in-the-repo). A missing one only **degrades** the build; it does not stop it.
 
