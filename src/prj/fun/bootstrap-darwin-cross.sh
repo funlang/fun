@@ -164,7 +164,10 @@ for cpu in $CPUS; do
     for t in libffi.tbd libffi-trampolines.tbd; do
       src="$DARWIN_SDK/usr/lib/$t"
       [ -f "$src" ] || src="$DARWIN_SDK/$t"
-      [ -f "$src" ] && cp -f "$src" "$ROOT/libffi/" && echo "libffi stub: $t"
+      if [ -f "$src" ]; then
+        cp -f "$src" "$ROOT/libffi/"
+        echo "libffi stub: $t"
+      fi
     done
   fi
 
