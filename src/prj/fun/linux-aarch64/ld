@@ -1,0 +1,48 @@
+#!/bin/sh
+# ============================================================
+# aarch64-linux-ld shim: the linker for the Linux aarch64 cross build.
+#
+# Free Pascal's linux target drives GNU ld, and for a linker script it writes a
+# `link.res` (-T) whose only real content is an INPUT(...) list of the objects
+# to link. A cross aarch64 binutils is not available here, so this shim inlines
+# that INPUT list and links with the lld bundled in Zig, against a static musl
+# C library (zig's default for -target aarch64-linux-musl).
+#
+# FPC supplies its own entry point (prt0.o defines `_start`), so the C runtime
+# startup files and libc are left out (-nostdlib); the aarch64-linux RTL is
+# syscall-based and needs no libc. Symbols are stripped (FPC's -Xs intent, since
+# Apple/GNU `strip` cannot run in a cross build).
+#
+# Zig must be on $ZIG (make-linux-aarch64.sh exports it).
+# ============================================================
+set -eu
+ZIG="${ZIG:-${ZIG_ARG:-zig}}"
+
+out=""
+entry="_start"
+script=""
+objs=""
+libs=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) shift; out="$1" ;;
+    -T) shift; script="$1" ;;
+    -e) shift; entry="$1" ;;
+    -L*|-l*) libs="$libs $1" ;;
+    *.o|*.a) objs="$objs $1" ;;
+    *) : ;;  # drop ld flags lld does not need (-b, -m, --fatal-warnings, ...)
+  esac
+  shift || true
+done
+
+[ -n "$out" ] || { echo "linux-aarch64 ld shim: no -o given" >&2; exit 1; }
+
+# The linker script's INPUT(...) is the object list.
+if [ -n "$script" ] && [ -f "$script" ]; then
+  inp=$(tr '\n' ' ' < "$script" | sed -n 's/.*INPUT[[:space:]]*(\([^)]*\)).*/\1/p')
+  objs="$objs $inp"
+fi
+
+# shellcheck disable=SC2086
+exec "$ZIG" cc -target aarch64-linux-musl -static -nostdlib \
+     -Wl,-e,"$entry" -Wl,--strip-all -o "$out" $objs $libs

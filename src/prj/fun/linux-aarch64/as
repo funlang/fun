@@ -1,0 +1,15 @@
+#!/bin/sh
+# ============================================================
+# aarch64-linux-as shim: the assembler for the Linux aarch64 cross build.
+#
+# Free Pascal's aarch64-linux target assembles through a cross GNU `as`
+# (invoked as <cpu>-<os>-as). A Linux aarch64 binutils is not available here,
+# so this shim hands the GNU-syntax assembly to the clang bundled with Zig
+# (Zig's clang assembles aarch64), which needs an explicit `-x assembler`
+# because a bare `.as` extension is not auto-detected.
+#
+# Zig must be on $ZIG (make-linux-aarch64.sh exports it).
+# ============================================================
+set -eu
+ZIG="${ZIG:-${ZIG_ARG:-zig}}"
+exec "$ZIG" cc -target aarch64-linux -x assembler -c "$@"

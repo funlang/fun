@@ -6,6 +6,13 @@
 
 ## [未发布]
 
+- 解释器的 Linux aarch64 (arm64) 交叉构建，与 x86_64 版一并保留。
+  `bootstrap-linux-aarch64.sh` 在 x86_64 主机上建出 aarch64-linux 的 FPC
+  RTL/rtl-objpas/hash 单元（复用 darwin 工具链的 `ppcrossa64`），
+  `make-linux-aarch64.sh` 产出 `fun/funcmd-linux-aarch64`（静态、基于系统调用、
+  已 strip）。汇编与链接经 `src/prj/fun/linux-aarch64/{as,ld}`（Zig 的 clang/lld），
+  因此不需要 aarch64 binutils 或 glibc。尚未启用：`-dRegex`（需 libc）与
+  `getapi`/`-dLinuxFFI`（需 aarch64 的 libffi）。
 - 解释器命令行：不接脚本文件运行时，现在会打印一句简短提示加用法，并以 0 退出。
   之前它会尝试把可执行文件自己当脚本跑，只会报一句来自 ELF/PE/Mach-O 头的
   `syntax error[ELF]` 并以 1 退出。点名但不存在的脚本仍是非零错误；

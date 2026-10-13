@@ -82,6 +82,9 @@ fun/funcmd-darwin-*
 src/prj/fun/.darwin-tools/
 src/prj/fun/libtcc.dylib
 
+# Linux aarch64 cross-build output (make-linux-aarch64.sh)
+fun/funcmd-linux-*
+
 # Vendored PCRE C source uploaded under src/3rd (build from source; not tracked)
 src/3rd/pcre-8/
 
