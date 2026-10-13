@@ -30,6 +30,8 @@
 #   raw-address-getapi (needs the Linux .so helper), lib-tcc-test / lib-jit-test
 #   (need libtcc.so next to funcmd, built by make-linux-x86_64.sh from src/3rd/tcc),
 #   lib-asm-lnx (mmap'd executable memory + 64-bit callback addresses),
+#   fractal-asm-x64 (same, and it prints a wall-clock timing line, so it runs as
+#                   a smoke check instead of a snapshot),
 #   lib-asm-a64 (encoder snapshot is portable, but its final "exec" line names
 #                the host cpu),
 #   lib-hash-test (str.md5/sha1 need the -dMD5 define)

@@ -89,3 +89,4 @@ lib-asm-x64.fun	test/lib-asm-x64.fun	snap
 input-console.sh	test/input-console.sh	shell
 eof-implicit-semi.fun	test/eof-implicit-semi.fun	snap
 lib-asm-a64.fun	test/lib-asm-a64.fun	snap
+fractal-asm-x64.fun	test/fractal-asm-x64.fun	smoke

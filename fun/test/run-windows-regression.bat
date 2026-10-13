@@ -38,7 +38,7 @@ set "LISTFILE=fun\test\regression-list.txt"
 if not exist "%LISTFILE%" ( echo missing %LISTFILE% 1>&2 & popd & exit /b 2 )
 
 rem Tests whose output is host-dependent (see the shell runner header).
-set "HOSTDEP= builtin-dispatch.fun lib-host-test.fun lib-param-linux.fun lib-cmdline-linux.fun lib-loadcheck.sh libc-outbuf.fun ptr-primitives.fun raw-address-getapi.fun lib-tcc-test.fun lib-jit-test.fun lib-asm-lnx.fun lib-hash-test.fun lib-proc-test.fun lib-unicode-test.fun run-benchmarks.sh "
+set "HOSTDEP= builtin-dispatch.fun lib-host-test.fun lib-param-linux.fun lib-cmdline-linux.fun lib-loadcheck.sh libc-outbuf.fun ptr-primitives.fun raw-address-getapi.fun lib-tcc-test.fun lib-jit-test.fun lib-asm-lnx.fun fractal-asm-x64.fun lib-hash-test.fun lib-proc-test.fun lib-unicode-test.fun run-benchmarks.sh "
 
 set "MODE=compare"
 set "PORTABLE=0"
