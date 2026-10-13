@@ -346,9 +346,12 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (59 modules)
 - **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`
 
 > **Platform-split convention**: the Windows implementation keeps the plain
-> module name, the Linux backend is `<name>-lnx.fun`, and logic shared by both
-> lives in `<name>-base.fun` (not counted above). E.g. `lib-proc` /
-> `lib-proc-lnx`, and `lib-unicode-base` + `lib-unicode` / `lib-unicode-lnx`.
+> module name, and the Unix backend is `<name>-unx.fun` (Linux + macOS); the
+> older `<name>-lnx.fun` name is kept as a thin wrapper on top of it. Logic
+> shared by both lives in `<name>-base.fun` (not counted above). Backends that
+> only work on Linux (e.g. `lib-proc`, which reads `/proc`) stay `<name>-lnx`.
+> E.g. `lib-os` / `lib-os-unx` (+ `lib-os-lnx`), and `lib-unicode-base` +
+> `lib-unicode` / `lib-unicode-unx`.
 
 ---
 

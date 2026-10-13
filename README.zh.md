@@ -343,9 +343,11 @@ Fun 核心为 Pascal，源码入口为 `src/prj/fun/funcmd.dpr`。
 - **UI**：`lib-ui`、`lib-ui-base`、`lib-dialog`、`lib-trayicon`
 - **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`
 
-> **平台拆分惯例**：Windows 实现保留原名，Linux 后端为 `<name>-lnx.fun`，两者共用的逻辑放在
-> `<name>-base.fun`（不计入上面的模块数）。例如 `lib-proc` / `lib-proc-lnx`，
-> 以及 `lib-unicode-base` + `lib-unicode` / `lib-unicode-lnx`。
+> **平台拆分惯例**：Windows 实现保留原名，Unix 后端为 `<name>-unx.fun`（Linux + macOS），
+> 旧的 `<name>-lnx.fun` 名字保留为它之上的薄包装；两者共用的逻辑放在
+> `<name>-base.fun`（不计入上面的模块数）。只在 Linux 成立的后端（如读 `/proc` 的
+> `lib-proc`）继续用 `<name>-lnx`。例如 `lib-os` / `lib-os-unx`（+ `lib-os-lnx`），
+> 以及 `lib-unicode-base` + `lib-unicode` / `lib-unicode-unx`。
 
 ---
 
