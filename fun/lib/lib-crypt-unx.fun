@@ -66,13 +66,12 @@ end fun;
 
 fun _init()
   result = true;
-  // Linux ships libcrypto as libcrypto.so.N; macOS has no system OpenSSL, so
-  // probe the common Homebrew/MacPorts locations too (keg-only: not on the
-  // default dyld search path).
+  // Linux ships libcrypto as libcrypto.so.N; on macOS the bare name resolves
+  // to the system LibreSSL, which aborts the process on load; only explicit
+  // Homebrew / MacPorts paths are probed here.
   var libs = DyLibList(
     ['libcrypto.so.3', 'libcrypto.so.1.1', 'libcrypto.so.10', 'libcrypto.so'],
-    ['libcrypto.dylib', 'libcrypto.3.dylib',
-     '/opt/homebrew/opt/openssl/lib/libcrypto.dylib',
+    ['/opt/homebrew/opt/openssl/lib/libcrypto.dylib',
      '/usr/local/opt/openssl/lib/libcrypto.dylib',
      '/opt/homebrew/lib/libcrypto.3.dylib',
      '/usr/local/lib/libcrypto.dylib']);
@@ -120,12 +119,22 @@ fun _init()
       end try;
     end if;
   end do;
+  // macOS: hashes come from CommonCrypto (libSystem, always present) so they
+  // work without Homebrew OpenSSL; OpenSSL here only serves AES/RSA.
+  if 'host'.arg().getJson(fd: true).os = 'macos' then
+    var Sys = 'libSystem.B.dylib';
+    _MD5    = Sys.getapi('CC_MD5',    'snp:p');
+    _SHA1   = Sys.getapi('CC_SHA1',   'snp:p');
+    _SHA256 = Sys.getapi('CC_SHA256', 'snp:p');
+    _SHA384 = Sys.getapi('CC_SHA384', 'snp:p');
+    _SHA512 = Sys.getapi('CC_SHA512', 'snp:p');
+  end if;
   result = found;
 end fun;
 _init();
 
 fun Crypt(msg, typ)
-  if _LIB = nil then raise 'lib-crypt-unx: libcrypto not available'; end if;
+  if _MD5 = nil then raise 'lib-crypt-unx: hash functions not available'; end if;
   var out;
   if typ = CALG_MD5 then
     out = ' '.x(16); _MD5(msg, msg.length(), out.toNum(-1));
