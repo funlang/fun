@@ -19,7 +19,8 @@ fun SHA256 (msg)
       // alias must be copied to Cr in the same branch (assigning after the
       // inner `end if` raises "libCr not found" and the except below would
       // silently fall back to the slow, non-wrapping pure implementation).
-      if 'host'.arg().getJson(fd: true).os = 'linux' then
+      if 'host'.arg().getJson(fd: true).os = 'linux' or
+         'host'.arg().getJson(fd: true).os = 'macos' then
         use 'lib-crypt-lnx.fun' as libCr;
         Cr = libCr;
       else
