@@ -268,15 +268,19 @@ jobs:
       - name: Regression (portable subset)
         shell: pwsh
         run: |
-          # The shared snapshots are stored verbatim as LF, but funcmd.exe on
-          # Windows ends its lines with CRLF, so compare against a CRLF copy
-          # instead of failing every snapshot on the line ending alone.
+          # Fun terminates lines with CRLF on every platform, and the POSIX
+          # runner captures with $(...), which drops the trailing newline, so a
+          # shared snapshot ends its last line with a lone CR. A Windows redirect
+          # keeps that final LF, so re-add exactly one "\n" (verified against
+          # every shared snapshot) instead of rewriting line endings - the
+          # snapshots are already CRLF.
           $expSrc = "fun\test\expected"
           $expDst = "$env:RUNNER_TEMP\expected-win"
           Remove-Item -Recurse -Force $expDst -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path $expDst | Out-Null
           Get-ChildItem "$expSrc\*.txt" | ForEach-Object {
-            $t = [IO.File]::ReadAllText($_.FullName).Replace("`r`n", "`n").Replace("`n", "`r`n")
+            $t = [IO.File]::ReadAllText($_.FullName)
+            if ($t.EndsWith("`r")) { $t += "`n" }
             [IO.File]::WriteAllText((Join-Path $expDst $_.Name), $t)
           }
           $env:FUNREG_EXPECTED = $expDst
