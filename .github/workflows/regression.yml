@@ -1,0 +1,85 @@
+# Continuous integration: build the interpreter and run the regression suite
+# on Linux and macOS.
+#
+# The Linux job builds natively with Free Pascal and runs the full suite
+# (fun/test/run-linux-regression.sh). The macOS job builds natively on the
+# runner and runs the macOS suite (fun/test/run-macos-regression.sh), which
+# skips the tests that are Linux-only by design (see
+# fun/test/regression-skip-macos.txt and art/notes/macos-port.md).
+#
+# Neither job needs the ~2 GB cross toolchain: each runner uses its host FPC.
+# Third-party C sources (PCRE, TCC) are fetched by src/prj/fun/fetch-3rd-party.sh;
+# a missing one only degrades the build, so remove that step to test the
+# degraded path.
+name: regression
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel an in-progress run when the same ref is pushed again.
+concurrency:
+  group: regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Free Pascal
+        id: cache-fpc
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/fpc-3.2.2
+            ~/.fpc.cfg
+          key: fpc-3.2.2-linux-x86_64
+
+      - name: Install Free Pascal 3.2.2
+        if: steps.cache-fpc.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 3 -o fpc.tar \
+            "https://downloads.sourceforge.net/project/freepascal/Linux/3.2.2/fpc-3.2.2.x86_64-linux.tar"
+          mkdir -p fpc && tar -xf fpc.tar -C fpc
+          cd fpc/fpc-3.2.2.x86_64-linux
+          # install.sh is interactive: first line is the prefix, the rest accept
+          # the defaults (install all unit packages, including libffi + hash).
+          printf '%s\n\n\n\n\n\n\n\n\n\n' "$HOME/fpc-3.2.2" | ./install.sh
+
+      - name: Put fpc on PATH
+        run: echo "$HOME/fpc-3.2.2/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch third-party C sources (PCRE, TCC)
+        run: src/prj/fun/fetch-3rd-party.sh
+
+      - name: Build funcmd
+        run: ./make-linux-x86_64.sh
+        working-directory: src/prj/fun
+
+      - name: Regression
+        run: fun/test/run-linux-regression.sh
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Free Pascal
+        run: brew install fpc
+
+      - name: Fetch third-party C sources (PCRE)
+        # TCC is not built on macOS yet; only PCRE (regex) is needed here.
+        run: src/prj/fun/fetch-3rd-party.sh --pcre-only
+
+      - name: Build funcmd
+        run: ./make-macos.sh
+        working-directory: src/prj/fun
+
+      - name: Regression
+        run: fun/test/run-macos-regression.sh

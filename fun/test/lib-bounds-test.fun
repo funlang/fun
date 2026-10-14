@@ -7,7 +7,8 @@
 //   1  string index read: negative wraps, out of range is nil
 //   2  string index write: out of range raises, in range works
 //   3  byte access: toByte out of range is 0, fromByte out of range raises
-//   4  list: @count out of range raises / resizes safely, huge index raises
+//   4  list: @count out of range raises / resizes safely (a huge *positive*
+//      index is allocation-dependent, so it is not asserted - see section 4)
 //   5  movs: out-of-range raises, in-range copies
 //   6  x(n): reverse/sort still work
 
@@ -60,10 +61,11 @@ try l.@count(-5); except threw = true; end try;
 var l2 = new [1, 2, 3];
 l2.@count(5);
 ?. 'count grows safely: ' & (l2.@count() = 5 and l2[4] = nil);
-var l3 = new [1, 2, 3];
-threw = false;
-try l3[1000000000] = 1; except threw = true; end try;
-?. 'huge index raises: ' & threw;
+// A huge positive list index grows the backing array. That raises EOutOfMemory
+// on Linux (the allocation fails) but can succeed lazily on macOS, so it is not
+// a portable assertion (no upper size cap, by author decision 2026-09-14; see
+// art/notes/safety-bounds.md). The deterministic bounds are the far-negative
+// write below and the sparse map just after it.
 var l4 = new [1, 2, 3];
 threw = false;
 try l4[-1000] = 7; except threw = true; end try;

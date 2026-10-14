@@ -6,6 +6,26 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Portable regression harness and macOS CI. `fun/test/run-linux-regression.sh`
+  now detects the host (linux / macos) and reads
+  `fun/test/regression-skip-<platform>.txt` plus an optional
+  `fun/test/expected/<platform>/` snapshot override, so tests that are
+  Linux-only by design (libc.so.6 / `/proc` / x86-64 assembly / TCC / JIT / the
+  FFI helpers) are reported as SKIP instead of failing on macOS. Added
+  `fun/test/run-macos-regression.sh`, `regression-skip-macos.txt`, a native
+  macOS build script `src/prj/fun/make-macos.sh`, a third-party source fetcher
+  `src/prj/fun/fetch-3rd-party.sh`, and `.github/workflows/regression.yml`
+  (Linux + macOS jobs, native FPC on each). Fixes from the Issue #2 macOS
+  real-machine report: `find()` now emits directory entries in a stable byte
+  order (ext4, APFS and NTFS enumerate differently, so the `lib-dyns-test` /
+  `lib-file-test` snapshots were host-specific); `run-benchmarks.sh` no longer
+  requires GNU `timeout` (absent from a stock macOS userland); `lib-loadcheck.sh`
+  byte-orders its module glob; the `builtin-dispatch` and `lib-host-test`
+  snapshots are now host-neutral; and the allocation-dependent "huge list index
+  raises" assertion in `lib-bounds-test` was dropped (it raises `EOutOfMemory`
+  on Linux but can succeed lazily on macOS; see `safety-bounds.md`). Linux
+  regression stays 92/92.
+
 - Linux aarch64 (arm64) cross build of the interpreter, kept alongside the
   x86_64 one. `bootstrap-linux-aarch64.sh` builds the aarch64-linux FPC
   RTL/rtl-objpas/hash units on an x86_64 host (reusing the darwin toolchain's

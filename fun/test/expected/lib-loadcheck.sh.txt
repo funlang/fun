@@ -1,12 +1,12 @@
-LOAD  lib-ado
 LOAD  lib-ado-schema
+LOAD  lib-ado
 LOAD  lib-ajax
 LOAD  lib-asm-a64
-LOAD  lib-asm
 LOAD  lib-asm-pro
+LOAD  lib-asm
 FAIL  lib-async              /home/jcode/funlang/fun/fun/lib/lib-os.fun:24: getapi: canno
-LOAD  lib-base64
 LOAD  lib-base
+LOAD  lib-base64
 LOAD  lib-bind
 LOAD  lib-bnf
 LOAD  lib-cmdline
@@ -29,10 +29,10 @@ LOAD  lib-math
 LOAD  lib-md5
 FAIL  lib-message            /home/jcode/funlang/fun/fun/lib/lib-message.fun:12: getapi: 
 LOAD  lib-orm-cte
-LOAD  lib-orm
 LOAD  lib-orm-gen
 LOAD  lib-orm-pro
 LOAD  lib-orm-rpc
+LOAD  lib-orm
 LOAD  lib-os
 LOAD  lib-param
 LOAD  lib-proc

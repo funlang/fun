@@ -12,7 +12,6 @@ toByte in range: True
 fromByte oob raises: True
 count negative raises: True
 count grows safely: True
-huge index raises: True
 far neg index raises: True
 sparse map works: True
 movs oob raises: True

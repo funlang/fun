@@ -47,6 +47,8 @@ fun/test/expected/**   -text
 *.sh      text eol=lf
 *.py      text eol=lf
 *.md      text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
 *.cfg     text eol=lf
 *.fd      text eol=lf
 *.fd.2    text eol=lf

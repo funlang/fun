@@ -181,34 +181,105 @@ var
     sr: TSearchRec;
     sz: fun.int;
     f2: fun.str;
-  begin
-    sz := -1;
-    if FindFirst(_fp + _fn, _ft, sr) = 0 then
+    // When a callback is given, matching entries are collected first and
+    // emitted in a stable byte order. FindFirst/FindNext returns entries in
+    // host order (ext4, APFS and NTFS all differ), so a script that lists a
+    // directory would otherwise print differently on each machine.
+    names: array of fun.str;
+    sizes: array of fun.int;
+    cnt, i, j: fun.int;
+    kn: fun.str;
+    kz: fun.int;
+
+    function _cmp(const a, b: fun.str): fun.int;
+    var
+      n, k: fun.int;
     begin
-      try
-        repeat
-          if (sr.Name = '.') or (sr.Name = '..') then continue;
-          if ((_ft = faDirectory) and ((sr.Attr and faDirectory) = faDirectory)) or
-             ((sr.Attr and _ft) = (sr.Attr and faAnyFile)) then
-          begin
-            if assigned(_act) then
+      n := Length(a);
+      if Length(b) < n then n := Length(b);
+      for k := 1 to n do
+      begin
+        if a[k] < b[k] then begin result := -1; exit; end;
+        if a[k] > b[k] then begin result := 1; exit; end;
+      end;
+      if Length(a) < Length(b) then result := -1
+      else if Length(a) > Length(b) then result := 1
+      else result := 0;
+    end;
+
+    procedure _collect(const _fp2, _fn2: fun.str; _ft2: fun.int);
+    var
+      sr2: TSearchRec;
+    begin
+      if FindFirst(_fp2 + _fn2, _ft2, sr2) = 0 then
+      begin
+        try
+          repeat
+            if (sr2.Name = '.') or (sr2.Name = '..') then continue;
+            if ((_ft2 = faDirectory) and ((sr2.Attr and faDirectory) = faDirectory)) or
+               ((sr2.Attr and _ft2) = (sr2.Attr and faAnyFile)) then
             begin
-              if size then sz := sr.Size;
-              f2 := _fp + sr.Name;
+              if size then sz := sr2.Size else sz := -1;
+              f2 := _fp2 + sr2.Name;
               if rel then Delete(f2, 1, Length(fp));
-              _act(f2, tag, sz);
-            end
-            else
+              SetLength(names, cnt + 1);
+              SetLength(sizes, cnt + 1);
+              names[cnt] := f2;
+              sizes[cnt] := sz;
+              cnt := cnt + 1;
+            end;
+          until FindNext(sr2) <> 0;
+        finally
+          FindClose(sr2);
+        end;
+      end;
+    end;
+
+  begin
+    if assigned(_act) then
+    begin
+      cnt := 0;
+      SetLength(names, 0);
+      SetLength(sizes, 0);
+      _collect(_fp, _fn, _ft);
+      // stable insertion sort: byte order, identical on every host
+      for i := 1 to cnt - 1 do
+      begin
+        kn := names[i];
+        kz := sizes[i];
+        j := i - 1;
+        while (j >= 0) and (_cmp(names[j], kn) > 0) do
+        begin
+          names[j + 1] := names[j];
+          sizes[j + 1] := sizes[j];
+          j := j - 1;
+        end;
+        names[j + 1] := kn;
+        sizes[j + 1] := kz;
+      end;
+      for i := 0 to cnt - 1 do
+        _act(names[i], tag, sizes[i]);
+    end
+    else
+    begin
+      sz := -1;
+      if FindFirst(_fp + _fn, _ft, sr) = 0 then
+      begin
+        try
+          repeat
+            if (sr.Name = '.') or (sr.Name = '..') then continue;
+            if ((_ft = faDirectory) and ((sr.Attr and faDirectory) = faDirectory)) or
+               ((sr.Attr and _ft) = (sr.Attr and faAnyFile)) then
               {$IfDef UNIX}
-_find(_fp + sr.Name + '/')
-{$Else}
-_find(_fp + sr.Name + '\')
-{$EndIf}
-            ;
-          end;
-        until FindNext(sr) <> 0;
-      finally
-        FindClose(sr);
+              _find(_fp + sr.Name + '/')
+              {$Else}
+              _find(_fp + sr.Name + '\')
+              {$EndIf}
+              ;
+          until FindNext(sr) <> 0;
+        finally
+          FindClose(sr);
+        end;
       end;
     end;
   end;

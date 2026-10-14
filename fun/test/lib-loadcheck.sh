@@ -13,6 +13,11 @@
 #
 # Usage: fun/test/lib-loadcheck.sh   (from the repo root)
 cd "$(dirname "$0")/../.." || exit 2
+# Byte-order the module glob so the report is identical on every host: the
+# default collation differs between glibc and macOS (lib-ado vs lib-ado-schema,
+# lib-asm vs lib-asm-pro), which reorders the whole listing.
+LC_ALL=C
+export LC_ALL
 ok=0; bad=0
 for f in fun/lib/*.fun; do
   n=$(basename "$f" .fun)

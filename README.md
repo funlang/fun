@@ -310,6 +310,7 @@ Each script is `<toolchain>-<target>`; the **build machine** is where it runs, w
 | Linux x86_64 (native)   | Linux x86_64  | `src/prj/fun/make-linux-x86_64.sh`       | FPC + gcc          |
 | Linux aarch64 (arm64)   | Linux x86_64  | `src/prj/fun/make-linux-aarch64.sh`      | FPC cross + Zig    |
 | macOS x86_64 / aarch64  | Linux x86_64  | `src/prj/fun/make-darwin.sh`             | FPC cross + Zig    |
+| macOS (native)          | macOS         | `src/prj/fun/make-macos.sh`              | FPC (Homebrew)     |
 
 Building with `-DFunDll` produces the embeddable runtime `fun.dll`, which exports the `Run` interface. Build artifacts are covered by `.gitignore` and are not versioned.
 
@@ -351,6 +352,29 @@ sources/binaries are **not** shipped. If one is missing the build script
 - Once the directories are in place, `cd src/prj/fun && ./make-linux-x86_64.sh` builds PCRE and TCC automatically.
 - Or point at them explicitly: `PCRE_SRC=/path/to/pcre TCC_SRC=/path/to/tcc ./make-linux-x86_64.sh`.
 - No PCRE -> the build has no regex (`-dRegex` off); no TCC -> no `libtcc.so`, so `lib-tcc` is unavailable. Neither affects the core interpreter.
+- Convenience fetcher: `src/prj/fun/fetch-3rd-party.sh` downloads and unpacks the pinned PCRE 8.45 and TCC 0.9.27 releases into `src/3rd/` (used by CI).
+
+### Regression tests and CI
+
+After building, run the snapshot suite from the repository root:
+
+```sh
+fun/test/run-linux-regression.sh     # Linux (or any POSIX host: auto-detects)
+fun/test/run-macos-regression.sh     # macOS wrapper; skips the Linux-only tests
+fun/test/run-windows-regression.bat  # Windows counterpart
+```
+
+The runner is host-aware: `fun/test/regression-skip-<platform>.txt` lists tests
+that cannot run on a host (a `/proc` or `libc.so.6` backend, an unported JIT,
+...) and `fun/test/expected/<platform>/` can hold host-specific snapshots that
+override the shared `fun/test/expected/`. `--update` writes to the host's own
+snapshot directory; macOS details and the current skip reasons are in
+[`art/notes/macos-port.md`](art/notes/macos-port.md).
+
+[`.github/workflows/regression.yml`](.github/workflows/regression.yml) runs both
+the Linux and macOS suites on every push and pull request; each runner builds
+natively with its host Free Pascal (no cross toolchain).
+
 
 ---
 
