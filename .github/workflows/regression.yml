@@ -105,10 +105,14 @@ jobs:
           MOUNT="$RUNNER_TEMP/fpcmnt"
           mkdir -p "$MOUNT"
           hdiutil attach fpc.dmg -nobrowse -mountpoint "$MOUNT"
-          sudo installer -pkg \
-            "$MOUNT/fpc-3.2.2.intelarm64-macosx/fpc-3.2.2-intelarm64-macosx.mpkg" \
-            -target /
-          hdiutil detach "$MOUNT"
+          # The dmg layout (volume root vs a wrapper folder) varies by tool, so
+          # locate the package instead of hard-coding the path. FPC's package is
+          # not notarized, so allow it explicitly.
+          PKG="$(find "$MOUNT" -maxdepth 2 \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
+          [ -n "$PKG" ] || { echo "no installer package found in the FPC dmg" >&2; exit 1; }
+          echo "installing $PKG"
+          sudo installer -pkg "$PKG" -target / -allowUntrusted
+          hdiutil detach "$MOUNT" || true
           fpc -iV
 
       - name: Fetch third-party C sources
