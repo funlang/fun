@@ -286,9 +286,25 @@ jobs:
             Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) {
             # Surface the failing tests and the first diff: the job log is not
-            # readable from outside, and fc /b's own output is the useful part.
+            # readable from outside. A byte-level report for all.fun shows whether
+            # the difference is line endings, a trailing newline, or content.
+            $o = "$env:TEMP\funreg-all.fun.out"
+            $e = "$env:RUNNER_TEMP\expected-win\all.fun.txt"
+            if ((Test-Path $o) -and (Test-Path $e)) {
+              $a = [IO.File]::ReadAllBytes($o); $b = [IO.File]::ReadAllBytes($e)
+              $n = [Math]::Min($a.Length, $b.Length); $d = -1
+              for ($i = 0; $i -lt $n; $i++) { if ($a[$i] -ne $b[$i]) { $d = $i; break } }
+              $ta = (($a | Select-Object -Last 8) | ForEach-Object { $_.ToString('x2') }) -join ' '
+              $tb = (($b | Select-Object -Last 8) | ForEach-Object { $_.ToString('x2') }) -join ' '
+              Write-Host "::warning title=win byte-diff::gotLen=$($a.Length) expLen=$($b.Length) firstDiff=$d tailGot=[$ta] tailExp=[$tb]"
+            }
+            $c = "$env:TEMP\funreg-calc.fun.out"
+            if (Test-Path $c) {
+              $ct = Get-Content $c -Raw
+              Write-Host "::warning title=win calc.fun output::$(($ct.Substring([Math]::Max(0, $ct.Length - 400))))"
+            }
             $head = (Get-Content $log | Select-Object -First 45 | ForEach-Object { $_ }) -join '~'
-            Write-Host "::warning title=regression (windows-x64) head::$($head.Substring(0, [Math]::Min(3000, $head.Length)))"
+            Write-Host "::warning title=regression (windows-x64) head::$($head.Substring(0, [Math]::Min(2500, $head.Length)))"
             $fails = (Get-Content $log |
                         Select-String -Pattern 'FAIL|failed|mismatch|not found|error' |
                         Select-Object -First 12 |
