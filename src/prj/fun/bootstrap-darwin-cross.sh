@@ -176,11 +176,18 @@ for cpu in $CPUS; do
     case "$cpu" in aarch64) zt=aarch64-macos ;; *) zt=x86_64-macos ;; esac
     POUT="$ROOT/pcre/$cpu-darwin"; mkdir -p "$POUT"
     echo "=== cross-building PCRE 8 for $cpu"
+    # A pristine PCRE tarball is not build-ready; create config.h / pcre.h /
+    # pcre_chartables.c from the shipped .generic / .dist copies (see
+    # make-linux-x86_64.sh). pcre_default_tables.c is an optional duplicate.
+    [ -f "$PCRE_SRC/config.h" ]          || cp "$PCRE_SRC/config.h.generic"          "$PCRE_SRC/config.h"          2>/dev/null || true
+    [ -f "$PCRE_SRC/pcre.h" ]            || cp "$PCRE_SRC/pcre.h.generic"            "$PCRE_SRC/pcre.h"            2>/dev/null || true
+    [ -f "$PCRE_SRC/pcre_chartables.c" ] || cp "$PCRE_SRC/pcre_chartables.c.dist"   "$PCRE_SRC/pcre_chartables.c" 2>/dev/null || true
     for f in pcre_byte_order pcre_chartables pcre_compile pcre_config \
              pcre_default_tables pcre_dfa_exec pcre_exec pcre_fullinfo \
              pcre_get pcre_globals pcre_maketables pcre_newline \
              pcre_refcount pcre_study pcre_tables pcre_ucd \
              pcre_valid_utf8 pcre_version pcre_xclass pcre_string_utils; do
+      [ -f "$PCRE_SRC/$f.c" ] || continue
       "$ZIG" cc -target "$zt" -c -O2 -DHAVE_CONFIG_H -DSUPPORT_PCRE8 \
         -I"$PCRE_SRC" "$PCRE_SRC/$f.c" -o "$POUT/$f.o"
     done

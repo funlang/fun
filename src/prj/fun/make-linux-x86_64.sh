@@ -81,6 +81,15 @@ PCRE_FLAGS=""
 if [ -n "$PCRE_SRC" ] && [ -f "$PCRE_SRC/pcre_compile.c" ]; then
     PCRE_LIB="$PCRE_SRC/linux-lib"
     mkdir -p "$PCRE_LIB"
+    # A pristine PCRE tarball is not build-ready: it ships config.h.generic /
+    # pcre.h.generic and pcre_chartables.c.dist (the upstream ./configure output
+    # for a default build is byte-identical to them). Create the build-ready
+    # files from those copies so no autoconf is needed. pcre_default_tables.c is
+    # a dftables-generated duplicate of the default_tables symbol already in
+    # pcre_chartables.c, so it is optional (the loop skips missing sources).
+    [ -f "$PCRE_SRC/config.h" ]          || cp "$PCRE_SRC/config.h.generic"          "$PCRE_SRC/config.h"          2>/dev/null || true
+    [ -f "$PCRE_SRC/pcre.h" ]            || cp "$PCRE_SRC/pcre.h.generic"            "$PCRE_SRC/pcre.h"            2>/dev/null || true
+    [ -f "$PCRE_SRC/pcre_chartables.c" ] || cp "$PCRE_SRC/pcre_chartables.c.dist"   "$PCRE_SRC/pcre_chartables.c" 2>/dev/null || true
     if command -v gcc >/dev/null 2>&1; then
         echo "Building PCRE 8 from $PCRE_SRC"
         for f in pcre_byte_order pcre_chartables pcre_compile pcre_config \
@@ -88,6 +97,7 @@ if [ -n "$PCRE_SRC" ] && [ -f "$PCRE_SRC/pcre_compile.c" ]; then
                  pcre_get pcre_globals pcre_maketables pcre_newline \
                  pcre_refcount pcre_study pcre_tables pcre_ucd \
                  pcre_valid_utf8 pcre_version pcre_xclass pcre_string_utils; do
+            [ -f "$PCRE_SRC/$f.c" ] || continue
             if [ ! -f "$PCRE_LIB/$f.o" ] || [ "$PCRE_SRC/$f.c" -nt "$PCRE_LIB/$f.o" ]; then
                 gcc -c -O2 -fPIC -ffunction-sections -fdata-sections \
                     -DHAVE_CONFIG_H -DSUPPORT_PCRE8 \

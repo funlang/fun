@@ -4,7 +4,7 @@ LOAD  lib-ajax
 LOAD  lib-asm-a64
 LOAD  lib-asm-pro
 LOAD  lib-asm
-FAIL  lib-async              /home/jcode/funlang/fun/fun/lib/lib-os.fun:24: getapi: canno
+FAIL  lib-async              fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
 LOAD  lib-base
 LOAD  lib-base64
 LOAD  lib-bind
@@ -13,21 +13,21 @@ LOAD  lib-cmdline
 LOAD  lib-crypt
 LOAD  lib-cstruct
 LOAD  lib-cwinapi
-FAIL  lib-dialog             /home/jcode/funlang/fun/fun/lib/lib-os.fun:24: getapi: canno
+FAIL  lib-dialog             fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
 LOAD  lib-dyns
 LOAD  lib-eval
 LOAD  lib-fd
 LOAD  lib-file
 LOAD  lib-host
-FAIL  lib-icmp               /home/jcode/funlang/fun/fun/lib/lib-icmp.fun:7: getapi: cann
+FAIL  lib-icmp               fun/lib/lib-icmp.fun:7: getapi: cannot load library "icmp.dl
 LOAD  lib-jit
-FAIL  lib-jsasync            /home/jcode/funlang/fun/fun/lib/lib-os.fun:24: getapi: canno
+FAIL  lib-jsasync            fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
 LOAD  lib-json
 LOAD  lib-jsonrpc
 LOAD  lib-match
 LOAD  lib-math
 LOAD  lib-md5
-FAIL  lib-message            /home/jcode/funlang/fun/fun/lib/lib-message.fun:12: getapi: 
+FAIL  lib-message            fun/lib/lib-message.fun:12: getapi: cannot load library "use
 LOAD  lib-orm-cte
 LOAD  lib-orm-gen
 LOAD  lib-orm-pro
@@ -37,7 +37,7 @@ LOAD  lib-os
 LOAD  lib-param
 LOAD  lib-proc
 LOAD  lib-regex
-FAIL  lib-registry           /home/jcode/funlang/fun/fun/lib/lib-registry.fun:23: getapi:
+FAIL  lib-registry           fun/lib/lib-registry.fun:23: getapi: cannot load library "ad
 LOAD  lib-set
 LOAD  lib-sse-compress
 LOAD  lib-stack
@@ -45,11 +45,11 @@ LOAD  lib-stream
 LOAD  lib-string
 LOAD  lib-tcc
 LOAD  lib-time
-FAIL  lib-trayicon           /home/jcode/funlang/fun/fun/lib/lib-os.fun:24: getapi: canno
+FAIL  lib-trayicon           fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
 LOAD  lib-tree
 LOAD  lib-type
-FAIL  lib-ui-base            /home/jcode/funlang/fun/fun/lib/lib-os.fun:24: getapi: canno
-FAIL  lib-ui                 /home/jcode/funlang/fun/fun/lib/lib-os.fun:24: getapi: canno
+FAIL  lib-ui-base            fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
+FAIL  lib-ui                 fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
 LOAD  lib-unicode
 LOAD  lib-utils
 LOAD  lib-winapi

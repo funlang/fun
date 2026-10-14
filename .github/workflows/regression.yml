@@ -105,10 +105,14 @@ jobs:
           MOUNT="$RUNNER_TEMP/fpcmnt"
           mkdir -p "$MOUNT"
           hdiutil attach fpc.dmg -nobrowse -mountpoint "$MOUNT"
-          sudo installer -pkg \
-            "$MOUNT/fpc-3.2.2.intelarm64-macosx/fpc-3.2.2-intelarm64-macosx.mpkg" \
-            -target /
-          hdiutil detach "$MOUNT"
+          # The dmg layout (volume root vs a wrapper folder) varies by tool, so
+          # locate the package instead of hard-coding the path. FPC's package is
+          # not notarized, so allow it explicitly.
+          PKG="$(find "$MOUNT" -maxdepth 2 \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
+          [ -n "$PKG" ] || { echo "no installer package found in the FPC dmg" >&2; exit 1; }
+          echo "installing $PKG"
+          sudo installer -pkg "$PKG" -target / -allowUntrusted
+          hdiutil detach "$MOUNT" || true
           fpc -iV
 
       - name: Fetch third-party C sources
@@ -136,14 +140,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Free Pascal 3.2.2 (x86_64-win64)
+      - name: Install Free Pascal 3.2.2 (win32 + win64)
         shell: pwsh
         run: |
-          $url = "https://downloads.sourceforge.net/project/freepascal/Win64/3.2.2/fpc-3.2.2.x86_64-win64.exe"
+          # FPC has no separate win64 installer; the combined win32+win64 one
+          # installs the native x86_64-win64 compiler under bin\x86_64-win64.
+          $url = "https://downloads.sourceforge.net/project/freepascal/Win32/3.2.2/fpc-3.2.2.win32.and.win64.exe"
           Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\fpc.exe"
           Start-Process -FilePath "$env:RUNNER_TEMP\fpc.exe" `
             -ArgumentList "/VERYSILENT", "/NORESTART", "/DIR=C:\FPC\3.2.2" -Wait
           "C:\FPC\3.2.2\bin\x86_64-win64" | Out-File -FilePath $env:GITHUB_PATH -Append
+          C:\FPC\3.2.2\bin\x86_64-win64\fpc.exe -iV
 
       - name: Build funcmd.exe
         working-directory: src\prj\fun

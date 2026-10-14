@@ -6,6 +6,14 @@
 
 ## [未发布]
 
+- 修复全新 checkout 下 CI 首次构建失败。原始 PCRE 压缩包只有
+  `config.h.generic` / `pcre.h.generic` / `pcre_chartables.c.dist`（上游
+  `./configure` 的产物与它们逐字节相同），且没有 dftables 生成的
+  `pcre_default_tables.c`，导致 `make-linux-x86_64.sh` 与 `make-macos.sh`
+  在 runner 上立刻中止。现在两者会用随包提供的副本生成构建所需的文件，并
+  跳过可选的生成副本。另外从 `lib-loadcheck.sh` 的 FAIL 行中去掉仓库绝对
+  路径，使其快照与主机无关。
+
 - 可移植的回归测试框架与 macOS CI。`fun/test/run-linux-regression.sh` 现在会
   自动识别主机（linux / macos），读取 `fun/test/regression-skip-<platform>.txt`
   跳过清单，并支持 `fun/test/expected/<platform>/` 覆盖快照，因此那些“按设计仅

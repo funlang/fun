@@ -68,12 +68,18 @@ if [ -n "$PCRE_SRC" ] && [ -f "$PCRE_SRC/pcre_compile.c" ]; then
         CC="$(command -v cc || command -v clang)"
         PCRE_LIB="$PCRE_SRC/darwin-lib"
         mkdir -p "$PCRE_LIB"
+        # A pristine PCRE tarball is not build-ready: create the generated files
+        # from the .generic / .dist copies it ships (see make-linux-x86_64.sh).
+        [ -f "$PCRE_SRC/config.h" ]          || cp "$PCRE_SRC/config.h.generic"          "$PCRE_SRC/config.h"          2>/dev/null || true
+        [ -f "$PCRE_SRC/pcre.h" ]            || cp "$PCRE_SRC/pcre.h.generic"            "$PCRE_SRC/pcre.h"            2>/dev/null || true
+        [ -f "$PCRE_SRC/pcre_chartables.c" ] || cp "$PCRE_SRC/pcre_chartables.c.dist"   "$PCRE_SRC/pcre_chartables.c" 2>/dev/null || true
         echo "Building PCRE 8 from $PCRE_SRC"
         for f in pcre_byte_order pcre_chartables pcre_compile pcre_config \
                  pcre_default_tables pcre_dfa_exec pcre_exec pcre_fullinfo \
                  pcre_get pcre_globals pcre_maketables pcre_newline \
                  pcre_refcount pcre_study pcre_tables pcre_ucd \
                  pcre_valid_utf8 pcre_version pcre_xclass pcre_string_utils; do
+            [ -f "$PCRE_SRC/$f.c" ] || continue
             if [ ! -f "$PCRE_LIB/$f.o" ] || [ "$PCRE_SRC/$f.c" -nt "$PCRE_LIB/$f.o" ]; then
                 "$CC" -c -O2 -fPIC -ffunction-sections -fdata-sections \
                     -DHAVE_CONFIG_H -DSUPPORT_PCRE8 \
