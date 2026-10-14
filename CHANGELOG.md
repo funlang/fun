@@ -30,6 +30,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
   `$(...)`, which strips that newline, so a raw Windows redirect was one byte
   longer than every snapshot.
 
+- CI caches the Free Pascal toolchain on every platform (only Linux did): the
+  Windows job caches `C:\FPC` and skips both installers on a hit, macOS Intel
+  caches the 274 MB dmg, and macOS arm64 caches the Homebrew downloads, so a
+  rerun no longer re-downloads and reinstalls FPC.
+
 - Fix the first CI build of a fresh checkout. A pristine PCRE tarball ships
   only `config.h.generic` / `pcre.h.generic` / `pcre_chartables.c.dist` (the
   upstream `./configure` output is byte-identical) and has no
