@@ -1,0 +1,14 @@
+# Tests skipped on Linux aarch64 (arm64). run-linux-regression.sh reads this
+# when FUNREG_PLATFORM=linux-aarch64 (set by the CI arm64 job). One per line:
+# name<TAB>reason. Blank lines and # lines are ignored.
+#
+# Everything else runs against the shared expected/ snapshots: the tests whose
+# output was host-specific (builtin-dispatch, lib-host-test, ...) were made
+# host-neutral in the same change, so no linux-aarch64 snapshot directory is
+# needed yet.
+#
+# --- x86-64-only native code generation -----------------------------------
+lib-asm-lnx.fun	x86-64 assembly backend (no arm64 Linux codegen)
+lib-asm-x64.fun	x86-64 assembly backend
+fractal-asm-x64.fun	x86-64 assembly backend
+lib-jit-test.fun	JIT backend emits x86-64

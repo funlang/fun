@@ -12,12 +12,10 @@
 raw-address-getapi.fun	Linux .so helper + atoi/raw-address probe
 lib-os-dispatch-prototype.fun	Linux libc.so.6 backend prototype
 libc-outbuf.fun	Linux libc.so.6 out-buffer probe
-# --- FFI suite (uses libc.so.6 / libm.so.6 / libffitest.so) ---------------
-ffi-scalar.fun	FFI test binds Linux libc.so.6 / libffitest.so
-ffi-int64.fun	FFI test binds Linux libc.so.6 / libffitest.so
-ffi-float.fun	FFI test binds Linux libm.so.6 / libffitest.so
-ffi-float-cb.fun	FFI test binds Linux libm.so.6 / libffitest.so
-ffi-callbacks.fun	FFI test binds Linux libc.so.6 / libffitest.so
+# --- FFI suite -----------------------------------------------------------
+# The ffi-*.fun tests are host-aware now (LibC()/DyLib() from lib-host, and
+# libffitest is built as .dylib by fun/test/ffi/build.sh), so they run on macOS
+# too. If getapi/ABI breaks on Darwin, they fail here rather than being hidden.
 # --- /proc and network backends -------------------------------------------
 lib-proc-test.fun	lib-proc reads /proc (no /proc on macOS)
 lib-winsock-lnx-test.fun	lib-winsock netif enumeration reads /proc

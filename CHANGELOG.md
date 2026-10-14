@@ -10,12 +10,18 @@ This project records notable changes in the style of [Keep a Changelog](https://
   now detects the host (linux / macos) and reads
   `fun/test/regression-skip-<platform>.txt` plus an optional
   `fun/test/expected/<platform>/` snapshot override, so tests that are
-  Linux-only by design (libc.so.6 / `/proc` / x86-64 assembly / TCC / JIT / the
-  FFI helpers) are reported as SKIP instead of failing on macOS. Added
+  Linux-only by design (libc.so.6 / `/proc` / x86-64 assembly / TCC / JIT) are
+  reported as SKIP instead of failing on macOS, while the `ffi-*.fun` suite was
+  made host-aware (`LibC()`/`DyLib()`, and `libffitest` built as `.dylib`) so
+  getapi is exercised on macOS too. Added
   `fun/test/run-macos-regression.sh`, `regression-skip-macos.txt`, a native
   macOS build script `src/prj/fun/make-macos.sh`, a third-party source fetcher
-  `src/prj/fun/fetch-3rd-party.sh`, and `.github/workflows/regression.yml`
-  (Linux + macOS jobs, native FPC on each). Fixes from the Issue #2 macOS
+  `src/prj/fun/fetch-3rd-party.sh`, `fun/test/ffi/build.sh` (builds the FFI
+  helper on demand; it is not tracked), and `.github/workflows/regression.yml`
+  (six jobs: Linux, macOS and Windows, x64 + arm64). The Linux/macOS jobs build
+  natively and gate the build; the Windows jobs are a bring-up first pass and
+  are marked continue-on-error (the Windows build has no regex yet and FPC
+  3.2.2 has no win64/aarch64 target). Fixes from the Issue #2 macOS
   real-machine report: `find()` now emits directory entries in a stable byte
   order (ext4, APFS and NTFS enumerate differently, so the `lib-dyns-test` /
   `lib-file-test` snapshots were host-specific); `run-benchmarks.sh` no longer

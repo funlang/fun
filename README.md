@@ -371,9 +371,12 @@ override the shared `fun/test/expected/`. `--update` writes to the host's own
 snapshot directory; macOS details and the current skip reasons are in
 [`art/notes/macos-port.md`](art/notes/macos-port.md).
 
-[`.github/workflows/regression.yml`](.github/workflows/regression.yml) runs both
-the Linux and macOS suites on every push and pull request; each runner builds
-natively with its host Free Pascal (no cross toolchain).
+[`.github/workflows/regression.yml`](.github/workflows/regression.yml) runs the
+suite on six platforms - Linux, macOS and Windows, each x64 and arm64. The
+Linux and macOS jobs build natively with Free Pascal and are the maintained
+gate; the Windows jobs are a bring-up first pass (the Windows build has no
+regex yet, and FPC 3.2.2 has no win64/aarch64 target), so they are marked
+`continue-on-error` for now.
 
 
 ---

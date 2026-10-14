@@ -143,6 +143,13 @@ total=0
 skipped=0
 failures=''
 
+# The FFI tests call into the helper C library next to them; it is a build
+# artifact (not tracked), so build it on demand. Skipped for --list/--help.
+if [ -f "$HERE/ffi/build.sh" ]; then
+    sh "$HERE/ffi/build.sh" >/dev/null 2>&1 || \
+        echo "warning: could not build fun/test/ffi/libffitest (FFI tests may fail)" >&2
+fi
+
 printf 'platform: %s%s\n' "$PLATFORM" "$( [ -f "$SKIPFILE" ] && printf ' (skip list: %s)' "${SKIPFILE##*/}" )"
 printf '%-26s %s\n' "TEST" "RESULT"
 printf '%-26s %s\n' "--------------------------" "------"

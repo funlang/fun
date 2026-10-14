@@ -1,6 +1,11 @@
+use 'fun/lib/lib-host.fun';
+
+// libffitest is built per host by fun/test/ffi/build.sh (the runner builds
+// it on demand): .so on Linux, .dylib on macOS.
+var FFITEST = DyLib('./fun/test/ffi/libffitest.so', './fun/test/ffi/libffitest.dylib');
 
 ########################################
-# Linux FFI: 64-bit integer ('l') args/returns + callback roundtrip
+# Unix FFI (Linux / macOS): 64-bit integer ('l') args/returns + callback roundtrip
 ########################################
 # NOTE: Fun's own numeric literals/arithmetic wrap at 32-bit, so feed true
 # 64-bit values in from C (e.g. big64) rather than from a Fun literal. The FFI
@@ -9,10 +14,10 @@
 #   src/prj/fun/funcmd fun/test/ffi/ffi-int64.fun
 ########################################
 
-var bigf  = './fun/test/ffi/libffitest.so'.getapi('big64',  ':l');
-var passf = './fun/test/ffi/libffitest.so'.getapi('passll','l:l');
-var addf  = './fun/test/ffi/libffitest.so'.getapi('addll', 'll:l');
-var applyllf = './fun/test/ffi/libffitest.so'.getapi('applyll','lc:l');
+var bigf  = FFITEST.getapi('big64',  ':l');
+var passf = FFITEST.getapi('passll','l:l');
+var addf  = FFITEST.getapi('addll', 'll:l');
+var applyllf = FFITEST.getapi('applyll','lc:l');
 
 var b = bigf();                    // 0x100000005 = 4294967301 (> 2^31)
 ?. b;                 ?. ' <- big64 expect 4294967301';
