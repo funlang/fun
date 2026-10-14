@@ -6,6 +6,15 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Fix the first CI build of a fresh checkout. A pristine PCRE tarball ships
+  only `config.h.generic` / `pcre.h.generic` / `pcre_chartables.c.dist` (the
+  upstream `./configure` output is byte-identical) and has no
+  dftables-generated `pcre_default_tables.c`, so `make-linux-x86_64.sh` and
+  `make-macos.sh` aborted immediately on the runners. Both now create the
+  build-ready files from the shipped copies and skip the optional generated
+  duplicate. Also drop the absolute repo path from `lib-loadcheck.sh`'s FAIL
+  lines so its snapshot is host-independent.
+
 - Portable regression harness and macOS CI. `fun/test/run-linux-regression.sh`
   now detects the host (linux / macos) and reads
   `fun/test/regression-skip-<platform>.txt` plus an optional

@@ -13,6 +13,7 @@
 #
 # Usage: fun/test/lib-loadcheck.sh   (from the repo root)
 cd "$(dirname "$0")/../.." || exit 2
+ROOT="$(pwd)"
 # Byte-order the module glob so the report is identical on every host: the
 # default collation differs between glibc and macOS (lib-ado vs lib-ado-schema,
 # lib-asm vs lib-asm-pro), which reorders the whole listing.
@@ -35,7 +36,7 @@ for f in fun/lib/*.fun; do
     ok=$((ok+1)); printf 'LOAD  %s\n' "$n"
   else
     bad=$((bad+1))
-    reason=$(printf '%s' "$out" | grep -m1 -iE 'error|not found|cannot load|violation' | cut -c1-60)
+    reason=$(printf '%s' "$out" | grep -m1 -iE 'error|not found|cannot load|violation' | sed "s|$ROOT/||g" | cut -c1-60)
     printf 'FAIL  %-22s %s\n' "$n" "$reason"
   fi
 done
