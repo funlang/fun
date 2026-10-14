@@ -266,8 +266,21 @@ jobs:
           }
 
       - name: Regression (portable subset)
-        shell: cmd
-        run: fun\test\run-windows-regression.bat --portable
+        shell: pwsh
+        run: |
+          $log = "$env:RUNNER_TEMP\reg-windows-x64.log"
+          cmd /c "fun\test\run-windows-regression.bat --portable" 2>&1 |
+            Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            # Surface the failing tests: the job log is not readable from outside.
+            $fails = (Get-Content $log |
+                        Select-String -Pattern 'FAIL|failed|mismatch|not found|error' |
+                        Select-Object -First 12 |
+                        ForEach-Object { $_.Line }) -join ' | '
+            if ([string]::IsNullOrEmpty($fails)) { $fails = "runner exited $LASTEXITCODE" }
+            Write-Host "::error title=regression (windows-x64)::$($fails.Substring(0, [Math]::Min(900, $fails.Length)))"
+            exit 1
+          }
 
   windows-arm64:
     name: windows-arm64
