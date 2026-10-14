@@ -268,6 +268,19 @@ jobs:
       - name: Regression (portable subset)
         shell: pwsh
         run: |
+          # The shared snapshots are stored verbatim as LF, but funcmd.exe on
+          # Windows ends its lines with CRLF, so compare against a CRLF copy
+          # instead of failing every snapshot on the line ending alone.
+          $expSrc = "fun\test\expected"
+          $expDst = "$env:RUNNER_TEMP\expected-win"
+          Remove-Item -Recurse -Force $expDst -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $expDst | Out-Null
+          Get-ChildItem "$expSrc\*.txt" | ForEach-Object {
+            $t = [IO.File]::ReadAllText($_.FullName).Replace("`r`n", "`n").Replace("`n", "`r`n")
+            [IO.File]::WriteAllText((Join-Path $expDst $_.Name), $t)
+          }
+          $env:FUNREG_EXPECTED = $expDst
+
           $log = "$env:RUNNER_TEMP\reg-windows-x64.log"
           cmd /c "fun\test\run-windows-regression.bat --portable" 2>&1 |
             Tee-Object -FilePath $log
