@@ -3,9 +3,9 @@
 #
 #   linux-x64    ubuntu-24.04      native FPC + full suite
 #   linux-arm64  ubuntu-24.04-arm  native FPC + full suite (linux-aarch64 skips)
-#   macos-x64    macos-15-intel    FPC universal installer + macOS suite
-#   macos-arm64  macos-latest      FPC universal installer + macOS suite
-#   windows-x64  windows-latest    FPC + the Windows runner (portable subset)
+#   macos-x64    macos-15-intel    FPC universal dmg + macOS suite
+#   macos-arm64  macos-latest      Homebrew FPC 3.2.2 bottle + macOS suite
+#   windows-x64  windows-latest    FPC (ppcrossx64) + the Windows runner (portable subset)
 #   windows-arm64 windows-11-arm   placeholder: FPC has no win64/aarch64 target
 #
 # The POSIX runner auto-detects the host and reads a per-platform skip list
@@ -101,58 +101,38 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           set -e
-          cd "$RUNNER_TEMP"
-          # Official universal (Intel + arm64) installer; Homebrew has no Intel
-          # bottle for fpc. The dmg holds fpc-3.2.2.intelarm64-macosx/.
-          curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o fpc.dmg \
-            "https://downloads.sourceforge.net/project/freepascal/Mac%20OS%20X/3.2.2/fpc-3.2.2.intelarm64-macosx.dmg"
-          ls -l fpc.dmg
-          MOUNT="$RUNNER_TEMP/fpcmnt"
-          mkdir -p "$MOUNT"
-          if ! hdiutil attach fpc.dmg -nobrowse -mountpoint "$MOUNT"; then
-            echo "::error title=macos fpc install::hdiutil attach failed"; exit 1
-          fi
-          # The dmg layout (volume root vs a wrapper folder, package at any
-          # depth) varies, so locate the package instead of hard-coding it.
-          # FPC's package is not notarized, so allow it explicitly.
-          PKG="$(find "$MOUNT" \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
-          [ -n "$PKG" ] || { echo "::error title=macos fpc install::no package in the dmg"; exit 1; }
-          echo "installing $PKG on macOS $(sw_vers -productVersion) $(uname -m)"
-
-          install_pkg() { sudo installer -pkg "$1" -target / -allowUntrusted 2>&1; }
-
-          if ! out="$(install_pkg "$PKG")"; then
-            # The 3.2.2 package carries a Distribution os-version guard, so newer
-            # macOS (macos-latest) rejects it with "This package is incompatible
-            # with this version of macOS". Copy the package off the read-only dmg
-            # (it is a bundle-form .mpkg, which pkgutil --expand refuses to open),
-            # strip the version guard and install the copy instead of giving up.
-            echo "installer refused: $(printf '%s' "$out" | tail -n 2 | tr '\n' '~')"
-            echo "retrying with the version guard removed"
-            PKGCOPY="$RUNNER_TEMP/fpc-pkg"; rm -rf "$PKGCOPY"
-            ditto "$PKG" "$PKGCOPY" \
-              || { echo "::error title=macos fpc install::copying the package failed"; exit 1; }
-            GUARDS="$RUNNER_TEMP/fpc-guards.txt"; : > "$GUARDS"
-            FILES="$RUNNER_TEMP/fpc-files.txt"; : > "$FILES"
-            find "$PKGCOPY" \( -name Distribution -o -name PackageInfo \) -print > "$FILES" 2>/dev/null || true
-            while IFS= read -r f; do
-              if grep -qE 'os-version|allowed-os-versions' "$f"; then echo "$f" >> "$GUARDS"; fi
-              perl -0pi -e \
-                's{<allowed-os-versions>.*?</allowed-os-versions>}{}gs; s{<os-version\b[^>]*/>}{}gs; s{<os-version\b[^>]*>.*?</os-version>}{}gs' \
-                "$f"
-            done < "$FILES"
-            # The job log is private, so surface the facts as annotations: what the
-            # package is, which files carried a guard, and the Distribution text.
-            echo "::warning title=macos fpc pkg::type=[$(file -b "$PKGCOPY" 2>&1)] top=[$(ls "$PKGCOPY" 2>/dev/null | tr '\n' ' ')] found=[$(tr '\n' ' ' < "$FILES")] guards=[$(tr '\n' ' ' < "$GUARDS")]"
-            if [ -f "$PKGCOPY/Distribution" ]; then
-              echo "::warning title=macos fpc Distribution::$(head -c 1500 "$PKGCOPY/Distribution" | tr '\n' '~')"
+          if [ "$(uname -m)" = "arm64" ]; then
+            # Homebrew has an FPC 3.2.2 arm64 bottle (sequoia / tahoe / golden
+            # gate). The official universal dmg, by contrast, is a PackageMaker
+            # .mpkg that current macOS refuses ("This package is incompatible
+            # with this version of macOS") and that pkgutil --expand cannot even
+            # open, so use the bottle on Apple Silicon.
+            brew install fpc
+          else
+            cd "$RUNNER_TEMP"
+            # Intel runners have no Homebrew bottle for fpc, so use the official
+            # universal dmg (fpc-3.2.2-intelarm64-macosx.mpkg), which installs
+            # fine there.
+            curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o fpc.dmg \
+              "https://downloads.sourceforge.net/project/freepascal/Mac%20OS%20X/3.2.2/fpc-3.2.2.intelarm64-macosx.dmg"
+            ls -l fpc.dmg
+            MOUNT="$RUNNER_TEMP/fpcmnt"
+            mkdir -p "$MOUNT"
+            if ! hdiutil attach fpc.dmg -nobrowse -mountpoint "$MOUNT"; then
+              echo "::error title=macos fpc install::hdiutil attach failed"; exit 1
             fi
-            if ! out="$(install_pkg "$PKGCOPY")"; then
+            # The dmg layout (volume root vs a wrapper folder, package at any
+            # depth) varies, so locate the package instead of hard-coding it.
+            # FPC's package is not notarized, so allow it explicitly.
+            PKG="$(find "$MOUNT" \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
+            [ -n "$PKG" ] || { echo "::error title=macos fpc install::no package in the dmg"; exit 1; }
+            echo "installing $PKG on macOS $(sw_vers -productVersion) $(uname -m)"
+            out="$(sudo installer -pkg "$PKG" -target / -allowUntrusted 2>&1)" || {
               echo "::error title=macos fpc install::installer failed: $(printf '%s' "$out" | tail -n 3 | tr '\n' '~' | cut -c1-500)"
               exit 1
-            fi
+            }
+            hdiutil detach "$MOUNT" || true
           fi
-          hdiutil detach "$MOUNT" || true
           fpc -iV || { echo "::error title=macos fpc install::fpc not on PATH after install"; exit 1; }
 
       - name: Link OpenSSL (lib-crypto tests)
@@ -269,7 +249,10 @@ jobs:
         shell: pwsh
         run: |
           $log = "$env:RUNNER_TEMP\build-windows-x64.log"
-          fpc funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx *>&1 |
+          # Call the x86_64-win64 compiler directly, as make-win64.bat does: the
+          # generic fpc.exe driver is the i386 one here and forwards -Twin64 to
+          # ppc386.exe ("Illegal parameter: -Twin64").
+          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx *>&1 |
             Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) {
             # Surface the real error: the log itself is not readable from outside.

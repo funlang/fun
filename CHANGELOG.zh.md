@@ -9,13 +9,13 @@
 - 加密测试支持 OpenSSL 3，以及剩余的 CI 平台修复。`lib-crypt-unx` 之前探测
   `EVP_PKEY_size`，而 OpenSSL 3.0 把它变成了指向 `EVP_PKEY_get_size` 的头文件
   宏、符号已不存在，于是整个探测在 OpenSSL 3 的 CI 镜像上失败，连带拖垮
-  `lib-crypt-lnx` 和 `lib-e2e-lnx`；现在会回退到 `EVP_PKEY_get_size`。macOS 的
-  FPC 安装在新系统以“与当前 macOS 版本不兼容”拒绝 3.2.2 的 `.pkg` 时，会去掉包
-  内 `Distribution` 的 os-version 版本闸门后重试。Windows 的 FPC 安装改用
-  `/TYPE=full` 安装全部组件，在组合安装包只留下 `bin\i386-win32` 时补装 win64
-  交叉包，并把 win64 编译器放在 `PATH` 最前。`lib-asm-a64` 在 Linux arm64 上跳过：
-  它的实时 JIT 调用会让解释器在那里崩溃（`Load()` 报成 `Open "<repo>/" failed`
-  的 EFAULT），而且其快照本就是 x86_64 专用的。
+  `lib-crypt-lnx` 和 `lib-e2e-lnx`；现在会回退到 `EVP_PKEY_get_size`。macOS arm64
+  改用 Homebrew 的 3.2.2 bottle 装 FPC，而不用官方 dmg——它的 PackageMaker `.mpkg`
+  会被新系统以“与当前 macOS 版本不兼容”拒绝（`pkgutil --expand` 也打不开）；
+  Intel 仍用 dmg。Windows 构建改为直接调用 `ppcrossx64`（与 `make-win64.bat` 一致），
+  因为那里的通用 `fpc.exe` driver 其实是 i386 的，会把 `-Twin64` 转给 `ppc386.exe`。
+  `lib-asm-a64` 在 Linux arm64 上跳过：它的实时 JIT 调用会让解释器在那里崩溃
+  （`Load()` 报成 `Open "<repo>/" failed` 的 EFAULT），而且其快照本就是 x86_64 专用的。
 
 - 修复全新 checkout 下 CI 首次构建失败。原始 PCRE 压缩包只有
   `config.h.generic` / `pcre.h.generic` / `pcre_chartables.c.dist`（上游

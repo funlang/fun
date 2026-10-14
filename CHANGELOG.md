@@ -10,15 +10,15 @@ This project records notable changes in the style of [Keep a Changelog](https://
   `lib-crypt-unx` probed `EVP_PKEY_size`, which OpenSSL 3.0 turned into a header
   macro for `EVP_PKEY_get_size` — the symbol is gone, so the whole probe failed
   on the OpenSSL 3 CI images and took `lib-crypt-lnx` and `lib-e2e-lnx` down with
-  it; it now falls back to `EVP_PKEY_get_size`. The macOS FPC install retries
-  with the package's `Distribution` os-version guard stripped when a newer macOS
-  rejects the 3.2.2 `.pkg` with "This package is incompatible with this version
-  of macOS". The Windows FPC install selects every component (`/TYPE=full`), adds
-  the win64 cross package when the combined installer leaves only
-  `bin\i386-win32`, and puts the win64 compiler first on `PATH`. `lib-asm-a64`
-  is skipped on Linux arm64: its live JIT call aborts the interpreter there
-  (`Load()` -> an EFAULT reported as `Open "<repo>/" failed`), and its snapshot
-  is x86_64-specific anyway.
+  it; it now falls back to `EVP_PKEY_get_size`. macOS arm64 installs FPC from
+  the Homebrew 3.2.2 bottle instead of the official dmg, whose PackageMaker
+  `.mpkg` current macOS refuses with "This package is incompatible with this
+  version of macOS" (and which `pkgutil --expand` cannot open); Intel keeps the
+  dmg. The Windows build calls `ppcrossx64` directly, as `make-win64.bat` does,
+  because the generic `fpc.exe` driver there is the i386 one and forwards
+  `-Twin64` to `ppc386.exe`. `lib-asm-a64` is skipped on Linux arm64: its live
+  JIT call aborts the interpreter there (`Load()` -> an EFAULT reported as
+  `Open "<repo>/" failed`), and its snapshot is x86_64-specific anyway.
 
 - Fix the first CI build of a fresh checkout. A pristine PCRE tarball ships
   only `config.h.generic` / `pcre.h.generic` / `pcre_chartables.c.dist` (the
