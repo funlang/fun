@@ -195,9 +195,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Free Pascal (Windows)
+      - name: Restore FPC cache (Windows)
         id: cache-fpc-win
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: C:\FPC
           key: fpc-3.2.2-win64-and-cross
@@ -277,6 +277,17 @@ jobs:
             $d | Out-File -FilePath $env:GITHUB_PATH -Append
           }
           & $fpc.FullName -iV
+
+      - name: Save FPC cache (Windows)
+        # actions/cache only saves on a successful job, and this job still fails
+        # on the bring-up tests, so save explicitly - before the build/regression
+        # steps, while everything above has succeeded (a failed install never
+        # poisons the cache).
+        if: steps.cache-fpc-win.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: C:\FPC
+          key: fpc-3.2.2-win64-and-cross
 
       - name: Build funcmd.exe
         working-directory: src\prj\fun
