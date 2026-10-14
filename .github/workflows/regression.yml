@@ -118,9 +118,10 @@ jobs:
           PKG="$(find "$MOUNT" \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
           [ -n "$PKG" ] || { echo "::error title=macos fpc install::no package in the dmg"; exit 1; }
           echo "installing $PKG"
-          if ! sudo installer -pkg "$PKG" -target / -allowUntrusted; then
-            echo "::error title=macos fpc install::installer failed for $PKG"; exit 1
-          fi
+          out="$(sudo installer -pkg "$PKG" -target / -allowUntrusted 2>&1)" || {
+            echo "::error title=macos fpc install::installer failed: $(printf '%s' "$out" | tail -n 3 | tr '\n' '~' | cut -c1-500)"
+            exit 1
+          }
           hdiutil detach "$MOUNT" || true
           fpc -iV || { echo "::error title=macos fpc install::fpc not on PATH after install"; exit 1; }
 
@@ -170,7 +171,12 @@ jobs:
             # FPC has no separate win64 installer; the combined win32+win64 one
             # installs the native x86_64-win64 compiler under bin\x86_64-win64.
             $url = "https://downloads.sourceforge.net/project/freepascal/Win32/3.2.2/fpc-3.2.2.win32.and.win64.exe"
-            Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\fpc.exe"
+            # curl.exe follows the SourceForge redirect to the actual mirror;
+            # Invoke-WebRequest has saved an HTML page here (corrupt .exe).
+            curl.exe -fL --retry 3 --retry-all-errors -o "$env:RUNNER_TEMP\fpc.exe" $url
+            $sz = (Get-Item "$env:RUNNER_TEMP\fpc.exe").Length
+            Write-Host "downloaded $sz bytes"
+            if ($sz -lt 1000000) { throw "installer download too small ($sz bytes) - not a PE" }
             $p = Start-Process -FilePath "$env:RUNNER_TEMP\fpc.exe" -PassThru -Wait `
               -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=C:\FPC\3.2.2"
             Write-Host "installer exit code: $($p.ExitCode)"

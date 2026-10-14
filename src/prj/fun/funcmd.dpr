@@ -278,6 +278,22 @@ label
 
 {$EndIf}
 
+{$IfDef CPUAARCH64}{$IfDef LINUX}
+// glibc >= 2.34 removed __libc_csu_init / __libc_csu_fini, but FPC 3.2.2's
+// aarch64-linux cprt0.o still references them (undefined reference at link
+// time on e.g. ubuntu-24.04). Modern glibc runs .init_array itself, so empty
+// definitions satisfy the linker without changing behaviour.
+procedure __libc_csu_init(argc: longint; argv, envp: pointer); cdecl;
+  public name '__libc_csu_init';
+begin
+end;
+
+procedure __libc_csu_fini; cdecl;
+  public name '__libc_csu_fini';
+begin
+end;
+{$EndIf}{$EndIf}
+
 begin
 {$IfNdef FunDll}
   _ParserClass := CFunParser;

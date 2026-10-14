@@ -38,6 +38,7 @@ var CRYPT_MODE_ECB = 2;
 var ZERO_PADDING   = 3;
 
 var _LIB = nil;
+var _init_err = '';   // last library-probe error, for diagnostics
 var _MD5 = nil; var _SHA1 = nil; var _SHA256 = nil; var _SHA384 = nil; var _SHA512 = nil;
 var _RAND = nil;
 var _CTXNEW = nil; var _CTXFREE = nil; var _SETPAD = nil;
@@ -66,6 +67,7 @@ end fun;
 
 fun _init()
   result = true;
+  _init_err = '';
   // Linux ships libcrypto as libcrypto.so.N; on macOS the bare name resolves
   // to the system LibreSSL, which aborts the process on load; only explicit
   // Homebrew / MacPorts paths are probed here.
@@ -115,6 +117,7 @@ fun _init()
         _LIB = n;
         found = true;
       except
+        _init_err = '' & @;
         _clear();
       end try;
     end if;
@@ -134,7 +137,7 @@ end fun;
 _init();
 
 fun Crypt(msg, typ)
-  if _MD5 = nil then raise 'lib-crypt-unx: hash functions not available'; end if;
+  if _MD5 = nil then raise 'lib-crypt-unx: hash functions not available: ' & _init_err; end if;
   var out;
   if typ = CALG_MD5 then
     out = ' '.x(16); _MD5(msg, msg.length(), out.toNum(-1));
@@ -166,7 +169,7 @@ fun _aeskey(key)
 end fun;
 
 fun AES(msg, key, isDecode, args)
-  if _LIB = nil then raise 'lib-crypt-unx: libcrypto not available'; end if;
+  if _LIB = nil then raise 'lib-crypt-unx: libcrypto not available: ' & _init_err; end if;
   var k = _aeskey(key);
   if k.length() <> 16 and k.length() <> 24 and k.length() <> 32 then
     raise 'lib-crypt-unx: AES key must be 16/24/32 bytes, got ' & k.length();
@@ -287,7 +290,7 @@ end fun;
 // (PKCS#1 v1.5 padding by default). A private key works both ways; a public key
 // only encrypts. This is the portable replacement for the CryptoAPI-blob RSA().
 fun RSA_PEM(msg, pem, isDecode)
-  if _LIB = nil then raise 'lib-crypt-unx: libcrypto not available'; end if;
+  if _LIB = nil then raise 'lib-crypt-unx: libcrypto not available: ' & _init_err; end if;
   var pkey = _pkey_load(pem, true);
   if pkey = nil then
     if isDecode then raise 'lib-crypt-unx: RSA_PEM needs a private key to decrypt'; end if;
@@ -318,7 +321,7 @@ fun RSA_PEM(msg, pem, isDecode)
 end fun;
 
 fun RandomBytes(n)
-  if _LIB = nil then raise 'lib-crypt-unx: libcrypto not available'; end if;
+  if _LIB = nil then raise 'lib-crypt-unx: libcrypto not available: ' & _init_err; end if;
   var b = ' '.x(n);
   if _RAND(b.toNum(-1), n) <> 1 then raise 'lib-crypt-unx: RAND_bytes failed'; end if;
   result = b;
