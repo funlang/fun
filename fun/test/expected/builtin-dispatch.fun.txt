@@ -52,10 +52,8 @@ True
 False
 True
 False
-fun "9.0"
-os linux
-cpu x86_64
-compiler fpc 3.2.2
-bits 64
-chars 1
-version 20260926
+True
+True
+64
+1
+True

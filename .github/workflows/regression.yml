@@ -1,0 +1,172 @@
+# Continuous integration: build the interpreter and run the regression suite
+# on six platforms - Linux / macOS / Windows, each on x64 and arm64.
+#
+#   linux-x64    ubuntu-24.04      native FPC + full suite
+#   linux-arm64  ubuntu-24.04-arm  native FPC + full suite (linux-aarch64 skips)
+#   macos-x64    macos-15-intel    FPC universal installer + macOS suite
+#   macos-arm64  macos-latest      FPC universal installer + macOS suite
+#   windows-x64  windows-latest    FPC + the Windows runner (portable subset)
+#   windows-arm64 windows-11-arm   placeholder: FPC has no win64/aarch64 target
+#
+# The POSIX runner auto-detects the host and reads a per-platform skip list
+# (fun/test/regression-skip-<platform>.txt) plus optional
+# fun/test/expected/<platform>/ snapshots; see fun/test/run-linux-regression.sh
+# and art/notes/macos-port.md.
+#
+# Status: the Linux and macOS jobs are the maintained gate. The Windows jobs are
+# a bring-up first pass (the Windows build has no regex yet and its FPC layout
+# needs checking), so they are marked continue-on-error for now; remove that
+# once they are green. See the README "Regression tests and CI" section.
+name: regression
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel an in-progress run when the same ref is pushed again.
+concurrency:
+  group: regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------- POSIX ---
+  unix:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x64
+            os: ubuntu-24.04
+            platform: linux
+            fpc_tar: fpc-3.2.2.x86_64-linux.tar
+            build: ./make-linux-x86_64.sh
+            fetch_all: true
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            platform: linux-aarch64
+            fpc_tar: fpc-3.2.2.aarch64-linux.tar
+            build: ./make-linux-x86_64.sh
+            fetch_all: true
+          - name: macos-x64
+            os: macos-15-intel
+            platform: macos
+            fpc_tar: ""
+            build: ./make-macos.sh
+            fetch_all: false
+          - name: macos-arm64
+            os: macos-latest
+            platform: macos
+            fpc_tar: ""
+            build: ./make-macos.sh
+            fetch_all: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Free Pascal (Linux)
+        if: runner.os == 'Linux'
+        id: cache-fpc
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/fpc-3.2.2
+            ~/.fpc.cfg
+          key: ${{ matrix.fpc_tar }}
+
+      - name: Install Free Pascal 3.2.2 (Linux)
+        if: runner.os == 'Linux' && steps.cache-fpc.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 3 -o fpc.tar \
+            "https://downloads.sourceforge.net/project/freepascal/Linux/3.2.2/${{ matrix.fpc_tar }}"
+          mkdir -p fpc && tar -xf fpc.tar -C fpc
+          cd fpc/fpc-3.2.2.*-linux
+          # install.sh is interactive: first line is the prefix, the rest accept
+          # the defaults (install all unit packages, including libffi + hash).
+          printf '%s\n\n\n\n\n\n\n\n\n\n' "$HOME/fpc-3.2.2" | ./install.sh
+
+      - name: Put fpc on PATH (Linux)
+        if: runner.os == 'Linux'
+        run: echo "$HOME/fpc-3.2.2/bin" >> "$GITHUB_PATH"
+
+      - name: Install Free Pascal 3.2.2 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -e
+          cd "$RUNNER_TEMP"
+          # Official universal (Intel + arm64) installer; Homebrew has no Intel
+          # bottle for fpc. The dmg holds fpc-3.2.2.intelarm64-macosx/.
+          curl -fsSL --retry 3 -o fpc.dmg \
+            "https://downloads.sourceforge.net/project/freepascal/Mac%20OS%20X/3.2.2/fpc-3.2.2.intelarm64-macosx.dmg"
+          MOUNT="$RUNNER_TEMP/fpcmnt"
+          mkdir -p "$MOUNT"
+          hdiutil attach fpc.dmg -nobrowse -mountpoint "$MOUNT"
+          sudo installer -pkg \
+            "$MOUNT/fpc-3.2.2.intelarm64-macosx/fpc-3.2.2-intelarm64-macosx.mpkg" \
+            -target /
+          hdiutil detach "$MOUNT"
+          fpc -iV
+
+      - name: Fetch third-party C sources
+        run: |
+          if [ "${{ matrix.fetch_all }}" = "true" ]; then
+            src/prj/fun/fetch-3rd-party.sh
+          else
+            src/prj/fun/fetch-3rd-party.sh --pcre-only
+          fi
+
+      - name: Build funcmd
+        working-directory: src/prj/fun
+        run: ${{ matrix.build }}
+
+      - name: Regression
+        env:
+          FUNREG_PLATFORM: ${{ matrix.platform }}
+        run: fun/test/run-linux-regression.sh
+
+  # -------------------------------------------------------------- WINDOWS ---
+  windows-x64:
+    name: windows-x64
+    runs-on: windows-latest
+    continue-on-error: true   # bring-up: FPC layout + regex still being wired
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Free Pascal 3.2.2 (x86_64-win64)
+        shell: pwsh
+        run: |
+          $url = "https://downloads.sourceforge.net/project/freepascal/Win64/3.2.2/fpc-3.2.2.x86_64-win64.exe"
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\fpc.exe"
+          Start-Process -FilePath "$env:RUNNER_TEMP\fpc.exe" `
+            -ArgumentList "/VERYSILENT", "/NORESTART", "/DIR=C:\FPC\3.2.2" -Wait
+          "C:\FPC\3.2.2\bin\x86_64-win64" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Build funcmd.exe
+        working-directory: src\prj\fun
+        shell: cmd
+        run: |
+          fpc funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx
+
+      - name: Regression (portable subset)
+        shell: cmd
+        run: fun\test\run-windows-regression.bat --portable
+
+  windows-arm64:
+    name: windows-arm64
+    runs-on: windows-11-arm
+    continue-on-error: true   # see the step below: no aarch64-windows FPC yet
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No aarch64-windows FPC in the pinned toolchain
+        shell: pwsh
+        run: |
+          Write-Host "FPC 3.2.2 (the pinned toolchain) has no win64/aarch64 target,"
+          Write-Host "so funcmd cannot be built natively for Windows arm64 yet."
+          Write-Host "This job reserves the matrix slot and will fail until an FPC"
+          Write-Host "with aarch64-windows support (>= 3.3.x) is available."
+          exit 1

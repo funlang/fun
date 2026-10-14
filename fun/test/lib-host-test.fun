@@ -2,8 +2,10 @@
 // Only host-independent facts are asserted, so the snapshot is machine-neutral.
 use 'fun/lib/lib-host.fun';
 
-?. IsLinux();
-?. IsWindows();
+// IsLinux()/IsWindows() are host-specific; assert the invariant that exactly
+// one supported host family matches, instead of printing the host's value.
+?. IsUnix() or IsWindows();
+?. IsWindows() <> IsUnix();
 ?. HostSep();
 ?. HostCurrPath().substr(0, 1) = '/';
 ?. HostCurrPath().length() > 1;

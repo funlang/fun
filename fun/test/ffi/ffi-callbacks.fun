@@ -1,6 +1,11 @@
+use 'fun/lib/lib-host.fun';
+
+// libffitest is built per host by fun/test/ffi/build.sh (the runner builds
+// it on demand): .so on Linux, .dylib on macOS.
+var FFITEST = DyLib('./fun/test/ffi/libffitest.so', './fun/test/ffi/libffitest.dylib');
 
 ########################################
-# Linux FFI: callbacks (Fun function as native function pointer)
+# Unix FFI (Linux / macOS): callbacks (Fun function as native function pointer)
 ########################################
 # f.@toCallback(type) wraps a Fun function into a libffi closure; getapi()
 # passes it to C via the 'c' argument type. arg:ret type chars.
@@ -8,12 +13,12 @@
 #   src/prj/fun/funcmd fun/test/ffi/ffi-callbacks.fun
 ########################################
 
-var apply1   = './fun/test/ffi/libffitest.so'.getapi('apply1',  'ic:i');   // int cb
-var dapply   = './fun/test/ffi/libffitest.so'.getapi('dapply',  'dc:d');   // double cb
-var sumvia   = './fun/test/ffi/libffitest.so'.getapi('sumvia',  'ic:i');  // int n + cb, repeated
-var cb2f     = './fun/test/ffi/libffitest.so'.getapi('cb2',     'iic:i');  // int,int cb
-var applyStr = './fun/test/ffi/libffitest.so'.getapi('applyStr','sc:i');   // string cb
-var makef    = './fun/test/ffi/libffitest.so'.getapi('make',    'ic:s');   // cb returns string
+var apply1   = FFITEST.getapi('apply1',  'ic:i');   // int cb
+var dapply   = FFITEST.getapi('dapply',  'dc:d');   // double cb
+var sumvia   = FFITEST.getapi('sumvia',  'ic:i');  // int n + cb, repeated
+var cb2f     = FFITEST.getapi('cb2',     'iic:i');  // int,int cb
+var applyStr = FFITEST.getapi('applyStr','sc:i');   // string cb
+var makef    = FFITEST.getapi('make',    'ic:s');   // cb returns string
 
 // --- int callback ---
 fun dbl(n)
@@ -64,8 +69,8 @@ var cbRet = greet.@toCallback(nil, 'i:s');
 ?. makef(9, cbRet);     ?. ' <- make(9, greet) string return expect made-string';
 
 // --- zero-argument callbacks (no args; int / void return) ---
-var fire0i = './fun/test/ffi/libffitest.so'.getapi('fire0i', 'c:i');
-var fire0  = './fun/test/ffi/libffitest.so'.getapi('fire0',  'c:v');
+var fire0i = FFITEST.getapi('fire0i', 'c:i');
+var fire0  = FFITEST.getapi('fire0',  'c:v');
 var zcnt = 0;
 fun seven() return 7; end fun;
 fun tick() zcnt += 1; end fun;

@@ -6,6 +6,27 @@
 
 ## [未发布]
 
+- 可移植的回归测试框架与 macOS CI。`fun/test/run-linux-regression.sh` 现在会
+  自动识别主机（linux / macos），读取 `fun/test/regression-skip-<platform>.txt`
+  跳过清单，并支持 `fun/test/expected/<platform>/` 覆盖快照，因此那些“按设计仅
+  Linux”的测试（libc.so.6 / `/proc` / x86-64 汇编 / TCC / JIT）在 macOS 上会记为
+  SKIP 而不是失败；`ffi-*.fun` 则改为与主机无关（`LibC()`/`DyLib()`，`libffitest`
+  在 macOS 上构建为 `.dylib`），因此在 macOS 上同样验证 getapi。新增
+  `fun/test/run-macos-regression.sh`、
+  `regression-skip-macos.txt`、macOS 原生构建脚本 `src/prj/fun/make-macos.sh`、
+  第三方源码下载脚本 `src/prj/fun/fetch-3rd-party.sh`、
+  `fun/test/ffi/build.sh`（按需构建 FFI 辅助库，该产物不入库），以及
+  `.github/workflows/regression.yml`（6 个 job：Linux / macOS / Windows 各 x64 与
+  arm64）。Linux/macOS 原生构建并作为通过门槛；Windows 为首次接入，暂以
+  continue-on-error 标记（Windows 构建尚未启用 regex，且 FPC 3.2.2 没有
+  win64/aarch64 目标）。依据 Issue #2 的 macOS 真机报告修复：`find()` 现在按固定字节序输出目录项
+  （ext4、APFS、NTFS 的枚举顺序不同，`lib-dyns-test` / `lib-file-test` 快照此前
+  依赖主机）；`run-benchmarks.sh` 不再依赖 GNU `timeout`（原生 macOS 没有）；
+  `lib-loadcheck.sh` 的模块 glob 改为字节序；`builtin-dispatch` 与 `lib-host-test`
+  快照改为与主机无关；`lib-bounds-test` 中依赖分配失败的“超大下标抛异常”断言已
+  移除（Linux 上抛 `EOutOfMemory`，macOS 上可能惰性成功；见 `safety-bounds.md`）。
+  Linux 回归仍为 92/92。
+
 - 解释器的 Linux aarch64 (arm64) 交叉构建，与 x86_64 版一并保留。
   `bootstrap-linux-aarch64.sh` 在 x86_64 主机上建出 aarch64-linux 的 FPC
   RTL/rtl-objpas/hash 单元（复用 darwin 工具链的 `ppcrossa64`），

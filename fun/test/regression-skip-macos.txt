@@ -1,0 +1,33 @@
+# Tests skipped on macOS (fun/test/run-linux-regression.sh reads this when
+# PLATFORM=macos). One per line: name<TAB>reason. Blank lines and # lines are
+# ignored. Everything not listed here must pass against fun/test/expected/
+# (shared) or fun/test/expected/macos/ (host-specific snapshot).
+#
+# Most entries are Linux-only by design - they bind libc.so.6 / libX.so.N, read
+# /proc, or use x86-64 executable memory. See art/notes/macos-port.md for the
+# port status. When one of these becomes available on macOS (or gets a host
+# branch + a macOS snapshot), remove it from this list.
+#
+# --- Linux libc.so.6 / .so probes (no macOS name yet) ---------------------
+raw-address-getapi.fun	Linux .so helper + atoi/raw-address probe
+lib-os-dispatch-prototype.fun	Linux libc.so.6 backend prototype
+libc-outbuf.fun	Linux libc.so.6 out-buffer probe
+# --- FFI suite -----------------------------------------------------------
+# The ffi-*.fun tests are host-aware now (LibC()/DyLib() from lib-host, and
+# libffitest is built as .dylib by fun/test/ffi/build.sh), so they run on macOS
+# too. If getapi/ABI breaks on Darwin, they fail here rather than being hidden.
+# --- /proc and network backends -------------------------------------------
+lib-proc-test.fun	lib-proc reads /proc (no /proc on macOS)
+lib-winsock-lnx-test.fun	lib-winsock netif enumeration reads /proc
+lib-ajax-lnx-test.fun	lib-ajax binds Linux libcurl.so
+run-ajax-lnx.sh	Linux curl/http server harness
+lib-e2e-lnx.fun	Linux end-to-end backend test
+# --- native code generation (not ported to macOS) -------------------------
+lib-tcc-test.fun	needs libtcc.dylib (no macOS build yet)
+lib-jit-test.fun	JIT backend is Windows/Linux only
+lib-asm-lnx.fun	Linux x86-64 executable memory
+lib-asm-x64.fun	x86-64 assembly backend (no arm64 macOS support)
+lib-asm-a64.fun	needs MAP_JIT / executable memory on arm64 macOS
+fractal-asm-x64.fun	x86-64 assembly backend
+# --- host-dependent output that needs its own macOS snapshot --------------
+lib-loadcheck.sh	module load set differs (lib-asm*, lib-async); run --update on macOS to add expected/macos/lib-loadcheck.sh.txt

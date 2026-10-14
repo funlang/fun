@@ -14,6 +14,13 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT" || exit 2
 FUNCMD="$ROOT/src/prj/fun/funcmd"
+# GNU `timeout` is not part of a stock macOS userland; use it when present so a
+# hung benchmark cannot wedge CI, and fall back to a plain run otherwise.
+if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT="timeout 600"
+else
+    TIMEOUT=""
+fi
 B="fun/test/.bench"
 
 rm -rf "$B"
@@ -24,11 +31,11 @@ cp fun/demos/benchmarks/fractal-benchmark.fun \
    fun/demos/benchmarks/test-high-level-language.fun "$B/"
 
 echo "--- fractal-benchmark: deterministic output (timings filtered) ---"
-( cd "$B" && timeout 600 ./funcmd fractal-benchmark.fun 2>&1 | tr -d '\r' | grep -v '^: ' )
+( cd "$B" && $TIMEOUT ./funcmd fractal-benchmark.fun 2>&1 | tr -d '\r' | grep -v '^: ' )
 echo "--- fractal done ---"
 
 echo "--- test-high-level-language ---"
-( cd "$B" && timeout 600 ./funcmd test-high-level-language.fun 2>&1 | tr -d '\r' )
+( cd "$B" && $TIMEOUT ./funcmd test-high-level-language.fun 2>&1 | tr -d '\r' )
 
 # test-speed.fun (a 100M-iteration loop, prints only timings) is deliberately
 # not part of the default run: it costs ~11s and adds no deterministic output.

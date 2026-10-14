@@ -86,5 +86,12 @@ mp['b'] = nil;
 ?. st.@has(-1);    // true
 ?. st.@has('x');   // false
 
-// host facts
-?. 'host'.arg();
+// host facts: os/cpu/compiler are machine-specific, so assert the invariant
+// shape instead of printing the raw value (keeps the snapshot host-neutral).
+var hf = 'host'.arg().getJson(fd: true);
+?. hf.os <> '';         // 'linux' / 'macos' / 'windows'
+?. hf.cpu <> '';        // 'x86_64' / 'aarch64' / ...
+?. hf.bits;             // 64 on every supported target
+?. hf.chars;            // 1
+?. hf.version >= 20250000;
+
