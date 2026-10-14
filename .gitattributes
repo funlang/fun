@@ -1,30 +1,73 @@
-# Preserve line endings & encoding for this Windows-centric (Delphi/FPC) codebase.
-# Existing blobs are kept as-is; this governs future commits and checkouts.
+# ===========================================================================
+# Line endings.
+#
+# Every text file is listed with an explicit `eol` so a checkout is
+# byte-identical on every platform and under any core.autocrlf setting. Git
+# always stores LF in the object database and converts on checkout; a file
+# whose stored blob disagrees with its attribute shows up as spuriously
+# "modified" right after a fresh clone, so keep the index and these rules in
+# sync (git add --renormalize .).
+#
+# Policy:
+#   CRLF     - Windows-centric sources and batch/make scripts
+#   LF       - Unix shell/Python tooling, Markdown, and data read verbatim
+#   verbatim - golden test snapshots, compared byte-for-byte (see below)
+# ===========================================================================
 
-# Pascal / C sources
-*.pas   text eol=crlf
-*.inc   text eol=crlf
-*.dpr   text eol=crlf
-*.c     text eol=crlf
-*.h     text eol=crlf
+# ---- Windows-centric sources ----------------------------------------------
+*.pas     text eol=crlf
+*.inc     text eol=crlf
+*.INC     text eol=crlf
+*.dpr     text eol=crlf
+*.fpc     text eol=crlf
+*.c       text eol=crlf
+*.h       text eol=crlf
 
-# Fun scripts & data formats
-*.fun   text eol=crlf
-*.ebnf  text eol=crlf
-*.y     text eol=crlf
-*.l     text eol=crlf
-*.ini   text eol=crlf
-*.md    text eol=lf
+# ---- Fun scripts, grammars, Windows-side data -----------------------------
+*.fun     text eol=crlf
+*.ebnf    text eol=crlf
+*.y       text eol=crlf
+*.l       text eol=crlf
+*.ini     text eol=crlf
+*.presets text eol=crlf
 
-# Batch / Makefiles
-*.bat   text eol=crlf
-*.mak   text eol=crlf
+# ---- Batch / Makefiles ----------------------------------------------------
+*.bat     text eol=crlf
+*.mak     text eol=crlf
 
-# Vendored third-party code: excluded from GitHub language statistics
+# ---- Test snapshots -------------------------------------------------------
+*.txt   text eol=lf
+# Golden files are compared byte-for-byte. funcmd prints CRLF for ordinary
+# lines but LF for a newline embedded inside a string literal (the SQL and
+# 'host'.arg() snapshots are mixed), so store them verbatim - no eol conversion
+# on any platform and under any core.autocrlf setting.
+fun/test/expected/**   -text
+
+# ---- Unix tooling and docs ------------------------------------------------
+*.sh      text eol=lf
+*.py      text eol=lf
+*.md      text eol=lf
+*.cfg     text eol=lf
+*.fd      text eol=lf
+*.fd.2    text eol=lf
+.gitignore      text eol=lf
+.gitattributes  text eol=lf
+
+# Cross-linker wrappers are POSIX shell scripts without an extension.
+src/prj/fun/darwin/clang        text eol=lf
+src/prj/fun/darwin/ld           text eol=lf
+src/prj/fun/linux-aarch64/as    text eol=lf
+src/prj/fun/linux-aarch64/ld    text eol=lf
+
+# Editor assets for the notepad-- demo.
+fun/demos/notepad--/notepad--.css       text eol=lf
+fun/demos/notepad--/notepad--*.syntax   text eol=lf
+
+# ---- Vendored third-party code: excluded from GitHub language statistics ---
 src/3rd/**           linguist-vendored
 src/regex/pcre/**    linguist-vendored
 
-# Explicitly binary (never touch)
+# ---- Explicitly binary (never convert) ------------------------------------
 *.exe   binary
 *.dll   binary
 *.obj   binary
@@ -35,3 +78,8 @@ src/regex/pcre/**    linguist-vendored
 *.gz    binary
 # GBK/CP936 codepoint table used by lib-unicode on Linux (2-byte LE entries)
 *.tbl   binary
+
+# LICENSE.dll is a license document, not a binary; override *.dll above.
+LICENSE         text eol=lf
+LICENSE.custom  text eol=lf
+LICENSE.dll     text eol=lf
