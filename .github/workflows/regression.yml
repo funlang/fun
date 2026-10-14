@@ -289,6 +289,26 @@ jobs:
             # log is not readable from outside, so an annotation is the only view.
             $head = (Get-Content $log | Select-Object -First 45 | ForEach-Object { $_ }) -join '~'
             Write-Host "::warning title=regression (windows-x64) head::$($head.Substring(0, [Math]::Min(2500, $head.Length)))"
+
+            # Lengths + first differing byte for the first few failures: equal
+            # lengths with a difference means line endings, unequal means content.
+            $line = Get-Content $log
+            $pairs = @(); $g = $null
+            foreach ($l in $line) {
+              if ($l -match '^\s*got:\s*(.+)$') { $g = $Matches[1].Trim() }
+              elseif ($l -match '^\s*exp:\s*(.+)$' -and $g) { $pairs += , @($g, $Matches[1].Trim()); $g = $null }
+            }
+            $rep = @()
+            foreach ($p in ($pairs | Select-Object -First 6)) {
+              if ((Test-Path $p[0]) -and (Test-Path $p[1])) {
+                $a = [IO.File]::ReadAllBytes($p[0]); $b = [IO.File]::ReadAllBytes($p[1])
+                $n = [Math]::Min($a.Length, $b.Length); $d = -1
+                for ($i = 0; $i -lt $n; $i++) { if ($a[$i] -ne $b[$i]) { $d = $i; break } }
+                $rep += "$([IO.Path]::GetFileNameWithoutExtension($p[1])): got=$($a.Length) exp=$($b.Length) diff@$d"
+              }
+            }
+            Write-Host "::warning title=regression (windows-x64) sizes::$($rep -join ' | ')"
+
             $fails = (Get-Content $log |
                         Select-String -Pattern 'FAIL|failed|mismatch|not found|error' |
                         Select-Object -First 12 |
