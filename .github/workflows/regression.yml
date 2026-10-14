@@ -100,15 +100,16 @@ jobs:
           cd "$RUNNER_TEMP"
           # Official universal (Intel + arm64) installer; Homebrew has no Intel
           # bottle for fpc. The dmg holds fpc-3.2.2.intelarm64-macosx/.
-          curl -fsSL --retry 3 -o fpc.dmg \
+          curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o fpc.dmg \
             "https://downloads.sourceforge.net/project/freepascal/Mac%20OS%20X/3.2.2/fpc-3.2.2.intelarm64-macosx.dmg"
+          ls -l fpc.dmg
           MOUNT="$RUNNER_TEMP/fpcmnt"
           mkdir -p "$MOUNT"
           hdiutil attach fpc.dmg -nobrowse -mountpoint "$MOUNT"
-          # The dmg layout (volume root vs a wrapper folder) varies by tool, so
-          # locate the package instead of hard-coding the path. FPC's package is
-          # not notarized, so allow it explicitly.
-          PKG="$(find "$MOUNT" -maxdepth 2 \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
+          # The dmg layout (volume root vs a wrapper folder, package at any
+          # depth) varies, so locate the package instead of hard-coding it.
+          # FPC's package is not notarized, so allow it explicitly.
+          PKG="$(find "$MOUNT" \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
           [ -n "$PKG" ] || { echo "no installer package found in the FPC dmg" >&2; exit 1; }
           echo "installing $PKG"
           sudo installer -pkg "$PKG" -target / -allowUntrusted
@@ -125,7 +126,15 @@ jobs:
 
       - name: Build funcmd
         working-directory: src/prj/fun
-        run: ${{ matrix.build }}
+        run: |
+          log="$RUNNER_TEMP/build-${{ matrix.name }}.log"
+          if ! ${{ matrix.build }} >"$log" 2>&1; then
+            tail -n 40 "$log"
+            # Surface the error on the run page (public annotations API).
+            echo "::error title=build (${{ matrix.name }})::$(grep -iE 'error|fatal|cannot find|No such file' "$log" | tail -n 3 | tr '\n' ' | ')"
+            exit 1
+          fi
+          tail -n 5 "$log"
 
       - name: Regression
         env:
@@ -147,10 +156,18 @@ jobs:
           # installs the native x86_64-win64 compiler under bin\x86_64-win64.
           $url = "https://downloads.sourceforge.net/project/freepascal/Win32/3.2.2/fpc-3.2.2.win32.and.win64.exe"
           Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\fpc.exe"
-          Start-Process -FilePath "$env:RUNNER_TEMP\fpc.exe" `
-            -ArgumentList "/VERYSILENT", "/NORESTART", "/DIR=C:\FPC\3.2.2" -Wait
+          $p = Start-Process -FilePath "$env:RUNNER_TEMP\fpc.exe" -PassThru -Wait `
+            -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=C:\FPC\3.2.2"
+          Write-Host "installer exit code: $($p.ExitCode)"
+          # Inno may return before the files are on disk; wait for the compiler.
+          $fpc = "C:\FPC\3.2.2\bin\x86_64-win64\fpc.exe"
+          for ($i = 0; $i -lt 60 -and -not (Test-Path $fpc); $i++) { Start-Sleep -Seconds 2 }
+          if (-not (Test-Path $fpc)) {
+            Get-ChildItem C:\FPC -Recurse -Filter fpc.exe -ErrorAction SilentlyContinue | Select-Object -First 10 -ExpandProperty FullName
+            throw "fpc.exe not found after install"
+          }
+          & $fpc -iV
           "C:\FPC\3.2.2\bin\x86_64-win64" | Out-File -FilePath $env:GITHUB_PATH -Append
-          C:\FPC\3.2.2\bin\x86_64-win64\fpc.exe -iV
 
       - name: Build funcmd.exe
         working-directory: src\prj\fun

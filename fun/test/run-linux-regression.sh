@@ -204,9 +204,13 @@ while IFS="$(printf '\t')" read -r name script testmode; do
 done < "$LISTFILE"
 
 echo
-echo "$((total - fail))/$total checks passed$( [ "$skipped" -gt 0 ] && printf ' (%s skipped)' "$skipped" )"
+_passed=$((total - fail))
+echo "$_passed/$total checks passed$( [ "$skipped" -gt 0 ] && printf ' (%s skipped)' "$skipped" )"
 if [ "$fail" -ne 0 ]; then
     echo "failed:$failures"
+    # GitHub Actions annotation: makes the failing test names visible on the
+    # run page (and via the public check-run annotations API) without the job log.
+    echo "::error title=regression ($PLATFORM)::$fail/$total failed:$failures"
     exit 1
 fi
 exit 0
