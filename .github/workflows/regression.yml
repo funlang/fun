@@ -132,13 +132,21 @@ jobs:
             PKGCOPY="$RUNNER_TEMP/fpc-pkg"; rm -rf "$PKGCOPY"
             ditto "$PKG" "$PKGCOPY" \
               || { echo "::error title=macos fpc install::copying the package failed"; exit 1; }
-            find "$PKGCOPY" \( -name Distribution -o -name PackageInfo \) -print |
+            GUARDS="$RUNNER_TEMP/fpc-guards.txt"; : > "$GUARDS"
+            FILES="$RUNNER_TEMP/fpc-files.txt"; : > "$FILES"
+            find "$PKGCOPY" \( -name Distribution -o -name PackageInfo \) -print > "$FILES" 2>/dev/null || true
             while IFS= read -r f; do
-              grep -nE 'os-version|allowed-os-versions' "$f" || true
+              if grep -qE 'os-version|allowed-os-versions' "$f"; then echo "$f" >> "$GUARDS"; fi
               perl -0pi -e \
                 's{<allowed-os-versions>.*?</allowed-os-versions>}{}gs; s{<os-version\b[^>]*/>}{}gs; s{<os-version\b[^>]*>.*?</os-version>}{}gs' \
                 "$f"
-            done
+            done < "$FILES"
+            # The job log is private, so surface the facts as annotations: what the
+            # package is, which files carried a guard, and the Distribution text.
+            echo "::warning title=macos fpc pkg::type=[$(file -b "$PKGCOPY" 2>&1)] top=[$(ls "$PKGCOPY" 2>/dev/null | tr '\n' ' ')] found=[$(tr '\n' ' ' < "$FILES")] guards=[$(tr '\n' ' ' < "$GUARDS")]"
+            if [ -f "$PKGCOPY/Distribution" ]; then
+              echo "::warning title=macos fpc Distribution::$(head -c 1500 "$PKGCOPY/Distribution" | tr '\n' '~')"
+            fi
             if ! out="$(install_pkg "$PKGCOPY")"; then
               echo "::error title=macos fpc install::installer failed: $(printf '%s' "$out" | tail -n 3 | tr '\n' '~' | cut -c1-500)"
               exit 1
