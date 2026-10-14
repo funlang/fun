@@ -162,6 +162,23 @@ show('sum1ton', `#!asm
 @sum1ton
 `);
 
+show('bcond_all', `#!asm
+b.eq #0
+b.ne #0
+b.cs #0
+b.cc #0
+b.mi #0
+b.pl #0
+b.vs #0
+b.vc #0
+b.hi #0
+b.ls #0
+b.ge #0
+b.lt #0
+b.gt #0
+b.le #0
+`);
+
 // `<name>` callback: address is host-specific, so only assert it encoded.
 fun cb(a)
   result = a + 1;
