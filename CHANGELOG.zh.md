@@ -19,7 +19,8 @@
   跳过清单，并支持 `fun/test/expected/<platform>/` 覆盖快照，因此那些“按设计仅
   Linux”的测试（libc.so.6 / `/proc` / x86-64 汇编 / TCC / JIT）在 macOS 上会记为
   SKIP 而不是失败；`ffi-*.fun` 则改为与主机无关（`LibC()`/`DyLib()`，`libffitest`
-  在 macOS 上构建为 `.dylib`），因此在 macOS 上同样验证 getapi。新增
+  在 macOS 上构建为 `.dylib`），但在真机验证 Darwin 的 getapi 运行时之前仍在
+  macOS 上跳过。新增
   `fun/test/run-macos-regression.sh`、
   `regression-skip-macos.txt`、macOS 原生构建脚本 `src/prj/fun/make-macos.sh`、
   第三方源码下载脚本 `src/prj/fun/fetch-3rd-party.sh`、

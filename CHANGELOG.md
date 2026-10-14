@@ -21,8 +21,9 @@ This project records notable changes in the style of [Keep a Changelog](https://
   `fun/test/expected/<platform>/` snapshot override, so tests that are
   Linux-only by design (libc.so.6 / `/proc` / x86-64 assembly / TCC / JIT) are
   reported as SKIP instead of failing on macOS, while the `ffi-*.fun` suite was
-  made host-aware (`LibC()`/`DyLib()`, and `libffitest` built as `.dylib`) so
-  getapi is exercised on macOS too. Added
+  made host-aware (`LibC()`/`DyLib()`, `libffitest` built as `.dylib`) but is
+  kept skipped on macOS until the Darwin getapi runtime is verified on a real
+  Mac. Added
   `fun/test/run-macos-regression.sh`, `regression-skip-macos.txt`, a native
   macOS build script `src/prj/fun/make-macos.sh`, a third-party source fetcher
   `src/prj/fun/fetch-3rd-party.sh`, `fun/test/ffi/build.sh` (builds the FFI
