@@ -301,7 +301,12 @@ begin
   gui   := FindParamAsBool('gui');
   v     := FindParamAsBool('v'  ) or FindParamAsBool('?');
   log   := FindParam(      'log');
-  if not gui then gui := not FindCmdLine;
+  // A named script means a command-line run, even where no console is attached
+  // (stdout redirected to a file, a CI runner, a scheduled task). FindCmdLine
+  // only detects a parent console via AttachConsole, which is false in those
+  // cases, so without this a redirected run was mistaken for a GUI launch and
+  // printed nothing (isLog stayed false). Unix FindCmdLine is always true.
+  if not gui then gui := (not FindCmdLine) and (FindParam('fun', 1) = '');
   isLog := not gui or (log <> '');
 
   hlog := 0;

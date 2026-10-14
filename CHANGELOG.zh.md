@@ -17,6 +17,11 @@
   `lib-asm-a64` 在 Linux arm64 上跳过：它的实时 JIT 调用会让解释器在那里崩溃
   （`Load()` 报成 `Open "<repo>/" failed` 的 EFAULT），而且其快照本就是 x86_64 专用的。
 
+- Windows 上 `funcmd` 带脚本运行且 stdout 被重定向（到文件、管道、CI runner）时
+  完全没有输出：GUI/命令行模式的判断用了 `AttachConsole`，没有父控制台时它返回
+  false，于是即使给了脚本也被当成 GUI 启动，`isLog` 一直是 false。现在只要指定了
+  脚本就强制命令行模式。Windows 的 CI 任务也改为用 LF 快照的 CRLF 副本做比较。
+
 - 修复全新 checkout 下 CI 首次构建失败。原始 PCRE 压缩包只有
   `config.h.generic` / `pcre.h.generic` / `pcre_chartables.c.dist`（上游
   `./configure` 的产物与它们逐字节相同），且没有 dftables 生成的

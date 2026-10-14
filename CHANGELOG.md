@@ -20,6 +20,13 @@ This project records notable changes in the style of [Keep a Changelog](https://
   JIT call aborts the interpreter there (`Load()` -> an EFAULT reported as
   `Open "<repo>/" failed`), and its snapshot is x86_64-specific anyway.
 
+- `funcmd` on Windows produced no output when it was run with a script and its
+  stdout redirected (a file, a pipe, a CI runner): the GUI/CLI decision used
+  `AttachConsole`, which is false without a parent console, so the run was
+  mistaken for a GUI launch and `isLog` stayed false even though a script was
+  named. A named script now forces command-line mode. The Windows CI job also
+  compares its CRLF output against a CRLF copy of the LF snapshots.
+
 - Fix the first CI build of a fresh checkout. A pristine PCRE tarball ships
   only `config.h.generic` / `pcre.h.generic` / `pcre_chartables.c.dist` (the
   upstream `./configure` output is byte-identical) and has no
