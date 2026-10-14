@@ -211,6 +211,8 @@ while IFS="$(printf '\t')" read -r name script testmode; do
             echo "::error file=fun/$script title=$name::$result"
             if [ -n "$detail" ]; then
                 echo "::error file=fun/$script title=$name diff::$(_ann=$(printf '%s' "$detail" | sed -n '4,7p' | tr '\n' '~' | cut -c1-500); printf '%s' "$_ann")"
+            elif [ -n "$out" ]; then
+                echo "::error file=fun/$script title=$name out::$(_ann=$(printf '%s' "$out" | tail -n 4 | tr '\n' '~' | cut -c1-500); printf '%s' "$_ann")"
             fi
         fi
         ;;
