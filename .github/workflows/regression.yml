@@ -99,6 +99,20 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libssl-dev
 
+      - name: Cache FPC installer dmg (macOS Intel)
+        if: runner.os == 'macOS' && runner.arch == 'X64'
+        uses: actions/cache@v4
+        with:
+          path: ~/fpc-cache
+          key: fpc-dmg-3.2.2-intelarm64
+
+      - name: Cache Homebrew downloads (macOS arm64)
+        if: runner.os == 'macOS' && runner.arch == 'ARM64'
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: brew-downloads-${{ runner.arch }}
+
       - name: Install Free Pascal 3.2.2 (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -114,9 +128,15 @@ jobs:
             cd "$RUNNER_TEMP"
             # Intel runners have no Homebrew bottle for fpc, so use the official
             # universal dmg (fpc-3.2.2-intelarm64-macosx.mpkg), which installs
-            # fine there.
-            curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o fpc.dmg \
-              "https://downloads.sourceforge.net/project/freepascal/Mac%20OS%20X/3.2.2/fpc-3.2.2.intelarm64-macosx.dmg"
+            # fine there. Cache the 274 MB download between runs.
+            CACHE="$HOME/fpc-cache"; mkdir -p "$CACHE"
+            if [ -f "$CACHE/fpc.dmg" ]; then
+              cp -f "$CACHE/fpc.dmg" fpc.dmg
+            else
+              curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o fpc.dmg \
+                "https://downloads.sourceforge.net/project/freepascal/Mac%20OS%20X/3.2.2/fpc-3.2.2.intelarm64-macosx.dmg"
+              cp -f fpc.dmg "$CACHE/fpc.dmg"
+            fi
             ls -l fpc.dmg
             MOUNT="$RUNNER_TEMP/fpcmnt"
             mkdir -p "$MOUNT"
@@ -175,7 +195,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache Free Pascal (Windows)
+        id: cache-fpc-win
+        uses: actions/cache@v4
+        with:
+          path: C:\FPC
+          key: fpc-3.2.2-win64-and-cross
+
       - name: Install Free Pascal 3.2.2 (win32 + win64)
+        if: steps.cache-fpc-win.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -214,37 +242,41 @@ jobs:
               for ($i = 0; $i -lt 60 -and -not (& $win64Evidence); $i++) { Start-Sleep -Seconds 2 }
             }
 
-            # The combined installer ships the driver as bin\i386-win32\fpc.exe
-            # and targets win64 through bin\i386-win32\ppcrossx64.exe plus the
-            # x86_64-win64 units, so do not insist on an x86_64-win64\fpc.exe.
-            # Prefer that directory if it exists, else fall back to any fpc.exe.
-            $compilers = Get-ChildItem C:\FPC -Recurse -Filter fpc.exe -ErrorAction SilentlyContinue
-            $fpc = $compilers | Where-Object { $_.FullName -match 'x86_64-win64' } | Select-Object -First 1
-            if (-not $fpc) { $fpc = $compilers | Select-Object -First 1 }
-            if (-not $fpc) { throw "no fpc.exe under C:\FPC after install" }
-
-            # Surface the layout as an annotation: the log itself is not readable
-            # from outside, and the win64 arrangement is what bring-up needs.
-            $bins = @(Get-ChildItem C:\FPC -Recurse -Include 'fpc.exe', 'pp*.exe' -ErrorAction SilentlyContinue |
-                        ForEach-Object { $_.FullName }) -join '; '
-            $units = @(Get-ChildItem C:\FPC -Recurse -Directory -ErrorAction SilentlyContinue |
-                        Where-Object { $_.FullName -match '[\\/]units' } |
-                        ForEach-Object { $_.FullName }) -join '; '
-            Write-Host "::warning title=windows fpc layout::compilers=[$bins] units=[$units]"
-
-            $dirs = @($fpc.Directory.FullName)
-            $dirs += @($compilers | ForEach-Object { $_.Directory.FullName } |
-              Sort-Object -Unique | Where-Object { $_ -ne $fpc.Directory.FullName })
-            foreach ($d in $dirs) {
-              Write-Host "PATH += $d"
-              $d | Out-File -FilePath $env:GITHUB_PATH -Append
-            }
-            $fpcPath = $fpc.FullName
-            & $fpcPath -iV
           } catch {
             Write-Host "::error title=windows fpc install::$($_.Exception.Message)"
             throw
           }
+
+      - name: Put FPC on PATH (Windows)
+        shell: pwsh
+        run: |
+          # Runs for both a fresh install and a cache restore: PATH itself is not
+          # cached, and this also validates that the cache held a usable toolchain.
+          # The combined installer ships the driver as bin\i386-win32\fpc.exe and
+          # targets win64 through bin\i386-win32\ppcrossx64.exe plus the
+          # x86_64-win64 units, so do not insist on an x86_64-win64\fpc.exe.
+          $compilers = Get-ChildItem C:\FPC -Recurse -Filter fpc.exe -ErrorAction SilentlyContinue
+          $fpc = $compilers | Where-Object { $_.FullName -match 'x86_64-win64' } | Select-Object -First 1
+          if (-not $fpc) { $fpc = $compilers | Select-Object -First 1 }
+          if (-not $fpc) { throw "no fpc.exe under C:\FPC (install or cache restore failed)" }
+
+          # Surface the layout as an annotation: the log itself is not readable
+          # from outside, and the win64 arrangement is what bring-up needs.
+          $bins = @(Get-ChildItem C:\FPC -Recurse -Include 'fpc.exe', 'pp*.exe' -ErrorAction SilentlyContinue |
+                      ForEach-Object { $_.FullName }) -join '; '
+          $units = @(Get-ChildItem C:\FPC -Recurse -Directory -ErrorAction SilentlyContinue |
+                      Where-Object { $_.FullName -match '[\\/]units' } |
+                      ForEach-Object { $_.FullName }) -join '; '
+          Write-Host "::warning title=windows fpc layout::compilers=[$bins] units=[$units]"
+
+          $dirs = @($fpc.Directory.FullName)
+          $dirs += @($compilers | ForEach-Object { $_.Directory.FullName } |
+            Sort-Object -Unique | Where-Object { $_ -ne $fpc.Directory.FullName })
+          foreach ($d in $dirs) {
+            Write-Host "PATH += $d"
+            $d | Out-File -FilePath $env:GITHUB_PATH -Append
+          }
+          & $fpc.FullName -iV
 
       - name: Build funcmd.exe
         working-directory: src\prj\fun
