@@ -285,7 +285,10 @@ jobs:
           cmd /c "fun\test\run-windows-regression.bat --portable" 2>&1 |
             Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) {
-            # Surface the failing tests: the job log is not readable from outside.
+            # Surface the failing tests and the first diff: the job log is not
+            # readable from outside, and fc /b's own output is the useful part.
+            $head = (Get-Content $log | Select-Object -First 45 | ForEach-Object { $_ }) -join '~'
+            Write-Host "::warning title=regression (windows-x64) head::$($head.Substring(0, [Math]::Min(3000, $head.Length)))"
             $fails = (Get-Content $log |
                         Select-String -Pattern 'FAIL|failed|mismatch|not found|error' |
                         Select-Object -First 12 |
