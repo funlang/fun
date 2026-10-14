@@ -37,8 +37,10 @@ set "EXPECTED=%FUNREG_EXPECTED%"
 set "LISTFILE=fun\test\regression-list.txt"
 if not exist "%LISTFILE%" ( echo missing %LISTFILE% 1>&2 & popd & exit /b 2 )
 
-rem Tests whose output is host-dependent (see the shell runner header).
-set "HOSTDEP= builtin-dispatch.fun lib-host-test.fun lib-param-linux.fun lib-cmdline-linux.fun lib-loadcheck.sh libc-outbuf.fun ptr-primitives.fun raw-address-getapi.fun lib-tcc-test.fun lib-jit-test.fun lib-asm-lnx.fun fractal-asm-x64.fun lib-hash-test.fun lib-proc-test.fun lib-unicode-test.fun run-benchmarks.sh "
+rem Tests whose output is host-dependent, plus the Unix-only ones the Windows
+rem build cannot run: the -lnx/*-unx backends (libc.so.6), the FFI suite
+rem (Unix libc/libm + libffitest) and arm64/x86-only codegen.
+set "HOSTDEP= builtin-dispatch.fun lib-host-test.fun lib-param-linux.fun lib-cmdline-linux.fun lib-loadcheck.sh libc-outbuf.fun ptr-primitives.fun raw-address-getapi.fun lib-tcc-test.fun lib-jit-test.fun lib-asm-lnx.fun lib-asm-a64.fun fractal-asm-x64.fun lib-hash-test.fun lib-proc-test.fun lib-unicode-test.fun run-benchmarks.sh ffi-scalar.fun ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun lib-os-dispatch-prototype.fun lib-crypt-lnx.fun lib-e2e-lnx.fun lib-ajax-lnx-test.fun run-ajax-lnx.sh lib-winsock-lnx-test.fun lib-ado-lnx-test.fun lib-ado-schema-lnx-test.fun lib-xml-lnx-test.fun lib-jsonrpc-lnx-test.fun lib-orm-rpc-lnx-test.fun lib-os-lnx-test.fun lib-cmdline-lnx-test.fun "
 
 set "MODE=compare"
 set "PORTABLE=0"

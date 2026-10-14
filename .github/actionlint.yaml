@@ -1,0 +1,7 @@
+# actionlint configuration: teach it the newer GitHub-hosted runner labels it
+# does not know yet. Both are real GitHub-hosted labels (see the GitHub-hosted
+# runners reference); actionlint ships a static list that lags behind.
+self-hosted-runner:
+  labels:
+    - macos-15-intel
+    - windows-11-arm
