@@ -106,7 +106,13 @@ fun _init()
         _BIO_FREE = n.getapi('BIO_free', 'p:i');
         _PEM_PRIV = n.getapi('PEM_read_bio_PrivateKey', 'pp:p');
         _PEM_PUB  = n.getapi('PEM_read_bio_PUBKEY', 'pp:p');
-        _PKEY_SIZE    = n.getapi('EVP_PKEY_size', 'p:i');
+        // OpenSSL 3.0 removed the EVP_PKEY_size symbol (now a header macro for
+        // EVP_PKEY_get_size, which 1.1.1 already exported); resolve both names.
+        try
+          _PKEY_SIZE = n.getapi('EVP_PKEY_size', 'p:i');
+        except
+          _PKEY_SIZE = n.getapi('EVP_PKEY_get_size', 'p:i');
+        end try;
         _PKEY_CTX_NEW = n.getapi('EVP_PKEY_CTX_new', 'pp:p');
         _PKEY_CTX_FREE = n.getapi('EVP_PKEY_CTX_free', 'p:v');
         _PKEY_FREE     = n.getapi('EVP_PKEY_free', 'p:v');

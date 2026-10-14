@@ -117,11 +117,34 @@ jobs:
           # FPC's package is not notarized, so allow it explicitly.
           PKG="$(find "$MOUNT" \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
           [ -n "$PKG" ] || { echo "::error title=macos fpc install::no package in the dmg"; exit 1; }
-          echo "installing $PKG"
-          out="$(sudo installer -pkg "$PKG" -target / -allowUntrusted 2>&1)" || {
-            echo "::error title=macos fpc install::installer failed: $(printf '%s' "$out" | tail -n 3 | tr '\n' '~' | cut -c1-500)"
-            exit 1
-          }
+          echo "installing $PKG on macOS $(sw_vers -productVersion) $(uname -m)"
+
+          install_pkg() { sudo installer -pkg "$1" -target / -allowUntrusted 2>&1; }
+
+          if ! out="$(install_pkg "$PKG")"; then
+            # The 3.2.2 package carries a Distribution os-version guard, so newer
+            # macOS (macos-latest) rejects it with "This package is incompatible
+            # with this version of macOS". Expand the package, strip the version
+            # guard, flatten it and install the same payload instead of giving up.
+            echo "installer refused: $(printf '%s' "$out" | tail -n 2 | tr '\n' '~')"
+            echo "retrying with the Distribution version guard removed"
+            EXP="$RUNNER_TEMP/fpc-expand"; rm -rf "$EXP"; mkdir -p "$EXP"
+            pkgutil --expand "$PKG" "$EXP" \
+              || { echo "::error title=macos fpc install::pkgutil --expand failed"; exit 1; }
+            if [ -f "$EXP/Distribution" ]; then
+              grep -nE 'os-version|allowed-os-versions' "$EXP/Distribution" || true
+              perl -0pi -e \
+                's{<allowed-os-versions>.*?</allowed-os-versions>}{}gs; s{<os-version\b[^>]*/>}{}gs; s{<os-version\b[^>]*>.*?</os-version>}{}gs' \
+                "$EXP/Distribution"
+            fi
+            FPKG="$RUNNER_TEMP/fpc-flat.pkg"; rm -rf "$FPKG"
+            pkgutil --flatten "$EXP" "$FPKG" \
+              || { echo "::error title=macos fpc install::pkgutil --flatten failed"; exit 1; }
+            if ! out="$(install_pkg "$FPKG")"; then
+              echo "::error title=macos fpc install::installer failed: $(printf '%s' "$out" | tail -n 3 | tr '\n' '~' | cut -c1-500)"
+              exit 1
+            fi
+          fi
           hdiutil detach "$MOUNT" || true
           fpc -iV || { echo "::error title=macos fpc install::fpc not on PATH after install"; exit 1; }
 
@@ -168,27 +191,53 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           try {
-            # FPC has no separate win64 installer; the combined win32+win64 one
-            # installs the native x86_64-win64 compiler under bin\x86_64-win64.
-            $url = "https://downloads.sourceforge.net/project/freepascal/Win32/3.2.2/fpc-3.2.2.win32.and.win64.exe"
             # curl.exe follows the SourceForge redirect to the actual mirror;
             # Invoke-WebRequest has saved an HTML page here (corrupt .exe).
-            curl.exe -fL --retry 3 --retry-all-errors -o "$env:RUNNER_TEMP\fpc.exe" $url
-            $sz = (Get-Item "$env:RUNNER_TEMP\fpc.exe").Length
-            Write-Host "downloaded $sz bytes"
-            if ($sz -lt 1000000) { throw "installer download too small ($sz bytes) - not a PE" }
-            $p = Start-Process -FilePath "$env:RUNNER_TEMP\fpc.exe" -PassThru -Wait `
-              -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/DIR=C:\FPC\3.2.2"
-            Write-Host "installer exit code: $($p.ExitCode)"
-            # Inno may return before the files are on disk; wait for the compiler.
-            $fpc = "C:\FPC\3.2.2\bin\x86_64-win64\fpc.exe"
-            for ($i = 0; $i -lt 60 -and -not (Test-Path $fpc); $i++) { Start-Sleep -Seconds 2 }
-            if (-not (Test-Path $fpc)) {
-              $found = (Get-ChildItem C:\FPC -Recurse -Filter fpc.exe -ErrorAction SilentlyContinue | Select-Object -First 5 -ExpandProperty FullName) -join ', '
-              throw "fpc.exe not found (installer exit $($p.ExitCode)); fpc.exe under C:\FPC: [$found]"
+            # /TYPE=full selects every component, including the win64 compiler:
+            # a bare /VERYSILENT install has laid down only bin\i386-win32.
+            function Install-Fpc([string]$url, [string]$exe, [string]$label) {
+              curl.exe -fL --retry 3 --retry-all-errors -o $exe $url
+              if ($LASTEXITCODE -ne 0) { throw "$label curl failed ($LASTEXITCODE)" }
+              $sz = (Get-Item $exe).Length
+              Write-Host "$label downloaded $sz bytes"
+              if ($sz -lt 1000000) { throw "$label download too small ($sz bytes) - not a PE" }
+              $p = Start-Process -FilePath $exe -PassThru -Wait `
+                -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-", "/TYPE=full", "/DIR=C:\FPC\3.2.2"
+              Write-Host "$label installer exit code: $($p.ExitCode)"
             }
-            & $fpc -iV
-            "C:\FPC\3.2.2\bin\x86_64-win64" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+            # FPC has no separate win64 installer; the combined win32+win64 one
+            # installs the native x86_64-win64 compiler under bin\x86_64-win64.
+            Install-Fpc "https://downloads.sourceforge.net/project/freepascal/Win32/3.2.2/fpc-3.2.2.win32.and.win64.exe" "$env:RUNNER_TEMP\fpc.exe" "combined"
+            $win64rel = "bin\x86_64-win64\fpc.exe"
+            for ($i = 0; $i -lt 60 -and -not (Test-Path "C:\FPC\3.2.2\$win64rel"); $i++) { Start-Sleep -Seconds 2 }
+
+            if (-not (Test-Path "C:\FPC\3.2.2\$win64rel")) {
+              # The combined installer did not lay down the win64 compiler, so
+              # add fpc-3.2.2.i386-win32.cross.x86_64-win64.exe, which is exactly
+              # the win64 target (it also ships the x86_64-win64 units).
+              Write-Host "no x86_64-win64 compiler after the combined install; adding the cross package"
+              Install-Fpc "https://downloads.sourceforge.net/project/freepascal/Win32/3.2.2/fpc-3.2.2.i386-win32.cross.x86_64-win64.exe" "$env:RUNNER_TEMP\fpcx.exe" "cross"
+              for ($i = 0; $i -lt 60 -and -not (Test-Path "C:\FPC\3.2.2\$win64rel"); $i++) { Start-Sleep -Seconds 2 }
+            }
+
+            # Put the win64 compiler dir first on PATH, then any other bin dir
+            # FPC shipped (the driver finds ppcx64/units relative to itself).
+            $compilers = Get-ChildItem C:\FPC -Recurse -Filter fpc.exe -ErrorAction SilentlyContinue
+            $win64 = $compilers | Where-Object { $_.FullName -match 'x86_64-win64' } | Select-Object -First 1
+            if (-not $win64) {
+              $all = ($compilers | Select-Object -First 5 -ExpandProperty FullName) -join ', '
+              throw "no x86_64-win64 fpc.exe under C:\FPC; found: [$all]"
+            }
+            $dirs = @($win64.Directory.FullName)
+            $dirs += @($compilers | ForEach-Object { $_.Directory.FullName } |
+              Sort-Object -Unique | Where-Object { $_ -ne $win64.Directory.FullName })
+            foreach ($d in $dirs) {
+              Write-Host "PATH += $d"
+              $d | Out-File -FilePath $env:GITHUB_PATH -Append
+            }
+            $fpcPath = $win64.FullName
+            & $fpcPath -iV
           } catch {
             Write-Host "::error title=windows fpc install::$($_.Exception.Message)"
             throw
