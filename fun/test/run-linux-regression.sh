@@ -201,6 +201,20 @@ while IFS="$(printf '\t')" read -r name script testmode; do
     esac
     printf '%-26s %s\n' "$name" "$result"
     [ -n "$detail" ] && printf '%s\n' "$detail" | sed 's/^/    | /'
+
+    # GitHub Actions: one annotation per failure, carrying the result plus the
+    # first changed lines, so a CI failure is diagnosable from the public
+    # check-run annotations API without the (admin-only) job log.
+    case "$result" in
+      FAIL*)
+        if [ -n "${GITHUB_ACTIONS:-}" ]; then
+            echo "::error file=fun/$script title=$name::$result"
+            if [ -n "$detail" ]; then
+                echo "::error file=fun/$script title=$name diff::$(_ann=$(printf '%s' "$detail" | sed -n '4,7p' | tr '\n' '~' | cut -c1-500); printf '%s' "$_ann")"
+            fi
+        fi
+        ;;
+    esac
 done < "$LISTFILE"
 
 echo
