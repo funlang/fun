@@ -124,25 +124,22 @@ jobs:
           if ! out="$(install_pkg "$PKG")"; then
             # The 3.2.2 package carries a Distribution os-version guard, so newer
             # macOS (macos-latest) rejects it with "This package is incompatible
-            # with this version of macOS". Expand the package, strip the version
-            # guard, flatten it and install the same payload instead of giving up.
+            # with this version of macOS". Copy the package off the read-only dmg
+            # (it is a bundle-form .mpkg, which pkgutil --expand refuses to open),
+            # strip the version guard and install the copy instead of giving up.
             echo "installer refused: $(printf '%s' "$out" | tail -n 2 | tr '\n' '~')"
-            echo "retrying with the Distribution version guard removed"
-            # pkgutil --expand writes a NEW directory (it fails if the target
-            # already exists), so only remove any stale copy.
-            EXP="$RUNNER_TEMP/fpc-expand"; rm -rf "$EXP"
-            exout="$(pkgutil --expand "$PKG" "$EXP" 2>&1)" \
-              || { echo "::error title=macos fpc install::pkgutil --expand failed: $(printf '%s' "$exout" | tail -n 2 | tr '\n' '~' | cut -c1-400)"; exit 1; }
-            if [ -f "$EXP/Distribution" ]; then
-              grep -nE 'os-version|allowed-os-versions' "$EXP/Distribution" || true
+            echo "retrying with the version guard removed"
+            PKGCOPY="$RUNNER_TEMP/fpc-pkg"; rm -rf "$PKGCOPY"
+            ditto "$PKG" "$PKGCOPY" \
+              || { echo "::error title=macos fpc install::copying the package failed"; exit 1; }
+            find "$PKGCOPY" \( -name Distribution -o -name PackageInfo \) -print |
+            while IFS= read -r f; do
+              grep -nE 'os-version|allowed-os-versions' "$f" || true
               perl -0pi -e \
                 's{<allowed-os-versions>.*?</allowed-os-versions>}{}gs; s{<os-version\b[^>]*/>}{}gs; s{<os-version\b[^>]*>.*?</os-version>}{}gs' \
-                "$EXP/Distribution"
-            fi
-            FPKG="$RUNNER_TEMP/fpc-flat.pkg"; rm -rf "$FPKG"
-            pkgutil --flatten "$EXP" "$FPKG" \
-              || { echo "::error title=macos fpc install::pkgutil --flatten failed"; exit 1; }
-            if ! out="$(install_pkg "$FPKG")"; then
+                "$f"
+            done
+            if ! out="$(install_pkg "$PKGCOPY")"; then
               echo "::error title=macos fpc install::installer failed: $(printf '%s' "$out" | tail -n 3 | tr '\n' '~' | cut -c1-500)"
               exit 1
             fi
@@ -261,9 +258,21 @@ jobs:
 
       - name: Build funcmd.exe
         working-directory: src\prj\fun
-        shell: cmd
+        shell: pwsh
         run: |
-          fpc funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx
+          $log = "$env:RUNNER_TEMP\build-windows-x64.log"
+          fpc funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx *>&1 |
+            Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            # Surface the real error: the log itself is not readable from outside.
+            $err = (Get-Content $log |
+                      Select-String -Pattern 'Fatal:|Error:' |
+                      Select-Object -Last 6 |
+                      ForEach-Object { $_.Line }) -join ' | '
+            if ([string]::IsNullOrEmpty($err)) { $err = "fpc exited $LASTEXITCODE with no Fatal:/Error: line" }
+            Write-Host "::error title=build (windows-x64)::$($err.Substring(0, [Math]::Min(900, $err.Length)))"
+            exit 1
+          }
 
       - name: Regression (portable subset)
         shell: cmd
