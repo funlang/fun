@@ -24,9 +24,10 @@
   Fun 在所有平台都写 CRLF，而 POSIX runner 用 `$(...)` 捕获会吃掉末尾换行，因此
   Windows 原始重定向比每个快照都多一个字节。
 
-- CI 现在在所有平台都缓存 Free Pascal 工具链（此前只有 Linux 有）：Windows 缓存
-  `C:\FPC`，命中时跳过两个安装包；macOS Intel 缓存 274 MB 的 dmg；macOS arm64 缓存
-  Homebrew 的下载。重跑不再重新下载安装 FPC。
+- CI 在所有平台都缓存 Free Pascal 工具链（此前只有 Linux 有）。Linux 命中时本就跳过
+  安装；Windows 现在缓存 `C:\FPC`，命中时同样跳过两个安装包。macOS 缓存的是安装包而
+  非安装结果：Intel 缓存 274 MB 的 dmg，arm64 缓存 Homebrew 下载，因此这两者不再重复
+  下载（但安装仍需执行——它写入 `/usr/local`、`/opt/homebrew` 等系统路径，无法直接缓存）。
 
 - 修复全新 checkout 下 CI 首次构建失败。原始 PCRE 压缩包只有
   `config.h.generic` / `pcre.h.generic` / `pcre_chartables.c.dist`（上游
