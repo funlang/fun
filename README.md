@@ -374,9 +374,10 @@ snapshot directory; macOS details and the current skip reasons are in
 [`.github/workflows/regression.yml`](.github/workflows/regression.yml) runs the
 suite on six platforms - Linux, macOS and Windows, each x64 and arm64. The
 Linux and macOS jobs build natively with Free Pascal and are the maintained
-gate; the Windows jobs are a bring-up first pass (the Windows build has no
-regex yet, and FPC 3.2.2 has no win64/aarch64 target), so they are marked
-`continue-on-error` for now.
+gate; the Windows jobs are a bring-up first pass (the build and the portable
+subset run, via `ppcrossx64`, but the Windows build has no regex yet, and FPC
+3.2.2 has no win64/aarch64 target), so they are marked `continue-on-error` for
+now.
 
 
 ---

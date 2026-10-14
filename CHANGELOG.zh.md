@@ -20,7 +20,9 @@
 - Windows 上 `funcmd` 带脚本运行且 stdout 被重定向（到文件、管道、CI runner）时
   完全没有输出：GUI/命令行模式的判断用了 `AttachConsole`，没有父控制台时它返回
   false，于是即使给了脚本也被当成 GUI 启动，`isLog` 一直是 false。现在只要指定了
-  脚本就强制命令行模式。Windows 的 CI 任务也改为用 LF 快照的 CRLF 副本做比较。
+  脚本就强制命令行模式。Windows 的 CI 任务改为用“补回末尾换行”的快照副本做比较：
+  Fun 在所有平台都写 CRLF，而 POSIX runner 用 `$(...)` 捕获会吃掉末尾换行，因此
+  Windows 原始重定向比每个快照都多一个字节。
 
 - 修复全新 checkout 下 CI 首次构建失败。原始 PCRE 压缩包只有
   `config.h.generic` / `pcre.h.generic` / `pcre_chartables.c.dist`（上游

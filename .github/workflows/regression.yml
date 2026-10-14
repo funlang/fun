@@ -14,9 +14,11 @@
 # and art/notes/macos-port.md.
 #
 # Status: the Linux and macOS jobs are the maintained gate. The Windows jobs are
-# a bring-up first pass (the Windows build has no regex yet and its FPC layout
-# needs checking), so they are marked continue-on-error for now; remove that
-# once they are green. See the README "Regression tests and CI" section.
+# a bring-up first pass: the build works (ppcrossx64 + the FPC layout are wired
+# up) and the portable subset runs, but the Windows build has no regex yet, so
+# the regex-driven demos and a few type/variant tests still differ; both Windows
+# jobs stay continue-on-error until those are closed. See the README
+# "Regression tests and CI" section.
 name: regression
 
 on:
@@ -169,7 +171,7 @@ jobs:
   windows-x64:
     name: windows-x64
     runs-on: windows-latest
-    continue-on-error: true   # bring-up: no regex yet; a few tests need a Windows baseline
+    continue-on-error: true   # bring-up: the Windows build has no regex yet; a few tests differ
     steps:
       - uses: actions/checkout@v4
 
