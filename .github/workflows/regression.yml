@@ -128,9 +128,11 @@ jobs:
             # guard, flatten it and install the same payload instead of giving up.
             echo "installer refused: $(printf '%s' "$out" | tail -n 2 | tr '\n' '~')"
             echo "retrying with the Distribution version guard removed"
-            EXP="$RUNNER_TEMP/fpc-expand"; rm -rf "$EXP"; mkdir -p "$EXP"
-            pkgutil --expand "$PKG" "$EXP" \
-              || { echo "::error title=macos fpc install::pkgutil --expand failed"; exit 1; }
+            # pkgutil --expand writes a NEW directory (it fails if the target
+            # already exists), so only remove any stale copy.
+            EXP="$RUNNER_TEMP/fpc-expand"; rm -rf "$EXP"
+            exout="$(pkgutil --expand "$PKG" "$EXP" 2>&1)" \
+              || { echo "::error title=macos fpc install::pkgutil --expand failed: $(printf '%s' "$exout" | tail -n 2 | tr '\n' '~' | cut -c1-400)"; exit 1; }
             if [ -f "$EXP/Distribution" ]; then
               grep -nE 'os-version|allowed-os-versions' "$EXP/Distribution" || true
               perl -0pi -e \
@@ -207,36 +209,50 @@ jobs:
             }
 
             # FPC has no separate win64 installer; the combined win32+win64 one
-            # installs the native x86_64-win64 compiler under bin\x86_64-win64.
+            # carries both targets (see the layout annotation below for how it
+            # actually lays them out).
             Install-Fpc "https://downloads.sourceforge.net/project/freepascal/Win32/3.2.2/fpc-3.2.2.win32.and.win64.exe" "$env:RUNNER_TEMP\fpc.exe" "combined"
-            $win64rel = "bin\x86_64-win64\fpc.exe"
-            for ($i = 0; $i -lt 60 -and -not (Test-Path "C:\FPC\3.2.2\$win64rel"); $i++) { Start-Sleep -Seconds 2 }
+            # Any of these means the win64 target came with the combined install.
+            $win64Evidence = { (Test-Path "C:\FPC\3.2.2\bin\x86_64-win64\fpc.exe") -or
+                               (Test-Path "C:\FPC\3.2.2\bin\i386-win32\ppcrossx64.exe") -or
+                               (Test-Path "C:\FPC\3.2.2\units\x86_64-win64") }
+            for ($i = 0; $i -lt 60 -and -not (& $win64Evidence); $i++) { Start-Sleep -Seconds 2 }
 
-            if (-not (Test-Path "C:\FPC\3.2.2\$win64rel")) {
-              # The combined installer did not lay down the win64 compiler, so
-              # add fpc-3.2.2.i386-win32.cross.x86_64-win64.exe, which is exactly
-              # the win64 target (it also ships the x86_64-win64 units).
-              Write-Host "no x86_64-win64 compiler after the combined install; adding the cross package"
+            if (-not (& $win64Evidence)) {
+              # The combined installer did not lay down the win64 target, so add
+              # fpc-3.2.2.i386-win32.cross.x86_64-win64.exe, which is exactly the
+              # win64 target (ppcrossx64 + the x86_64-win64 units).
+              Write-Host "no win64 target after the combined install; adding the cross package"
               Install-Fpc "https://downloads.sourceforge.net/project/freepascal/Win32/3.2.2/fpc-3.2.2.i386-win32.cross.x86_64-win64.exe" "$env:RUNNER_TEMP\fpcx.exe" "cross"
-              for ($i = 0; $i -lt 60 -and -not (Test-Path "C:\FPC\3.2.2\$win64rel"); $i++) { Start-Sleep -Seconds 2 }
+              for ($i = 0; $i -lt 60 -and -not (& $win64Evidence); $i++) { Start-Sleep -Seconds 2 }
             }
 
-            # Put the win64 compiler dir first on PATH, then any other bin dir
-            # FPC shipped (the driver finds ppcx64/units relative to itself).
+            # The combined installer ships the driver as bin\i386-win32\fpc.exe
+            # and targets win64 through bin\i386-win32\ppcrossx64.exe plus the
+            # x86_64-win64 units, so do not insist on an x86_64-win64\fpc.exe.
+            # Prefer that directory if it exists, else fall back to any fpc.exe.
             $compilers = Get-ChildItem C:\FPC -Recurse -Filter fpc.exe -ErrorAction SilentlyContinue
-            $win64 = $compilers | Where-Object { $_.FullName -match 'x86_64-win64' } | Select-Object -First 1
-            if (-not $win64) {
-              $all = ($compilers | Select-Object -First 5 -ExpandProperty FullName) -join ', '
-              throw "no x86_64-win64 fpc.exe under C:\FPC; found: [$all]"
-            }
-            $dirs = @($win64.Directory.FullName)
+            $fpc = $compilers | Where-Object { $_.FullName -match 'x86_64-win64' } | Select-Object -First 1
+            if (-not $fpc) { $fpc = $compilers | Select-Object -First 1 }
+            if (-not $fpc) { throw "no fpc.exe under C:\FPC after install" }
+
+            # Surface the layout as an annotation: the log itself is not readable
+            # from outside, and the win64 arrangement is what bring-up needs.
+            $bins = @(Get-ChildItem C:\FPC -Recurse -Include 'fpc.exe', 'pp*.exe' -ErrorAction SilentlyContinue |
+                        ForEach-Object { $_.FullName }) -join '; '
+            $units = @(Get-ChildItem C:\FPC -Recurse -Directory -ErrorAction SilentlyContinue |
+                        Where-Object { $_.FullName -match '[\\/]units' } |
+                        ForEach-Object { $_.FullName }) -join '; '
+            Write-Host "::warning title=windows fpc layout::compilers=[$bins] units=[$units]"
+
+            $dirs = @($fpc.Directory.FullName)
             $dirs += @($compilers | ForEach-Object { $_.Directory.FullName } |
-              Sort-Object -Unique | Where-Object { $_ -ne $win64.Directory.FullName })
+              Sort-Object -Unique | Where-Object { $_ -ne $fpc.Directory.FullName })
             foreach ($d in $dirs) {
               Write-Host "PATH += $d"
               $d | Out-File -FilePath $env:GITHUB_PATH -Append
             }
-            $fpcPath = $win64.FullName
+            $fpcPath = $fpc.FullName
             & $fpcPath -iV
           } catch {
             Write-Host "::error title=windows fpc install::$($_.Exception.Message)"
