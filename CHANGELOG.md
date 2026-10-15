@@ -76,6 +76,24 @@ This project records notable changes in the style of [Keep a Changelog](https://
   hand once `ffi.dll` is next to funcmd.exe. The 32-bit (Delphi/bcc32) build
   and the Unix paths are untouched.
 
+- The FFI suite runs on win64 too, and it immediately found one more Windows-only
+  divergence. Four of its five cases (`ffi-int64`, `ffi-float`, `ffi-float-cb`,
+  `ffi-callbacks`) are plain int/double/float/long-long/callback ABI whose output
+  is host-independent, so they use the shared snapshots; the job builds the C
+  helper with MinGW gcc (`-Wl,--export-all-symbols`, since libffitest.c has no
+  `__declspec(dllexport)`), `DyLibWin()` in `lib-host.fun` names it per host, and
+  the runner probes for both the DLL and a working `getapi`, adding the cases to
+  its skip list when either is missing. `ffi-scalar` stays Unix-only (libc/libm,
+  no `getpid` on Windows). The divergence: those cases load `lib-host.fun`, whose
+  Windows branch calls `'kernel32'.getapi('GetCommandLine', ':s')` - but kernel32
+  exports `GetCommandLineA`/`GetCommandLineW`, the unsuffixed spelling is a header
+  macro, and `io.GetProc` (the Delphi path) already retries with the A/W suffix
+  while the libffi path did not. Every unsuffixed Windows API name in Fun code was
+  therefore unavailable on win64; `lffi.pas` now retries `name + 'A'` there, which
+  is also the right variant for the narrow string convention (`nameW` still
+  resolves directly). windows-x64 went from 51/51 (skipped 41) to 55/55 (skipped
+  37).
+
 - OpenSSL 3 in the crypto tests, and the remaining CI platform fixes.
   `lib-crypt-unx` probed `EVP_PKEY_size`, which OpenSSL 3.0 turned into a header
   macro for `EVP_PKEY_get_size` — the symbol is gone, so the whole probe failed

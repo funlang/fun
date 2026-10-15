@@ -383,6 +383,13 @@ funcmd，因此 `pcrd.pas` 以 `-dPCRE_WinDLL` 方式导入 DLL）；`run-window
 目标，Windows 上只差这个库。两个可选特性遵循同一条规则——DLL 或单元缺失时 job 退回
 核心解释器而不是失败，另有一个探针步骤报告最终构建带上了哪些特性。
 
+有了 `getapi`，Windows 的 job 还会用同一个 MinGW gcc 把 FFI 测试辅助库
+（`fun/test/ffi/libffitest.c`）编成 `libffitest.dll`，并让四个与宿主无关的 FFI 用例
+（`ffi-int64`、`ffi-float`、`ffi-float-cb`、`ffi-callbacks`）跑共享快照——于是 64 位整数、
+float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scalar` 仍限 Unix
+（它直接调 `getpid`/libm）。`lib-host.fun` 的 `DyLibWin()` 按宿主取辅助库名，runner
+会同时探测该 DLL 与可用的 `getapi`，任一缺失就把这几个用例放进跳过名单。
+
 `windows-arm64` 已暂时禁用：所钉住的工具链 FPC 3.2.2 没有 win64/aarch64 目标，
 没有可用的构建方式。
 

@@ -62,6 +62,20 @@
   放到 funcmd.exe 旁后可以手工启用 `-dWinFFI`。32 位（Delphi/bcc32）构建与 Unix
   各路径均未改动。
 
+- FFI 用例套在 win64 上也跑起来了，并立刻又抓出一处只在 Windows 显形的差异。五个用例
+  里的四个（`ffi-int64`、`ffi-float`、`ffi-float-cb`、`ffi-callbacks`）是纯粹的
+  int/double/float/long long/回调 ABI，输出与宿主无关，因此直接共用共享快照；job 用
+  MinGW gcc 编出 C 辅助库（`-Wl,--export-all-symbols`，因为 libffitest.c 没有
+  `__declspec(dllexport)`），`lib-host.fun` 的 `DyLibWin()` 按宿主给出库名，runner 同时
+  探测该 DLL 与可用的 `getapi`，任一缺失就把这几个用例放进跳过名单。`ffi-scalar` 仍限
+  Unix（libc/libm，Windows 上也没有 `getpid`）。差异本身：这些用例会加载
+  `lib-host.fun`，它的 Windows 分支调用 `'kernel32'.getapi('GetCommandLine', ':s')`，
+  而 kernel32 导出的名字是 `GetCommandLineA`/`GetCommandLineW`——不带后缀的写法只是头
+  文件宏；`io.GetProc`（Delphi 路径）本来就会在失败后补 A/W 后缀重试，libffi 路径却
+  没有。于是 Fun 代码里所有不带后缀的 Windows API 名在 win64 上都取不到；现在
+  `lffi.pas` 也会先补 `name + 'A'` 再报错（对窄字符串约定而言也正是该用的变体，
+  显式写 `nameW` 仍直接生效）。windows-x64 从 51/51（跳 41）变成 55/55（跳 37）。
+
 - 加密测试支持 OpenSSL 3，以及剩余的 CI 平台修复。`lib-crypt-unx` 之前探测
   `EVP_PKEY_size`，而 OpenSSL 3.0 把它变成了指向 `EVP_PKEY_get_size` 的头文件
   宏、符号已不存在，于是整个探测在 OpenSSL 3 的 CI 镜像上失败，连带拖垮

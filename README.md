@@ -392,6 +392,16 @@ the same rule - if the DLL or the unit is absent the job falls back to the core
 interpreter instead of failing, and a probe step reports what the build ended up
 with.
 
+With `getapi` in place, the Windows job also builds the FFI test helper
+(`fun/test/ffi/libffitest.c`) into `libffitest.dll` with the same MinGW gcc and
+runs the four host-independent FFI cases (`ffi-int64`, `ffi-float`,
+`ffi-float-cb`, `ffi-callbacks`) against the shared snapshots, so 64-bit
+integers, float/mixed arguments and `@toCallback` closures are covered on win64
+too; `ffi-scalar` stays Unix-only (it calls `getpid`/libm directly).
+`DyLibWin()` in `lib-host.fun` picks the helper's name per host, and the runner
+probes for both the DLL and a working `getapi`, adding those cases to its skip
+list when either is missing.
+
 `windows-arm64` is disabled: FPC 3.2.2, the pinned toolchain, has no
 win64/aarch64 target, so there is nothing to build with.
 
