@@ -397,19 +397,14 @@ jobs:
           # (next to funcmd.exe, where the loader finds it); otherwise the build
           # stays regex-less and the runner reports the regex tests as SKIP.
           $extra = @()
-          $strip = @('-Xs')
           if ($env:FUN_PCRE_DLL) {
-            # -dFunTraceback only to report where the probe crashes (see the
-            # diagnostic step); drop it once the win64 regex path runs
-            $extra = @('-dRegex', '-dPCRE_WinDLL', '-dFunTraceback')
-            # keep symbols + line info so the cdb stack in the diagnostic step
-            # names the faulting Pascal function (the release build strips)
-            $strip = @('-gl')
+            # regex through pcre3.dll, which the PCRE step put next to funcmd.exe
+            $extra = @('-dRegex', '-dPCRE_WinDLL')
             Write-Host "regex: -dRegex -dPCRE_WinDLL (pcre3.dll)"
           } else {
             Write-Host "regex: no pcre3.dll, building without -dRegex"
           }
-          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar @strip -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @extra *>&1 |
+          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @extra *>&1 |
             Tee-Object -FilePath $log
           # visible from outside: whether this build carries regex
           Write-Host "::warning title=build (windows-x64) flags::[$($extra -join ' ')]"
@@ -422,109 +417,6 @@ jobs:
             if ([string]::IsNullOrEmpty($err)) { $err = "fpc exited $LASTEXITCODE with no Fatal:/Error: line" }
             Write-Host "::error title=build (windows-x64)::$($err.Substring(0, [Math]::Min(900, $err.Length)))"
             exit 1
-          }
-
-      - name: Regex probe (diagnostic)
-        shell: pwsh
-        run: |
-          # The runner's own probe, run here so its outcome is visible from
-          # outside (the job log is not): if this does not print regex-on the
-          # regex tests stay SKIPped, and the reason is in this annotation.
-          $probe = "$env:RUNNER_TEMP\regex-probe.fun"
-          "var r = 'a1b2'.replace(/\d++/g, '-');" | Out-File -FilePath $probe -Encoding ascii
-          "if r = 'a-b-' then ?. 'regex-on'; else ?. 'regex-off'; end if;" | Out-File -FilePath $probe -Append -Encoding ascii
-          $out = & "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe" $probe 2>&1
-          Write-Host "::warning title=regex probe::exit=$LASTEXITCODE out=[$($out -join '~')]"
-          # the same call path, one step at a time: the last marker printed says
-          # which PCRE entry point crashes
-          $steps = "$env:RUNNER_TEMP\regex-steps.fun"
-          @(
-            "?. 'start';",
-            'var re = /\d++/g;',
-            "?. 'compiled';",
-            "?. 'a1b2'.match(re);",
-            "?. 'matched';",
-            "?. 'a1b2'.replace(/\d++/g, '-');",
-            "?. 'replaced-shorter';",
-            "?. 'a1b2'.replace(/1/, 'X');",
-            "?. 'replaced-equal';",
-            "?. 'a1b2'.replace(/1/, 'XYZ');",
-            "?. 'replaced-longer';",
-            "?. 'a1b2'.replace(/\d++/g, m->'<' & m.@@() & '>');",
-            "?. 'replaced-callback';",
-            "?. 'a1b2'.subpos('1');",
-            "?. 'subpos';",
-            "?. 'a1b2' =~ /2/;",
-            "?. 'tilde'"
-          ) -join "`n" | Out-File -FilePath $steps -Encoding ascii
-          $so = & "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe" $steps 2>&1
-          Write-Host "::warning title=regex steps::exit=$LASTEXITCODE out=[$($so -join '~')]"
-          # where does it crash? cdb gives funcmd+0xNNNN; the DWARF from -gl
-          # maps that to a function with addr2line (cdb cannot read DWARF)
-          $exe = "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe"
-          $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
-          if (Test-Path $cdb) {
-            $raw = & $cdb -g -G -c "g; q" $exe $steps 2>&1
-            $hit = $raw | Select-String -Pattern 'funcmd\+0x[0-9a-f]+' | Select-Object -First 1
-            if ($hit) {
-              $off = [Convert]::ToInt64(($hit.Line -replace '.*funcmd\+0x([0-9a-f]+).*', '$1'), 16)
-              $aa = 'C:\mingw64\bin\addr2line.exe'
-              foreach ($b in @(0x140000000, 0x400000)) {
-                $a = '0x{0:x}' -f ($b + $off)
-                $r = (& $aa -e $exe -f -C $a 2>&1) -join ' | '
-                Write-Host "::warning title=regex crash::$($hit.Line.Trim()) @ $a -> $r"
-              }
-            } else {
-              # no fault address: the process did not even start (a loader error
-              # such as a missing entry point names the offending symbol)
-              $tail = ($raw | Where-Object { $_ -match '\S' } | Select-Object -Last 12) -join ' ~ '
-              Write-Host "::warning title=regex cdb::$tail"
-            }
-          }
-          $dll = "$env:GITHUB_WORKSPACE\src\prj\fun\pcre3.dll"
-          if (Test-Path $dll) {
-            # the exact names on both sides: a mismatch is why the loader says
-            # STATUS_ENTRYPOINT_NOT_FOUND (c0000139) before funcmd runs
-            $od = 'C:\mingw64\bin\objdump.exe'
-            if (Test-Path $od) {
-              $imp = (& $od -p $exe 2>&1 | Select-String -Pattern 'pcre|fun_pcre' |
-                        Select-Object -First 40 | ForEach-Object { $_.Line.Trim() }) -join ' ; '
-              Write-Host "::warning title=funcmd imports::$imp"
-            }
-            if (Test-Path $od) {
-              # the export table is what the loader matches against, not the
-              # symbol table (nm): dump both names the exe asks for
-              $exp = (& $od -p $dll 2>&1 | Select-String -Pattern 'fun_pcre|pcre_get_stringnumber|pcre_exec|pcre_compile' |
-                        Select-Object -First 8 | ForEach-Object { $_.Line.Trim() }) -join ' ; '
-              Write-Host "::warning title=pcre3.dll export table::$exp"
-            }
-
-            # does the DLL itself work? a C caller linking the import library
-            # (if this prints a match count, the DLL is fine and a failure above
-            # is on the FPC/Pascal side)
-            $c = "$env:RUNNER_TEMP\pcreprobe.c"
-            @(
-              '#include <stdio.h>',
-              '#include "pcre.h"',
-              'int main(void) {',
-              '  const char *err = 0; int erroff = 0;',
-              '  pcre *re = pcre_compile("\\d++", 0, &err, &erroff, 0);',
-              '  if (!re) { printf("compile failed: %s at %d\n", err, erroff); return 2; }',
-              '  int ov[9]; int rc = pcre_exec(re, 0, "a1b2", 4, 0, 0, ov, 9);',
-              '  printf("pcre %s exec rc=%d (%d..%d)\n", pcre_version(), rc, ov[0], ov[1]);',
-              '  return 0;',
-              '}'
-            ) -join "`n" | Out-File -FilePath $c -Encoding ascii
-            $tl = "$env:RUNNER_TEMP\pcreprobe.exe"
-            $gcc = 'C:\mingw64\bin\gcc.exe'
-            Copy-Item $dll $env:RUNNER_TEMP -Force      # loader needs it beside the probe
-            $co = & $gcc $c "-I$env:FUN_PCRE_DLLSRC" "-L$(Split-Path $env:FUN_PCRE_IMPLIB)" -lpcre3 -o $tl 2>&1
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "::warning title=pcre3.dll C probe (build)::$((($co | Select-Object -First 8) -join ' ~ '))"
-            } else {
-              $ro = & $tl 2>&1
-              Write-Host "::warning title=pcre3.dll C probe::exit=$LASTEXITCODE out=[$($ro -join '~')]"
-            }
           }
 
       - name: Regression (portable subset)

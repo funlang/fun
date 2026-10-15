@@ -38,17 +38,21 @@ This project records notable changes in the style of [Keep a Changelog](https://
   text-mode copy re-encoded the raw GBK bytes of the `set-named.fun` snapshot
   and made it unmatchable.
 
-- Building PCRE for the win64 FPC build was attempted and is not landed: the
-  8-bit sources compile with the runner's MinGW-w64 gcc (libpcre.a builds), but
-  the objects then reference the MinGW CRT (`__imp_isupper`, `malloc`, `free`,
-  `strcmp`, ...) and neither of FPC's two linkers resolves them here - the
-  internal one names imported symbols after the Pascal declaration, and the
-  external one (ld) finds no member for them in the toolchain's
-  libucrt/libmsvcrt/libmingwex. `pcrd.pas` gained the prerequisite fix (the
-  `__llmul` stub it carries is 32-bit only; win64 multiplied natively and has no
-  `System.__llmul`). The runner's regex probe means the regex tests start
-  running by themselves as soon as a win64 build actually links PCRE. Details
-  and the two candidate routes are in `art/notes/port-decisions.md` D27.
+- The win64 FPC build has regex now, and links it dynamically. The bcc32 PCRE
+  objects belong to the 32-bit build and the MinGW ones cannot be linked into
+  funcmd (neither FPC linker resolves their CRT symbols), so the build compiles
+  PCRE 8.45 with the runner's MinGW-w64 gcc into `pcre3.dll` beside funcmd.exe,
+  and `-dPCRE_WinDLL` swaps the `{$LINK}`ed objects plus the CRT declarations
+  for `external 'pcre3.dll'` imports (FPC writes the import table from the DLL
+  name alone). Two Pascal-side fixes came with it: the `__llmul` stub is 32-bit
+  only (win64 multiplies natively and has no `System.__llmul`), and PCRE memory
+  must go back to PCRE's own free - the DLL allocates from its own CRT, so the
+  static path's `FreeMem` corrupted the heap right after a match
+  (`pcre_free_substring` is `(PUBL(free))(p)`, so the free path uses it). The
+  32-bit Delphi build, the static Unix builds and the MinGW search order are
+  untouched. The Windows runner's regex probe now finds the engine, so the 8
+  regex tests and `portability-probe` run there instead of skipping:
+  51/51 checks pass, 41 skipped.
 
 - OpenSSL 3 in the crypto tests, and the remaining CI platform fixes.
   `lib-crypt-unx` probed `EVP_PKEY_size`, which OpenSSL 3.0 turned into a header

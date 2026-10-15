@@ -57,8 +57,10 @@ rem lib-orm-rows pulls lib-xml (COM). Plus lib-file-test/lib-dyns-test, whose
 rem find() emits '\' on Windows and '/' elsewhere while the snapshots use '/'.
 set "HOSTDEP= builtin-dispatch.fun lib-host-test.fun lib-param-linux.fun lib-cmdline-linux.fun lib-loadcheck.sh libc-outbuf.fun ptr-primitives.fun raw-address-getapi.fun lib-tcc-test.fun lib-jit-test.fun lib-asm-lnx.fun lib-asm-a64.fun lib-asm-x64.fun fractal-asm-x64.fun lib-hash-test.fun lib-proc-test.fun lib-unicode-test.fun run-benchmarks.sh ffi-scalar.fun ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun lib-os-dispatch-prototype.fun lib-crypt-lnx.fun lib-e2e-lnx.fun lib-ajax-lnx-test.fun run-ajax-lnx.sh lib-winsock-lnx-test.fun lib-ado-lnx-test.fun lib-ado-schema-lnx-test.fun lib-xml-lnx-test.fun lib-jsonrpc-lnx-test.fun lib-orm-rpc-lnx-test.fun lib-os-lnx-test.fun lib-cmdline-lnx-test.fun lib-zlib-test.fun lib-orm-rows.fun lib-file-test.fun lib-dyns-test.fun "
 
-rem Tests gated only by the regex engine's absence (the Windows build has no
-rem PCRE): probed below, skipped while REGEXOK=0.
+rem Tests gated only by the regex engine's absence: probed below, skipped while
+rem REGEXOK=0. The CI win64 build links PCRE dynamically (pcre3.dll next to
+rem funcmd.exe, -dPCRE_WinDLL), so the probe normally finds it; a toolchain
+rem without PCRE just skips these instead of failing.
 set "REGEXTESTS= all.fun regex-adv.fun lib-match-test.fun lib-regex-test.fun lib-func-check.fun lib-bnf-dedup.fun lib-regex-replace.fun portability-probe.fun "
 
 set "MODE=compare"

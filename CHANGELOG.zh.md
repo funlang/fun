@@ -33,14 +33,17 @@
   （`ReadAllBytes`）：旧写法走文本模式，会把 `set-named.fun` 快照里的原始 GBK
   字节重编码，导致永远对不上。
 
-- 尝试为 win64 的 FPC 构建接入 PCRE，结果未落地：8-bit 源码能用 runner 的
-  MinGW-w64 gcc 编过（libpcre.a 能生成），但产物会引用 MinGW 的 CRT
-  （`__imp_isupper`、`malloc`、`free`、`strcmp` 等），而 FPC 的两条链接路径都
-  解不掉：内部链接器给导入符号起的是 Pascal 声明名；外部链接器（ld）在该工具链
-  的 libucrt/libmsvcrt/libmingwex 里找不到这些成员。`pcrd.pas` 留下了必要的前置
-  修复（它带的 `__llmul` 桩只对 32 位成立：win64 乘法是原生的，也没有
-  `System.__llmul`）。runner 的正则探测会在 win64 真正链上 PCRE 后自动开始跑这些
-  用例。细节与两条候选路线见 `art/notes/port-decisions.md` D27。
+- win64 的 FPC 构建现在有正则了，走**动态链接**。bcc32 那套 PCRE 对象属于 32 位
+  构建，MinGW 编出来的对象又链不进 funcmd（FPC 两条链接路径都解不掉它们的 CRT
+  符号），所以构建用 runner 的 MinGW-w64 gcc 把 PCRE 8.45 编成 `pcre3.dll` 放在
+  funcmd.exe 旁，再用 `-dPCRE_WinDLL` 把 `{$LINK}` 对象与 CRT 声明换成
+  `external 'pcre3.dll'` 导入（FPC 仅凭 DLL 名就能生成导入表）。随之而来两处
+  Pascal 侧修复：`__llmul` 桩只对 32 位成立（win64 乘法是原生的，也没有
+  `System.__llmul`）；PCRE 的内存必须交回它自己的 free —— DLL 用的是它自己的
+  CRT 堆，静态路径的 `FreeMem` 在匹配成功后就把堆搞坏了（`pcre_free_substring`
+  即 `(PUBL(free))(p)`，free 路径改走它）。32 位 Delphi 构建、Unix 静态构建与
+  MinGW 搜索顺序都未受影响。Windows runner 的正则探测现在能探到引擎，那 8 个正则
+  用例与 `portability-probe` 由 SKIP 变为实跑：51/51 通过、41 跳过。
 
 - 加密测试支持 OpenSSL 3，以及剩余的 CI 平台修复。`lib-crypt-unx` 之前探测
   `EVP_PKEY_size`，而 OpenSSL 3.0 把它变成了指向 `EVP_PKEY_get_size` 的头文件
