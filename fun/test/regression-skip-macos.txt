@@ -29,5 +29,3 @@ lib-asm-lnx.fun	Linux x86-64 executable memory
 lib-asm-x64.fun	x86-64 assembly backend (no arm64 macOS support)
 lib-asm-a64.fun	needs MAP_JIT / executable memory on arm64 macOS
 fractal-asm-x64.fun	x86-64 assembly backend
-# --- host-dependent output that needs its own macOS snapshot --------------
-lib-loadcheck.sh	module load set differs (lib-asm*, lib-async); run --update on macOS to add expected/macos/lib-loadcheck.sh.txt
