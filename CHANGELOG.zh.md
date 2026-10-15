@@ -6,6 +6,14 @@
 
 ## [未发布]
 
+- Delphi 构建恢复可用。`pcrd` 动态分支（`-dPCRE_LINKDLL`）的移植层把 FPC 的
+  `dynlibs` 单元无条件写进了 `uses`，于是 `dcc32` 停在
+  `pcrd.pas(542) Fatal: F1026 File not found: 'dynlibs.dcu'`——哪怕静态构建根本
+  走不到那段代码（Delphi 没有 `dynlibs` 这个单元，FPC 才有）。现在该单元只在
+  `{$IFDEF FPC}` 下引入，非 FPC 一侧改用 Win32 调用（`HINST` 句柄、
+  `GetProcAddress`、`SafeLoadLibrary`、`FreeLibrary`）保持同样行为，两个编译器
+  都能继续使用 `-dPCRE_LINKDLL`。
+
 - CI 五个平台全部绿标（Windows arm64 暂时禁用：FPC 3.2.2 没有 win64/aarch64
   目标）。修掉三处只在 Windows 显形的差异，都放在 `{$IfDef FPC}` 分支里，
   Delphi 源码保持原样。其一，`ToFunTime` 在所有非 Unix 构建上走

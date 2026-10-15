@@ -6,6 +6,16 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- The Delphi build works again. The portability shim in `pcrd`'s dynamic branch
+  (`-dPCRE_LINKDLL`) put FPC's `dynlibs` unit in the unit's `uses` clause
+  unconditionally, so `dcc32` stopped at
+  `pcrd.pas(542) Fatal: F1026 File not found: 'dynlibs.dcu'` even for the static
+  build, which never reaches that code - Delphi ships no `dynlibs` unit, FPC
+  does. The unit is now imported under `{$IFDEF FPC}` only, and the non-FPC
+  side of the branch keeps the same behaviour through the Win32 calls (`HINST`
+  handle, `GetProcAddress`, `SafeLoadLibrary`, `FreeLibrary`), so
+  `-dPCRE_LINKDLL` remains available to both compilers.
+
 - CI is green on all five platforms (Windows arm64 is disabled: FPC 3.2.2 has
   no win64/aarch64 target). Three Windows-only divergences are fixed, all in
   `{$IfDef FPC}` branches so the Delphi sources stay as they were.
