@@ -14,7 +14,7 @@
 // script opts in, so `use`-ing both backends stays deterministic):
 //
 //   use 'lib-asm-a64.fun';
-//   Assembly = AssemblyA64();
+//   Assembly = AssemblyA64;
 //   var f = Assembly('i:i', `#!asm
 //   add x0, x0, #1
 //   ret
@@ -617,11 +617,15 @@ end class;
 
 // ----------------------------------------------------------- icache flush
 // aarch64 does not keep I-cache and D-cache coherent: after writing code to
-// mmap'd memory it MUST be flushed or the cpu may execute stale bytes. glibc
-// does not provide __clear_cache on every ABI (it lives in libgcc on aarch64),
-// so try the usual spellings; refuse to JIT silently if none is found.
+// mmap'd memory it MUST be flushed or the cpu may execute stale bytes. Darwin
+// spells it sys_icache_invalidate (libSystem); on Linux glibc does not provide
+// __clear_cache on every ABI (it lives in libgcc on aarch64), so try the usual
+// spellings; refuse to JIT silently if none is found.
 if _a64_cpu = 'arch64' then
   var _clr = nil;
+  if _asm_macos then
+    try _clr = 'libSystem.B.dylib'.getapi('sys_icache_invalidate', 'pp:v'); except _clr = nil; end try;
+  end if;
   for lib in ['libc.so.6', 'libgcc_s.so.1'] do
     if _clr = nil then
       try _clr = lib.getapi('__clear_cache', 'pp:i'); except _clr = nil; end try;
@@ -631,7 +635,7 @@ if _a64_cpu = 'arch64' then
     try _clr = 'libc.so.6'.getapi('cacheflush', 'pp:i'); except _clr = nil; end try;
   end if;
   if _clr = nil then
-    raise 'lib-asm-a64: no __clear_cache/cacheflush; refusing to run unflushed code';
+    raise 'lib-asm-a64: no cache-flush symbol; refusing to run unflushed code';
   end if;
   _asm_flush = _clr;
 end if;
