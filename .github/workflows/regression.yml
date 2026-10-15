@@ -384,6 +384,32 @@ jobs:
           # best-effort: GitHub's pwsh wrapper exits with $LASTEXITCODE
           $global:LASTEXITCODE = 0
 
+      - name: Get libffi for win64 (getapi, best effort)
+        shell: pwsh
+        run: |
+          # FPC's bundled `ffi` unit has a WIN64 target (FFI_DEFAULT_ABI =
+          # FFI_WIN64), so getapi works on win64 too - it just needs ffi.dll,
+          # which the unit's externals name 'ffi'. FPC writes the import table
+          # from that name, so nothing else is needed at link time.
+          # Best effort: without the DLL the build drops -dWinFFI.
+          $ErrorActionPreference = 'Stop'
+          try {
+            $msys = 'C:\msys64\usr\bin\bash.exe'
+            if (-not (Test-Path $msys)) { throw 'no MSYS2 to install libffi from' }
+            & $msys -lc 'pacman -Sy --noconfirm --needed mingw-w64-x86_64-libffi' 2>&1 |
+              Select-Object -Last 4 | Write-Host
+            $ffi = Get-ChildItem 'C:\msys64\mingw64\bin' -Filter 'libffi-*.dll' -ErrorAction SilentlyContinue |
+                     Select-Object -First 1
+            if (-not $ffi) { throw 'pacman left no libffi-*.dll in C:\msys64\mingw64\bin' }
+            $dst = Join-Path $env:GITHUB_WORKSPACE 'src\prj\fun\ffi.dll'
+            Copy-Item $ffi.FullName $dst -Force
+            "FUN_FFI_DLL=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host "::warning title=libffi (win64) ok::copied $($ffi.Name) to src\prj\fun\ffi.dll"
+          } catch {
+            Write-Host "::warning title=libffi (win64)::$($_.Exception.Message)"
+          }
+          $global:LASTEXITCODE = 0
+
       - name: Build funcmd.exe
         working-directory: src\prj\fun
         shell: pwsh
@@ -393,30 +419,59 @@ jobs:
           # generic fpc.exe driver is the i386 one here and forwards -Twin64 to
           # ppc386.exe ("Illegal parameter: -Twin64").
           #
-          # -dRegex -dPCRE_WinDLL when the PCRE step above produced pcre3.dll
-          # (next to funcmd.exe, where the loader finds it); otherwise the build
-          # stays regex-less and the runner reports the regex tests as SKIP.
-          $extra = @()
-          if ($env:FUN_PCRE_DLL) {
-            # regex through pcre3.dll, which the PCRE step put next to funcmd.exe
-            $extra = @('-dRegex', '-dPCRE_WinDLL')
-            Write-Host "regex: -dRegex -dPCRE_WinDLL (pcre3.dll)"
-          } else {
-            Write-Host "regex: no pcre3.dll, building without -dRegex"
-          }
-          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @extra *>&1 |
-            Tee-Object -FilePath $log
-          # visible from outside: whether this build carries regex
-          Write-Host "::warning title=build (windows-x64) flags::[$($extra -join ' ')]"
-          if ($LASTEXITCODE -ne 0) {
-            # Surface the real error: the log itself is not readable from outside.
+          # Optional capabilities come from the DLLs the step above placed next
+          # to this exe: -dRegex -dPCRE_WinDLL for PCRE (pcre3.dll) and -dWinFFI
+          # for getapi (ffi.dll, FPC's bundled libffi unit). Each is tried and
+          # dropped on failure, so a missing DLL degrades instead of failing.
+          $sets = @()
+          $caps = @()
+          if ($env:FUN_PCRE_DLL) { $caps += @('-dRegex', '-dPCRE_WinDLL') }
+          if ($env:FUN_FFI_DLL)  { $caps += @('-dWinFFI') }
+          $sets += ,($caps)                       # everything available
+          if ($caps.Count -gt 1) { $sets += ,($caps[0..($caps.Count-2)]) }  # drop WinFFI
+          $sets += ,@()                           # core build
+
+          $built = $null
+          $tried = @()
+          foreach ($v in $sets) {
+            $label = if ($v.Count -eq 0) { 'no optional features' } else { $v -join ' ' }
+            & ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @v *>&1 |
+              Tee-Object -FilePath $log
+            if ($LASTEXITCODE -eq 0) { $built = $label; break }
             $err = (Get-Content $log |
                       Select-String -Pattern 'Fatal:|Error:' |
                       Select-Object -Last 6 |
                       ForEach-Object { $_.Line }) -join ' | '
             if ([string]::IsNullOrEmpty($err)) { $err = "fpc exited $LASTEXITCODE with no Fatal:/Error: line" }
-            Write-Host "::error title=build (windows-x64)::$($err.Substring(0, [Math]::Min(900, $err.Length)))"
+            $tried += "[$label] $err"
+            Write-Host "::warning title=build attempt failed::$label :: $err"
+          }
+          if (-not $built) {
+            $all = ($tried -join ' ;; ')
+            Write-Host "::error title=build (windows-x64)::$($all.Substring(0, [Math]::Min(900, $all.Length)))"
             exit 1
+          }
+          # visible from outside: which optional features this build carries
+          Write-Host "::warning title=build (windows-x64) flags::[$built]"
+
+      - name: Capability probes
+        shell: pwsh
+        run: |
+          # Which optional features the build actually has, visible from outside
+          # (the job log is not). Same regex probe the runner uses, plus getapi
+          # (win64 reaches it through ffi.dll and -dWinFFI).
+          $exe = "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe"
+          $probes = @{
+            regex  = @("var r = 'a1b2'.replace(/\d++/g, '-');",
+                       "if r = 'a-b-' then ?. 'on'; else ?. 'off'; end if;")
+            getapi = @("var f = 'kernel32'.getapi('GetTickCount', ':i');",
+                       "if f then ?. 'on'; else ?. 'off'; end if;")
+          }
+          foreach ($name in $probes.Keys) {
+            $f = "$env:RUNNER_TEMP\probe-$name.fun"
+            ($probes[$name]) -join "`n" | Out-File -FilePath $f -Encoding ascii
+            $out = & $exe $f 2>&1
+            Write-Host "::warning title=probe $name::exit=$LASTEXITCODE out=[$($out -join '~')]"
           }
 
       - name: Regression (portable subset)

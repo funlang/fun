@@ -19,13 +19,17 @@
 // SOFTWARE.
 unit host;
 
-// Unix FFI (getapi via FPC's bundled libffi unit) is requested by make-linux-x86_64.sh
-// as -dLinuxFFI and by make-darwin.sh as -dDarwinFFI. Both map to the single
-// UnixFFI symbol used throughout the engine. Guarded because FPC keeps a defined
-// symbol globally across the units of one build.
+// libffi FFI (getapi via FPC's bundled libffi unit) is requested by
+// make-linux-x86_64.sh as -dLinuxFFI, by make-darwin.sh as -dDarwinFFI and by the
+// win64 CI as -dWinFFI (there the same unit binds to ffi.dll). All map to the
+// single UnixFFI symbol used throughout the engine - the name predates the
+// Windows use, and it is what lffi.pas and the registrations below key on.
+// Guarded because FPC keeps a defined symbol globally across the units of one
+// build.
 {$IfNDef UnixFFI}
   {$IfDef LinuxFFI}{$Define UnixFFI}{$EndIf}
   {$IfDef DarwinFFI}{$Define UnixFFI}{$EndIf}
+  {$IfDef WinFFI}{$Define UnixFFI}{$EndIf}
 {$EndIf}
 
 interface

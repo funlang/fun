@@ -31,7 +31,10 @@ interface
 // libffi is linked explicitly: FPC does not always surface the library name
 // recorded by the bundled ffi unit (its externals use a const, `external 'ffi'`),
 // and the darwin cross link needs -lffi against the seeded libffi.tbd stub.
-{$LINKLIB ffi}
+// Windows needs none of that: FPC writes the import table for 'ffi' (i.e.
+// ffi.dll, which the build places next to funcmd.exe) itself, so a LINKLIB here
+// would only ask for a libffi.a that does not exist.
+{$IfNDef MSWINDOWS}{$LINKLIB ffi}{$EndIf}
 
 uses fun, base, core, host,
      dynlibs,
@@ -130,14 +133,20 @@ begin
   if libname <> '' then
   begin
     hlib := LoadLibrary(libname);
-    // bare name, e.g. 'libc': try the platform's shared-object suffix.
-    // Windows-style '.dll' is never appended here.
-    if (hlib = NilHandle) and (Pos('/', libname) = 0) and (Pos('.so', libname) = 0)
-       and (Pos('.dylib', libname) = 0) then
-      {$IfDef Darwin}
-      hlib := LoadLibrary(libname + '.dylib')
+    // bare name, e.g. 'libc' on Unix or 'kernel32' on Windows: try the
+    // platform's library suffix. Fun-side names usually carry their extension
+    // ('zlib.dll', 'libc.so.6'), so this only fires for a bare name.
+    if (hlib = NilHandle) and (Pos('/', libname) = 0) and (Pos('\', libname) = 0)
+       and (Pos('.so', libname) = 0) and (Pos('.dylib', libname) = 0)
+       and (Pos('.dll', libname) = 0) then
+      {$IfDef MSWINDOWS}
+      hlib := LoadLibrary(libname + '.dll')
       {$Else}
-      hlib := LoadLibrary(libname + '.so')
+        {$IfDef Darwin}
+        hlib := LoadLibrary(libname + '.dylib')
+        {$Else}
+        hlib := LoadLibrary(libname + '.so')
+        {$EndIf}
       {$EndIf};
   end;
 
