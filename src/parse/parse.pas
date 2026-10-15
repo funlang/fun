@@ -1042,13 +1042,19 @@ end;
 class function CParser.StrToNum(const s: fun.str): CValue;
 var
   i, ii: fun.int;
-  u: fun.uint;
+  u: fun.uint32;
 begin
   ii := Length(s);
   if (ii > 2) and (s[1] = '0') and (s[2] in ['X', 'x', 'B', 'b']) then
   begin
     if s[2] in ['X', 'x'] then
-      result := fun.uint(StrToInt(s))
+      // Fun's 0x literals are 32-bit (type.fun pins 0xffffffff = 4294967295),
+      // so ask for the 32-bit unsigned type explicitly. fun.uint is uint64
+      // under {$IfDef Win64} (it is sized for pointers), and on that build
+      // fun.uint(StrToInt('0xffffffff')) held a varUInt64 that the ANSI value
+      // -> string path echoed as -1. uint32 is what fun.uint already is on the
+      // other targets, so this is a no-op there.
+      result := fun.uint32(StrToInt(s))
     else
     begin
       u := 0;
