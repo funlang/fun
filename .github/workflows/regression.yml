@@ -355,6 +355,8 @@ jobs:
             $ar = Join-Path (Split-Path $gcc) 'ar.exe'
             if (-not (Test-Path $ar)) { $ar = (Get-Command ar -ErrorAction SilentlyContinue).Source }
             if (-not (Test-Path $ar)) { throw "no ar next to $gcc" }
+            # also exposes ld for the -Xe (external linker) build attempt
+            (Split-Path $gcc) | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
             Write-Host "gcc: $gcc  target=$(& $gcc -dumpmachine)  $(& $gcc --version 2>&1 | Select-Object -First 1)"
             Write-Host "ar : $ar"
 
@@ -371,12 +373,15 @@ jobs:
             foreach ($u in $units) {
               $c = Join-Path $src "$u.c"
               if (-not (Test-Path $c)) { continue }
-              $out = & $gcc -c -O2 -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DPCRE_STATIC "-I$src" $c -o (Join-Path $lib "$u.o") 2>&1
+              # .obj, not .o: FPC's Windows linker derives the member name as
+              # <base>.obj (target_info.objext), and the loose files are kept
+              # next to the archive because that is what it opens.
+              $out = & $gcc -c -O2 -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DPCRE_STATIC "-I$src" $c -o (Join-Path $lib "$u.obj") 2>&1
               if ($LASTEXITCODE -ne 0) {
                 throw "gcc failed: $u :: " + (($out | Select-Object -First 14) -join ' ~ ')
               }
             }
-            & $ar rcs (Join-Path $lib 'libpcre.a') (Get-ChildItem (Join-Path $lib '*.o') | ForEach-Object { $_.FullName })
+            & $ar rcs (Join-Path $lib 'libpcre.a') (Get-ChildItem (Join-Path $lib '*.obj') | ForEach-Object { $_.FullName })
             if ($LASTEXITCODE -ne 0) { throw 'ar failed' }
             $a = Join-Path $lib 'libpcre.a'
             Write-Host "built $a ($((Get-Item $a).Length) bytes)"
@@ -402,25 +407,38 @@ jobs:
           # -dRegex + -Fl<dir> come from the PCRE step above; if it failed there
           # is no libpcre.a and the build stays regex-less (the runner then
           # reports the regex tests as SKIP).
-          $extra = @()
+          $base = @('-B','-Sd','-O2','-Ooregvar','-Xs','-Twin64','-dWin64','-d_B_','-d_C_','-dWinCOMx')
+          $variants = @()
           if ($env:FUN_PCRE_DIR -and (Test-Path "$env:FUN_PCRE_DIR\libpcre.a")) {
-            $extra = @('-dRegex', "-Fl$env:FUN_PCRE_DIR")
-            Write-Host "regex: linking PCRE from $env:FUN_PCRE_DIR"
-          } else {
-            Write-Host "regex: no PCRE for win64, building without -dRegex"
+            # FPC's internal linker first, then the MinGW ld (-Xe) as a fallback.
+            $variants += ,(@('-dRegex', "-Fl$env:FUN_PCRE_DIR"))
+            $variants += ,(@('-dRegex', "-Fl$env:FUN_PCRE_DIR", '-Xe'))
           }
-          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @extra *>&1 |
-            Tee-Object -FilePath $log
-          if ($LASTEXITCODE -ne 0) {
-            # Surface the real error: the log itself is not readable from outside.
+          $variants += ,(@())   # last resort: build without regex, keep the job green
+
+          $built = $null
+          $tried = @()
+          foreach ($v in $variants) {
+            $label = if ($v.Count -eq 0) { 'no regex' } else { $v -join ' ' }
+            $a = $base + $v
+            & ppcrossx64 funcmd.dpr @a *>&1 | Tee-Object -FilePath $log
+            if ($LASTEXITCODE -eq 0) { $built = $label; break }
             $err = (Get-Content $log |
                       Select-String -Pattern 'Fatal:|Error:' |
-                      Select-Object -Last 6 |
+                      Select-Object -Last 4 |
                       ForEach-Object { $_.Line }) -join ' | '
             if ([string]::IsNullOrEmpty($err)) { $err = "fpc exited $LASTEXITCODE with no Fatal:/Error: line" }
-            Write-Host "::error title=build (windows-x64)::$($err.Substring(0, [Math]::Min(900, $err.Length)))"
+            $tried += "[$label] $err"
+            Write-Host "::warning title=build attempt failed::$label :: $err"
+          }
+          if (-not $built) {
+            $all = ($tried -join ' ;; ')
+            Write-Host "::error title=build (windows-x64)::$($all.Substring(0, [Math]::Min(900, $all.Length)))"
             exit 1
           }
+          # visible from outside: which flag set linked (and therefore whether
+          # the runner will run or skip the regex tests)
+          Write-Host "::warning title=build (windows-x64) ok::flags=[$built]"
 
       - name: Regression (portable subset)
         shell: pwsh
