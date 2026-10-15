@@ -413,6 +413,25 @@ jobs:
             exit 1
           }
 
+      - name: Regex probe (diagnostic)
+        shell: pwsh
+        run: |
+          # The runner's own probe, run here so its outcome is visible from
+          # outside (the job log is not): if this does not print regex-on the
+          # regex tests stay SKIPped, and the reason is in this annotation.
+          $probe = "$env:RUNNER_TEMP\regex-probe.fun"
+          "var r = 'a1b2'.replace(/\d++/g, '-');" | Out-File -FilePath $probe -Encoding ascii
+          "if r = 'a-b-' then ?. 'regex-on'; else ?. 'regex-off'; end if;" | Out-File -FilePath $probe -Append -Encoding ascii
+          $out = & "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe" $probe 2>&1
+          Write-Host "::warning title=regex probe::exit=$LASTEXITCODE out=[$($out -join '~')]"
+          $dll = "$env:GITHUB_WORKSPACE\src\prj\fun\pcre3.dll"
+          if (Test-Path $dll) {
+            $sym = (& nm -g --defined-only $dll 2>&1 |
+                      Select-String -Pattern 'pcre_compile|pcre_exec|pcre_fullinfo|pcre_version' |
+                      Select-Object -First 6 | ForEach-Object { $_.Line.Trim() }) -join ' ; '
+            Write-Host "::warning title=pcre3.dll exports::$sym"
+          }
+
       - name: Regression (portable subset)
         shell: pwsh
         run: |
