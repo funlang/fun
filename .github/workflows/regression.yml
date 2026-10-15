@@ -459,13 +459,24 @@ jobs:
           ) -join "`n" | Out-File -FilePath $steps -Encoding ascii
           $so = & "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe" $steps 2>&1
           Write-Host "::warning title=regex steps::exit=$LASTEXITCODE out=[$($so -join '~')]"
-          # a native stack, if the SDK debugger is on the image
+          # where does it crash? cdb gives funcmd+0xNNNN; the DWARF from -gl
+          # maps that to a function with addr2line (cdb cannot read DWARF)
+          $exe = "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe"
           $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
           if (Test-Path $cdb) {
-            $st = & $cdb -g -G -c "g; kb; q" "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe" $probe 2>&1 |
-                    Select-String -Pattern '!|ChildEBP|WARNING|Access|pcre|funcmd|pcrd|regex|pcre3' |
-                    Select-Object -First 25 | ForEach-Object { $_.Line.Trim() }
-            Write-Host "::warning title=regex probe stack::$((($st) -join ' ~ '))"
+            $hit = & $cdb -g -G -c "g; q" $exe $steps 2>&1 |
+                     Select-String -Pattern 'funcmd\+0x[0-9a-f]+' | Select-Object -First 1
+            if ($hit) {
+              $off = [Convert]::ToInt64(($hit.Line -replace '.*funcmd\+0x([0-9a-f]+).*', '$1'), 16)
+              $aa = 'C:\mingw64\bin\addr2line.exe'
+              foreach ($b in @(0x140000000, 0x400000)) {
+                $a = '0x{0:x}' -f ($b + $off)
+                $r = (& $aa -e $exe -f -C $a 2>&1) -join ' | '
+                Write-Host "::warning title=regex crash::$($hit.Line.Trim()) @ $a -> $r"
+              }
+            } else {
+              Write-Host "::warning title=regex crash::cdb found no funcmd+0x address"
+            }
           }
           $dll = "$env:GITHUB_WORKSPACE\src\prj\fun\pcre3.dll"
           if (Test-Path $dll) {
