@@ -151,7 +151,9 @@ end;
 procedure Print(const s: fun.str);
 begin
   try
-    if isLog then Write(s);
+    // WriteOut (not the RTL Write) keeps stdout byte-exact on Windows; see its
+    // comment in utils.pas. The `?.`/echo output is a byte stream.
+    if isLog then WriteOut(s);
   except
     on E: EBase do
       Writeln(E.Message);

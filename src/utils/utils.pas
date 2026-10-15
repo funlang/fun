@@ -39,6 +39,15 @@ function SetStdOut(const fn: fun.str): fun.int;
 // the file at startup, so an -gui run that later attaches to a console works.
 procedure WriteErr(const s: fun.str);
 
+// Write a string to standard output as raw bytes. FPC tags the standard Output
+// text file with GetConsoleOutputCP() (OpenStdIO in the RTL), so the RTL Write()
+// re-encodes every write from the string codepage to the console codepage (e.g.
+// CP1252 -> CP65001) and mangles any non-ASCII output. Fun's output is a byte
+// stream (see the CRLF convention in the regression docs), so bypass the RTL
+// text file on Windows, exactly as WriteErr does for stderr. The Unix and
+// Delphi builds are byte-exact already and keep the plain RTL write.
+procedure WriteOut(const s: fun.str);
+
 implementation
 
 uses SysUtils
@@ -251,5 +260,37 @@ begin
 end;
 {$EndIf}
 {$EndIf}
+
+procedure WriteOut(const s: fun.str);
+{$IfDef FPC}
+{$IfNDef UNIX}
+{$IfNDef WinCE}
+var
+  h: THandle;
+  n: DWORD;
+  b: AnsiString;
+{$EndIf}
+{$EndIf}
+{$EndIf}
+begin
+{$IfDef FPC}
+{$IfNDef UNIX}
+{$IfNDef WinCE}
+  if s <> '' then
+  begin
+    h := GetStdHandle(STD_OUTPUT_HANDLE);
+    if (h <> 0) and (h <> INVALID_HANDLE_VALUE) then
+    begin
+      b := s;
+      WriteFile(h, b[1], Length(b), n, nil);
+      exit;
+    end;
+  end;
+{$EndIf}
+{$EndIf}
+{$EndIf}
+  // Unix, WinCE and Delphi: the RTL write is already byte-exact.
+  Write(Output, s);
+end;
 
 end.

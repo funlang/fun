@@ -190,15 +190,19 @@ implementation
 
 uses Variants;
 
+{$IfDef FPC}
+// FPC's own VarToDateTime is not locale-independent: it goes through
+// TryStrToDateTime with the host's ShortDateFormat / DateSeparator (e.g.
+// "M/d/yyyy" with a '/' separator on a US Windows), so Fun's ISO time literal
+// ("2010-04-09 15:35:15") raises EVariantError. Parse the ISO form directly,
+// matching the Unix builds. Delphi (a different VarToDateTime) keeps the
+// plain conversion below.
 function ToFunTime(const s: fun.str): fun.time;
 var
   i, n: fun.int;
   yy, mm, dd, hh, nn, ss: fun.int;
   t: fun.time;
 begin
-{$IfNDef UNIX}
-  result := VarToDateTime(s);
-{$Else}
   yy := 0; mm := 0; dd := 0;
   hh := 0; nn := 0; ss := 0;
   i := 1; n := Length(s);
@@ -229,8 +233,19 @@ begin
   else
     t := VarToDateTime(s);  // fall through: let it raise if it must
   result := t;
-{$EndIf}
 end;
+
+{$Else}
+
+// Delphi's VarToDateTime (OLE) accepts Fun's ISO form regardless of the
+// host locale, so the Windows/Delphi build keeps the plain conversion.
+function ToFunTime(const s: fun.str): fun.time;
+begin
+  result := VarToDateTime(s);
+end;
+
+{$EndIf}
+
 procedure add(obj: CBase);
 begin
   if obj <> nil then obj._AddRef;
