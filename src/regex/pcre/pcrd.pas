@@ -643,6 +643,34 @@ function _isspace(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isspac
 function _isupper(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isupper';
 function _isxdigit(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isxdigit';
 function _strchr(__s: PAnsiChar; __c: Integer): PAnsiChar; cdecl; external szMSVCRT name 'strchr';
+{$IfDef Win64}
+// win64 compiles PCRE with MinGW-w64 (see the PCRE step in
+// .github/workflows/regression.yml) instead of the bcc32 .obj files, and those
+// objects call the CRT by plain name - they are built with -D_CRTBLD, which
+// empties MinGW's _CRTIMP, so there is no __imp_... indirection that FPC's
+// linker cannot resolve. The declarations above are the bcc32 (underscored)
+// names; these are the plain ones. malloc/free are already plain (pcrd_c.inc).
+function isalnum(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isalnum';
+function isalpha(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isalpha';
+function iscntrl(__ch: Integer): Integer; cdecl; external szMSVCRT name 'iscntrl';
+function isdigit(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isdigit';
+function isgraph(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isgraph';
+function islower(__ch: Integer): Integer; cdecl; external szMSVCRT name 'islower';
+function isprint(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isprint';
+function ispunct(__ch: Integer): Integer; cdecl; external szMSVCRT name 'ispunct';
+function isspace(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isspace';
+function isupper(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isupper';
+function isxdigit(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isxdigit';
+function tolower(__ch: Integer): Integer; cdecl; external szMSVCRT name 'tolower';
+function toupper(__ch: Integer): Integer; cdecl; external szMSVCRT name 'toupper';
+function strchr(__s: PAnsiChar; __c: Integer): PAnsiChar; cdecl; external szMSVCRT name 'strchr';
+function memcmp(s1, s2: Pointer; n: size_t): Integer; cdecl; external szMSVCRT name 'memcmp';
+function memcpy(dest, src: Pointer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memcpy';
+function memmove(dest, src: Pointer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memmove';
+function memset(dest: Pointer; val: Integer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memset';
+function strlen(s: PAnsiChar): size_t; cdecl; external szMSVCRT name 'strlen';
+function strncmp(s1, s2: PAnsiChar; n: size_t): Integer; cdecl; external szMSVCRT name 'strncmp';
+{$EndIf}
 {$Else}
 // Linux: the PCRE engine is linked from libpcre.a (built from the pcre-8 C
 // sources); its C-runtime calls (memcpy, memcmp, isspace, ...) are provided by

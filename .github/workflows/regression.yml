@@ -450,9 +450,15 @@ jobs:
             $a = $base + $v
             & ppcrossx64 funcmd.dpr @a *>&1 | Tee-Object -FilePath $log
             if ($LASTEXITCODE -eq 0) { $built = $label; break }
-            # the real message (ld's, FPC's) is in the log tail
-            $err = (Get-Content $log | Where-Object { $_.Trim() -ne '' } |
-                      Select-Object -Last 8) -join ' | '
+            # the complete undefined-symbol list, else the log tail (ld/FPC)
+            $und = Get-Content $log | Select-String -Pattern 'Undefined symbol' |
+                     ForEach-Object { ($_.Line -replace '^.*Undefined symbol: ', '').Trim() } |
+                     Sort-Object -Unique
+            if ($und) { $err = 'undefined: ' + ($und -join ', ') }
+            else {
+              $err = (Get-Content $log | Where-Object { $_.Trim() -ne '' } |
+                        Select-Object -Last 8) -join ' | '
+            }
             if ([string]::IsNullOrEmpty($err)) { $err = "fpc exited $LASTEXITCODE with no Fatal:/Error: line" }
             $tried += "[$label] $err"
             Write-Host "::warning title=build attempt failed::$label :: $err"
