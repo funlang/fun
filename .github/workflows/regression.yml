@@ -291,6 +291,69 @@ jobs:
           path: C:\FPC
           key: fpc-3.2.2-win64-and-cross
 
+      - name: Build PCRE 8 for win64 (regex, best effort)
+        shell: pwsh
+        run: |
+          # The win64 build had no regex because nothing compiled PCRE there.
+          # Mirror make-linux-x86_64.sh: drop the pristine 8.45 source into
+          # src/3rd/pcre-8, create the build-ready files from the shipped
+          # .generic/.dist copies, compile the 8-bit sources with the runner's
+          # MinGW-w64 gcc and archive them into libpcre.a (pcrd.pas asks for it
+          # with {$LINKLIB pcre}, so -Fl<dir> is all the FPC side needs).
+          #
+          # Best effort: a failure is a warning and the build then runs without
+          # -dRegex, so the job stays green while this is brought up.
+          $ErrorActionPreference = 'Stop'
+          $src = Join-Path $env:GITHUB_WORKSPACE 'src\3rd\pcre-8'
+          try {
+            if (-not (Test-Path (Join-Path $src 'pcre_compile.c'))) {
+              $tmp = Join-Path $env:RUNNER_TEMP 'pcre'
+              New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+              $tar = Join-Path $tmp 'pcre-8.45.tar.gz'
+              curl.exe -fsSL --retry 3 --retry-all-errors -o $tar `
+                'https://downloads.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz'
+              if ($LASTEXITCODE -ne 0) { throw "download failed ($LASTEXITCODE)" }
+              tar.exe -xf $tar -C $tmp
+              New-Item -ItemType Directory -Force -Path (Split-Path $src) | Out-Null
+              Move-Item (Join-Path $tmp 'pcre-8.45') $src
+            }
+            Copy-Item (Join-Path $src 'config.h.generic') (Join-Path $src 'config.h') -Force
+            Copy-Item (Join-Path $src 'pcre.h.generic') (Join-Path $src 'pcre.h') -Force
+            Copy-Item (Join-Path $src 'pcre_chartables.c.dist') (Join-Path $src 'pcre_chartables.c') -Force
+
+            $gcc = (Get-Command gcc -ErrorAction SilentlyContinue).Source
+            if (-not $gcc) { $gcc = 'C:\msys64\mingw64\bin\gcc.exe' }
+            if (-not (Test-Path $gcc)) { throw 'no gcc (neither on PATH nor C:\msys64)' }
+            $ar = (Get-Command ar -ErrorAction SilentlyContinue).Source
+            if (-not $ar) { $ar = Join-Path (Split-Path $gcc) 'ar.exe' }
+            Write-Host "gcc: $gcc  target=$(& $gcc -dumpmachine)"
+            Write-Host "ar : $ar"
+
+            $lib = Join-Path $src 'win64-lib'
+            Remove-Item -Recurse -Force $lib -ErrorAction SilentlyContinue
+            New-Item -ItemType Directory -Force -Path $lib | Out-Null
+            # the 8-bit sources make-linux-x86_64.sh compiles (a missing source
+            # is skipped, so the list can be shared)
+            $units = 'pcre_byte_order','pcre_chartables','pcre_compile','pcre_config',
+                     'pcre_default_tables','pcre_dfa_exec','pcre_exec','pcre_fullinfo',
+                     'pcre_get','pcre_globals','pcre_maketables','pcre_newline',
+                     'pcre_refcount','pcre_string_utils','pcre_study','pcre_tables',
+                     'pcre_ucd','pcre_valid_utf8','pcre_version','pcre_xclass'
+            foreach ($u in $units) {
+              $c = Join-Path $src "$u.c"
+              if (-not (Test-Path $c)) { continue }
+              & $gcc -c -O2 -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DPCRE_STATIC "-I$src" $c -o (Join-Path $lib "$u.o")
+              if ($LASTEXITCODE -ne 0) { throw "gcc failed: $u" }
+            }
+            & $ar rcs (Join-Path $lib 'libpcre.a') (Get-ChildItem (Join-Path $lib '*.o') | ForEach-Object { $_.FullName })
+            if ($LASTEXITCODE -ne 0) { throw 'ar failed' }
+            $a = Join-Path $lib 'libpcre.a'
+            Write-Host "built $a ($((Get-Item $a).Length) bytes)"
+            "FUN_PCRE_DIR=$lib" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } catch {
+            Write-Host "::warning title=pcre (win64)::$($_.Exception.Message)"
+          }
+
       - name: Build funcmd.exe
         working-directory: src\prj\fun
         shell: pwsh
@@ -299,7 +362,18 @@ jobs:
           # Call the x86_64-win64 compiler directly, as make-win64.bat does: the
           # generic fpc.exe driver is the i386 one here and forwards -Twin64 to
           # ppc386.exe ("Illegal parameter: -Twin64").
-          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx *>&1 |
+          #
+          # -dRegex + -Fl<dir> come from the PCRE step above; if it failed there
+          # is no libpcre.a and the build stays regex-less (the runner then
+          # reports the regex tests as SKIP).
+          $extra = @()
+          if ($env:FUN_PCRE_DIR -and (Test-Path "$env:FUN_PCRE_DIR\libpcre.a")) {
+            $extra = @('-dRegex', "-Fl$env:FUN_PCRE_DIR")
+            Write-Host "regex: linking PCRE from $env:FUN_PCRE_DIR"
+          } else {
+            Write-Host "regex: no PCRE for win64, building without -dRegex"
+          }
+          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @extra *>&1 |
             Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) {
             # Surface the real error: the log itself is not readable from outside.
