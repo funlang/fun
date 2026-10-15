@@ -397,15 +397,19 @@ jobs:
           # (next to funcmd.exe, where the loader finds it); otherwise the build
           # stays regex-less and the runner reports the regex tests as SKIP.
           $extra = @()
+          $strip = @('-Xs')
           if ($env:FUN_PCRE_DLL) {
             # -dFunTraceback only to report where the probe crashes (see the
             # diagnostic step); drop it once the win64 regex path runs
             $extra = @('-dRegex', '-dPCRE_WinDLL', '-dFunTraceback')
+            # keep symbols + line info so the cdb stack in the diagnostic step
+            # names the faulting Pascal function (the release build strips)
+            $strip = @('-gl')
             Write-Host "regex: -dRegex -dPCRE_WinDLL (pcre3.dll)"
           } else {
             Write-Host "regex: no pcre3.dll, building without -dRegex"
           }
-          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @extra *>&1 |
+          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar @strip -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @extra *>&1 |
             Tee-Object -FilePath $log
           # visible from outside: whether this build carries regex
           Write-Host "::warning title=build (windows-x64) flags::[$($extra -join ' ')]"
@@ -431,6 +435,22 @@ jobs:
           "if r = 'a-b-' then ?. 'regex-on'; else ?. 'regex-off'; end if;" | Out-File -FilePath $probe -Append -Encoding ascii
           $out = & "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe" $probe 2>&1
           Write-Host "::warning title=regex probe::exit=$LASTEXITCODE out=[$($out -join '~')]"
+          # the same call path, one step at a time: the last marker printed says
+          # which PCRE entry point crashes
+          $steps = "$env:RUNNER_TEMP\regex-steps.fun"
+          @(
+            "?. 'start';",
+            'var re = /(\d++)/;',
+            "?. 'compiled';",
+            "var m = 'a1b2'.match(re);",
+            "?. 'matched';",
+            '?. m.@count();',
+            "?. 'counted';",
+            "?. 'a1b2'.replace(re, '-');",
+            "?. 'replaced';"
+          ) -join "`n" | Out-File -FilePath $steps -Encoding ascii
+          $so = & "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe" $steps 2>&1
+          Write-Host "::warning title=regex steps::exit=$LASTEXITCODE out=[$($so -join '~')]"
           # a native stack, if the SDK debugger is on the image
           $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
           if (Test-Path $cdb) {
