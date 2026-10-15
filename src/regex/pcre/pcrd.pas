@@ -536,10 +536,14 @@ uses
   {$IFDEF HAS_UNIT_LIBC}
   Libc,
   {$ENDIF HAS_UNIT_LIBC}
-  SysUtils,
-  // portable LoadLibrary/GetProcedureAddress/UnloadLibrary, used by the
-  // non-static modes (see -dPCRE_LINKDLL / -dPCRE_LINKONREQUEST below)
-  dynlibs;
+  SysUtils
+  // Portable LoadLibrary/GetProcedureAddress/UnloadLibrary, used by the
+  // non-static modes (see -dPCRE_LINKDLL / -dPCRE_LINKONREQUEST below). They
+  // come from FPC's dynlibs unit; Delphi ships no such unit, so there the same
+  // calls are mapped onto the Win32 API further down.
+  {$IFDEF FPC}
+  , dynlibs
+  {$ENDIF FPC};
 
 {$IFDEF PCRE_STATICLINK}
 
@@ -772,9 +776,14 @@ end;
 {$ELSE ~PCRE_STATICLINK}
 
 type
-  // dynlibs' handle type, so LoadLibrary/GetProcedureAddress/UnloadLibrary
-  // line up on every platform (it is HINST on Windows and a PtrInt on Unix)
+  // FPC: dynlibs' own handle type (HINST on Windows, a PtrInt on Unix), so its
+  // LoadLibrary/GetProcedureAddress/UnloadLibrary line up on every platform.
+  // Delphi: no dynlibs, and this branch is Windows-only there, so HINST.
+  {$IFDEF FPC}
   TModuleHandle = TLibHandle;
+  {$ELSE}
+  TModuleHandle = HINST;
+  {$ENDIF FPC}
 
 const
   {$IFDEF MSWINDOWS}
@@ -1077,7 +1086,11 @@ end;
 {$ELSE ~PCRE_STATICLINK}
   function GetSymbol(SymbolName: PAnsiChar): Pointer;
   begin
+    {$IFDEF FPC}
     Result := GetProcedureAddress(PCRELib, AnsiString(SymbolName));
+    {$ELSE}
+    Result := GetProcAddress(PCRELib, SymbolName);
+    {$ENDIF FPC}
   end;
 
 begin
@@ -1086,7 +1099,11 @@ begin
     Exit;
 
   if PCRELib = INVALID_MODULEHANDLE_VALUE then
+    {$IFDEF FPC}
     PCRELib := LoadLibrary(libpcremodulename);
+    {$ELSE}
+    PCRELib := SafeLoadLibrary(libpcremodulename);
+    {$ENDIF FPC}
   Result := PCRELib <> INVALID_MODULEHANDLE_VALUE;
   if Result then
   begin
@@ -1126,7 +1143,11 @@ procedure UnloadPCRE;
 begin
   {$IFNDEF PCRE_STATICLINK}
   if PCRELib <> INVALID_MODULEHANDLE_VALUE then
+    {$IFDEF FPC}
     UnloadLibrary(PCRELib);
+    {$ELSE}
+    FreeLibrary(PCRELib);
+    {$ENDIF FPC}
   PCRELib := INVALID_MODULEHANDLE_VALUE;
   InitPCREFuncPtrs(@LibNotLoadedHandler);
   {$ENDIF ~PCRE_STATICLINK}
