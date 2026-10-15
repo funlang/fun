@@ -24,17 +24,24 @@
 #
 # HOST PLATFORMS
 # --------------
-# PLATFORM is derived from `uname -s` (linux / macos) and can be overridden with
-# FUNREG_PLATFORM=<name>. Two per-platform files tune the run:
+# PLATFORM is derived from `uname -s` plus `uname -m` (linux / macos, and
+# macos-aarch64 on Apple Silicon) and can be overridden with
+# FUNREG_PLATFORM=<name>. Arch-suffixed ids (macos-aarch64, linux-aarch64) look
+# for their own skip list and snapshots first, then fall back to the base id.
+# Two per-platform files tune the run:
 #
 #   fun/test/regression-skip-<platform>.txt   name<TAB>reason for tests that
 #       cannot run on that host at all (a Linux-only /proc or libc.so backend,
 #       an unimplemented JIT, ...). Skipped tests are reported as SKIP and do
-#       not count as failures.
+#       not count as failures. A missing arch-specific file falls back to the
+#       base id's (macos-aarch64 reads regression-skip-macos.txt).
 #   fun/test/expected/<platform>/<name>.txt   a host-specific snapshot that
 #       overrides the shared fun/test/expected/<name>.txt for that host. Only
 #       tests whose *portable* output legitimately differs per host need one;
 #       writing a snapshot with --update on a host fills its directory.
+#       Lookup order: expected/<platform>/ -> expected/<base-platform>/ ->
+#       shared (macos-aarch64 reads expected/macos-aarch64/, then
+#       expected/macos/, then expected/).
 #
 # FUNCMD=... overrides the interpreter path (default src/prj/fun/funcmd).
 #
@@ -70,13 +77,23 @@ EXPECTED="$HERE/expected"
 # --- host platform ---------------------------------------------------------
 HOSTOS="$(uname -s 2>/dev/null | tr 'A-Z' 'a-z')"
 case "$HOSTOS" in
-    darwin) PLATFORM=macos ;;
+    darwin) case "$(uname -m 2>/dev/null)" in
+                arm64|aarch64) PLATFORM=macos-aarch64 ;;
+                *)             PLATFORM=macos ;;
+            esac ;;
     linux)  PLATFORM=linux ;;
     *)      PLATFORM="$HOSTOS" ;;
 esac
 PLATFORM="${FUNREG_PLATFORM:-$PLATFORM}"
+PLATFORM_BASE="${PLATFORM%%-*}"
 PLATFORM_EXPECTED="$EXPECTED/$PLATFORM"
 SKIPFILE="$HERE/regression-skip-$PLATFORM.txt"
+# Arch-suffixed ids (macos-aarch64, linux-aarch64) fall back to the base id's
+# skip list when they have no file of their own.
+if [ ! -f "$SKIPFILE" ] && [ "$PLATFORM_BASE" != "$PLATFORM" ] \
+   && [ -f "$HERE/regression-skip-$PLATFORM_BASE.txt" ]; then
+    SKIPFILE="$HERE/regression-skip-$PLATFORM_BASE.txt"
+fi
 
 # --update writes into the host's own snapshot dir on non-Linux hosts, so the
 # shared Linux snapshots stay the common baseline; Linux keeps writing to
@@ -106,11 +123,13 @@ skip_reason() {
     awk -F'\t' -v n="$1" '$1==n { print ($2=="" ? "platform-specific" : $2); found=1; exit } END { exit(found?0:1) }' "$SKIPFILE"
 }
 
-# The snapshot a test is compared against: the host-specific one if it exists,
-# else the shared baseline. Prints the path (may not exist).
+# The snapshot a test is compared against: arch-specific, then base-platform,
+# then the shared baseline. Prints the path (may not exist).
 snapshot_for() {
     if [ -f "$PLATFORM_EXPECTED/$1.txt" ]; then
         printf '%s/%s.txt\n' "$PLATFORM_EXPECTED" "$1"
+    elif [ "$PLATFORM_BASE" != "$PLATFORM" ] && [ -f "$EXPECTED/$PLATFORM_BASE/$1.txt" ]; then
+        printf '%s/%s/%s.txt\n' "$EXPECTED" "$PLATFORM_BASE" "$1"
     else
         printf '%s/%s.txt\n' "$EXPECTED" "$1"
     fi
