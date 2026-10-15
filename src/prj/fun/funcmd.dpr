@@ -298,6 +298,24 @@ end;
 
 begin
 {$IfNdef FunDll}
+{$IfDef FPC}{$IfNDef UNIX}
+  // FPC initialises its default datetime/number formats from the OS locale on
+  // Windows, while on Unix it has no locale support and keeps the built-in
+  // values (ShortDateFormat 'd/m/y', DateSeparator '-', DecimalSeparator '.').
+  // Fun renders a date through that default (Variant -> AnsiString), so the
+  // same line printed "7/18/2010 15:35:15" here and "18-7-10 15:35:15" on
+  // Linux, and the shared snapshots could not match. Pin the Unix defaults so
+  // date/number output (and the StrToDateTime-based FD parsing) is
+  // host-independent. Delphi keeps the OS locale.
+  DefaultFormatSettings.DateSeparator     := '-';
+  DefaultFormatSettings.TimeSeparator     := ':';
+  DefaultFormatSettings.ShortDateFormat   := 'd/m/y';
+  DefaultFormatSettings.LongDateFormat    := 'dd" "mmmm" "yyyy';
+  DefaultFormatSettings.ShortTimeFormat   := 'hh:nn';
+  DefaultFormatSettings.LongTimeFormat    := 'hh:nn:ss';
+  DefaultFormatSettings.DecimalSeparator  := '.';
+  DefaultFormatSettings.ThousandSeparator := ',';
+{$EndIf}{$EndIf}
   _ParserClass := CFunParser;
 
   gui   := FindParamAsBool('gui');

@@ -321,14 +321,18 @@ jobs:
           # keeps that final LF, so re-add exactly one "\n" (verified against
           # every shared snapshot) instead of rewriting line endings - the
           # snapshots are already CRLF.
+          #
+          # Copy bytes, not text: some snapshots (set-named.fun) carry raw
+          # non-UTF-8 bytes, and ReadAllText/WriteAllText would decode and
+          # re-encode them (U+FFFD), so the copy would no longer match.
           $expSrc = "fun\test\expected"
           $expDst = "$env:RUNNER_TEMP\expected-win"
           Remove-Item -Recurse -Force $expDst -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path $expDst | Out-Null
           Get-ChildItem "$expSrc\*.txt" | ForEach-Object {
-            $t = [IO.File]::ReadAllText($_.FullName)
-            if ($t.EndsWith("`r")) { $t += "`n" }
-            [IO.File]::WriteAllText((Join-Path $expDst $_.Name), $t)
+            $b = [IO.File]::ReadAllBytes($_.FullName)
+            if ($b.Length -gt 0 -and $b[$b.Length - 1] -eq 13) { $b += [byte]10 }
+            [IO.File]::WriteAllBytes((Join-Path $expDst $_.Name), $b)
           }
           $env:FUNREG_EXPECTED = $expDst
 

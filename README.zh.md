@@ -310,6 +310,7 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | Linux x86_64（原生）   | Linux x86_64 | `src/prj/fun/make-linux-x86_64.sh`      | FPC（本机）+ gcc   |
 | Linux aarch64（arm64） | Linux x86_64 | `src/prj/fun/make-linux-aarch64.sh`     | FPC 交叉 + Zig     |
 | macOS x86_64 / aarch64 | Linux x86_64 | `src/prj/fun/make-darwin.sh`            | FPC 交叉 + Zig     |
+| macOS（原生）          | macOS        | `src/prj/fun/make-macos.sh`             | FPC（Homebrew）    |
 
 以 `-DFunDll` 编译可生成嵌入运行时 `fun.dll`，导出 `Run` 接口。构建产物已由 `.gitignore` 覆盖，不纳入版本控制。
 
@@ -348,6 +349,32 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 - 放好目录后，`cd src/prj/fun && ./make-linux-x86_64.sh` 会自动编译 PCRE 与 TCC。
 - 也可以显式指定路径：`PCRE_SRC=/path/to/pcre TCC_SRC=/path/to/tcc ./make-linux-x86_64.sh`。
 - 缺 PCRE → 构建不带正则（`-dRegex` 关闭）；缺 TCC → 无 `libtcc.so`，`lib-tcc` 不可用。两者都不影响核心解释器。
+- 便捷下载脚本：`src/prj/fun/fetch-3rd-party.sh` 会把钉住的 PCRE 8.45 与 TCC 0.9.27 发行包下载并解包到 `src/3rd/`（CI 使用）。
+
+### 回归测试与 CI
+
+构建完成后，在仓库根目录运行快照测试：
+
+```sh
+fun/test/run-linux-regression.sh     # Linux（或任意 POSIX 主机：自动识别）
+fun/test/run-macos-regression.sh     # macOS 包装脚本；跳过仅 Linux 的用例
+fun/test/run-windows-regression.bat  # Windows 对应脚本
+```
+
+runner 会识别宿主：`fun/test/regression-skip-<platform>.txt` 列出无法在该宿主上
+运行的用例（`/proc` 或 `libc.so.6` 后端、尚未移植的 JIT……），
+`fun/test/expected/<platform>/` 可存放覆盖共享 `fun/test/expected/` 的宿主专属快照。
+`--update` 写入宿主自己的快照目录；macOS 细节与当前的跳过原因见
+[`art/notes/macos-port.md`](art/notes/macos-port.md)。
+
+[`.github/workflows/regression.yml`](.github/workflows/regression.yml) 在五个平台上
+运行本套件——Linux / macOS / Windows 的 x64，加上 Linux 与 macOS 的 arm64。五个
+都基于 Free Pascal 构建并作为门槛。Windows 构建目前仍无正则（尚未在那里编译
+PCRE），因此 `run-windows-regression.bat` 启动时会先探测引擎，把依赖正则的用例
+报成 SKIP，而不是去比对注定不同的输出；等接上 PCRE 后它们会自动恢复。
+
+`windows-arm64` 已暂时禁用：所钉住的工具链 FPC 3.2.2 没有 win64/aarch64 目标，
+没有可用的构建方式。
 
 ---
 

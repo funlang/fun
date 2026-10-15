@@ -7,24 +7,31 @@
 ## [未发布]
 
 - CI 五个平台全部绿标（Windows arm64 暂时禁用：FPC 3.2.2 没有 win64/aarch64
-  目标）。修掉两处只在 Windows 显形的缺陷，都放在 `{$IfDef FPC}` 分支里，
+  目标）。修掉三处只在 Windows 显形的差异，都放在 `{$IfDef FPC}` 分支里，
   Delphi 源码保持原样。其一，`ToFunTime` 在所有非 Unix 构建上走
   `VarToDateTime`，而 FPC 的 `VarToDateTime` 经 `TryStrToDateTime`、依赖宿主的
   `ShortDateFormat`/`DateSeparator`，于是美式区域下 Fun 的 ISO 时间字面量
   （`@'2010-04-09 15:35:15'`）抛 `EVariantError`（"Invalid variant type
   cast"），在 parse 期就把 `calc.fun`、`type.fun`、`lib-type-test.fun` 拖垮；
-  现在 FPC 构建直接解析 ISO 形式（与既有 Unix 构建一致）。其二，`Print` 走
-  RTL 的 `Output` 文本文件，而 FPC 会把它标成 `GetConsoleOutputCP()`，于是每次
-  `?.` 输出都从字符串代码页（CP1252）重编码到控制台代码页（runner 上是
-  CP65001），每个非 ASCII 字节都变成两个；标准输出现在改走新增的 `WriteOut`，
-  Windows 上直接向 stdout 句柄写原始字节（与 `WriteErr` 对 stderr 的做法一致），
-  `set-named.fun` 因此重新对齐。
+  现在 FPC 构建直接解析 ISO 形式（与既有 Unix 构建一致）。其二，日期回显又跟着
+  宿主区域走（`7/18/2010` 而非 Unix 的 `18-7-10`），故 `funcmd` 把
+  `DefaultFormatSettings` 钉到 FPC 在 Unix 上的内置值（Unix 下不引 clocale 读不到
+  区域），日期与数字输出因此与宿主无关。其三，`Print` 走 RTL 的 `Output` 文本
+  文件，而 FPC 会把它标成 `GetConsoleOutputCP()`，于是每次 `?.` 输出都从字符串
+  代码页（CP1252）重编码到控制台代码页（runner 上是 CP65001），每个非 ASCII
+  字节都变成两个；标准输出现在改走新增的 `WriteOut`，Windows 上直接向 stdout
+  句柄写原始字节（与 `WriteErr` 对 stderr 的做法一致），`set-named.fun` 因此
+  重新对齐。
 
 - Windows 回归 runner 现在先探测正则引擎：PCRE 缺席时（没有 `-dRegex` 时正则
   字面量解析为 nil 节点）把依赖正则的用例报成 SKIP，而不是去比一份注定不同的
-  输出；等 Windows 上有了 PCRE 构建它们会自动恢复。`lib-file-test` 与
-  `lib-dyns-test` 加入宿主相关跳过名单（`find()` 在 Windows 上给 `\`、别处给
-  `/`，而共享快照用的是 `/`）。
+  输出；等 Windows 上有了 PCRE 构建它们会自动恢复。需要 `.getapi` 的用例
+  （`lib-asm-x64`、`lib-zlib-test`；构建未开 `-dWinAPI`，`winapi.pas` 的 getapi
+  是 32 位 x86 汇编）与需要 COM 的用例（`lib-orm-rows`，经 `lib-xml`）同样加入
+  跳过名单；`lib-file-test`/`lib-dyns-test` 也是（`find()` 在 Windows 上给 `\`、
+  别处给 `/`，而共享快照用的是 `/`）。工作流的 `expected-win` 复制改为逐字节
+  （`ReadAllBytes`）：旧写法走文本模式，会把 `set-named.fun` 快照里的原始 GBK
+  字节重编码，导致永远对不上。
 
 - 加密测试支持 OpenSSL 3，以及剩余的 CI 平台修复。`lib-crypt-unx` 之前探测
   `EVP_PKEY_size`，而 OpenSSL 3.0 把它变成了指向 `EVP_PKEY_get_size` 的头文件

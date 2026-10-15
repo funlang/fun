@@ -7,7 +7,7 @@ This project records notable changes in the style of [Keep a Changelog](https://
 ## [Unreleased]
 
 - CI is green on all five platforms (Windows arm64 is disabled: FPC 3.2.2 has
-  no win64/aarch64 target). Two Windows-only defects are fixed, both in
+  no win64/aarch64 target). Three Windows-only divergences are fixed, all in
   `{$IfDef FPC}` branches so the Delphi sources stay as they were.
   `ToFunTime` used `VarToDateTime` on every non-Unix build, but FPC's
   `VarToDateTime` goes through `TryStrToDateTime` with the host's
@@ -15,20 +15,28 @@ This project records notable changes in the style of [Keep a Changelog](https://
   (`@'2010-04-09 15:35:15'`) raised `EVariantError` ("Invalid variant type
   cast") on a machine with a US locale and took `calc.fun`, `type.fun` and
   `lib-type-test.fun` down at parse time; the FPC build now parses the ISO form
-  directly, as the Unix builds already did. And `Print` wrote through the RTL
-  `Output` text file, which FPC tags with `GetConsoleOutputCP()`: every `?.`
-  write was re-encoded from the string codepage (CP1252) to the console
-  codepage (CP65001 on the runner), doubling every non-ASCII byte. Standard
-  output now goes through a new `WriteOut` that writes the raw bytes to the
-  stdout handle on Windows, like `WriteErr` already did for stderr, so
-  `set-named.fun` matches again.
+  directly, as the Unix builds already did. Rendering a date back then still
+  followed the host locale (`7/18/2010` vs the Unix `18-7-10`), so `funcmd`
+  pins `DefaultFormatSettings` to the values FPC uses on Unix (it cannot read
+  the locale there without `clocale`), making date and number output
+  host-independent. And `Print` wrote through the RTL `Output` text file, which
+  FPC tags with `GetConsoleOutputCP()`: every `?.` write was re-encoded from
+  the string codepage (CP1252) to the console codepage (CP65001 on the runner),
+  doubling every non-ASCII byte. Standard output now goes through a new
+  `WriteOut` that writes the raw bytes to the stdout handle on Windows, like
+  `WriteErr` already did for stderr, so `set-named.fun` matches again.
 
 - The Windows regression runner probes for the regex engine and reports the
   regex-dependent tests as SKIP while PCRE is absent (a regex literal parses to
   a nil node without `-dRegex`), instead of diffing output that cannot match;
-  they run by themselves once a Windows PCRE build exists. `lib-file-test` and
-  `lib-dyns-test` join the host-dependent skip list (`find()` emits `\` on
-  Windows and `/` elsewhere, and the shared snapshots use `/`).
+  they run by themselves once a Windows PCRE build exists. Tests that need
+  `.getapi` (`lib-asm-x64`, `lib-zlib-test`; `-dWinAPI` is off because
+  `winapi.pas` getapi is 32-bit x86 asm) or COM (`lib-orm-rows`, via `lib-xml`)
+  join the skip list too, as do `lib-file-test`/`lib-dyns-test` (`find()` emits
+  `\` on Windows and `/` elsewhere, and the shared snapshots use `/`). The
+  workflow's `expected-win` copy is now byte-exact (`ReadAllBytes`); the old
+  text-mode copy re-encoded the raw GBK bytes of the `set-named.fun` snapshot
+  and made it unmatchable.
 
 - OpenSSL 3 in the crypto tests, and the remaining CI platform fixes.
   `lib-crypt-unx` probed `EVP_PKEY_size`, which OpenSSL 3.0 turned into a header
