@@ -478,8 +478,8 @@ jobs:
           $exe = "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe"
           $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
           if (Test-Path $cdb) {
-            $hit = & $cdb -g -G -c "g; q" $exe $steps 2>&1 |
-                     Select-String -Pattern 'funcmd\+0x[0-9a-f]+' | Select-Object -First 1
+            $raw = & $cdb -g -G -c "g; q" $exe $steps 2>&1
+            $hit = $raw | Select-String -Pattern 'funcmd\+0x[0-9a-f]+' | Select-Object -First 1
             if ($hit) {
               $off = [Convert]::ToInt64(($hit.Line -replace '.*funcmd\+0x([0-9a-f]+).*', '$1'), 16)
               $aa = 'C:\mingw64\bin\addr2line.exe'
@@ -489,7 +489,10 @@ jobs:
                 Write-Host "::warning title=regex crash::$($hit.Line.Trim()) @ $a -> $r"
               }
             } else {
-              Write-Host "::warning title=regex crash::cdb found no funcmd+0x address"
+              # no fault address: the process did not even start (a loader error
+              # such as a missing entry point names the offending symbol)
+              $tail = ($raw | Where-Object { $_ -match '\S' } | Select-Object -Last 12) -join ' ~ '
+              Write-Host "::warning title=regex cdb::$tail"
             }
           }
           $dll = "$env:GITHUB_WORKSPACE\src\prj\fun\pcre3.dll"
