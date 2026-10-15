@@ -451,7 +451,11 @@ jobs:
               if ($crt.Count -gt 0) { $crt = @("-k-L$d") + $crt; break }
             }
             if ($crt.Count -eq 0) { Write-Host "no CRT import library found for -Xe" }
-            $variants += ,(@('-dRegex') + $crt + @("-Fl$env:FUN_PCRE_DIR", "-Fu$env:FUN_PCRE_DIR", '-Xe'))
+            # the libraries are listed on both sides of the inputs: ld only
+            # pulls an archive member for a symbol it has already seen, and
+            # where FPC places -k arguments relative to the objects is not
+            # specified, so cover both orders
+            $variants += ,(@('-dRegex') + $crt + @("-Fl$env:FUN_PCRE_DIR", "-Fu$env:FUN_PCRE_DIR", '-Xe') + $crt)
             $variants += ,(@('-dRegex', "-Fl$env:FUN_PCRE_DIR", "-Fu$env:FUN_PCRE_DIR"))
           }
           $variants += ,(@())   # last resort: build without regex, keep the job green
