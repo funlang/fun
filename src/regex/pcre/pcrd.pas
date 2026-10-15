@@ -615,17 +615,12 @@ function pcre_refcount; external 'pcre3.dll' name 'pcre_refcount';
 function pcre_study; external 'pcre3.dll' name 'pcre_study';
 function pcre_version; external 'pcre3.dll' name 'pcre_version';
 
-// PCRE owns its allocator: everything it allocates comes from the DLL's CRT
-// malloc, so it must be released by the DLL's free. Handing such a pointer to
-// FPC's FreeMem (what the static path does) corrupts the heap - that is the
-// access violation this bring-up hit right after a successful match. PCRE
-// exports pcre_malloc/pcre_free as *data*, which FPC cannot call, so the DLL
-// carries these two thin C wrappers (see fun_pcre_glue.c in the CI PCRE step).
-// No calling convention on purpose: FPC's win64 `cdecl` prefixes the imported
-// symbol with '_', so declaring it would request _fun_pcre_free and the loader
-// would fail with STATUS_ENTRYPOINT_NOT_FOUND. win64 has a single ABI anyway.
-function fun_pcre_malloc(Size: NativeUInt): Pointer; external 'pcre3.dll' name 'fun_pcre_malloc';
-procedure fun_pcre_free(P: Pointer); external 'pcre3.dll' name 'fun_pcre_free';
+// PCRE owns its allocator: everything it allocates comes from the DLL's CRT,
+// so it must be released by the DLL's free. Handing such a pointer to FPC's
+// FreeMem (what the static path does) corrupts the heap - the access violation
+// this bring-up hit right after a successful match. pcre_free_substring is
+// exactly "release with PCRE's own free" (see pcre_get.c: (PUBL(free))(p)), so
+// the free path below goes through it instead of introducing another export.
 {$Else}
 function pcre_compile; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_compile2; {$IfDef Darwin}cdecl;{$EndIf} external;
@@ -711,8 +706,9 @@ begin
     Result := pcre_malloc_user(Size)
   else
   {$IfDef PCRE_WinDLL}
-    // the DLL's allocator: the pair below must match what PCRE allocated with
-    Result := fun_pcre_malloc(Size);
+    // nothing in the DLL calls this (PCRE allocates with its own there), so
+    // FPC's malloc is fine; the free side must not use FPC's heap, see below
+    Result := malloc(Size);
   {$Else}
     Result := malloc(Size);
   {$EndIf}
@@ -724,7 +720,7 @@ begin
     Result := pcre_stack_malloc_user(Size)
   else
   {$IfDef PCRE_WinDLL}
-    Result := fun_pcre_malloc(Size);
+    Result := malloc(Size);
   {$Else}
     Result := malloc(Size);
   {$EndIf}
@@ -741,7 +737,8 @@ begin
     pcre_free_user(P)
   else
   {$IfDef PCRE_WinDLL}
-    fun_pcre_free(P);
+    // PCRE's own free: pcre_free_substring(p) is (PUBL(free))(p) in pcre_get.c
+    pcre_free_substring(PAnsiChar(P));
   {$Else}
     free(P);
   {$EndIf}
@@ -753,7 +750,7 @@ begin
     pcre_stack_free_user(P)
   else
   {$IfDef PCRE_WinDLL}
-    fun_pcre_free(P);
+    pcre_free_substring(PAnsiChar(P));
   {$Else}
     free(P);
   {$EndIf}

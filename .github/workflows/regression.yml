@@ -366,20 +366,6 @@ jobs:
               }
             }
             $dll = Join-Path (Join-Path $env:GITHUB_WORKSPACE 'src\prj\fun') 'pcre3.dll'
-            # PCRE owns its allocator: the Pascal side must release PCRE memory
-            # with the allocator the DLL used (FPC's FreeMem on a DLL-malloc'd
-            # pointer corrupts the heap - the AV this bring-up hit). PCRE points
-            # pcre_malloc/pcre_free at the DLL's CRT and nothing here changes
-            # that, so the wrappers just use the CRT directly; that also avoids
-            # depending on how pcre.h spells those two (data vs function).
-            $glue = Join-Path $src 'fun_pcre_glue.c'
-            @(
-              '#include <stdlib.h>',
-              'void *fun_pcre_malloc(size_t n) { return malloc(n); }',
-              'void fun_pcre_free(void *p) { free(p); }'
-            ) -join "`n" | Out-File -FilePath $glue -Encoding ascii
-            $go = & $gcc -c -O2 -DHAVE_CONFIG_H -DSUPPORT_PCRE8 "-I$src" $glue -o (Join-Path $lib 'fun_pcre_glue.o') 2>&1
-            if ($LASTEXITCODE -ne 0) { throw "gcc failed: fun_pcre_glue :: " + (($go | Select-Object -First 8) -join ' ~ ') }
             # an import library too: it lets a C probe link the DLL, which is
             # how the diagnostic step checks the DLL itself
             $implib = Join-Path $lib 'libpcre3.dll.a'
