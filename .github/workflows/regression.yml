@@ -321,11 +321,40 @@ jobs:
             Copy-Item (Join-Path $src 'pcre.h.generic') (Join-Path $src 'pcre.h') -Force
             Copy-Item (Join-Path $src 'pcre_chartables.c.dist') (Join-Path $src 'pcre_chartables.c') -Force
 
-            $gcc = (Get-Command gcc -ErrorAction SilentlyContinue).Source
-            if (-not $gcc) { $gcc = 'C:\msys64\mingw64\bin\gcc.exe' }
-            if (-not (Test-Path $gcc)) { throw 'no gcc (neither on PATH nor C:\msys64)' }
-            $ar = (Get-Command ar -ErrorAction SilentlyContinue).Source
-            if (-not $ar) { $ar = Join-Path (Split-Path $gcc) 'ar.exe' }
+            # Pick a MinGW-w64 C compiler that can actually see its own headers:
+            # the image's "gcc" (Tools) had no reachable C headers from this
+            # shell (ctype.h/stdio.h missing), so probe candidates with a
+            # one-line compile and fall back to MSYS2's package if none works.
+            function Test-CC([string]$exe) {
+              if (-not (Test-Path $exe)) { return $false }
+              $o = Join-Path $env:RUNNER_TEMP 'cctest.o'
+              Remove-Item -Force $o -ErrorAction SilentlyContinue
+              'int main(void){return 0;}' | & $exe -c -x c - -o $o 2>&1 | Out-Null
+              return (($LASTEXITCODE -eq 0) -and (Test-Path $o))
+            }
+            $cands = @()
+            $onpath = Get-Command gcc -ErrorAction SilentlyContinue
+            if ($onpath) { $cands += $onpath.Source }
+            $cands += 'C:\msys64\mingw64\bin\gcc.exe'
+            $cands += 'C:\mingw64\bin\gcc.exe'
+            $cands += 'C:\tools\mingw64\bin\gcc.exe'
+            $gcc = $null
+            foreach ($c in $cands) {
+              if (Test-CC $c) { $gcc = $c; break }
+              Write-Host "not usable as a C compiler: $c"
+            }
+            if (-not $gcc) {
+              Write-Host "no usable gcc yet; installing MSYS2's mingw-w64 toolchain"
+              if (Test-Path 'C:\msys64\usr\bin\bash.exe') {
+                & 'C:\msys64\usr\bin\bash.exe' -lc 'pacman -Sy --noconfirm --needed mingw-w64-x86_64-gcc' 2>&1 |
+                  Select-Object -Last 6 | Write-Host
+                if (Test-CC 'C:\msys64\mingw64\bin\gcc.exe') { $gcc = 'C:\msys64\mingw64\bin\gcc.exe' }
+              }
+            }
+            if (-not $gcc) { throw 'no usable C compiler (tried PATH gcc, C:\msys64\mingw64, pacman install)' }
+            $ar = Join-Path (Split-Path $gcc) 'ar.exe'
+            if (-not (Test-Path $ar)) { $ar = (Get-Command ar -ErrorAction SilentlyContinue).Source }
+            if (-not (Test-Path $ar)) { throw "no ar next to $gcc" }
             Write-Host "gcc: $gcc  target=$(& $gcc -dumpmachine)  $(& $gcc --version 2>&1 | Select-Object -First 1)"
             Write-Host "ar : $ar"
 
@@ -352,6 +381,8 @@ jobs:
             $a = Join-Path $lib 'libpcre.a'
             Write-Host "built $a ($((Get-Item $a).Length) bytes)"
             "FUN_PCRE_DIR=$lib" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            # visible from outside (the job log is not): the bring-up detail
+            Write-Host "::warning title=pcre (win64) ok::gcc=$gcc ($(& $gcc -dumpmachine)); libpcre.a=$((Get-Item $a).Length) bytes"
           } catch {
             Write-Host "::warning title=pcre (win64)::$($_.Exception.Message)"
           }
