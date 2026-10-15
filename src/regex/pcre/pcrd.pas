@@ -597,10 +597,17 @@ function pcre_study; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_version; {$IfDef Darwin}cdecl;{$EndIf} external;
 
 {$IfNDef UNIX}
+{$IfNDef Win64}
+// 32-bit only: the bcc32-built PCRE .obj files (make.bat / makefile.mak) call
+// the Borland __llmul helper, which FPC's System.__llmul satisfies on i386.
+// On win64 the 64-bit multiply is native, nothing references the helper, and
+// System.__llmul does not exist - keeping this stub there fails to compile
+// ("Unknown identifier SYSTEM.__LLMUL").
 procedure __llmul;
 asm
   JMP System.__llmul
 end;
+{$EndIf}
 {$EndIf Linux}
 
 type
