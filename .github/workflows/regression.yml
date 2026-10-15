@@ -400,6 +400,8 @@ jobs:
           }
           ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @extra *>&1 |
             Tee-Object -FilePath $log
+          # visible from outside: whether this build carries regex
+          Write-Host "::warning title=build (windows-x64) flags::[$($extra -join ' ')]"
           if ($LASTEXITCODE -ne 0) {
             # Surface the real error: the log itself is not readable from outside.
             $err = (Get-Content $log |
@@ -438,6 +440,10 @@ jobs:
           $log = "$env:RUNNER_TEMP\reg-windows-x64.log"
           cmd /c "fun\test\run-windows-regression.bat --portable" 2>&1 |
             Tee-Object -FilePath $log
+          # visible from outside on success too: N/M checks passed (skipped K)
+          $sum = (Get-Content $log | Select-String -Pattern 'checks passed' |
+                    Select-Object -Last 1 | ForEach-Object { $_.Line.Trim() })
+          Write-Host "::warning title=regression (windows-x64) summary::$sum"
           if ($LASTEXITCODE -ne 0) {
             # Surface the failing tests and the runner's own diff lines: the job
             # log is not readable from outside, so an annotation is the only view.
