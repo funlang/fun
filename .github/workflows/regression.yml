@@ -395,16 +395,10 @@ jobs:
               # .obj, not .o: that is the name FPC's Windows compiler expects
               # both for {$LINK} and inside the archive
               #
-              # -D_CRTBLD empties MinGW-w64's _CRTIMP (it is
-              # __attribute__((dllimport)) unless _CRTBLD/_SYSCRT), so the
-              # objects call the CRT by plain name (isupper, strchr, ...) and
-              # not through the __imp_... indirect slots that FPC's linker
-              # cannot resolve without MinGW's import libraries.
-              #
               # -mno-stack-arg-probe keeps GCC from calling ___chkstk_ms for
               # the big frames in pcre_exec/pcre_compile (that helper lives in
               # libgcc, which FPC's linker does not have).
-              $out = & $gcc -c -O2 -mno-stack-arg-probe -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DPCRE_STATIC -D_CRTBLD "-I$src" $c -o (Join-Path $lib "$($units[$u]).obj") 2>&1
+              $out = & $gcc -c -O2 -mno-stack-arg-probe -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DPCRE_STATIC "-I$src" $c -o (Join-Path $lib "$($units[$u]).obj") 2>&1
               if ($LASTEXITCODE -ne 0) {
                 throw "gcc failed: $u :: " + (($out | Select-Object -First 14) -join ' ~ ')
               }
@@ -448,13 +442,13 @@ jobs:
             $crt = @()
             $root = Split-Path (Split-Path $env:FUN_PCRE_GCC)
             foreach ($d in @("$root\x86_64-w64-mingw32\lib", "$root\lib", "$root\..\x86_64-w64-mingw32\lib")) {
-              foreach ($crl in @('msvcrt', 'ucrt')) {
+              foreach ($crl in @('ucrt', 'msvcrt', 'mingwex')) {
                 if (Test-Path "$d\lib$crl.a") {
-                  $crt = @("-k-L$d", "-k-l$crl")
+                  $crt += @("-k-l$crl")
                   Write-Host "CRT import library: $d\lib$crl.a"
                 }
               }
-              if ($crt.Count -gt 0) { break }
+              if ($crt.Count -gt 0) { $crt = @("-k-L$d") + $crt; break }
             }
             if ($crt.Count -eq 0) { Write-Host "no CRT import library found for -Xe" }
             $variants += ,(@('-dRegex') + $crt + @("-Fl$env:FUN_PCRE_DIR", "-Fu$env:FUN_PCRE_DIR", '-Xe'))
