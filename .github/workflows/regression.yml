@@ -435,12 +435,20 @@ jobs:
           if ($caps.Count -gt 1) { $sets += ,($caps[0..($caps.Count-2)]) }  # drop WinFFI
           $sets += ,@()                           # core build
 
+          # Splat one array instead of typing the flags inline: PowerShell's
+          # native argument passing is what mangles a bare -Fu..\..\lib into
+          # something fpc reads as a path plus a stray 'lib' source file.
+          $argv = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs', '-Twin64',
+                    '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx',
+                    "-Fu$((Resolve-Path '..\..\lib').Path)")
+
           $built = $null
           $tried = @()
           foreach ($v in $sets) {
             $label = if ($v.Count -eq 0) { 'no optional features' } else { $v -join ' ' }
-            & ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx `
-                -Fu..\..\lib @v *>&1 |
+            $pa = $argv + $v
+            Write-Host "argv: $(($pa | ForEach-Object { "[$_]" }) -join ' ')"
+            & ppcrossx64 @pa *>&1 |
               Tee-Object -FilePath $log
             if ($LASTEXITCODE -eq 0) { $built = $label; break }
             $err = (Get-Content $log |
