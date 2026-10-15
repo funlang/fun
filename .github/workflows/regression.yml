@@ -497,6 +497,14 @@ jobs:
           }
           $dll = "$env:GITHUB_WORKSPACE\src\prj\fun\pcre3.dll"
           if (Test-Path $dll) {
+            # the exact names on both sides: a mismatch is why the loader says
+            # STATUS_ENTRYPOINT_NOT_FOUND (c0000139) before funcmd runs
+            $od = 'C:\mingw64\bin\objdump.exe'
+            if (Test-Path $od) {
+              $imp = (& $od -p $exe 2>&1 | Select-String -Pattern 'pcre|fun_pcre' |
+                        Select-Object -First 40 | ForEach-Object { $_.Line.Trim() }) -join ' ; '
+              Write-Host "::warning title=funcmd imports::$imp"
+            }
             $sym = (& nm -g --defined-only $dll 2>&1 |
                       Select-String -Pattern 'pcre_compile|pcre_exec|pcre_fullinfo|pcre_version|fun_pcre' |
                       Select-Object -First 6 | ForEach-Object { $_.Line.Trim() }) -join ' ; '
