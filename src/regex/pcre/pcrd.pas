@@ -643,76 +643,6 @@ function _isspace(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isspac
 function _isupper(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isupper';
 function _isxdigit(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isxdigit';
 function _strchr(__s: PAnsiChar; __c: Integer): PAnsiChar; cdecl; external szMSVCRT name 'strchr';
-{$IfDef Win64}
-// win64 compiles PCRE with MinGW-w64 (see the PCRE step in
-// .github/workflows/regression.yml) instead of the bcc32 .obj files, and those
-// objects call the CRT by plain name - they are built with -D_CRTBLD, which
-// empties MinGW's _CRTIMP, so there is no __imp_... indirection that FPC's
-// linker cannot resolve. The declarations above are the bcc32 (underscored)
-// names; the ones below are the plain ones. They keep the plain name on
-// purpose: FPC names the emitted symbol after the declaration on Windows, and
-// the C side looks up exactly these. FPC emits a reference only for an
-// external the Pascal code uses (an unused declaration produces no symbol at
-// all), so _win64_crt_anchor references all of them and the unit's
-// initialization section keeps the anchor in the object file.
-// malloc/free are imported here too: pcrd_c.inc's Pascal malloc/free would
-// carry FPC's mangled names, so on Win64 it does not define them (see the
-// {$IfNDef Win64} there) - the C side then uses msvcrt's, as on Linux it uses
-// glibc's (imported below the {$Else}).
-function isalnum(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isalnum';
-function isalpha(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isalpha';
-function iscntrl(__ch: Integer): Integer; cdecl; external szMSVCRT name 'iscntrl';
-function isgraph(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isgraph';
-function islower(__ch: Integer): Integer; cdecl; external szMSVCRT name 'islower';
-function isprint(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isprint';
-function ispunct(__ch: Integer): Integer; cdecl; external szMSVCRT name 'ispunct';
-function isspace(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isspace';
-function isupper(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isupper';
-function isxdigit(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isxdigit';
-function tolower(__ch: Integer): Integer; cdecl; external szMSVCRT name 'tolower';
-function toupper(__ch: Integer): Integer; cdecl; external szMSVCRT name 'toupper';
-function strchr(__s: PAnsiChar; __c: Integer): PAnsiChar; cdecl; external szMSVCRT name 'strchr';
-function strcmp(s1, s2: PAnsiChar): Integer; cdecl; external szMSVCRT name 'strcmp';
-function strlen(s: PAnsiChar): size_t; cdecl; external szMSVCRT name 'strlen';
-function strncmp(s1, s2: PAnsiChar; n: size_t): Integer; cdecl; external szMSVCRT name 'strncmp';
-function memcmp(s1, s2: Pointer; n: size_t): Integer; cdecl; external szMSVCRT name 'memcmp';
-function memcpy(dest, src: Pointer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memcpy';
-function memmove(dest, src: Pointer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memmove';
-function memset(dest: Pointer; val: Integer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memset';
-function malloc(n: size_t): Pointer; cdecl; external szMSVCRT name 'malloc';
-procedure free(p: Pointer); cdecl; external szMSVCRT name 'free';
-
-// Its only job is to reference every import above;
-// the unit's initialization section (at the end of the file) calls it. All
-// calls are safe, so it is fine that they actually run once at startup.
-procedure _win64_crt_anchor;
-var
-  one: array[0..0] of AnsiChar;
-begin
-  one[0] := #0;
-  if isalnum(Ord('0')) = 999 then exit;
-  if isalpha(Ord('0')) = 999 then exit;
-  if iscntrl(Ord('0')) = 999 then exit;
-  if isgraph(Ord('0')) = 999 then exit;
-  if islower(Ord('0')) = 999 then exit;
-  if isprint(Ord('0')) = 999 then exit;
-  if ispunct(Ord('0')) = 999 then exit;
-  if isspace(Ord('0')) = 999 then exit;
-  if isupper(Ord('0')) = 999 then exit;
-  if isxdigit(Ord('0')) = 999 then exit;
-  if tolower(Ord('0')) = 999 then exit;
-  if toupper(Ord('0')) = 999 then exit;
-  if strchr(@one[0], 0) = nil then exit;
-  if strcmp(@one[0], @one[0]) = 999 then exit;
-  if strlen(@one[0]) = 999 then exit;
-  if strncmp(@one[0], @one[0], 0) = 999 then exit;
-  if memcmp(@one[0], @one[0], 0) = 999 then exit;
-  if memcpy(@one[0], @one[0], 0) = nil then exit;
-  if memmove(@one[0], @one[0], 0) = nil then exit;
-  if memset(@one[0], 0, 0) = nil then exit;
-  free(malloc(0));
-end;
-{$EndIf}
 {$Else}
 // Linux: the PCRE engine is linked from libpcre.a (built from the pcre-8 C
 // sources); its C-runtime calls (memcpy, memcmp, isspace, ...) are provided by
@@ -1175,14 +1105,5 @@ function pcre_refcount; external libpcremodulename name PCRERefCountExportName;
 function pcre_study; external libpcremodulename name PCREStudyExportName;
 function pcre_version; external libpcremodulename name PCREVersionExportName;
 {$ENDIF PCRE_LINKDLL}
-
-{$IfDef Win64}
-// See _win64_crt_anchor: it exists only to keep a reference to the plain-name
-// msvcrt imports in the object file (FPC emits nothing for an external the
-// Pascal code does not use), and those are what the MinGW-built PCRE objects
-// resolve against. The calls are safe, so running them once is fine.
-initialization
-  _win64_crt_anchor;
-{$EndIf}
 
 end.

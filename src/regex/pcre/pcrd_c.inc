@@ -1,9 +1,3 @@
-{$IfNDef Win64}
-// PCRE's C side needs the symbol "malloc"/"free". On i386 a Pascal function
-// declared cdecl gets the _-prefixed C name, which is what the bcc32 objects
-// ask for. On win64 there is no prefix and these bodies would carry FPC's
-// mangled names, so pcrd.pas imports msvcrt's malloc/free there instead (and
-// gets the plain symbols the MinGW-built objects look up).
 function malloc(Size: Integer): Pointer; cdecl;
 begin
   GetMem(Result, Size);
@@ -13,7 +7,6 @@ procedure free(P: Pointer); cdecl;
 begin
   FreeMem(P);
 end;
-{$EndIf}
 
 function _memcpy(Dest, Src: Pointer; N: Integer): Pointer; cdecl;
 begin

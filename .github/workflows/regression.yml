@@ -414,6 +414,7 @@ jobs:
             $a = Join-Path $lib 'libpcre.a'
             Write-Host "built $a ($((Get-Item $a).Length) bytes)"
             "FUN_PCRE_DIR=$lib" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "FUN_PCRE_GCC=$gcc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             # visible from outside (the job log is not): the bring-up detail
             Write-Host "::warning title=pcre (win64) ok::gcc=$gcc ($(& $gcc -dumpmachine)); libpcre.a=$((Get-Item $a).Length) bytes"
           } catch {
@@ -438,12 +439,26 @@ jobs:
           $base = @('-B','-Sd','-O2','-Ooregvar','-Xs','-Twin64','-dWin64','-d_B_','-d_C_','-dWinCOMx')
           $variants = @()
           if ($env:FUN_PCRE_DIR -and (Test-Path "$env:FUN_PCRE_DIR\libpcre.a")) {
-            # FPC's internal linker first, then the MinGW ld (-Xe) as a fallback.
-            # -Fu also feeds the object search path (options.pas:
+            # The PCRE objects are MinGW-built, so link them with FPC's external
+            # linker (ld, -Xe) against that toolchain's CRT import library: FPC's
+            # internal linker cannot resolve the plain isalnum/malloc/... names
+            # they reference. -Fu also feeds the object search path (options.pas:
             # objectsearchpath.AddList(unitsearchpath)), which is where the
-            # internal linker looks for the archive's members (<member>.obj).
+            # internal linker looks for the {$LINK}ed <member>.obj files.
+            $crt = @()
+            $root = Split-Path (Split-Path $env:FUN_PCRE_GCC)
+            foreach ($d in @("$root\x86_64-w64-mingw32\lib", "$root\lib", "$root\..\x86_64-w64-mingw32\lib")) {
+              foreach ($crl in @('msvcrt', 'ucrt')) {
+                if (Test-Path "$d\lib$crl.a") {
+                  $crt = @("-k-L$d", "-k-l$crl")
+                  Write-Host "CRT import library: $d\lib$crl.a"
+                }
+              }
+              if ($crt.Count -gt 0) { break }
+            }
+            if ($crt.Count -eq 0) { Write-Host "no CRT import library found for -Xe" }
+            $variants += ,(@('-dRegex') + $crt + @("-Fl$env:FUN_PCRE_DIR", "-Fu$env:FUN_PCRE_DIR", '-Xe'))
             $variants += ,(@('-dRegex', "-Fl$env:FUN_PCRE_DIR", "-Fu$env:FUN_PCRE_DIR"))
-            $variants += ,(@('-dRegex', "-Fl$env:FUN_PCRE_DIR", '-Xe'))
           }
           $variants += ,(@())   # last resort: build without regex, keep the job green
 
