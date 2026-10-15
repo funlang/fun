@@ -679,38 +679,36 @@ function crt_memset(dest: Pointer; val: Integer; n: size_t): Pointer; cdecl; ext
 function crt_malloc(n: size_t): Pointer; cdecl; external szMSVCRT name 'malloc';
 procedure crt_free(p: Pointer); cdecl; external szMSVCRT name 'free';
 
+// Its only job is to reference every crt_* import (see the comment above);
+// the unit's initialization section (at the end of the file) calls it. All
+// calls are safe, so it is fine that they actually run once at startup.
 procedure _win64_crt_anchor;
+var
+  one: array[0..0] of AnsiChar;
 begin
-  if crt_isalnum(0) = 2 then exit;
-  if crt_isalpha(0) = 2 then exit;
-  if crt_iscntrl(0) = 2 then exit;
-  if crt_isgraph(0) = 2 then exit;
-  if crt_islower(0) = 2 then exit;
-  if crt_isprint(0) = 2 then exit;
-  if crt_ispunct(0) = 2 then exit;
-  if crt_isspace(0) = 2 then exit;
-  if crt_isupper(0) = 2 then exit;
-  if crt_isxdigit(0) = 2 then exit;
-  if crt_tolower(0) = 2 then exit;
-  if crt_toupper(0) = 2 then exit;
-  if crt_strchr(nil, 0) <> nil then exit;
-  if crt_strcmp(nil, nil) = 2 then exit;
-  if crt_strlen(nil) = 2 then exit;
-  if crt_strncmp(nil, nil, 0) = 2 then exit;
-  if crt_memcmp(nil, nil, 0) = 2 then exit;
-  if crt_memcpy(nil, nil, 0) <> nil then exit;
-  if crt_memmove(nil, nil, 0) <> nil then exit;
-  if crt_memset(nil, 0, 0) <> nil then exit;
+  one[0] := #0;
+  if crt_isalnum(Ord('0')) = 999 then exit;
+  if crt_isalpha(Ord('0')) = 999 then exit;
+  if crt_iscntrl(Ord('0')) = 999 then exit;
+  if crt_isgraph(Ord('0')) = 999 then exit;
+  if crt_islower(Ord('0')) = 999 then exit;
+  if crt_isprint(Ord('0')) = 999 then exit;
+  if crt_ispunct(Ord('0')) = 999 then exit;
+  if crt_isspace(Ord('0')) = 999 then exit;
+  if crt_isupper(Ord('0')) = 999 then exit;
+  if crt_isxdigit(Ord('0')) = 999 then exit;
+  if crt_tolower(Ord('0')) = 999 then exit;
+  if crt_toupper(Ord('0')) = 999 then exit;
+  if crt_strchr(@one[0], 0) = nil then exit;
+  if crt_strcmp(@one[0], @one[0]) = 999 then exit;
+  if crt_strlen(@one[0]) = 999 then exit;
+  if crt_strncmp(@one[0], @one[0], 0) = 999 then exit;
+  if crt_memcmp(@one[0], @one[0], 0) = 999 then exit;
+  if crt_memcpy(@one[0], @one[0], 0) = nil then exit;
+  if crt_memmove(@one[0], @one[0], 0) = nil then exit;
+  if crt_memset(@one[0], 0, 0) = nil then exit;
   crt_free(crt_malloc(0));
 end;
-
-var
-  // never set; the compiler cannot fold the guard away, so the anchor (and
-  // with it every crt_* import) stays in the object file
-  _win64_crt_anchor_live: Boolean;
-
-initialization
-  if _win64_crt_anchor_live then _win64_crt_anchor;
 {$EndIf}
 {$Else}
 // Linux: the PCRE engine is linked from libpcre.a (built from the pcre-8 C
@@ -1174,5 +1172,14 @@ function pcre_refcount; external libpcremodulename name PCRERefCountExportName;
 function pcre_study; external libpcremodulename name PCREStudyExportName;
 function pcre_version; external libpcremodulename name PCREVersionExportName;
 {$ENDIF PCRE_LINKDLL}
+
+{$IfDef Win64}
+// See _win64_crt_anchor: it exists only to keep a reference to the plain-name
+// msvcrt imports in the object file (FPC emits nothing for an external the
+// Pascal code does not use), and those are what the MinGW-built PCRE objects
+// resolve against. The calls are safe, so running them once is fine.
+initialization
+  _win64_crt_anchor;
+{$EndIf}
 
 end.
