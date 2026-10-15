@@ -614,6 +614,15 @@ function pcre_maketables; external 'pcre3.dll' name 'pcre_maketables';
 function pcre_refcount; external 'pcre3.dll' name 'pcre_refcount';
 function pcre_study; external 'pcre3.dll' name 'pcre_study';
 function pcre_version; external 'pcre3.dll' name 'pcre_version';
+
+// PCRE owns its allocator: everything it allocates comes from the DLL's CRT
+// malloc, so it must be released by the DLL's free. Handing such a pointer to
+// FPC's FreeMem (what the static path does) corrupts the heap - that is the
+// access violation this bring-up hit right after a successful match. PCRE
+// exports pcre_malloc/pcre_free as *data*, which FPC cannot call, so the DLL
+// carries these two thin C wrappers (see fun_pcre_glue.c in the CI PCRE step).
+function fun_pcre_malloc(Size: NativeUInt): Pointer; cdecl; external 'pcre3.dll' name 'fun_pcre_malloc';
+procedure fun_pcre_free(P: Pointer); cdecl; external 'pcre3.dll' name 'fun_pcre_free';
 {$Else}
 function pcre_compile; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_compile2; {$IfDef Darwin}cdecl;{$EndIf} external;
@@ -698,7 +707,12 @@ begin
   if Assigned(pcre_malloc_user) then
     Result := pcre_malloc_user(Size)
   else
+  {$IfDef PCRE_WinDLL}
+    // the DLL's allocator: the pair below must match what PCRE allocated with
+    Result := fun_pcre_malloc(Size);
+  {$Else}
     Result := malloc(Size);
+  {$EndIf}
 end;
 
 function pcre_stack_malloc(Size: SizeInt): Pointer;
@@ -706,7 +720,11 @@ begin
   if Assigned(pcre_stack_malloc_user) then
     Result := pcre_stack_malloc_user(Size)
   else
+  {$IfDef PCRE_WinDLL}
+    Result := fun_pcre_malloc(Size);
+  {$Else}
     Result := malloc(Size);
+  {$EndIf}
 end;
 
 function _malloc(size: size_t): Pointer;
@@ -719,7 +737,11 @@ begin
   if Assigned(pcre_free_user) then
     pcre_free_user(P)
   else
+  {$IfDef PCRE_WinDLL}
+    fun_pcre_free(P);
+  {$Else}
     free(P);
+  {$EndIf}
 end;
 
 procedure pcre_stack_free(P: Pointer);
@@ -727,7 +749,11 @@ begin
   if Assigned(pcre_stack_free_user) then
     pcre_stack_free_user(P)
   else
+  {$IfDef PCRE_WinDLL}
+    fun_pcre_free(P);
+  {$Else}
     free(P);
+  {$EndIf}
 end;
 
 procedure _free(pBlock: Pointer);
