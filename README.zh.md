@@ -239,6 +239,8 @@ Fun 通过**紧凑的签名串**约定暴露原生函数。标准库中的例子
 
 签名依次编码每个参数类型，然后是 `:`，最后是返回类型（`i`=int、`s`=string、`v`=void、`d`=double 等）。同一机制驱动 COM（`lib-winole`）、Windows API（`lib-winapi`）与 C 运行时。
 
+`getapi` 本身按平台提供：32 位 Windows 用 `winapi.pas`，Linux / macOS / win64 用 `lffi.pas`（后端是 FPC 自带的 libffi；win64 上它对应 `ffi.dll`）。
+
 ---
 
 ## 关键字别名
@@ -333,7 +335,7 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 
 - **构建机要求**：Linux x86_64、宿主 FPC 3.2.x、`make`、`curl` 或 `wget`、`tar`，约 2 GB 空闲磁盘。Zig 由 bootstrap 下载（钉在 0.13；0.14 在较旧的 glibc 上会 panic）。**不需要** macOS 真机、Apple SDK 或 `osxcross`——Zig 自带 libSystem stub。
 - `bootstrap-linux-aarch64.sh` 复用 darwin 工具链的 `ppcrossa64` 与 Zig：FPC 编译器二进制与 CPU 绑定，但只要目标 OS 的单元齐备，就能编译该 OS。
-- 可选特性照例降级：缺 PCRE → 无正则；缺 libffi 单元/stub → 无 `getapi`。Linux aarch64 产物是核心解释器（其 `-dRegex` 与 `-dLinuxFFI` 需要 libc / libffi，尚未交叉构建）。
+- 可选特性照例降级：缺 PCRE → 无正则；缺 libffi 单元/stub → 无 `getapi`（win64 的 CI 两者都会备好：`pcre3.dll` 与 `ffi.dll`）。Linux aarch64 产物是核心解释器（其 `-dRegex` 与 `-dLinuxFFI` 需要 libc / libffi，尚未交叉构建）。
 - 移植细节见 [`art/notes/macos-port.md`](art/notes/macos-port.md)。
 
 ### 第三方依赖（仓库未携带）
@@ -344,6 +346,7 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 | ---- | -------- | ---------- | -------- |
 | PCRE 8（8-bit） | `src/3rd/pcre-8/` | <https://www.pcre.org/>（8.x 源码，如 8.45） | Linux：`make-linux-x86_64.sh` 用 gcc 静态编译（`-dRegex`）；Windows(i386)：`src/regex/pcre/make.bat`（Borland bcc32 + make，可 `-Dpcresrc=<路径>`，产物即 `pcrd.pas` 里 `{$LINK}` 的对象）；win64：CI 用 MinGW-w64 gcc 编出 `pcre3.dll` 并动态链接（`-dRegex -dPCRE_WinDLL`） |
 | Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | savannah/nongnu 的 tinycc 发行包，或 repo.or.cz 的 `release_0_9_27` tag | `make-linux-x86_64.sh`，产出 `libtcc.so`（放在 `funcmd` 旁） |
+| libffi（win64） | 放在 `funcmd.exe` 旁的 `ffi.dll` | MSYS2 的 `mingw-w64-x86_64-libffi`，或任意 x86_64 libffi 构建 | win64 CI 会装好它，从而让 `getapi` 可用（`-dWinFFI`）；Linux / macOS 用 FPC 自带的 libffi |
 | Windows 运行期 DLL | `fun/libtcc.dll`、`fun/zlib.dll` | 官方发行包或自行构建 | 无需构建；运行时与 `fun.exe` 同目录，供 `ccompile` / `NewJit` 使用 |
 
 - 放好目录后，`cd src/prj/fun && ./make-linux-x86_64.sh` 会自动编译 PCRE 与 TCC。
@@ -369,9 +372,16 @@ runner 会识别宿主：`fun/test/regression-skip-<platform>.txt` 列出无法�
 
 [`.github/workflows/regression.yml`](.github/workflows/regression.yml) 在五个平台上
 运行本套件——Linux / macOS / Windows 的 x64，加上 Linux 与 macOS 的 arm64。五个
-都基于 Free Pascal 构建并作为门槛。Windows 构建目前仍无正则（尚未在那里编译
-PCRE），因此 `run-windows-regression.bat` 启动时会先探测引擎，把依赖正则的用例
-报成 SKIP，而不是去比对注定不同的输出；等接上 PCRE 后它们会自动恢复。
+都基于 Free Pascal 构建并作为门槛。win64 构建的正则来自 `pcre3.dll`：CI 用 runner 的
+MinGW-w64 gcc 编出该 DLL（bcc32 的目标文件属于 32 位构建，MinGW 目标文件也无法链进
+funcmd，因此 `pcrd.pas` 以 `-dPCRE_WinDLL` 方式导入 DLL）；`run-windows-regression.bat`
+启动时仍会探测引擎，构建没有正则时把依赖正则的用例报成 SKIP，于是缺 PCRE 的工具链
+只会降级而不是失败。
+
+同一个 job 还会从 runner 的 MSYS2 装 libffi，当 `ffi.dll` 落在 `funcmd.exe` 旁时就以
+`-dWinFFI` 构建 win64，这正是打开 `getapi` 的开关：FPC 自带的 `ffi` 单元本就有 WIN64
+目标，Windows 上只差这个库。两个可选特性遵循同一条规则——DLL 或单元缺失时 job 退回
+核心解释器而不是失败，另有一个探针步骤报告最终构建带上了哪些特性。
 
 `windows-arm64` 已暂时禁用：所钉住的工具链 FPC 3.2.2 没有 win64/aarch64 目标，
 没有可用的构建方式。

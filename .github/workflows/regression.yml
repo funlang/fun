@@ -477,8 +477,11 @@ jobs:
           $probes = @{
             regex  = @("var r = 'a1b2'.replace(/\d++/g, '-');",
                        "if r = 'a-b-' then ?. 'on'; else ?. 'off'; end if;")
+            # a getapi() result object is falsy in Fun, so call it: a value
+            # means the signature worked, not just that the symbol resolved
             getapi = @("var f = 'kernel32'.getapi('GetTickCount', ':i');",
-                       "if f then ?. 'on'; else ?. 'off'; end if;")
+                       "var t = f();",
+                       "if t > 0 then ?. 'on'; else ?. 'off'; end if;")
           }
           foreach ($name in $probes.Keys) {
             $f = "$env:RUNNER_TEMP\probe-$name.fun"

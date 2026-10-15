@@ -239,6 +239,8 @@ Fun exposes native functions through a compact **signature-string** convention. 
 
 The signature encodes each argument's type, then `:`, then the return type (`i` = int, `s` = string, `v` = void, `d` = double, etc.). The same mechanism drives COM (`lib-winole`), the Windows API (`lib-winapi`), and the C runtime.
 
+`getapi` is per-platform: `winapi.pas` on 32-bit Windows, and `lffi.pas` - backed by FPC's bundled libffi - on Linux, macOS and win64 (there it resolves against `ffi.dll`).
+
 ---
 
 ## Keyword aliasing
@@ -334,7 +336,7 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 
 - **Build machine requirements**: Linux x86_64, host FPC 3.2.x, `make`, `curl` or `wget`, `tar`, and ~2 GB free disk. Zig is fetched by the bootstrap (pinned to 0.13; 0.14 panics on older glibc). No macOS host, Apple SDK, or `osxcross` is required — Zig ships a libSystem stub.
 - `bootstrap-linux-aarch64.sh` reuses the `ppcrossa64` and Zig from the darwin toolchain: an FPC compiler binary is CPU-specific but can target any OS it has units for.
-- Optional features degrade as usual: no PCRE -> no regex, no libffi unit/stub -> no `getapi`. The Linux aarch64 artifact is the core interpreter (its `-dRegex` and `-dLinuxFFI` need a libc / libffi that are not cross-built yet).
+- Optional features degrade as usual: no PCRE -> no regex, no libffi unit/stub -> no `getapi` (the win64 CI supplies both, `pcre3.dll` and `ffi.dll`). The Linux aarch64 artifact is the core interpreter (its `-dRegex` and `-dLinuxFFI` need a libc / libffi that are not cross-built yet).
 - Porting details: [`art/notes/macos-port.md`](art/notes/macos-port.md).
 
 ### Third-party dependencies (not carried in the repo)
@@ -347,6 +349,7 @@ sources/binaries are **not** shipped. If one is missing the build script
 | --------- | --------------- | --------------- | ------------- |
 | PCRE 8 (8-bit) | `src/3rd/pcre-8/` | <https://www.pcre.org/> (8.x source, e.g. 8.45) | Linux: `make-linux-x86_64.sh` compiles it with gcc (static, `-dRegex`); Windows (i386): `src/regex/pcre/make.bat` (Borland bcc32 + make, `-Dpcresrc=<path>`; the objects `pcrd.pas` `{$LINK}`s); win64: the CI builds `pcre3.dll` with MinGW-w64 gcc and links it dynamically (`-dRegex -dPCRE_WinDLL`, see below) |
 | Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | the tinycc release on savannah/nongnu, or repo.or.cz tag `release_0_9_27` | `make-linux-x86_64.sh` produces `libtcc.so` (placed next to `funcmd`) |
+| libffi (win64) | `ffi.dll` next to `funcmd.exe` | MSYS2 `mingw-w64-x86_64-libffi`, or any x86_64 libffi build | the win64 CI installs it so `getapi` works there (`-dWinFFI`); Linux/macOS use the libffi that ships with FPC |
 | Windows runtime DLLs | `fun/libtcc.dll`, `fun/zlib.dll` | official release or build them yourself | no build step; keep them beside `fun.exe` for `ccompile` / `NewJit` |
 
 - Once the directories are in place, `cd src/prj/fun && ./make-linux-x86_64.sh` builds PCRE and TCC automatically.
@@ -380,6 +383,14 @@ into funcmd, so `pcrd.pas` imports the DLL under `-dPCRE_WinDLL`);
 `run-windows-regression.bat` still probes for the engine at startup and reports
 the regex-dependent tests as SKIP when a build has none, so a regex-less
 toolchain degrades instead of failing.
+
+The same job installs libffi from the runner's MSYS2 and builds win64 with
+`-dWinFFI` when the resulting `ffi.dll` sits next to `funcmd.exe`, which is what
+turns on `getapi` there: FPC's bundled `ffi` unit already has a WIN64 target, so
+the only thing missing on Windows was the library. Both optional features follow
+the same rule - if the DLL or the unit is absent the job falls back to the core
+interpreter instead of failing, and a probe step reports what the build ended up
+with.
 
 `windows-arm64` is disabled: FPC 3.2.2, the pinned toolchain, has no
 win64/aarch64 target, so there is nothing to build with.

@@ -50,11 +50,15 @@ rem Tests whose output is host-dependent, plus the Unix-only ones the Windows
 rem build cannot run: the -lnx/*-unx backends (libc.so.6), the FFI suite
 rem (Unix libc/libm + libffitest) and arm64/x86-only codegen.
 rem Also here: tests the win64 FPC build cannot run because a facility is not
-rem compiled in. The build omits -dWinAPI (winapi.pas getapi() is 32-bit x86
-rem asm) and passes -dWinCOMx, a typo for -dWinCOM (see make-win64.bat), so
-rem there is no .getapi and no COM: lib-asm-x64/lib-zlib-test need getapi and
-rem lib-orm-rows pulls lib-xml (COM). Plus lib-file-test/lib-dyns-test, whose
-rem find() emits '\' on Windows and '/' elsewhere while the snapshots use '/'.
+rem compiled in or the host ABI differs. -dWinAPI is omitted (winapi.pas
+rem getapi() is 32-bit x86 asm) and -dWinCOMx is a typo for -dWinCOM (see
+rem make-win64.bat), so there is no COM and lib-orm-rows (lib-xml) is out.
+rem getapi exists when the build carries -dWinFFI next to an ffi.dll, which
+rem the CI does provide, but the remaining getapi users still cannot run
+rem here: lib-asm-x64/lib-proc-test/raw-address-getapi/lib-crypt-lnx are x86-64
+rem System V (rdi/rsi, libc), and lib-zlib-test wants a libz.so.1/name it
+rem cannot find on Windows. Plus lib-file-test/lib-dyns-test, whose find()
+rem emits '\' on Windows and '/' elsewhere while the snapshots use '/'.
 set "HOSTDEP= builtin-dispatch.fun lib-host-test.fun lib-param-linux.fun lib-cmdline-linux.fun lib-loadcheck.sh libc-outbuf.fun ptr-primitives.fun raw-address-getapi.fun lib-tcc-test.fun lib-jit-test.fun lib-asm-lnx.fun lib-asm-a64.fun lib-asm-x64.fun fractal-asm-x64.fun lib-hash-test.fun lib-proc-test.fun lib-unicode-test.fun run-benchmarks.sh ffi-scalar.fun ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun lib-os-dispatch-prototype.fun lib-crypt-lnx.fun lib-e2e-lnx.fun lib-ajax-lnx-test.fun run-ajax-lnx.sh lib-winsock-lnx-test.fun lib-ado-lnx-test.fun lib-ado-schema-lnx-test.fun lib-xml-lnx-test.fun lib-jsonrpc-lnx-test.fun lib-orm-rpc-lnx-test.fun lib-os-lnx-test.fun lib-cmdline-lnx-test.fun lib-zlib-test.fun lib-orm-rows.fun lib-file-test.fun lib-dyns-test.fun "
 
 rem Tests gated only by the regex engine's absence: probed below, skipped while

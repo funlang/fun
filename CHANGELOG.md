@@ -29,10 +29,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
 - The Windows regression runner probes for the regex engine and reports the
   regex-dependent tests as SKIP while PCRE is absent (a regex literal parses to
   a nil node without `-dRegex`), instead of diffing output that cannot match;
-  they run by themselves once a Windows PCRE build exists. Tests that need
-  `.getapi` (`lib-asm-x64`, `lib-zlib-test`; `-dWinAPI` is off because
-  `winapi.pas` getapi is 32-bit x86 asm) or COM (`lib-orm-rows`, via `lib-xml`)
-  join the skip list too, as do `lib-file-test`/`lib-dyns-test` (`find()` emits
+  they run by themselves once a Windows PCRE build exists. The tests that need
+  `.getapi` stay skipped even now that the build carries it (`-dWinAPI` is off
+  because `winapi.pas` getapi is 32-bit x86 asm, and the others are x86-64
+  System V or want a Unix library name), as do the COM ones (`lib-orm-rows`,
+  via `lib-xml`), and `lib-file-test`/`lib-dyns-test` (`find()` emits
   `\` on Windows and `/` elsewhere, and the shared snapshots use `/`). The
   workflow's `expected-win` copy is now byte-exact (`ReadAllBytes`); the old
   text-mode copy re-encoded the raw GBK bytes of the `set-named.fun` snapshot
@@ -53,6 +54,27 @@ This project records notable changes in the style of [Keep a Changelog](https://
   untouched. The Windows runner's regex probe now finds the engine, so the 8
   regex tests and `portability-probe` run there instead of skipping:
   51/51 checks pass, 41 skipped.
+
+- win64 has `getapi` as well. FPC's bundled `ffi` unit already has a WIN64
+  target (`FFI_DEFAULT_ABI = FFI_WIN64`), so the only missing piece was the
+  library: the job installs libffi from the runner's MSYS2 and copies it next
+  to funcmd.exe as `ffi.dll`, and `-dWinFFI` - mapped onto the existing
+  `UnixFFI` symbol, which is what the engine's `getapi`/`@toCallback`
+  registration is keyed on - selects the libffi-backed `lffi` unit there.
+  `lffi.pas` skips its Unix `{$LINKLIB ffi}` on Windows (FPC writes the import
+  table from the `ffi` name in the unit's externals) and appends `.dll` when a
+  bare library name does not resolve, so `'kernel32'.getapi(...)` works. If
+  libffi or the DLL is missing the job falls back to the core interpreter
+  rather than failing, and a new probe step reports regex and getapi
+  availability as annotations (a `getapi()` result object is falsy in Fun, so
+  the probe calls the function it resolved). Two build details came out of it:
+  the unit path has to be passed as one argument - PowerShell's native
+  argument passing split a bare `-Fu..\..\lib` into a path plus a stray `lib`
+  source file - and `libase.pas` now maps `-dWinFFI` like `host.pas` does, so
+  the two files cannot disagree about `UnixFFI` depending on compile order.
+  `make-win64.bat` gained the same `-Fu..\..\lib`, so `-dWinFFI` can be used by
+  hand once `ffi.dll` is next to funcmd.exe. The 32-bit (Delphi/bcc32) build
+  and the Unix paths are untouched.
 
 - OpenSSL 3 in the crypto tests, and the remaining CI platform fixes.
   `lib-crypt-unx` probed `EVP_PKEY_size`, which OpenSSL 3.0 turned into a header

@@ -25,10 +25,11 @@
 
 - Windows 回归 runner 现在先探测正则引擎：PCRE 缺席时（没有 `-dRegex` 时正则
   字面量解析为 nil 节点）把依赖正则的用例报成 SKIP，而不是去比一份注定不同的
-  输出；等 Windows 上有了 PCRE 构建它们会自动恢复。需要 `.getapi` 的用例
-  （`lib-asm-x64`、`lib-zlib-test`；构建未开 `-dWinAPI`，`winapi.pas` 的 getapi
-  是 32 位 x86 汇编）与需要 COM 的用例（`lib-orm-rows`，经 `lib-xml`）同样加入
-  跳过名单；`lib-file-test`/`lib-dyns-test` 也是（`find()` 在 Windows 上给 `\`、
+  输出；等 Windows 上有了 PCRE 构建它们会自动恢复。需要 `.getapi` 的用例即便
+  构建已带上该能力也仍跳过（构建未开 `-dWinAPI`，`winapi.pas` 的 getapi 是
+  32 位 x86 汇编，其余几个是 x86-64 System V 或要求 Unix 库名），需要 COM 的
+  用例（`lib-orm-rows`，经 `lib-xml`）同样加入跳过名单；
+  `lib-file-test`/`lib-dyns-test` 也是（`find()` 在 Windows 上给 `\`、
   别处给 `/`，而共享快照用的是 `/`）。工作流的 `expected-win` 复制改为逐字节
   （`ReadAllBytes`）：旧写法走文本模式，会把 `set-named.fun` 快照里的原始 GBK
   字节重编码，导致永远对不上。
@@ -44,6 +45,22 @@
   即 `(PUBL(free))(p)`，free 路径改走它）。32 位 Delphi 构建、Unix 静态构建与
   MinGW 搜索顺序都未受影响。Windows runner 的正则探测现在能探到引擎，那 8 个正则
   用例与 `portability-probe` 由 SKIP 变为实跑：51/51 通过、41 跳过。
+
+- win64 同样有了 `getapi`。FPC 自带的 `ffi` 单元本就有 WIN64 目标
+  （`FFI_DEFAULT_ABI = FFI_WIN64`），唯一缺的只是库：job 用 runner 的 MSYS2 装
+  libffi 并复制到 funcmd.exe 旁作为 `ffi.dll`，而 `-dWinFFI`（映射到既有的
+  `UnixFFI` 符号，即引擎 `getapi`/`@toCallback` 注册所依赖的开关）选择走 libffi
+  的 `lffi` 单元。`lffi.pas` 在 Windows 上跳过 Unix 的 `{$LINKLIB ffi}`（FPC 仅凭
+  单元 external 里的 `ffi` 名就能生成导入表），裸库名解析不到时再补 `.dll`，于是
+  `'kernel32'.getapi(...)` 可用。若 libffi 或 DLL 缺失，job 退回核心解释器而不是
+  失败；新增的探针步骤把正则与 getapi 的可用性以 annotation 报出（Fun 里
+  `getapi()` 的结果对象是 falsy，所以探针会真的调用一次解析出来的函数）。
+  随之而来两个构建细节：单元路径必须作为**单个**参数传入——PowerShell 的原生参数
+  传递会把裸的 `-Fu..\..\lib` 拆成路径加一个多余的 `lib` 源文件；`libase.pas`
+  现在与 `host.pas` 一样映射 `-dWinFFI`，两个文件不会因编译顺序而对 `UnixFFI`
+  产生分歧。`make-win64.bat` 也加上了同样的 `-Fu..\..\lib`，这样把 `ffi.dll`
+  放到 funcmd.exe 旁后可以手工启用 `-dWinFFI`。32 位（Delphi/bcc32）构建与 Unix
+  各路径均未改动。
 
 - 加密测试支持 OpenSSL 3，以及剩余的 CI 平台修复。`lib-crypt-unx` 之前探测
   `EVP_PKEY_size`，而 OpenSSL 3.0 把它变成了指向 `EVP_PKEY_get_size` 的头文件
