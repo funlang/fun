@@ -209,7 +209,9 @@ end do;
 
 // Live execution only where the backend can run.
 if cpu = 'arch64' then
-  Assembly = AssemblyA64();
+  // Opt in with the class itself (lib-asm-pro does the same): an instance is
+  // not callable as a constructor, so Assembly(...) below must see the class.
+  Assembly = AssemblyA64;
   var dbl = Assembly('i:i', `#!asm
 add x0, x0, x0
 ret
