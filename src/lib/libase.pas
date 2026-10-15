@@ -19,10 +19,13 @@
 // SOFTWARE.
 unit libase;
 
-// LinuxFFI (Linux) and DarwinFFI (macOS) both mean "libffi-backed getapi".
+// LinuxFFI (Linux), DarwinFFI (macOS) and WinFFI (win64, via ffi.dll) all
+// mean "libffi-backed getapi". Kept in sync with host.pas, which is
+// compiled first and normally sets the symbol.
 {$IfNDef UnixFFI}
   {$IfDef LinuxFFI}{$Define UnixFFI}{$EndIf}
   {$IfDef DarwinFFI}{$Define UnixFFI}{$EndIf}
+  {$IfDef WinFFI}{$Define UnixFFI}{$EndIf}
 {$EndIf}
 
 interface

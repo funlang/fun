@@ -423,6 +423,10 @@ jobs:
           # to this exe: -dRegex -dPCRE_WinDLL for PCRE (pcre3.dll) and -dWinFFI
           # for getapi (ffi.dll, FPC's bundled libffi unit). Each is tried and
           # dropped on failure, so a missing DLL degrades instead of failing.
+          #
+          # -Fu..\..\lib is for lffi: funcmd.dpr lists host with an explicit
+          # `in` path, but a unit that host pulls in itself (lffi, under
+          # UnixFFI/-dWinFFI) is not on any search path without this.
           $sets = @()
           $caps = @()
           if ($env:FUN_PCRE_DLL) { $caps += @('-dRegex', '-dPCRE_WinDLL') }
@@ -435,7 +439,8 @@ jobs:
           $tried = @()
           foreach ($v in $sets) {
             $label = if ($v.Count -eq 0) { 'no optional features' } else { $v -join ' ' }
-            & ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @v *>&1 |
+            & ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx `
+                -Fu..\..\lib @v *>&1 |
               Tee-Object -FilePath $log
             if ($LASTEXITCODE -eq 0) { $built = $label; break }
             $err = (Get-Content $log |
@@ -473,6 +478,9 @@ jobs:
             $out = & $exe $f 2>&1
             Write-Host "::warning title=probe $name::exit=$LASTEXITCODE out=[$($out -join '~')]"
           }
+          # purely diagnostic: a probe that says 'off' or errors is a finding,
+          # not a regression, so never let it fail the job
+          $global:LASTEXITCODE = 0
 
       - name: Regression (portable subset)
         shell: pwsh
