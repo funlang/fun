@@ -291,6 +291,94 @@ jobs:
           path: C:\FPC
           key: fpc-3.2.2-win64-and-cross
 
+      - name: Build pcre3.dll for win64 (regex, best effort)
+        working-directory: src\prj\fun
+        shell: pwsh
+        run: |
+          # The win64 build had no regex because nothing compiled PCRE there.
+          # Build it as a DLL and let the Pascal side import from it
+          # (-dPCRE_WinDLL): linking the MinGW objects straight into funcmd needs
+          # the MinGW CRT resolved, which neither of FPC's linkers manages here
+          # (the internal one names imports after the declaration; the external
+          # one finds no member for __imp_isupper/malloc/... in
+          # libucrt/libmsvcrt/libmingwex). GCC links the DLL itself, so the CRT
+          # is its own problem, and FPC generates the import table from the DLL
+          # name alone. Art.notes port-decisions D27 has the full story.
+          #
+          # Best effort: on failure the build runs without -dRegex and the
+          # runner reports the regex tests as SKIP.
+          $ErrorActionPreference = 'Stop'
+          $src = Join-Path $env:GITHUB_WORKSPACE 'src\3rd\pcre-8'
+          try {
+            if (-not (Test-Path (Join-Path $src 'pcre_compile.c'))) {
+              $tmp = Join-Path $env:RUNNER_TEMP 'pcre'
+              New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+              $tar = Join-Path $tmp 'pcre-8.45.tar.gz'
+              curl.exe -fsSL --retry 3 --retry-all-errors -o $tar `
+                'https://downloads.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz'
+              if ($LASTEXITCODE -ne 0) { throw "download failed ($LASTEXITCODE)" }
+              tar.exe -xf $tar -C $tmp
+              New-Item -ItemType Directory -Force -Path (Split-Path $src) | Out-Null
+              Move-Item (Join-Path $tmp 'pcre-8.45') $src
+            }
+            Copy-Item (Join-Path $src 'config.h.generic') (Join-Path $src 'config.h') -Force
+            Copy-Item (Join-Path $src 'pcre.h.generic') (Join-Path $src 'pcre.h') -Force
+            Copy-Item (Join-Path $src 'pcre_chartables.c.dist') (Join-Path $src 'pcre_chartables.c') -Force
+
+            # the runner's gcc on PATH has no reachable C headers; this one does
+            function Test-CC([string]$exe) {
+              if (-not (Test-Path $exe)) { return $false }
+              $o = Join-Path $env:RUNNER_TEMP 'cctest.o'
+              Remove-Item -Force $o -ErrorAction SilentlyContinue
+              'int main(void){return 0;}' | & $exe -c -x c - -o $o 2>&1 | Out-Null
+              return (($LASTEXITCODE -eq 0) -and (Test-Path $o))
+            }
+            $cands = @()
+            $onpath = Get-Command gcc -ErrorAction SilentlyContinue
+            if ($onpath) { $cands += $onpath.Source }
+            $cands += 'C:\mingw64\bin\gcc.exe'
+            $cands += 'C:\tools\mingw64\bin\gcc.exe'
+            $gcc = $null
+            foreach ($c in $cands) {
+              if (Test-CC $c) { $gcc = $c; break }
+              Write-Host "not usable as a C compiler: $c"
+            }
+            if (-not $gcc) { throw 'no usable C compiler (tried PATH gcc, C:\mingw64)' }
+            Write-Host "gcc: $gcc  target=$(& $gcc -dumpmachine)"
+
+            $lib = Join-Path $src 'win64-dll'
+            Remove-Item -Recurse -Force $lib -ErrorAction SilentlyContinue
+            New-Item -ItemType Directory -Force -Path $lib | Out-Null
+            # the 8-bit sources (pcre_default_tables.c is a dftables-generated
+            # duplicate of pcre_chartables.c, so it is left out: linking both
+            # would clash on _pcre_default_tables)
+            $units = 'pcre_byte_order','pcre_chartables','pcre_compile','pcre_config',
+                     'pcre_dfa_exec','pcre_exec','pcre_fullinfo','pcre_get','pcre_globals',
+                     'pcre_maketables','pcre_newline','pcre_refcount','pcre_string_utils',
+                     'pcre_study','pcre_tables','pcre_ucd','pcre_valid_utf8','pcre_version',
+                     'pcre_xclass'
+            foreach ($u in $units) {
+              $c = Join-Path $src "$u.c"
+              if (-not (Test-Path $c)) { throw "missing source $u.c" }
+              $out = & $gcc -c -O2 -DHAVE_CONFIG_H -DSUPPORT_PCRE8 "-I$src" $c -o (Join-Path $lib "$u.o") 2>&1
+              if ($LASTEXITCODE -ne 0) {
+                throw "gcc failed: $u :: " + (($out | Select-Object -First 12) -join ' ~ ')
+              }
+            }
+            $dll = Join-Path (Join-Path $env:GITHUB_WORKSPACE 'src\prj\fun') 'pcre3.dll'
+            $lo = & $gcc -shared -o $dll (Get-ChildItem (Join-Path $lib '*.o') | ForEach-Object { $_.FullName }) 2>&1
+            if ($LASTEXITCODE -ne 0) {
+              throw "gcc -shared failed :: " + (($lo | Select-Object -First 12) -join ' ~ ')
+            }
+            Write-Host "built $dll ($((Get-Item $dll).Length) bytes) next to funcmd.exe"
+            "FUN_PCRE_DLL=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host "::warning title=pcre (win64) ok::gcc=$gcc ($(& $gcc -dumpmachine)); pcre3.dll=$((Get-Item $dll).Length) bytes"
+          } catch {
+            Write-Host "::warning title=pcre (win64)::$($_.Exception.Message)"
+          }
+          # best-effort: GitHub's pwsh wrapper exits with $LASTEXITCODE
+          $global:LASTEXITCODE = 0
+
       - name: Build funcmd.exe
         working-directory: src\prj\fun
         shell: pwsh
@@ -299,7 +387,18 @@ jobs:
           # Call the x86_64-win64 compiler directly, as make-win64.bat does: the
           # generic fpc.exe driver is the i386 one here and forwards -Twin64 to
           # ppc386.exe ("Illegal parameter: -Twin64").
-          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx *>&1 |
+          #
+          # -dRegex -dPCRE_WinDLL when the PCRE step above produced pcre3.dll
+          # (next to funcmd.exe, where the loader finds it); otherwise the build
+          # stays regex-less and the runner reports the regex tests as SKIP.
+          $extra = @()
+          if ($env:FUN_PCRE_DLL) {
+            $extra = @('-dRegex', '-dPCRE_WinDLL')
+            Write-Host "regex: -dRegex -dPCRE_WinDLL (pcre3.dll)"
+          } else {
+            Write-Host "regex: no pcre3.dll, building without -dRegex"
+          }
+          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx @extra *>&1 |
             Tee-Object -FilePath $log
           if ($LASTEXITCODE -ne 0) {
             # Surface the real error: the log itself is not readable from outside.

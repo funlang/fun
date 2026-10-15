@@ -13,7 +13,10 @@ type
 {$WEAKPACKAGEUNIT ON}
 
 //{$IfNDef UNIX}
-{$DEFINE PCRE_STATICLINK}
+// -dPCRE_LINKDLL selects the dynamic path (the imports at the end of this
+// unit, from libpcremodulename); otherwise the engine is linked statically -
+// the {$LINK}ed bcc32 objects on Windows, libpcre.a on Unix.
+{$IfNDef PCRE_LINKDLL}{$DEFINE PCRE_STATICLINK}{$EndIf}
 //{$EndIf}
 
 (*$HPPEMIT '#include "pcre.h"'*)
@@ -533,11 +536,19 @@ uses
   {$IFDEF HAS_UNIT_LIBC}
   Libc,
   {$ENDIF HAS_UNIT_LIBC}
-  SysUtils;
+  SysUtils,
+  // portable LoadLibrary/GetProcedureAddress/UnloadLibrary, used by the
+  // non-static modes (see -dPCRE_LINKDLL / -dPCRE_LINKONREQUEST below)
+  dynlibs;
 
 {$IFDEF PCRE_STATICLINK}
 
 {$IfNDef UNIX}
+// The win64 DLL build (-dPCRE_WinDLL) links against pcre3.dll instead of the
+// bcc32 objects, so neither the {$LINK} list below nor the CRT declarations
+// further down are needed: the object files those reference are not built here
+// and their MinGW CRT symbols are what FPC's linker cannot resolve.
+{$IfNDef PCRE_WinDLL}
 // make the linker happy with PCRE 8.00
 procedure _pcre_find_bracket; external;
 
@@ -560,6 +571,7 @@ procedure _pcre_find_bracket; external;
 {$LINK pcre_version.obj}
 {$LINK pcre_xclass.obj}
 {$LINK pcre_default_tables.obj}
+{$EndIf PCRE_WinDLL}
 {$EndIf Linux}
 
 // for ! SUPPORT_UTF8
@@ -576,6 +588,33 @@ var
   pcre_stack_free_user: pcre_stack_free_callback;
   pcre_callout_user: pcre_callout_callback;
 
+{$IfDef PCRE_WinDLL}
+// win64: the engine is pcre3.dll, placed next to funcmd.exe by the build (see
+// the PCRE step in .github/workflows/regression.yml). FPC generates the import
+// table from these names, so there is no import library, no bcc32 object and no
+// CRT symbol to resolve. The export names must be the plain C ones, which is
+// what the MinGW-built DLL exports (one caveat: a DLL cannot route its
+// allocations through pcre_malloc_user, exactly as the static Unix build).
+function pcre_compile; external 'pcre3.dll' name 'pcre_compile';
+function pcre_compile2; external 'pcre3.dll' name 'pcre_compile2';
+function pcre_config; external 'pcre3.dll' name 'pcre_config';
+function pcre_copy_named_substring; external 'pcre3.dll' name 'pcre_copy_named_substring';
+function pcre_copy_substring; external 'pcre3.dll' name 'pcre_copy_substring';
+function pcre_dfa_exec; external 'pcre3.dll' name 'pcre_dfa_exec';
+function pcre_exec; external 'pcre3.dll' name 'pcre_exec';
+procedure pcre_free_substring; external 'pcre3.dll' name 'pcre_free_substring';
+procedure pcre_free_substring_list; external 'pcre3.dll' name 'pcre_free_substring_list';
+function pcre_fullinfo; external 'pcre3.dll' name 'pcre_fullinfo';
+function pcre_get_named_substring; external 'pcre3.dll' name 'pcre_get_named_substring';
+function pcre_get_stringnumber; external 'pcre3.dll' name 'pcre_get_stringnumber';
+function pcre_get_stringtable_entries; external 'pcre3.dll' name 'pcre_get_stringtable_entries';
+function pcre_get_substring; external 'pcre3.dll' name 'pcre_get_substring';
+function pcre_get_substring_list; external 'pcre3.dll' name 'pcre_get_substring_list';
+function pcre_maketables; external 'pcre3.dll' name 'pcre_maketables';
+function pcre_refcount; external 'pcre3.dll' name 'pcre_refcount';
+function pcre_study; external 'pcre3.dll' name 'pcre_study';
+function pcre_version; external 'pcre3.dll' name 'pcre_version';
+{$Else}
 function pcre_compile; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_compile2; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_config; {$IfDef Darwin}cdecl;{$EndIf} external;
@@ -595,6 +634,7 @@ function pcre_maketables; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_refcount; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_study; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_version; {$IfDef Darwin}cdecl;{$EndIf} external;
+{$EndIf PCRE_WinDLL}
 
 {$IfNDef UNIX}
 {$IfNDef Win64}
@@ -706,12 +746,9 @@ end;
 {$ELSE ~PCRE_STATICLINK}
 
 type
-  {$IFDEF MSWINDOWS}
-  TModuleHandle = HINST;
-  {$ENDIF MSWINDOWS}
-  {$IFDEF LINUX}
-  TModuleHandle = Pointer;
-  {$ENDIF LINUX}
+  // dynlibs' handle type, so LoadLibrary/GetProcedureAddress/UnloadLibrary
+  // line up on every platform (it is HINST on Windows and a PtrInt on Unix)
+  TModuleHandle = TLibHandle;
 
 const
   {$IFDEF MSWINDOWS}
@@ -1014,12 +1051,7 @@ end;
 {$ELSE ~PCRE_STATICLINK}
   function GetSymbol(SymbolName: PAnsiChar): Pointer;
   begin
-    {$IFDEF MSWINDOWS}
-    Result := GetProcAddress(PCRELib, SymbolName);
-    {$ENDIF MSWINDOWS}
-    {$IFDEF UNIX}
-    Result := dlsym(PCRELib, SymbolName);
-    {$ENDIF UNIX}
+    Result := GetProcedureAddress(PCRELib, AnsiString(SymbolName));
   end;
 
 begin
@@ -1028,12 +1060,7 @@ begin
     Exit;
 
   if PCRELib = INVALID_MODULEHANDLE_VALUE then
-    {$IFDEF MSWINDOWS}
-    PCRELib := SafeLoadLibrary(libpcremodulename);
-    {$ENDIF MSWINDOWS}
-    {$IFDEF UNIX}
-    PCRELib := dlopen(PAnsiChar(libpcremodulename), RTLD_NOW);
-    {$ENDIF UNIX}
+    PCRELib := LoadLibrary(libpcremodulename);
   Result := PCRELib <> INVALID_MODULEHANDLE_VALUE;
   if Result then
   begin
@@ -1073,12 +1100,7 @@ procedure UnloadPCRE;
 begin
   {$IFNDEF PCRE_STATICLINK}
   if PCRELib <> INVALID_MODULEHANDLE_VALUE then
-    {$IFDEF MSWINDOWS}
-    FreeLibrary(PCRELib);
-    {$ENDIF MSWINDOWS}
-    {$IFDEF UNIX}
-    dlclose(Pointer(PCRELib));
-    {$ENDIF UNIX}
+    UnloadLibrary(PCRELib);
   PCRELib := INVALID_MODULEHANDLE_VALUE;
   InitPCREFuncPtrs(@LibNotLoadedHandler);
   {$ENDIF ~PCRE_STATICLINK}
