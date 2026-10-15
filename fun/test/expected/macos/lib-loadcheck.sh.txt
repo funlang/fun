@@ -1,9 +1,9 @@
 LOAD  lib-ado-schema
 LOAD  lib-ado
 LOAD  lib-ajax
-FAIL  lib-asm-a64            fun/lib/lib-asm.fun:21: getapi: cannot load library "kernel3
-FAIL  lib-asm-pro            fun/lib/lib-asm.fun:21: getapi: cannot load library "kernel3
-FAIL  lib-asm                fun/lib/lib-asm.fun:21: getapi: cannot load library "kernel3
+LOAD  lib-asm-a64
+LOAD  lib-asm-pro
+LOAD  lib-asm
 FAIL  lib-async              fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
 LOAD  lib-base
 LOAD  lib-base64
@@ -20,7 +20,7 @@ LOAD  lib-fd
 LOAD  lib-file
 LOAD  lib-host
 FAIL  lib-icmp               fun/lib/lib-icmp.fun:7: getapi: cannot load library "icmp.dl
-FAIL  lib-jit                fun/lib/lib-asm.fun:21: getapi: cannot load library "kernel3
+LOAD  lib-jit
 FAIL  lib-jsasync            fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
 LOAD  lib-json
 LOAD  lib-jsonrpc
@@ -59,4 +59,4 @@ LOAD  lib-xml
 LOAD  lib-yaml
 LOAD  lib-zlib
 
-loaded=46 failed=14
+loaded=50 failed=10
