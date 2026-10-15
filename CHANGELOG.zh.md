@@ -6,6 +6,26 @@
 
 ## [未发布]
 
+- CI 五个平台全部绿标（Windows arm64 暂时禁用：FPC 3.2.2 没有 win64/aarch64
+  目标）。修掉两处只在 Windows 显形的缺陷，都放在 `{$IfDef FPC}` 分支里，
+  Delphi 源码保持原样。其一，`ToFunTime` 在所有非 Unix 构建上走
+  `VarToDateTime`，而 FPC 的 `VarToDateTime` 经 `TryStrToDateTime`、依赖宿主的
+  `ShortDateFormat`/`DateSeparator`，于是美式区域下 Fun 的 ISO 时间字面量
+  （`@'2010-04-09 15:35:15'`）抛 `EVariantError`（"Invalid variant type
+  cast"），在 parse 期就把 `calc.fun`、`type.fun`、`lib-type-test.fun` 拖垮；
+  现在 FPC 构建直接解析 ISO 形式（与既有 Unix 构建一致）。其二，`Print` 走
+  RTL 的 `Output` 文本文件，而 FPC 会把它标成 `GetConsoleOutputCP()`，于是每次
+  `?.` 输出都从字符串代码页（CP1252）重编码到控制台代码页（runner 上是
+  CP65001），每个非 ASCII 字节都变成两个；标准输出现在改走新增的 `WriteOut`，
+  Windows 上直接向 stdout 句柄写原始字节（与 `WriteErr` 对 stderr 的做法一致），
+  `set-named.fun` 因此重新对齐。
+
+- Windows 回归 runner 现在先探测正则引擎：PCRE 缺席时（没有 `-dRegex` 时正则
+  字面量解析为 nil 节点）把依赖正则的用例报成 SKIP，而不是去比一份注定不同的
+  输出；等 Windows 上有了 PCRE 构建它们会自动恢复。`lib-file-test` 与
+  `lib-dyns-test` 加入宿主相关跳过名单（`find()` 在 Windows 上给 `\`、别处给
+  `/`，而共享快照用的是 `/`）。
+
 - 加密测试支持 OpenSSL 3，以及剩余的 CI 平台修复。`lib-crypt-unx` 之前探测
   `EVP_PKEY_size`，而 OpenSSL 3.0 把它变成了指向 `EVP_PKEY_get_size` 的头文件
   宏、符号已不存在，于是整个探测在 OpenSSL 3 的 CI 镜像上失败，连带拖垮
@@ -48,9 +68,8 @@
   第三方源码下载脚本 `src/prj/fun/fetch-3rd-party.sh`、
   `fun/test/ffi/build.sh`（按需构建 FFI 辅助库，该产物不入库），以及
   `.github/workflows/regression.yml`（6 个 job：Linux / macOS / Windows 各 x64 与
-  arm64）。Linux/macOS 原生构建并作为通过门槛；Windows 为首次接入，暂以
-  continue-on-error 标记（Windows 构建尚未启用 regex，且 FPC 3.2.2 没有
-  win64/aarch64 目标）。依据 Issue #2 的 macOS 真机报告修复：`find()` 现在按固定字节序输出目录项
+  arm64）。当时 Windows 尚属首次接入；现在所有平台都作为通过门槛（见最新的
+  条目）。依据 Issue #2 的 macOS 真机报告修复：`find()` 现在按固定字节序输出目录项
   （ext4、APFS、NTFS 的枚举顺序不同，`lib-dyns-test` / `lib-file-test` 快照此前
   依赖主机）；`run-benchmarks.sh` 不再依赖 GNU `timeout`（原生 macOS 没有）；
   `lib-loadcheck.sh` 的模块 glob 改为字节序；`builtin-dispatch` 与 `lib-host-test`

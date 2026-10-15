@@ -345,7 +345,7 @@ sources/binaries are **not** shipped. If one is missing the build script
 
 | Component | Where to put it | Where to get it | Who builds it |
 | --------- | --------------- | --------------- | ------------- |
-| PCRE 8 (8-bit) | `src/3rd/pcre-8/` | <https://www.pcre.org/> (8.x source, e.g. 8.45) | Linux: `make-linux-x86_64.sh` compiles it with gcc; Windows (i386): `src/regex/pcre/make.bat` (Borland bcc32 + make, `-Dpcresrc=<path>`) |
+| PCRE 8 (8-bit) | `src/3rd/pcre-8/` | <https://www.pcre.org/> (8.x source, e.g. 8.45) | Linux: `make-linux-x86_64.sh` compiles it with gcc; Windows (i386): `src/regex/pcre/make.bat` (Borland bcc32 + make, `-Dpcresrc=<path>`). The win64 FPC build has no PCRE build step yet, so it has no regex |
 | Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | the tinycc release on savannah/nongnu, or repo.or.cz tag `release_0_9_27` | `make-linux-x86_64.sh` produces `libtcc.so` (placed next to `funcmd`) |
 | Windows runtime DLLs | `fun/libtcc.dll`, `fun/zlib.dll` | official release or build them yourself | no build step; keep them beside `fun.exe` for `ccompile` / `NewJit` |
 
@@ -372,12 +372,15 @@ snapshot directory; macOS details and the current skip reasons are in
 [`art/notes/macos-port.md`](art/notes/macos-port.md).
 
 [`.github/workflows/regression.yml`](.github/workflows/regression.yml) runs the
-suite on six platforms - Linux, macOS and Windows, each x64 and arm64. The
-Linux and macOS jobs build natively with Free Pascal and are the maintained
-gate; the Windows jobs are a bring-up first pass (the build and the portable
-subset run, via `ppcrossx64`, but the Windows build has no regex yet, and FPC
-3.2.2 has no win64/aarch64 target), so they are marked `continue-on-error` for
-now.
+suite on five platforms - Linux, macOS and Windows on x64, plus Linux and macOS
+on arm64. All five build with Free Pascal and are a gate. The Windows build
+still has no regex (PCRE is not compiled there yet), so
+`run-windows-regression.bat` probes for the engine at startup and reports the
+regex-dependent tests as SKIP instead of diffing their (necessarily different)
+output; they resume automatically once PCRE is wired up.
+
+`windows-arm64` is disabled: FPC 3.2.2, the pinned toolchain, has no
+win64/aarch64 target, so there is nothing to build with.
 
 
 ---

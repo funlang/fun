@@ -1,24 +1,27 @@
 # Continuous integration: build the interpreter and run the regression suite
-# on six platforms - Linux / macOS / Windows, each on x64 and arm64.
+# on five platforms - Linux / macOS / Windows, x64 for each, arm64 for the
+# two where an FPC target exists.
 #
 #   linux-x64    ubuntu-24.04      native FPC + full suite
 #   linux-arm64  ubuntu-24.04-arm  native FPC + full suite (linux-aarch64 skips)
 #   macos-x64    macos-15-intel    FPC universal dmg + macOS suite
 #   macos-arm64  macos-latest      Homebrew FPC 3.2.2 bottle + macOS suite
 #   windows-x64  windows-latest    FPC (ppcrossx64) + the Windows runner (portable subset)
-#   windows-arm64 windows-11-arm   placeholder: FPC has no win64/aarch64 target
+#
+# windows-arm64 is disabled: FPC 3.2.2 has no win64/aarch64 target, so there is
+# no toolchain to build with (see the commented-out job at the end of the file;
+# re-enable it when a >= 3.3.x FPC with aarch64-windows support is pinned).
 #
 # The POSIX runner auto-detects the host and reads a per-platform skip list
 # (fun/test/regression-skip-<platform>.txt) plus optional
 # fun/test/expected/<platform>/ snapshots; see fun/test/run-linux-regression.sh
 # and art/notes/macos-port.md.
 #
-# Status: the Linux and macOS jobs are the maintained gate. The Windows jobs are
-# a bring-up first pass: the build works (ppcrossx64 + the FPC layout are wired
-# up) and the portable subset runs, but the Windows build has no regex yet, so
-# the regex-driven demos and a few type/variant tests still differ; both Windows
-# jobs stay continue-on-error until those are closed. See the README
-# "Regression tests and CI" section.
+# Status: all five jobs are a gate. The Windows build still has no regex (no
+# PCRE is compiled there yet), so run-windows-regression.bat probes for the
+# engine and skips the regex-dependent tests accordingly; the remaining
+# host-dependent entries are listed there too. See the README "Regression tests
+# and CI" section.
 name: regression
 
 on:
@@ -191,7 +194,6 @@ jobs:
   windows-x64:
     name: windows-x64
     runs-on: windows-latest
-    continue-on-error: true   # bring-up: the Windows build has no regex yet; a few tests differ
     steps:
       - uses: actions/checkout@v4
 
@@ -348,7 +350,7 @@ jobs:
               elseif ($l -match '^\s*exp:\s*(.+)$' -and $g) { $pairs += , @($g, $Matches[1].Trim()); $g = $null }
             }
             $rep = @()
-            foreach ($p in ($pairs | Select-Object -First 6)) {
+            foreach ($p in ($pairs | Select-Object -First 12)) {
               if ((Test-Path $p[0]) -and (Test-Path $p[1])) {
                 $a = [IO.File]::ReadAllBytes($p[0]); $b = [IO.File]::ReadAllBytes($p[1])
                 $n = [Math]::Min($a.Length, $b.Length); $d = -1
@@ -360,25 +362,30 @@ jobs:
 
             $fails = (Get-Content $log |
                         Select-String -Pattern 'FAIL|failed|mismatch|not found|error' |
-                        Select-Object -First 12 |
+                        Select-Object -First 40 |
                         ForEach-Object { $_.Line }) -join ' | '
             if ([string]::IsNullOrEmpty($fails)) { $fails = "runner exited $LASTEXITCODE" }
             Write-Host "::error title=regression (windows-x64)::$($fails.Substring(0, [Math]::Min(900, $fails.Length)))"
             exit 1
           }
 
-  windows-arm64:
-    name: windows-arm64
-    runs-on: windows-11-arm
-    continue-on-error: true   # see the step below: no aarch64-windows FPC yet
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: No aarch64-windows FPC in the pinned toolchain
-        shell: pwsh
-        run: |
-          Write-Host "FPC 3.2.2 (the pinned toolchain) has no win64/aarch64 target,"
-          Write-Host "so funcmd cannot be built natively for Windows arm64 yet."
-          Write-Host "This job reserves the matrix slot and will fail until an FPC"
-          Write-Host "with aarch64-windows support (>= 3.3.x) is available."
-          exit 1
+  # windows-arm64 is temporarily disabled: FPC 3.2.2 (the pinned toolchain) has
+  # no win64/aarch64 target, so there is nothing to build with and the job could
+  # only ever fail. Re-enable it together with an FPC >= 3.3.x that ships the
+  # aarch64-windows target (and a win64/aarch64 host runner).
+  #
+  # windows-arm64:
+  #   name: windows-arm64
+  #   runs-on: windows-11-arm
+  #   continue-on-error: true   # see the step below: no aarch64-windows FPC yet
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - name: No aarch64-windows FPC in the pinned toolchain
+  #       shell: pwsh
+  #       run: |
+  #         Write-Host "FPC 3.2.2 (the pinned toolchain) has no win64/aarch64 target,"
+  #         Write-Host "so funcmd cannot be built natively for Windows arm64 yet."
+  #         Write-Host "This job reserves the matrix slot and will fail until an FPC"
+  #         Write-Host "with aarch64-windows support (>= 3.3.x) is available."
+  #         exit 1

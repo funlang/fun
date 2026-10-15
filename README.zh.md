@@ -341,7 +341,7 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 
 | 组件 | 放到哪里 | 从哪里获取 | 由谁构建 |
 | ---- | -------- | ---------- | -------- |
-| PCRE 8（8-bit） | `src/3rd/pcre-8/` | <https://www.pcre.org/>（8.x 源码，如 8.45） | Linux：`make-linux-x86_64.sh` 用 gcc 直接编译；Windows(i386)：`src/regex/pcre/make.bat`（Borland bcc32 + make，可 `-Dpcresrc=<路径>`） |
+| PCRE 8（8-bit） | `src/3rd/pcre-8/` | <https://www.pcre.org/>（8.x 源码，如 8.45） | Linux：`make-linux-x86_64.sh` 用 gcc 直接编译；Windows(i386)：`src/regex/pcre/make.bat`（Borland bcc32 + make，可 `-Dpcresrc=<路径>`）。win64 的 FPC 构建尚无 PCRE 编译步骤，因此没有正则 |
 | Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | savannah/nongnu 的 tinycc 发行包，或 repo.or.cz 的 `release_0_9_27` tag | `make-linux-x86_64.sh`，产出 `libtcc.so`（放在 `funcmd` 旁） |
 | Windows 运行期 DLL | `fun/libtcc.dll`、`fun/zlib.dll` | 官方发行包或自行构建 | 无需构建；运行时与 `fun.exe` 同目录，供 `ccompile` / `NewJit` 使用 |
 

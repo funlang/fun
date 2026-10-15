@@ -26,6 +26,15 @@ rem   Linux snapshot. To build a Windows baseline to diff:
 rem       set FUNREG_EXPECTED=fun\test\expected-win
 rem       fun\test\run-windows-regression.bat --update
 rem   then compare fun\test\expected-win\*.txt with fun\test\expected\*.txt.
+rem
+rem Two more sets are skipped without being host-dependent in principle:
+rem   REGEXTESTS - need the PCRE engine, which the Windows build does not link
+rem                yet. Probed at startup (a regex literal parses to a nil node
+rem                without -dRegex), so they start running by themselves once
+rem                PCRE is wired up. See README "Third-party dependencies".
+rem   HOSTDEP    - plus lib-file-test/lib-dyns-test: find() emits '\' on
+rem                Windows and '/' elsewhere (io.pas Norm/_find), and the shared
+rem                snapshots use '/'.
 rem ============================================================
 
 set "HERE=%~dp0"
@@ -40,7 +49,11 @@ if not exist "%LISTFILE%" ( echo missing %LISTFILE% 1>&2 & popd & exit /b 2 )
 rem Tests whose output is host-dependent, plus the Unix-only ones the Windows
 rem build cannot run: the -lnx/*-unx backends (libc.so.6), the FFI suite
 rem (Unix libc/libm + libffitest) and arm64/x86-only codegen.
-set "HOSTDEP= builtin-dispatch.fun lib-host-test.fun lib-param-linux.fun lib-cmdline-linux.fun lib-loadcheck.sh libc-outbuf.fun ptr-primitives.fun raw-address-getapi.fun lib-tcc-test.fun lib-jit-test.fun lib-asm-lnx.fun lib-asm-a64.fun fractal-asm-x64.fun lib-hash-test.fun lib-proc-test.fun lib-unicode-test.fun run-benchmarks.sh ffi-scalar.fun ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun lib-os-dispatch-prototype.fun lib-crypt-lnx.fun lib-e2e-lnx.fun lib-ajax-lnx-test.fun run-ajax-lnx.sh lib-winsock-lnx-test.fun lib-ado-lnx-test.fun lib-ado-schema-lnx-test.fun lib-xml-lnx-test.fun lib-jsonrpc-lnx-test.fun lib-orm-rpc-lnx-test.fun lib-os-lnx-test.fun lib-cmdline-lnx-test.fun "
+set "HOSTDEP= builtin-dispatch.fun lib-host-test.fun lib-param-linux.fun lib-cmdline-linux.fun lib-loadcheck.sh libc-outbuf.fun ptr-primitives.fun raw-address-getapi.fun lib-tcc-test.fun lib-jit-test.fun lib-asm-lnx.fun lib-asm-a64.fun fractal-asm-x64.fun lib-hash-test.fun lib-proc-test.fun lib-unicode-test.fun run-benchmarks.sh ffi-scalar.fun ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun lib-os-dispatch-prototype.fun lib-crypt-lnx.fun lib-e2e-lnx.fun lib-ajax-lnx-test.fun run-ajax-lnx.sh lib-winsock-lnx-test.fun lib-ado-lnx-test.fun lib-ado-schema-lnx-test.fun lib-xml-lnx-test.fun lib-jsonrpc-lnx-test.fun lib-orm-rpc-lnx-test.fun lib-os-lnx-test.fun lib-cmdline-lnx-test.fun lib-file-test.fun lib-dyns-test.fun "
+
+rem Tests gated only by the regex engine's absence (the Windows build has no
+rem PCRE): probed below, skipped while REGEXOK=0.
+set "REGEXTESTS= all.fun regex-adv.fun lib-match-test.fun lib-regex-test.fun lib-func-check.fun lib-bnf-dedup.fun lib-regex-replace.fun "
 
 set "MODE=compare"
 set "PORTABLE=0"
@@ -70,6 +83,18 @@ popd & exit /b 2
 if /i "%MODE%"=="list"      goto listmode
 if /i "%MODE%"=="loadcheck" goto loadcheck
 
+rem --- is the regex engine built in? ----------------------------------------
+rem Without -dRegex a regex literal parses to a nil node, so the probe below
+rem cannot match. Run it once and skip REGEXTESTS while the engine is absent.
+set "REGEXOK=0"
+set "PROBEFILE=fun\test\.regex-probe.fun"
+>"%PROBEFILE%" echo var r = 'a1b2'.replace(/\d++/g, '-');
+>>"%PROBEFILE%" echo if r = 'a-b-' then ?. 'regex-on'; else ?. 'regex-off'; end if;
+"%FUNCMD%" "%PROBEFILE%" > "%TEMP%\funreg-regex.out" 2>&1
+findstr /x /c:"regex-on" "%TEMP%\funreg-regex.out" >nul 2>&1
+if not errorlevel 1 set "REGEXOK=1"
+del "%PROBEFILE%" >nul 2>&1
+
 if not exist "%EXPECTED%" mkdir "%EXPECTED%" >nul 2>&1
 set "FAIL=0"
 set "TOTAL=0"
@@ -89,6 +114,10 @@ if /i "%tmode%"=="shell" goto skip_shell
 if "%PORTABLE%"=="1" (
   echo !HOSTDEP! | findstr /i /c:" %name% " >nul
   if not errorlevel 1 goto skip_host
+)
+if "%REGEXOK%"=="0" (
+  echo !REGEXTESTS! | findstr /i /c:" %name% " >nul
+  if not errorlevel 1 goto skip_regex
 )
 set "OUT=%TEMP%\funreg-%name%.out"
 "%FUNCMD%" "fun\%script%" > "%OUT%" 2>&1
@@ -134,6 +163,11 @@ exit /b 0
 
 :skip_host
 echo %name%   SKIP (host-dependent)
+set /a SKIP+=1
+exit /b 0
+
+:skip_regex
+echo %name%   SKIP (no regex engine)
 set /a SKIP+=1
 exit /b 0
 
