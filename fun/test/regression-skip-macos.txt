@@ -17,7 +17,6 @@ libc-outbuf.fun	Linux libc.so.6 out-buffer probe
 # libffitest is built as .dylib by fun/test/ffi/build.sh), so they run on macOS
 # too. If getapi/ABI breaks on Darwin, they fail here rather than being hidden.
 # --- /proc and network backends -------------------------------------------
-lib-proc-test.fun	lib-proc reads /proc (no /proc on macOS)
 lib-winsock-lnx-test.fun	lib-winsock netif enumeration reads /proc
 lib-ajax-lnx-test.fun	lib-ajax binds Linux libcurl.so
 run-ajax-lnx.sh	Linux curl/http server harness

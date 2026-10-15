@@ -35,6 +35,7 @@ LOAD  lib-orm-rpc
 LOAD  lib-orm
 LOAD  lib-os
 LOAD  lib-param
+LOAD  lib-proc-darwin
 FAIL  lib-proc               fun/lib/lib-proc-lnx.fun:22: getapi: cannot load library "li
 LOAD  lib-regex
 FAIL  lib-registry           fun/lib/lib-registry.fun:23: getapi: cannot load library "ad
@@ -59,4 +60,4 @@ LOAD  lib-xml
 LOAD  lib-yaml
 LOAD  lib-zlib
 
-loaded=50 failed=10
+loaded=51 failed=10
