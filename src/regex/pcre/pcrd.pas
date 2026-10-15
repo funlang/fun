@@ -649,27 +649,68 @@ function _strchr(__s: PAnsiChar; __c: Integer): PAnsiChar; cdecl; external szMSV
 // objects call the CRT by plain name - they are built with -D_CRTBLD, which
 // empties MinGW's _CRTIMP, so there is no __imp_... indirection that FPC's
 // linker cannot resolve. The declarations above are the bcc32 (underscored)
-// names; these are the plain ones. malloc/free are already plain (pcrd_c.inc).
-function isalnum(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isalnum';
-function isalpha(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isalpha';
-function iscntrl(__ch: Integer): Integer; cdecl; external szMSVCRT name 'iscntrl';
-function isdigit(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isdigit';
-function isgraph(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isgraph';
-function islower(__ch: Integer): Integer; cdecl; external szMSVCRT name 'islower';
-function isprint(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isprint';
-function ispunct(__ch: Integer): Integer; cdecl; external szMSVCRT name 'ispunct';
-function isspace(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isspace';
-function isupper(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isupper';
-function isxdigit(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isxdigit';
-function tolower(__ch: Integer): Integer; cdecl; external szMSVCRT name 'tolower';
-function toupper(__ch: Integer): Integer; cdecl; external szMSVCRT name 'toupper';
-function strchr(__s: PAnsiChar; __c: Integer): PAnsiChar; cdecl; external szMSVCRT name 'strchr';
-function memcmp(s1, s2: Pointer; n: size_t): Integer; cdecl; external szMSVCRT name 'memcmp';
-function memcpy(dest, src: Pointer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memcpy';
-function memmove(dest, src: Pointer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memmove';
-function memset(dest: Pointer; val: Integer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memset';
-function strlen(s: PAnsiChar): size_t; cdecl; external szMSVCRT name 'strlen';
-function strncmp(s1, s2: PAnsiChar; n: size_t): Integer; cdecl; external szMSVCRT name 'strncmp';
+// names; the crt_* ones below import those plain names. FPC emits a reference
+// for an external only if the Pascal code uses it (an unused declaration
+// produces no symbol at all), so _win64_crt_anchor references all of them and
+// the initialization section below keeps the anchor in the object file.
+// malloc/free are imported here too: pcrd_c.inc's Pascal malloc/free get FPC's
+// mangled names, so the C side cannot reach them - on Linux it uses glibc's
+// malloc/free (imported below the {$Else}), and msvcrt's here.
+function crt_isalnum(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isalnum';
+function crt_isalpha(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isalpha';
+function crt_iscntrl(__ch: Integer): Integer; cdecl; external szMSVCRT name 'iscntrl';
+function crt_isgraph(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isgraph';
+function crt_islower(__ch: Integer): Integer; cdecl; external szMSVCRT name 'islower';
+function crt_isprint(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isprint';
+function crt_ispunct(__ch: Integer): Integer; cdecl; external szMSVCRT name 'ispunct';
+function crt_isspace(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isspace';
+function crt_isupper(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isupper';
+function crt_isxdigit(__ch: Integer): Integer; cdecl; external szMSVCRT name 'isxdigit';
+function crt_tolower(__ch: Integer): Integer; cdecl; external szMSVCRT name 'tolower';
+function crt_toupper(__ch: Integer): Integer; cdecl; external szMSVCRT name 'toupper';
+function crt_strchr(__s: PAnsiChar; __c: Integer): PAnsiChar; cdecl; external szMSVCRT name 'strchr';
+function crt_strcmp(s1, s2: PAnsiChar): Integer; cdecl; external szMSVCRT name 'strcmp';
+function crt_strlen(s: PAnsiChar): size_t; cdecl; external szMSVCRT name 'strlen';
+function crt_strncmp(s1, s2: PAnsiChar; n: size_t): Integer; cdecl; external szMSVCRT name 'strncmp';
+function crt_memcmp(s1, s2: Pointer; n: size_t): Integer; cdecl; external szMSVCRT name 'memcmp';
+function crt_memcpy(dest, src: Pointer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memcpy';
+function crt_memmove(dest, src: Pointer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memmove';
+function crt_memset(dest: Pointer; val: Integer; n: size_t): Pointer; cdecl; external szMSVCRT name 'memset';
+function crt_malloc(n: size_t): Pointer; cdecl; external szMSVCRT name 'malloc';
+procedure crt_free(p: Pointer); cdecl; external szMSVCRT name 'free';
+
+procedure _win64_crt_anchor;
+begin
+  if crt_isalnum(0) = 2 then exit;
+  if crt_isalpha(0) = 2 then exit;
+  if crt_iscntrl(0) = 2 then exit;
+  if crt_isgraph(0) = 2 then exit;
+  if crt_islower(0) = 2 then exit;
+  if crt_isprint(0) = 2 then exit;
+  if crt_ispunct(0) = 2 then exit;
+  if crt_isspace(0) = 2 then exit;
+  if crt_isupper(0) = 2 then exit;
+  if crt_isxdigit(0) = 2 then exit;
+  if crt_tolower(0) = 2 then exit;
+  if crt_toupper(0) = 2 then exit;
+  if crt_strchr(nil, 0) <> nil then exit;
+  if crt_strcmp(nil, nil) = 2 then exit;
+  if crt_strlen(nil) = 2 then exit;
+  if crt_strncmp(nil, nil, 0) = 2 then exit;
+  if crt_memcmp(nil, nil, 0) = 2 then exit;
+  if crt_memcpy(nil, nil, 0) <> nil then exit;
+  if crt_memmove(nil, nil, 0) <> nil then exit;
+  if crt_memset(nil, 0, 0) <> nil then exit;
+  crt_free(crt_malloc(0));
+end;
+
+var
+  // never set; the compiler cannot fold the guard away, so the anchor (and
+  // with it every crt_* import) stays in the object file
+  _win64_crt_anchor_live: Boolean;
+
+initialization
+  if _win64_crt_anchor_live then _win64_crt_anchor;
 {$EndIf}
 {$Else}
 // Linux: the PCRE engine is linked from libpcre.a (built from the pcre-8 C

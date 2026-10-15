@@ -400,7 +400,11 @@ jobs:
               # objects call the CRT by plain name (isupper, strchr, ...) and
               # not through the __imp_... indirect slots that FPC's linker
               # cannot resolve without MinGW's import libraries.
-              $out = & $gcc -c -O2 -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DPCRE_STATIC -D_CRTBLD "-I$src" $c -o (Join-Path $lib "$($units[$u]).obj") 2>&1
+              #
+              # -mno-stack-arg-probe keeps GCC from calling ___chkstk_ms for
+              # the big frames in pcre_exec/pcre_compile (that helper lives in
+              # libgcc, which FPC's linker does not have).
+              $out = & $gcc -c -O2 -mno-stack-arg-probe -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DPCRE_STATIC -D_CRTBLD "-I$src" $c -o (Join-Path $lib "$($units[$u]).obj") 2>&1
               if ($LASTEXITCODE -ne 0) {
                 throw "gcc failed: $u :: " + (($out | Select-Object -First 14) -join ' ~ ')
               }
