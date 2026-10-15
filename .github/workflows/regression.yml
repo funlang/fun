@@ -440,14 +440,22 @@ jobs:
           $steps = "$env:RUNNER_TEMP\regex-steps.fun"
           @(
             "?. 'start';",
-            'var re = /(\d++)/;',
+            'var re = /\d++/g;',
             "?. 'compiled';",
-            "var m = 'a1b2'.match(re);",
+            "?. 'a1b2'.match(re);",
             "?. 'matched';",
-            '?. m.@count();',
-            "?. 'counted';",
-            "?. 'a1b2'.replace(re, '-');",
-            "?. 'replaced';"
+            "?. 'a1b2'.replace(/\d++/g, '-');",
+            "?. 'replaced-shorter';",
+            "?. 'a1b2'.replace(/1/, 'X');",
+            "?. 'replaced-equal';",
+            "?. 'a1b2'.replace(/1/, 'XYZ');",
+            "?. 'replaced-longer';",
+            "?. 'a1b2'.replace(/\d++/g, m->'<' & m.@@() & '>');",
+            "?. 'replaced-callback';",
+            "?. 'a1b2'.subpos('1');",
+            "?. 'subpos';",
+            "?. 'a1b2' =~ /2/;",
+            "?. 'tilde'"
           ) -join "`n" | Out-File -FilePath $steps -Encoding ascii
           $so = & "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe" $steps 2>&1
           Write-Host "::warning title=regex steps::exit=$LASTEXITCODE out=[$($so -join '~')]"
