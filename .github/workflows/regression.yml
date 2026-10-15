@@ -466,6 +466,17 @@ jobs:
             if ([string]::IsNullOrEmpty($err)) { $err = "fpc exited $LASTEXITCODE with no Fatal:/Error: line" }
             $tried += "[$label] $err"
             Write-Host "::warning title=build attempt failed::$label :: $err"
+
+            # Which symbol FPC itself emitted for the CRT externals decides how
+            # this links, and it is not visible from outside: dump pcrd.o.
+            $obj = Join-Path $env:GITHUB_WORKSPACE 'src\regex\pcre\pcrd.o'
+            if ((Test-Path $obj) -and (Get-Command nm -ErrorAction SilentlyContinue)) {
+              $sym = (& nm $obj 2>&1 |
+                        Select-String -Pattern 'isalpha|isalnum|strlen|memcpy|malloc|memory' |
+                        Select-Object -First 10 |
+                        ForEach-Object { $_.Line.Trim() }) -join ' ; '
+              Write-Host "::warning title=pcrd.o symbols::$sym"
+            }
           }
           if (-not $built) {
             $all = ($tried -join ' ;; ')
