@@ -4,12 +4,14 @@
 use 'lib-utils.fun';
 
 // Executable-memory backend, resolved once at load. Windows keeps
-// VirtualAlloc / VirtualFree. Linux uses libc mmap / munmap, and because the
-// host ABI there is System V AMD64, any hand-written `#!asm` body for Linux
-// must use the register-argument convention (rdi, rsi, ...), not the Win32
-// stack form. See art/notes/library-port-plan.md and
-// art/notes/arch-machine-code-plan.md.
+// VirtualAlloc / VirtualFree. Linux uses libc mmap / munmap. macOS arm64 uses
+// libSystem mmap with MAP_JIT (plain RWX is refused there). These hosts pass
+// arguments in registers (System V AMD64 on Linux, Darwin arm64 on macOS), so
+// any hand-written `#!asm` body must use the register-argument convention
+// (rdi, rsi, ... / x0, ...), not the Win32 stack form. See
+// art/notes/library-port-plan.md and art/notes/arch-machine-code-plan.md.
 var _asm_linux = 'host'.arg().getJson(fd: true).os = 'linux';
+var _asm_macos = 'host'.arg().getJson(fd: true).os = 'macos';
 var _asm_cpu   = 'host'.arg().getJson(fd: true).cpu;
 var _asm_bits  = 'host'.arg().getJson(fd: true).bits;
 var _asm_alloc = nil;
@@ -17,6 +19,9 @@ var _asm_free  = nil;
 if _asm_linux then
   _asm_alloc = 'libc.so.6'.getapi('mmap',   'piiiii:p');
   _asm_free  = 'libc.so.6'.getapi('munmap', 'pi:i');
+elsif _asm_macos then
+  _asm_alloc = 'libSystem.B.dylib'.getapi('mmap',   'piiiii:p');
+  _asm_free  = 'libSystem.B.dylib'.getapi('munmap', 'pi:i');
 else
   _asm_alloc = 'kernel32'.getapi('VirtualAlloc', 'iiii:i');
   _asm_free  = 'kernel32'.getapi('VirtualFree',  'iii:i');
@@ -27,6 +32,18 @@ end if;
 // __clear_cache here (see lib-asm-a64.fun). Load() calls it with the real code
 // length after the bytes are copied and before the callable pointer is built.
 var _asm_flush = nil;
+
+// Darwin MAP_JIT write-protect toggle, nil by default: Load() calls it with 0
+// (writes on) around the code store and 1 (exec) before the call; arm64 macOS
+// enforces W^X per thread. No-op on x86 and Linux.
+var _asm_wr = nil;
+if _asm_macos then
+  try
+    _asm_wr = 'libSystem.B.dylib'.getapi('pthread_jit_write_protect_np', 'i:v');
+  except
+    _asm_wr = nil; // symbol missing: fall through without toggling
+  end try;
+end if;
 
 // 64-bit little-endian byte dump. lib-utils' int2hex is fixed at 4 bytes
 // because Fun's `>>` is 32-bit; a 64-bit host address (a @toCallback libffi
@@ -99,6 +116,10 @@ class AssemblyBase(args, code, names)
     if _asm_linux then
       // libc mmap(NULL, n, PROT_READ|WRITE|EXEC, MAP_PRIVATE|ANONYMOUS, -1, 0)
       result = _asm_alloc(nil, n, 7, 0x22, -1, 0);
+    elsif _asm_macos then
+      // MAP_PRIVATE|MAP_ANONYMOUS|MAP_JIT = 0x1802: macOS arm64 refuses plain
+      // RWX; the W^X state is toggled per thread around each store (see _asm_wr).
+      result = _asm_alloc(nil, n, 7, 0x1802, -1, 0);
     else
       result = _asm_alloc(nil, n, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
     end if;
@@ -106,7 +127,7 @@ class AssemblyBase(args, code, names)
 
   fun Delete()
     if ptr <> nil then
-      if _asm_linux then
+      if _asm_linux or _asm_macos then
         result = _asm_free(ptr, msize);
       else
         result = _asm_free(ptr, 0, MEM_RELEASE);
@@ -148,9 +169,9 @@ class AssemblyBase(args, code, names)
       c = code;
     end if;
     c = this.Compile(c); //?. c;
-    if _asm_linux then
-      // System V AMD64 passes arguments in registers and the caller cleans up,
-      // so Win32's `ret n` tail is wrong here (it would corrupt rsp). Only make
+    if _asm_linux or _asm_macos then
+      // System V AMD64 / Darwin arm64 pass arguments in registers and the
+      // caller cleans up, so Win32's `ret n` tail is wrong here. Only make
       // sure the code ends in this backend's plain return.
       var tail = '';
       if c.length() >= ret_hex.length() then
@@ -168,7 +189,9 @@ class AssemblyBase(args, code, names)
     var s = hex2str(c); //?. str2hex(s);
     Delete();
     ptr   = New(s.length()*charSize());
+    if _asm_wr <> nil then _asm_wr(0); end if; // arm64 macOS: writes on
     s.move(ptr); // ansi only ! -> now unicode ok !
+    if _asm_wr <> nil then _asm_wr(1); end if; // back to exec before the call
 
     // Instruction-cache coherency: no-op on x86, required on aarch64.
     if _asm_flush <> nil then

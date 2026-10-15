@@ -60,7 +60,7 @@ jobs:
             fetch_all: false
           - name: macos-arm64
             os: macos-latest
-            platform: macos
+            platform: macos-aarch64
             fpc_tar: ""
             build: ./make-macos.sh
             fetch_all: false
