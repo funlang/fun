@@ -169,6 +169,15 @@ begin
     if name = '' then
       raise EBase.Create('getapi: no symbol name for library "' + libname + '"');
     hfun := fun.ptr(GetProcedureAddress(hlib, name));
+    {$IfDef MSWINDOWS}
+    // Windows exports most of these with an A/W suffix (GetCommandLineA) while
+    // the Fun-side names are unsuffixed (GetCommandLine), which is exactly what
+    // io.GetProc handles for the Delphi path: retry with the suffix before
+    // giving up. The narrow 's'/'i' convention means the ANSI entry point is
+    // the one wanted, and an explicit 'nameW' still resolves directly.
+    if hfun = nil then
+      hfun := fun.ptr(GetProcedureAddress(hlib, name + 'A'));
+    {$EndIf}
     if hfun = nil then
       raise EBase.Create('getapi: symbol "' + name + '" not found in "' + libname + '"');
   end;
