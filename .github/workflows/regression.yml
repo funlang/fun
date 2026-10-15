@@ -366,12 +366,17 @@ jobs:
               }
             }
             $dll = Join-Path (Join-Path $env:GITHUB_WORKSPACE 'src\prj\fun') 'pcre3.dll'
-            $lo = & $gcc -shared -o $dll (Get-ChildItem (Join-Path $lib '*.o') | ForEach-Object { $_.FullName }) 2>&1
+            # an import library too: it lets a C probe link the DLL, which is
+            # how the diagnostic step checks the DLL itself
+            $implib = Join-Path $lib 'libpcre3.dll.a'
+            $lo = & $gcc -shared -o $dll "-Wl,--out-implib,$implib" (Get-ChildItem (Join-Path $lib '*.o') | ForEach-Object { $_.FullName }) 2>&1
             if ($LASTEXITCODE -ne 0) {
               throw "gcc -shared failed :: " + (($lo | Select-Object -First 12) -join ' ~ ')
             }
             Write-Host "built $dll ($((Get-Item $dll).Length) bytes) next to funcmd.exe"
             "FUN_PCRE_DLL=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "FUN_PCRE_IMPLIB=$implib" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            "FUN_PCRE_DLLSRC=$src" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             Write-Host "::warning title=pcre (win64) ok::gcc=$gcc ($(& $gcc -dumpmachine)); pcre3.dll=$((Get-Item $dll).Length) bytes"
           } catch {
             Write-Host "::warning title=pcre (win64)::$($_.Exception.Message)"
@@ -430,6 +435,33 @@ jobs:
                       Select-String -Pattern 'pcre_compile|pcre_exec|pcre_fullinfo|pcre_version' |
                       Select-Object -First 6 | ForEach-Object { $_.Line.Trim() }) -join ' ; '
             Write-Host "::warning title=pcre3.dll exports::$sym"
+
+            # does the DLL itself work? a C caller linking the import library
+            # (if this prints a match count, the DLL is fine and a failure above
+            # is on the FPC/Pascal side)
+            $c = "$env:RUNNER_TEMP\pcreprobe.c"
+            @(
+              '#include <stdio.h>',
+              '#include "pcre.h"',
+              'int main(void) {',
+              '  const char *err = 0; int erroff = 0;',
+              '  pcre *re = pcre_compile("\\d++", 0, &err, &erroff, 0);',
+              '  if (!re) { printf("compile failed: %s at %d\n", err, erroff); return 2; }',
+              '  int ov[9]; int rc = pcre_exec(re, 0, "a1b2", 4, 0, 0, ov, 9);',
+              '  printf("pcre %s exec rc=%d (%d..%d)\n", pcre_version(), rc, ov[0], ov[1]);',
+              '  return 0;',
+              '}'
+            ) -join "`n" | Out-File -FilePath $c -Encoding ascii
+            $tl = "$env:RUNNER_TEMP\pcreprobe.exe"
+            $gcc = 'C:\mingw64\bin\gcc.exe'
+            Copy-Item $dll $env:RUNNER_TEMP -Force      # loader needs it beside the probe
+            $co = & $gcc $c "-I$env:FUN_PCRE_DLLSRC" "-L$(Split-Path $env:FUN_PCRE_IMPLIB)" -lpcre3 -o $tl 2>&1
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "::warning title=pcre3.dll C probe (build)::$((($co | Select-Object -First 8) -join ' ~ '))"
+            } else {
+              $ro = & $tl 2>&1
+              Write-Host "::warning title=pcre3.dll C probe::exit=$LASTEXITCODE out=[$($ro -join '~')]"
+            }
           }
 
       - name: Regression (portable subset)
