@@ -291,133 +291,6 @@ jobs:
           path: C:\FPC
           key: fpc-3.2.2-win64-and-cross
 
-      - name: Build PCRE 8 for win64 (regex, best effort)
-        shell: pwsh
-        run: |
-          # The win64 build had no regex because nothing compiled PCRE there.
-          # Mirror make-linux-x86_64.sh: drop the pristine 8.45 source into
-          # src/3rd/pcre-8, create the build-ready files from the shipped
-          # .generic/.dist copies, compile the 8-bit sources with the runner's
-          # MinGW-w64 gcc and archive them into libpcre.a (pcrd.pas asks for it
-          # with {$LINKLIB pcre}, so -Fl<dir> is all the FPC side needs).
-          #
-          # Best effort: a failure is a warning and the build then runs without
-          # -dRegex, so the job stays green while this is brought up.
-          $ErrorActionPreference = 'Stop'
-          $src = Join-Path $env:GITHUB_WORKSPACE 'src\3rd\pcre-8'
-          try {
-            if (-not (Test-Path (Join-Path $src 'pcre_compile.c'))) {
-              $tmp = Join-Path $env:RUNNER_TEMP 'pcre'
-              New-Item -ItemType Directory -Force -Path $tmp | Out-Null
-              $tar = Join-Path $tmp 'pcre-8.45.tar.gz'
-              curl.exe -fsSL --retry 3 --retry-all-errors -o $tar `
-                'https://downloads.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz'
-              if ($LASTEXITCODE -ne 0) { throw "download failed ($LASTEXITCODE)" }
-              tar.exe -xf $tar -C $tmp
-              New-Item -ItemType Directory -Force -Path (Split-Path $src) | Out-Null
-              Move-Item (Join-Path $tmp 'pcre-8.45') $src
-            }
-            Copy-Item (Join-Path $src 'config.h.generic') (Join-Path $src 'config.h') -Force
-            Copy-Item (Join-Path $src 'pcre.h.generic') (Join-Path $src 'pcre.h') -Force
-            Copy-Item (Join-Path $src 'pcre_chartables.c.dist') (Join-Path $src 'pcre_chartables.c') -Force
-
-            # Pick a MinGW-w64 C compiler that can actually see its own headers:
-            # the image's "gcc" (Tools) had no reachable C headers from this
-            # shell (ctype.h/stdio.h missing), so probe candidates with a
-            # one-line compile and fall back to MSYS2's package if none works.
-            function Test-CC([string]$exe) {
-              if (-not (Test-Path $exe)) { return $false }
-              $o = Join-Path $env:RUNNER_TEMP 'cctest.o'
-              Remove-Item -Force $o -ErrorAction SilentlyContinue
-              'int main(void){return 0;}' | & $exe -c -x c - -o $o 2>&1 | Out-Null
-              return (($LASTEXITCODE -eq 0) -and (Test-Path $o))
-            }
-            $cands = @()
-            $onpath = Get-Command gcc -ErrorAction SilentlyContinue
-            if ($onpath) { $cands += $onpath.Source }
-            $cands += 'C:\msys64\mingw64\bin\gcc.exe'
-            $cands += 'C:\mingw64\bin\gcc.exe'
-            $cands += 'C:\tools\mingw64\bin\gcc.exe'
-            $gcc = $null
-            foreach ($c in $cands) {
-              if (Test-CC $c) { $gcc = $c; break }
-              Write-Host "not usable as a C compiler: $c"
-            }
-            if (-not $gcc) {
-              Write-Host "no usable gcc yet; installing MSYS2's mingw-w64 toolchain"
-              if (Test-Path 'C:\msys64\usr\bin\bash.exe') {
-                & 'C:\msys64\usr\bin\bash.exe' -lc 'pacman -Sy --noconfirm --needed mingw-w64-x86_64-gcc' 2>&1 |
-                  Select-Object -Last 6 | Write-Host
-                if (Test-CC 'C:\msys64\mingw64\bin\gcc.exe') { $gcc = 'C:\msys64\mingw64\bin\gcc.exe' }
-              }
-            }
-            if (-not $gcc) { throw 'no usable C compiler (tried PATH gcc, C:\msys64\mingw64, pacman install)' }
-            $ar = Join-Path (Split-Path $gcc) 'ar.exe'
-            if (-not (Test-Path $ar)) { $ar = (Get-Command ar -ErrorAction SilentlyContinue).Source }
-            if (-not (Test-Path $ar)) { throw "no ar next to $gcc" }
-            # also exposes ld for the -Xe (external linker) build attempt
-            (Split-Path $gcc) | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-            Write-Host "gcc: $gcc  target=$(& $gcc -dumpmachine)  $(& $gcc --version 2>&1 | Select-Object -First 1)"
-            Write-Host "ar : $ar"
-
-            $lib = Join-Path $src 'win64-lib'
-            Remove-Item -Recurse -Force $lib -ErrorAction SilentlyContinue
-            New-Item -ItemType Directory -Force -Path $lib | Out-Null
-            # Exactly the objects pcrd.pas asks for with {$LINK <name>.obj} on
-            # the Windows build (source name -> object name): the bcc32 .obj
-            # files under src/regex/pcre are not in the repo, so win64 builds
-            # them here. pcre_chartables.c.dist is the shipped copy of the
-            # default tables, so it becomes pcre_default_tables.obj - it defines
-            # the same PRIV(default_tables) symbol dftables would generate, and
-            # nothing else in the list defines it.
-            $units = [ordered]@{
-              'pcre_compile'    = 'pcre_compile'
-              'pcre_config'     = 'pcre_config'
-              'pcre_dfa_exec'   = 'pcre_dfa_exec'
-              'pcre_exec'       = 'pcre_exec'
-              'pcre_fullinfo'   = 'pcre_fullinfo'
-              'pcre_get'        = 'pcre_get'
-              'pcre_globals'    = 'pcre_globals'
-              'pcre_maketables' = 'pcre_maketables'
-              'pcre_newline'    = 'pcre_newline'
-              'pcre_refcount'   = 'pcre_refcount'
-              'pcre_study'      = 'pcre_study'
-              'pcre_tables'     = 'pcre_tables'
-              'pcre_ucd'        = 'pcre_ucd'
-              'pcre_valid_utf8' = 'pcre_valid_utf8'
-              'pcre_version'    = 'pcre_version'
-              'pcre_xclass'     = 'pcre_xclass'
-              'pcre_chartables' = 'pcre_default_tables'
-            }
-            foreach ($u in $units.Keys) {
-              $c = Join-Path $src "$u.c"
-              if (-not (Test-Path $c)) { throw "missing source $u.c" }
-              # .obj, not .o: that is the name FPC's Windows compiler expects
-              # both for {$LINK} and inside the archive
-              #
-              # -mno-stack-arg-probe keeps GCC from calling ___chkstk_ms for
-              # the big frames in pcre_exec/pcre_compile (that helper lives in
-              # libgcc, which FPC's linker does not have).
-              $out = & $gcc -c -O2 -mno-stack-arg-probe -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DPCRE_STATIC "-I$src" $c -o (Join-Path $lib "$($units[$u]).obj") 2>&1
-              if ($LASTEXITCODE -ne 0) {
-                throw "gcc failed: $u :: " + (($out | Select-Object -First 14) -join ' ~ ')
-              }
-            }
-            & $ar rcs (Join-Path $lib 'libpcre.a') (Get-ChildItem (Join-Path $lib '*.obj') | ForEach-Object { $_.FullName })
-            if ($LASTEXITCODE -ne 0) { throw 'ar failed' }
-            $a = Join-Path $lib 'libpcre.a'
-            Write-Host "built $a ($((Get-Item $a).Length) bytes)"
-            "FUN_PCRE_DIR=$lib" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            "FUN_PCRE_GCC=$gcc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            # visible from outside (the job log is not): the bring-up detail
-            Write-Host "::warning title=pcre (win64) ok::gcc=$gcc ($(& $gcc -dumpmachine)); libpcre.a=$((Get-Item $a).Length) bytes"
-          } catch {
-            Write-Host "::warning title=pcre (win64)::$($_.Exception.Message)"
-          }
-          # keep the step green on the best-effort failure path: GitHub's pwsh
-          # wrapper exits with $LASTEXITCODE
-          $global:LASTEXITCODE = 0
-
       - name: Build funcmd.exe
         working-directory: src\prj\fun
         shell: pwsh
@@ -426,79 +299,18 @@ jobs:
           # Call the x86_64-win64 compiler directly, as make-win64.bat does: the
           # generic fpc.exe driver is the i386 one here and forwards -Twin64 to
           # ppc386.exe ("Illegal parameter: -Twin64").
-          #
-          # -dRegex + -Fl<dir> come from the PCRE step above; if it failed there
-          # is no libpcre.a and the build stays regex-less (the runner then
-          # reports the regex tests as SKIP).
-          $base = @('-B','-Sd','-O2','-Ooregvar','-Xs','-Twin64','-dWin64','-d_B_','-d_C_','-dWinCOMx')
-          $variants = @()
-          if ($env:FUN_PCRE_DIR -and (Test-Path "$env:FUN_PCRE_DIR\libpcre.a")) {
-            # The PCRE objects are MinGW-built, so link them with FPC's external
-            # linker (ld, -Xe) against that toolchain's CRT import library: FPC's
-            # internal linker cannot resolve the plain isalnum/malloc/... names
-            # they reference. -Fu also feeds the object search path (options.pas:
-            # objectsearchpath.AddList(unitsearchpath)), which is where the
-            # internal linker looks for the {$LINK}ed <member>.obj files.
-            $crt = @()
-            $root = Split-Path (Split-Path $env:FUN_PCRE_GCC)
-            foreach ($d in @("$root\x86_64-w64-mingw32\lib", "$root\lib", "$root\..\x86_64-w64-mingw32\lib")) {
-              foreach ($crl in @('ucrt', 'msvcrt', 'mingwex')) {
-                if (Test-Path "$d\lib$crl.a") {
-                  $crt += @("-k-l$crl")
-                  Write-Host "CRT import library: $d\lib$crl.a"
-                }
-              }
-              if ($crt.Count -gt 0) { $crt = @("-k-L$d") + $crt; break }
-            }
-            if ($crt.Count -eq 0) { Write-Host "no CRT import library found for -Xe" }
-            # the libraries are listed on both sides of the inputs: ld only
-            # pulls an archive member for a symbol it has already seen, and
-            # where FPC places -k arguments relative to the objects is not
-            # specified, so cover both orders
-            $variants += ,(@('-dRegex') + $crt + @("-Fl$env:FUN_PCRE_DIR", "-Fu$env:FUN_PCRE_DIR", '-Xe') + $crt)
-            $variants += ,(@('-dRegex', "-Fl$env:FUN_PCRE_DIR", "-Fu$env:FUN_PCRE_DIR"))
-          }
-          $variants += ,(@())   # last resort: build without regex, keep the job green
-
-          $built = $null
-          $tried = @()
-          foreach ($v in $variants) {
-            $label = if ($v.Count -eq 0) { 'no regex' } else { $v -join ' ' }
-            $a = $base + $v
-            & ppcrossx64 funcmd.dpr @a *>&1 | Tee-Object -FilePath $log
-            if ($LASTEXITCODE -eq 0) { $built = $label; break }
-            # the complete undefined-symbol list, else the log tail (ld/FPC)
-            $und = Get-Content $log | Select-String -Pattern 'Undefined symbol' |
-                     ForEach-Object { ($_.Line -replace '^.*Undefined symbol: ', '').Trim() } |
-                     Sort-Object -Unique
-            if ($und) { $err = 'undefined: ' + ($und -join ', ') }
-            else {
-              $err = (Get-Content $log | Where-Object { $_.Trim() -ne '' } |
-                        Select-Object -Last 8) -join ' | '
-            }
+          ppcrossx64 funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx *>&1 |
+            Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            # Surface the real error: the log itself is not readable from outside.
+            $err = (Get-Content $log |
+                      Select-String -Pattern 'Fatal:|Error:' |
+                      Select-Object -Last 6 |
+                      ForEach-Object { $_.Line }) -join ' | '
             if ([string]::IsNullOrEmpty($err)) { $err = "fpc exited $LASTEXITCODE with no Fatal:/Error: line" }
-            $tried += "[$label] $err"
-            Write-Host "::warning title=build attempt failed::$label :: $err"
-
-            # Which symbol FPC itself emitted for the CRT externals decides how
-            # this links, and it is not visible from outside: dump pcrd.o.
-            $obj = Join-Path $env:GITHUB_WORKSPACE 'src\regex\pcre\pcrd.o'
-            if ((Test-Path $obj) -and (Get-Command nm -ErrorAction SilentlyContinue)) {
-              $sym = (& nm $obj 2>&1 |
-                        Select-String -Pattern 'isalpha|isalnum|strlen|memcpy|malloc|memory' |
-                        Select-Object -First 10 |
-                        ForEach-Object { $_.Line.Trim() }) -join ' ; '
-              Write-Host "::warning title=pcrd.o symbols::$sym"
-            }
-          }
-          if (-not $built) {
-            $all = ($tried -join ' ;; ')
-            Write-Host "::error title=build (windows-x64)::$($all.Substring(0, [Math]::Min(900, $all.Length)))"
+            Write-Host "::error title=build (windows-x64)::$($err.Substring(0, [Math]::Min(900, $err.Length)))"
             exit 1
           }
-          # visible from outside: which flag set linked (and therefore whether
-          # the runner will run or skip the regex tests)
-          Write-Host "::warning title=build (windows-x64) ok::flags=[$built]"
 
       - name: Regression (portable subset)
         shell: pwsh
