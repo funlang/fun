@@ -33,6 +33,15 @@
   （`ReadAllBytes`）：旧写法走文本模式，会把 `set-named.fun` 快照里的原始 GBK
   字节重编码，导致永远对不上。
 
+- 尝试为 win64 的 FPC 构建接入 PCRE，结果未落地：8-bit 源码能用 runner 的
+  MinGW-w64 gcc 编过（libpcre.a 能生成），但产物会引用 MinGW 的 CRT
+  （`__imp_isupper`、`malloc`、`free`、`strcmp` 等），而 FPC 的两条链接路径都
+  解不掉：内部链接器给导入符号起的是 Pascal 声明名；外部链接器（ld）在该工具链
+  的 libucrt/libmsvcrt/libmingwex 里找不到这些成员。`pcrd.pas` 留下了必要的前置
+  修复（它带的 `__llmul` 桩只对 32 位成立：win64 乘法是原生的，也没有
+  `System.__llmul`）。runner 的正则探测会在 win64 真正链上 PCRE 后自动开始跑这些
+  用例。细节与两条候选路线见 `art/notes/port-decisions.md` D27。
+
 - 加密测试支持 OpenSSL 3，以及剩余的 CI 平台修复。`lib-crypt-unx` 之前探测
   `EVP_PKEY_size`，而 OpenSSL 3.0 把它变成了指向 `EVP_PKEY_get_size` 的头文件
   宏、符号已不存在，于是整个探测在 OpenSSL 3 的 CI 镜像上失败，连带拖垮

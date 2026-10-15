@@ -38,6 +38,18 @@ This project records notable changes in the style of [Keep a Changelog](https://
   text-mode copy re-encoded the raw GBK bytes of the `set-named.fun` snapshot
   and made it unmatchable.
 
+- Building PCRE for the win64 FPC build was attempted and is not landed: the
+  8-bit sources compile with the runner's MinGW-w64 gcc (libpcre.a builds), but
+  the objects then reference the MinGW CRT (`__imp_isupper`, `malloc`, `free`,
+  `strcmp`, ...) and neither of FPC's two linkers resolves them here - the
+  internal one names imported symbols after the Pascal declaration, and the
+  external one (ld) finds no member for them in the toolchain's
+  libucrt/libmsvcrt/libmingwex. `pcrd.pas` gained the prerequisite fix (the
+  `__llmul` stub it carries is 32-bit only; win64 multiplied natively and has no
+  `System.__llmul`). The runner's regex probe means the regex tests start
+  running by themselves as soon as a win64 build actually links PCRE. Details
+  and the two candidate routes are in `art/notes/port-decisions.md` D27.
+
 - OpenSSL 3 in the crypto tests, and the remaining CI platform fixes.
   `lib-crypt-unx` probed `EVP_PKEY_size`, which OpenSSL 3.0 turned into a header
   macro for `EVP_PKEY_get_size` — the symbol is gone, so the whole probe failed
