@@ -377,6 +377,8 @@ jobs:
             "FUN_PCRE_DLL=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             "FUN_PCRE_IMPLIB=$implib" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             "FUN_PCRE_DLLSRC=$src" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            # reused by the libffitest step: same compiler, no re-detection
+            "FUN_CC=$gcc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
             Write-Host "::warning title=pcre (win64) ok::gcc=$gcc ($(& $gcc -dumpmachine)); pcre3.dll=$((Get-Item $dll).Length) bytes"
           } catch {
             Write-Host "::warning title=pcre (win64)::$($_.Exception.Message)"
@@ -407,6 +409,68 @@ jobs:
             Write-Host "::warning title=libffi (win64) ok::copied $($ffi.Name) to src\prj\fun\ffi.dll"
           } catch {
             Write-Host "::warning title=libffi (win64)::$($_.Exception.Message)"
+          }
+          $global:LASTEXITCODE = 0
+
+      - name: Build libffitest.dll for win64 (FFI tests, best effort)
+        shell: pwsh
+        run: |
+          # The FFI suite (fun/test/ffi/ffi-*.fun) calls a small C helper that
+          # fun/test/ffi/build.sh builds per host. Four of the five cases are
+          # plain int/double/long-long/callback ABI with host-independent
+          # output, so they run on win64 as soon as getapi does (-dWinFFI plus
+          # ffi.dll, see the steps above) and the helper is next to its sources
+          # as libffitest.dll.
+          #
+          # --export-all-symbols is what makes the helper's names visible to
+          # GetProcAddress: libffitest.c has no __declspec(dllexport), and MinGW
+          # exports nothing by default.
+          #
+          # Best effort: without the DLL the runner adds those four cases to its
+          # skip list instead of failing (same rule as pcre3.dll/ffi.dll).
+          $ErrorActionPreference = 'Stop'
+          try {
+            $gcc = $env:FUN_CC
+            if (-not $gcc) {
+              $onpath = Get-Command gcc -ErrorAction SilentlyContinue
+              $cands = @()
+              if ($onpath) { $cands += $onpath.Source }
+              $cands += 'C:\mingw64\bin\gcc.exe'
+              foreach ($c in $cands) {
+                if (-not (Test-Path $c)) { continue }
+                $o = Join-Path $env:RUNNER_TEMP 'cctest2.o'
+                Remove-Item -Force $o -ErrorAction SilentlyContinue
+                'int main(void){return 0;}' | & $c -c -x c - -o $o 2>&1 | Out-Null
+                if (($LASTEXITCODE -eq 0) -and (Test-Path $o)) { $gcc = $c; break }
+              }
+            }
+            if (-not $gcc) { throw 'no usable C compiler (no FUN_CC, no PATH gcc, no C:\mingw64)' }
+
+            $src = Join-Path $env:GITHUB_WORKSPACE 'fun\test\ffi\libffitest.c'
+            $dll = Join-Path $env:GITHUB_WORKSPACE 'fun\test\ffi\libffitest.dll'
+            # quoted: PowerShell splits a bare -Wl,--x into two arguments
+            $out = & $gcc -O2 -shared '-Wl,--export-all-symbols' -o $dll $src 2>&1
+            if ($LASTEXITCODE -ne 0) { throw "gcc -shared failed :: " + (($out | Select-Object -First 12) -join ' ~ ') }
+
+            # report the exports the suite needs, so a 'symbol not found' failure
+            # is readable from outside (the job log is not)
+            $need = 'big64','passll','addll','applyll','summ','ident','addi','five','fsum',
+                    'fdbl','dfromf','mixsum','apply1','dapply','sumvia','cb2','twice_cb',
+                    'walk','acc','fc','fire0i','fire0'
+            $objdump = Join-Path (Split-Path $gcc) 'objdump.exe'
+            $sym = @()
+            if (Test-Path $objdump) {
+              $sym = (& $objdump -p $dll 2>$null) |
+                       Select-String -Pattern '^\s*\[\s*\d+\] (\w+)' |
+                       ForEach-Object { $_.Matches[0].Groups[1].Value }
+            }
+            $missing = @($need | Where-Object { $sym -notcontains $_ })
+            $tag = if ($sym.Count -eq 0) { 'objdump unavailable' }
+                   elseif ($missing.Count -eq 0) { 'all ' + $need.Count + ' needed symbols' }
+                   else { 'MISSING ' + ($missing -join ',') }
+            Write-Host "::warning title=libffitest (win64) ok::gcc=$(& $gcc -dumpmachine); dll=$((Get-Item $dll).Length) bytes; exports: $tag"
+          } catch {
+            Write-Host "::warning title=libffitest (win64)::$($_.Exception.Message)"
           }
           $global:LASTEXITCODE = 0
 

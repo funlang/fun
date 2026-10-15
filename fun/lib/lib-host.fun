@@ -69,14 +69,26 @@ end fun;
 //--------------------------------------------------------------
 
 // The C library: glibc's stable runtime soname on Linux; macOS folds libc
-// (and much else) into libSystem.
+// (and much else) into libSystem; the Windows counterpart is msvcrt, which is
+// what the FPC/win64 build and MinGW both link against by default. Only the
+// Unix callers use it today, but the name is honest on every host.
 fun LibC()
-  if _isMac then result = 'libSystem.B.dylib'; else result = 'libc.so.6'; end if;
+  if _isWindows then result = 'msvcrt.dll';
+  elsif _isMac then result = 'libSystem.B.dylib';
+  else result = 'libc.so.6'; end if;
 end fun;
 
 // One shared-object name per host.
 fun DyLib(lnx, mac)
   if _isMac then result = mac; else result = lnx; end if;
+end fun;
+
+// One shared-object name per host, Windows included. The *-unx backends only
+// need (Linux, macOS) because their Windows counterparts live in different
+// modules, but a helper that is built on all three hosts - the FFI test
+// library - needs all three spellings.
+fun DyLibWin(lnx, mac, win)
+  if _isWindows then result = win; elsif _isMac then result = mac; else result = lnx; end if;
 end fun;
 
 // A candidate list per host (e.g. several libcrypto versions to probe).

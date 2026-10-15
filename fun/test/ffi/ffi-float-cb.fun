@@ -1,8 +1,9 @@
 use 'fun/lib/lib-host.fun';
 
 // libffitest is built per host by fun/test/ffi/build.sh (the runner builds
-// it on demand): .so on Linux, .dylib on macOS.
-var FFITEST = DyLib('./fun/test/ffi/libffitest.so', './fun/test/ffi/libffitest.dylib');
+// it on demand): .so on Linux, .dylib on macOS, .dll on Windows.
+var FFITEST = DyLibWin('./fun/test/ffi/libffitest.so', './fun/test/ffi/libffitest.dylib',
+                       './fun/test/ffi/libffitest.dll');
 
 ########################################
 # Unix FFI (Linux / macOS): float callbacks, mixed register classes, string callbacks

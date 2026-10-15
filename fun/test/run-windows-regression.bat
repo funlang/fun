@@ -59,7 +59,11 @@ rem here: lib-asm-x64/lib-proc-test/raw-address-getapi/lib-crypt-lnx are x86-64
 rem System V (rdi/rsi, libc), and lib-zlib-test wants a libz.so.1/name it
 rem cannot find on Windows. Plus lib-file-test/lib-dyns-test, whose find()
 rem emits '\' on Windows and '/' elsewhere while the snapshots use '/'.
-set "HOSTDEP= builtin-dispatch.fun lib-host-test.fun lib-param-linux.fun lib-cmdline-linux.fun lib-loadcheck.sh libc-outbuf.fun ptr-primitives.fun raw-address-getapi.fun lib-tcc-test.fun lib-jit-test.fun lib-asm-lnx.fun lib-asm-a64.fun lib-asm-x64.fun fractal-asm-x64.fun lib-hash-test.fun lib-proc-test.fun lib-unicode-test.fun run-benchmarks.sh ffi-scalar.fun ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun lib-os-dispatch-prototype.fun lib-crypt-lnx.fun lib-e2e-lnx.fun lib-ajax-lnx-test.fun run-ajax-lnx.sh lib-winsock-lnx-test.fun lib-ado-lnx-test.fun lib-ado-schema-lnx-test.fun lib-xml-lnx-test.fun lib-jsonrpc-lnx-test.fun lib-orm-rpc-lnx-test.fun lib-os-lnx-test.fun lib-cmdline-lnx-test.fun lib-zlib-test.fun lib-orm-rows.fun lib-file-test.fun lib-dyns-test.fun "
+rem The four portable FFI cases (ffi-int64/float/float-cb/callbacks) are NOT
+rem listed here: they only need getapi plus libffitest.dll, so they run
+rem when both are there and are added below when they are not. ffi-scalar
+rem stays: it calls libc/libm directly (getpid does not exist on Windows).
+set "HOSTDEP= builtin-dispatch.fun lib-host-test.fun lib-param-linux.fun lib-cmdline-linux.fun lib-loadcheck.sh libc-outbuf.fun ptr-primitives.fun raw-address-getapi.fun lib-tcc-test.fun lib-jit-test.fun lib-asm-lnx.fun lib-asm-a64.fun lib-asm-x64.fun fractal-asm-x64.fun lib-hash-test.fun lib-proc-test.fun lib-unicode-test.fun run-benchmarks.sh ffi-scalar.fun lib-os-dispatch-prototype.fun lib-crypt-lnx.fun lib-e2e-lnx.fun lib-ajax-lnx-test.fun run-ajax-lnx.sh lib-winsock-lnx-test.fun lib-ado-lnx-test.fun lib-ado-schema-lnx-test.fun lib-xml-lnx-test.fun lib-jsonrpc-lnx-test.fun lib-orm-rpc-lnx-test.fun lib-os-lnx-test.fun lib-cmdline-lnx-test.fun lib-zlib-test.fun lib-orm-rows.fun lib-file-test.fun lib-dyns-test.fun "
 
 rem Tests gated only by the regex engine's absence: probed below, skipped while
 rem REGEXOK=0. The CI win64 build links PCRE dynamically (pcre3.dll next to
@@ -106,6 +110,26 @@ set "PROBEFILE=fun\test\.regex-probe.fun"
 findstr /x /c:"regex-on" "%TEMP%\funreg-regex.out" >nul 2>&1
 if not errorlevel 1 set "REGEXOK=1"
 del "%PROBEFILE%" >nul 2>&1
+
+rem --- FFI cases: getapi and the helper library both have to be there -------
+rem ffi-*.fun load fun/test/ffi/libffitest.(so|dylib|dll) (built on demand, see
+rem fun/test/ffi/build.sh / the CI) and call it through getapi(). On Windows
+rem getapi needs -dWinFFI plus ffi.dll next to funcmd.exe, so probe for a
+rem working getapi as well, and SKIP the four portable cases instead of
+rem failing when a build has neither.
+set "FFITESTS= ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun "
+set "GETAPIOK=0"
+if not exist "fun\test\ffi\libffitest.dll" goto ffi_probed
+set "PROBEFILE=fun\test\.getapi-probe.fun"
+>"%PROBEFILE%" echo var g = 'kernel32'.getapi('GetTickCount', ':i');
+>>"%PROBEFILE%" echo var t = g();
+>>"%PROBEFILE%" echo if t ^> 0 then ?. 'getapi-on'; else ?. 'getapi-off'; end if;
+"%FUNCMD%" "%PROBEFILE%" > "%TEMP%\funreg-getapi.out" 2>&1
+findstr /x /c:"getapi-on" "%TEMP%\funreg-getapi.out" >nul 2>&1
+if not errorlevel 1 set "GETAPIOK=1"
+del "%PROBEFILE%" >nul 2>&1
+:ffi_probed
+if "%GETAPIOK%"=="0" set "HOSTDEP=%HOSTDEP%%FFITESTS%"
 
 if not exist "%EXPECTED%" mkdir "%EXPECTED%" >nul 2>&1
 set "FAIL=0"

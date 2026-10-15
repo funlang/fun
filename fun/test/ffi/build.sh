@@ -8,6 +8,9 @@
 #
 #   Linux  -> libffitest.so    (cc -fPIC -shared)
 #   macOS  -> libffitest.dylib (cc -fPIC -dynamiclib)
+#   Windows-> libffitest.dll   (gcc -shared -Wl,--export-all-symbols, from an
+#                               MSYS/MinGW shell; the .dll is what the Windows
+#                               runner loads when the build has getapi)
 #
 # Called automatically by run-linux-regression.sh (and the macOS wrapper) so a
 # fresh checkout can run the FFI suite; run it by hand after editing the C file.
@@ -26,6 +29,11 @@ done
 
 case "$(uname -s 2>/dev/null)" in
     Darwin) OUT="$HERE/libffitest.dylib"; SHARED="-dynamiclib" ;;
+    MINGW*|MSYS*|CYGWIN*)
+            # libffitest.c has no __declspec(dllexport), and MinGW exports
+            # nothing by default, so the symbols GetProcAddress looks up need
+            # --export-all-symbols.
+            OUT="$HERE/libffitest.dll"; SHARED="-shared -Wl,--export-all-symbols" ;;
     *)      OUT="$HERE/libffitest.so";    SHARED="-shared" ;;
 esac
 
