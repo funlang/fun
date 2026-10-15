@@ -411,7 +411,10 @@ jobs:
           $variants = @()
           if ($env:FUN_PCRE_DIR -and (Test-Path "$env:FUN_PCRE_DIR\libpcre.a")) {
             # FPC's internal linker first, then the MinGW ld (-Xe) as a fallback.
-            $variants += ,(@('-dRegex', "-Fl$env:FUN_PCRE_DIR"))
+            # -Fu also feeds the object search path (options.pas:
+            # objectsearchpath.AddList(unitsearchpath)), which is where the
+            # internal linker looks for the archive's members (<member>.obj).
+            $variants += ,(@('-dRegex', "-Fl$env:FUN_PCRE_DIR", "-Fu$env:FUN_PCRE_DIR"))
             $variants += ,(@('-dRegex', "-Fl$env:FUN_PCRE_DIR", '-Xe'))
           }
           $variants += ,(@())   # last resort: build without regex, keep the job green
@@ -423,10 +426,9 @@ jobs:
             $a = $base + $v
             & ppcrossx64 funcmd.dpr @a *>&1 | Tee-Object -FilePath $log
             if ($LASTEXITCODE -eq 0) { $built = $label; break }
-            $err = (Get-Content $log |
-                      Select-String -Pattern 'Fatal:|Error:' |
-                      Select-Object -Last 4 |
-                      ForEach-Object { $_.Line }) -join ' | '
+            # the real message (ld's, FPC's) is in the log tail
+            $err = (Get-Content $log | Where-Object { $_.Trim() -ne '' } |
+                      Select-Object -Last 8) -join ' | '
             if ([string]::IsNullOrEmpty($err)) { $err = "fpc exited $LASTEXITCODE with no Fatal:/Error: line" }
             $tried += "[$label] $err"
             Write-Host "::warning title=build attempt failed::$label :: $err"
