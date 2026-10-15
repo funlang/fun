@@ -505,10 +505,13 @@ jobs:
                         Select-Object -First 40 | ForEach-Object { $_.Line.Trim() }) -join ' ; '
               Write-Host "::warning title=funcmd imports::$imp"
             }
-            $sym = (& nm -g --defined-only $dll 2>&1 |
-                      Select-String -Pattern 'pcre_compile|pcre_exec|pcre_fullinfo|pcre_version|fun_pcre' |
-                      Select-Object -First 6 | ForEach-Object { $_.Line.Trim() }) -join ' ; '
-            Write-Host "::warning title=pcre3.dll exports::$sym"
+            if (Test-Path $od) {
+              # the export table is what the loader matches against, not the
+              # symbol table (nm): dump both names the exe asks for
+              $exp = (& $od -p $dll 2>&1 | Select-String -Pattern 'fun_pcre|pcre_get_stringnumber|pcre_exec|pcre_compile' |
+                        Select-Object -First 8 | ForEach-Object { $_.Line.Trim() }) -join ' ; '
+              Write-Host "::warning title=pcre3.dll export table::$exp"
+            }
 
             # does the DLL itself work? a C caller linking the import library
             # (if this prints a match count, the DLL is fine and a failure above
