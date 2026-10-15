@@ -495,7 +495,7 @@ jobs:
           $dll = "$env:GITHUB_WORKSPACE\src\prj\fun\pcre3.dll"
           if (Test-Path $dll) {
             $sym = (& nm -g --defined-only $dll 2>&1 |
-                      Select-String -Pattern 'pcre_compile|pcre_exec|pcre_fullinfo|pcre_version' |
+                      Select-String -Pattern 'pcre_compile|pcre_exec|pcre_fullinfo|pcre_version|fun_pcre' |
                       Select-Object -First 6 | ForEach-Object { $_.Line.Trim() }) -join ' ; '
             Write-Host "::warning title=pcre3.dll exports::$sym"
 

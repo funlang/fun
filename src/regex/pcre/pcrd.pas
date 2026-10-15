@@ -621,8 +621,11 @@ function pcre_version; external 'pcre3.dll' name 'pcre_version';
 // access violation this bring-up hit right after a successful match. PCRE
 // exports pcre_malloc/pcre_free as *data*, which FPC cannot call, so the DLL
 // carries these two thin C wrappers (see fun_pcre_glue.c in the CI PCRE step).
-function fun_pcre_malloc(Size: NativeUInt): Pointer; cdecl; external 'pcre3.dll' name 'fun_pcre_malloc';
-procedure fun_pcre_free(P: Pointer); cdecl; external 'pcre3.dll' name 'fun_pcre_free';
+// No calling convention on purpose: FPC's win64 `cdecl` prefixes the imported
+// symbol with '_', so declaring it would request _fun_pcre_free and the loader
+// would fail with STATUS_ENTRYPOINT_NOT_FOUND. win64 has a single ABI anyway.
+function fun_pcre_malloc(Size: NativeUInt): Pointer; external 'pcre3.dll' name 'fun_pcre_malloc';
+procedure fun_pcre_free(P: Pointer); external 'pcre3.dll' name 'fun_pcre_free';
 {$Else}
 function pcre_compile; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_compile2; {$IfDef Darwin}cdecl;{$EndIf} external;
