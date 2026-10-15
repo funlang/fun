@@ -363,20 +363,38 @@ jobs:
             $lib = Join-Path $src 'win64-lib'
             Remove-Item -Recurse -Force $lib -ErrorAction SilentlyContinue
             New-Item -ItemType Directory -Force -Path $lib | Out-Null
-            # the 8-bit sources make-linux-x86_64.sh compiles (a missing source
-            # is skipped, so the list can be shared)
-            $units = 'pcre_byte_order','pcre_chartables','pcre_compile','pcre_config',
-                     'pcre_default_tables','pcre_dfa_exec','pcre_exec','pcre_fullinfo',
-                     'pcre_get','pcre_globals','pcre_maketables','pcre_newline',
-                     'pcre_refcount','pcre_string_utils','pcre_study','pcre_tables',
-                     'pcre_ucd','pcre_valid_utf8','pcre_version','pcre_xclass'
-            foreach ($u in $units) {
+            # Exactly the objects pcrd.pas asks for with {$LINK <name>.obj} on
+            # the Windows build (source name -> object name): the bcc32 .obj
+            # files under src/regex/pcre are not in the repo, so win64 builds
+            # them here. pcre_chartables.c.dist is the shipped copy of the
+            # default tables, so it becomes pcre_default_tables.obj - it defines
+            # the same PRIV(default_tables) symbol dftables would generate, and
+            # nothing else in the list defines it.
+            $units = [ordered]@{
+              'pcre_compile'    = 'pcre_compile'
+              'pcre_config'     = 'pcre_config'
+              'pcre_dfa_exec'   = 'pcre_dfa_exec'
+              'pcre_exec'       = 'pcre_exec'
+              'pcre_fullinfo'   = 'pcre_fullinfo'
+              'pcre_get'        = 'pcre_get'
+              'pcre_globals'    = 'pcre_globals'
+              'pcre_maketables' = 'pcre_maketables'
+              'pcre_newline'    = 'pcre_newline'
+              'pcre_refcount'   = 'pcre_refcount'
+              'pcre_study'      = 'pcre_study'
+              'pcre_tables'     = 'pcre_tables'
+              'pcre_ucd'        = 'pcre_ucd'
+              'pcre_valid_utf8' = 'pcre_valid_utf8'
+              'pcre_version'    = 'pcre_version'
+              'pcre_xclass'     = 'pcre_xclass'
+              'pcre_chartables' = 'pcre_default_tables'
+            }
+            foreach ($u in $units.Keys) {
               $c = Join-Path $src "$u.c"
-              if (-not (Test-Path $c)) { continue }
-              # .obj, not .o: FPC's Windows linker derives the member name as
-              # <base>.obj (target_info.objext), and the loose files are kept
-              # next to the archive because that is what it opens.
-              $out = & $gcc -c -O2 -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DPCRE_STATIC "-I$src" $c -o (Join-Path $lib "$u.obj") 2>&1
+              if (-not (Test-Path $c)) { throw "missing source $u.c" }
+              # .obj, not .o: that is the name FPC's Windows compiler expects
+              # both for {$LINK} and inside the archive
+              $out = & $gcc -c -O2 -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DPCRE_STATIC "-I$src" $c -o (Join-Path $lib "$($units[$u]).obj") 2>&1
               if ($LASTEXITCODE -ne 0) {
                 throw "gcc failed: $u :: " + (($out | Select-Object -First 14) -join ' ~ ')
               }
