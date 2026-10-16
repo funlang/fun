@@ -1,10 +1,12 @@
+LOAD  http-client
+LOAD  http-server
 LOAD  lib-ado-schema
 LOAD  lib-ado
 LOAD  lib-ajax
 LOAD  lib-asm-a64
 LOAD  lib-asm-pro
 LOAD  lib-asm
-FAIL  lib-async              fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
+LOAD  lib-async
 LOAD  lib-base
 LOAD  lib-base64
 LOAD  lib-bind
@@ -13,7 +15,7 @@ LOAD  lib-cmdline
 LOAD  lib-crypt
 LOAD  lib-cstruct
 LOAD  lib-cwinapi
-FAIL  lib-dialog             fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
+FAIL  lib-dialog             fun/lib/lib-dialog.fun:59: getapi: cannot load library "user
 LOAD  lib-dyns
 LOAD  lib-eval
 LOAD  lib-fd
@@ -21,7 +23,7 @@ LOAD  lib-file
 LOAD  lib-host
 FAIL  lib-icmp               fun/lib/lib-icmp.fun:7: getapi: cannot load library "icmp.dl
 LOAD  lib-jit
-FAIL  lib-jsasync            fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
+LOAD  lib-jsasync
 LOAD  lib-json
 LOAD  lib-jsonrpc
 LOAD  lib-match
@@ -46,11 +48,11 @@ LOAD  lib-stream
 LOAD  lib-string
 LOAD  lib-tcc
 LOAD  lib-time
-FAIL  lib-trayicon           fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
+FAIL  lib-trayicon           fun/lib/lib-trayicon.fun:12: getapi: cannot load library "sh
 LOAD  lib-tree
 LOAD  lib-type
-FAIL  lib-ui-base            fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
-FAIL  lib-ui                 fun/lib/lib-os.fun:24: getapi: cannot load library "kernel32
+LOAD  lib-ui-base
+LOAD  lib-ui
 LOAD  lib-unicode
 LOAD  lib-utils
 LOAD  lib-winapi
@@ -60,4 +62,4 @@ LOAD  lib-xml
 LOAD  lib-yaml
 LOAD  lib-zlib
 
-loaded=51 failed=10
+loaded=57 failed=6

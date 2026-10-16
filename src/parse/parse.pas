@@ -142,6 +142,7 @@ type
     function CreateValues(const a1: YYSType): YYSType; overload;
     function CreateValue(const a1, a0, id, exp: YYSType; str: fun.bool = false): YYSType;
     class function ParseFileName(const fn: fun.str; prev: CNode): fun.str;
+    class function PlatformFile(const fn: fun.str; prev: CNode): fun.str;
     class function ParseString(const s: fun.str; str: fun.bool = false): fun.str;
     class function StrToNum(const s: fun.str): CValue;
   end;
@@ -558,6 +559,7 @@ end;
 function CParser.BuildUse(const a1, a0, estr: YYSType; const id: fun.str = ''): YYSType;
 var
   f: fun.str;
+  pf: fun.str;
   m: CRuns;
   temp: YYSType;
 begin
@@ -580,7 +582,11 @@ begin
     end;
   end;
   
-  f := ParseFileName(f, Root);
+  pf := PlatformFile(f, Root);
+  if pf <> '' then
+    f := pf
+  else
+    f := ParseFileName(f, Root);
   m := CModu(Root).find(ExpandFileName(f));
   if m <> nil then
     Curr.use(m, id)
@@ -1021,6 +1027,39 @@ begin
       end;
     end;
   end;
+end;
+
+class function CParser.PlatformFile(const fn: fun.str; prev: CNode): fun.str;
+// 'name.fun' -> the platform backend when one exists: 'name-darwin.fun' /
+// 'name-lnx.fun', else the shared 'name-unx.fun'. Lets code use the neutral
+// name while plain names stay the Windows implementation. '' = no variant.
+var
+  i: Integer;
+  s: fun.str;
+begin
+  result := '';
+  s      := '';
+  i := Length(fn) - 3;
+  if (i < 1) or (Copy(fn, i, 4) <> '.fun') then exit;
+  {$IfDef Darwin}
+  s := '-darwin';
+  {$EndIf}
+  {$IfDef Linux}
+  s := '-lnx';
+  {$EndIf}
+  {$IfDef UNIX}
+  if s <> '' then
+  begin
+    s := ParseFileName(Copy(fn, 1, i - 1) + s + '.fun', prev);
+    if FileExists(s) then
+    begin
+      result := s;
+      exit;
+    end;
+  end;
+  s := ParseFileName(Copy(fn, 1, i - 1) + '-unx.fun', prev);
+  if FileExists(s) then result := s;
+  {$EndIf}
 end;
 
 class function CParser.ParseOrLoad(const fn: fun.str; prev: fun.ptr = nil; CCParser: CParserClass = nil): fun.ptr;
