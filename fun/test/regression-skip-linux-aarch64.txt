@@ -4,21 +4,12 @@
 #
 # Everything else runs against the shared expected/ snapshots: the tests whose
 # output was host-specific (builtin-dispatch, lib-host-test, ...) were made
-# host-neutral in the same change, so no linux-aarch64 snapshot directory is
-# needed yet.
+# host-neutral in the same change. lib-asm-a64.fun keeps an
+# expected/linux-aarch64/ snapshot because its live-exec line depends on the
+# host cpu ("exec: 42" here, "exec: skip (cpu=x86_64)" elsewhere).
 #
 # --- x86-64-only native code generation -----------------------------------
 lib-asm-lnx.fun	x86-64 assembly backend (no arm64 Linux codegen)
 lib-asm-x64.fun	x86-64 assembly backend
 fractal-asm-x64.fun	x86-64 assembly backend
 lib-jit-test.fun	JIT backend emits x86-64
-
-# --- arm64 backend live-exec not yet green on Linux arm64 -----------------
-# The encoder half of lib-asm-a64.fun is host-independent, but the file fences
-# one live JIT call behind `cpu = 'arch64'`, and the shared snapshot's last line
-# is x86_64-specific ("exec: skip (cpu=x86_64)") with no expected/linux-aarch64/
-# override. On the CI arm64 host that live call aborts the interpreter in Load()
-# (an EFAULT reported as `Open "<repo>/" failed: Bad address`, run 38567328558),
-# so the test cannot pass there until the arm64 exec-memory path is debugged on
-# real hardware. Re-enable together with an expected/linux-aarch64 snapshot.
-lib-asm-a64.fun	arm64 live JIT exec aborts on Linux arm64; needs on-hardware debugging
