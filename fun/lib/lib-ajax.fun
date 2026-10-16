@@ -8,6 +8,63 @@ var defaultProxy    = nil;
 var defaultCodePage = 0;
 var Decode = _Decode;
 
+//--------------------------------------------------------------
+// Http(args): one blocking request, the Windows twin of the helper in
+// lib-ajax-unx.fun. fun/lib/http-client.fun routes through it, so the
+// returned set keeps the same shape: [rc, code, message, headers, body]
+// (rc is 0 once a response arrived, 1 when the transport failed and
+// message carries the error text).
+//--------------------------------------------------------------
+fun _ws(c)
+  result = c = 32 or c = 9 or c = 13 or c = 10;
+end fun;
+
+fun _trim(s)
+  var n = s.length();
+  var b = 0;
+  while b < n and _ws(s[b + 0.5]) do b += 1; end do;
+  var e = n;
+  while e > b and _ws(s[e - 0.5]) do e -= 1; end do;
+  result = s.substr(b, e - b);
+end fun;
+
+// The response block as a set of lowercased header names, the shape
+// lib-ajax-unx exposes as Ajax.headers. A failure leaves it empty.
+fun _respHeaders(xhr)
+  result = new [];
+  try
+    var s = OleToStr(xhr.getAllResponseHeaders());
+    if s <> nil then
+      var i = 0; var n = s.length();
+      while i < n do
+        var e = i;
+        while e < n and s[e + 0.5] <> 13 and s[e + 0.5] <> 10 do e += 1; end do;
+        var line = s.substr(i, e - i);
+        var c = line.subpos(':');
+        if c > 0 then
+          result[_trim(line.substr(0, c)).lower()] = _trim(line.substr(c + 1));
+        end if;
+        i = e;
+        while i < n and (s[i + 0.5] = 13 or s[i + 0.5] = 10) do i += 1; end do;
+      end do;
+    end if;
+  except
+  end try;
+end fun;
+
+fun Http(args)
+  if args.url = nil or args.url = '' then raise 'lib-ajax: url required'; end if;
+  var ajx = Ajax();
+  ajx.async = false; // a blocking helper returns with the body, not later
+  var body = ajx.go(args);
+  result = new [];
+  result.body    = body;
+  result.code    = ajx.code;
+  result.message = ajx.message;
+  result.headers = ajx.headers or new [];
+  if ajx.code > 0 then result.rc = 0; else result.rc = 1; end if;
+end fun;
+
 //==============================================================
 // Ajax
 //==============================================================
@@ -21,6 +78,7 @@ class Ajax(container)
   var html  = '';
   var code  = 0;
   var message = '';
+  var headers = nil; // final response block, lowercased keys (parity with lib-ajax-unx)
   var checks;
   var hide  = false;
   var async = true;
@@ -68,6 +126,7 @@ class Ajax(container)
     html = '';
     code  = 0;
     message = '';
+    this.headers = nil;
     hide = no_ui;
     //?, url & ' ->';
     url  = CorrectURL(url, last);
@@ -183,6 +242,7 @@ class Ajax(container)
       if xhr.readyState = 4 then
         code = xhr.status;
         message = OleToStr(xhr.statusText);
+        headers = _respHeaders(xhr);
         if xhr.status = 200 then
           if charset = nil then
             html = xhr.responseText;

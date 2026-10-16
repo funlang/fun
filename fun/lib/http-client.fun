@@ -12,8 +12,9 @@
 //
 // HttpClient(args) performs one blocking request (url, body, method, headers,
 // timeouts, proxy, ...) and returns [rc, code, message, headers, body]. The
-// lib-ajax-compatible class Ajax is re-exported too. The Windows backend has
-// no Http(args) function behind HttpClient yet -- use Ajax there for now.
+// lib-ajax-compatible class Ajax is re-exported too. Http(args) lives in the
+// host's lib-ajax backend -- lib-ajax-unx.fun on Linux/macOS, lib-ajax.fun on
+// Windows -- and returns a set [rc, code, message, headers, body].
 
 use 'lib-ajax.fun';
 
