@@ -42,7 +42,7 @@
 // HTTP/WebSocket protocol + connection bookkeeping live in lib-winsock-base.fun
 // (class HttpBase, shared with lib-winsock.fun); this file implements the
 // HttpBase hooks (SendOnce/Read/CloseSock/ShutdownSock/Delay/Fatal), the
-// poll(2) pump and the socket layer. `class HttpServer = HttpBase()` is top level
+// poll(2) pump and the socket layer. `class HttpServerBase = HttpBase()` is top level
 // because Fun cannot inherit a nested class from a top-level one; it is
 // re-exposed as `Server.HTP` / `Server.HTTP` by assignment below.
 //
@@ -460,7 +460,7 @@ end class;
 // poll(2) pump. Re-exposed as Server.HTTP below (Fun cannot inherit a nested
 // class from a top-level one, so the class lives here and is aliased).
 //============================================================
-class HttpServer = HttpBase()
+class HttpServerBase = HttpBase()
   var running = false;
   var sched   = Scheduler();
 
@@ -643,5 +643,5 @@ class Server()
   var HTP  = nil;
 end class;
 Server.UDP = UDP;
-Server.HTTP = HttpServer;
-Server.HTP  = HttpServer;
+Server.HTTP = HttpServerBase;
+Server.HTP  = HttpServerBase;

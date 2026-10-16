@@ -26,15 +26,15 @@
 //
 // Fun quirk that shaped this file: a *nested* class cannot inherit from a
 // top-level class (a sibling nested class is fine). So each backend defines its
-// HTTP class at top level (`class HttpServer = HttpBase()`) and re-exposes it as
+// HTTP class at top level (`class HttpServerBase = HttpBase()`) and re-exposes it as
 // `Server.HTTP` / `Server.HTP` by assignment after the class:
 //
 //   class Server()
 //     var UDP = nil; var HTTP = nil; var HTP = nil;
 //   end class;
 //   Server.UDP  = UDP;
-//   Server.HTTP = HttpServer;
-//   Server.HTP  = HttpServer;
+//   Server.HTTP = HttpServerBase;
+//   Server.HTP  = HttpServerBase;
 //
 // `use` is textual inclusion, so this file simply becomes part of both backends.
 //

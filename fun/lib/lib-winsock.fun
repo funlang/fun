@@ -11,7 +11,7 @@
 // original public API: Server.UDP / Server.HTP.
 //
 // Fun cannot inherit a *nested* class from a top-level one, so the HTTP class
-// is defined top level as `HttpServer = HttpBase()` and re-exposed as
+// is defined top level as `HttpServerBase = HttpBase()` and re-exposed as
 // `Server.HTTP` / `Server.HTP` by assignment after the class.
 
 use 'lib-os.fun';
@@ -197,7 +197,7 @@ end class;
 //=====================================================================================================================
 // HTTP / WebSocket: HttpBase hooks + the WSAAsyncSelect / message-pump wiring
 //=====================================================================================================================
-class HttpServer = HttpBase()
+class HttpServerBase = HttpBase()
   var message;
 
   //---- platform hooks (called by HttpBase) --------------------
@@ -315,5 +315,5 @@ class Server()
   var HTP  = nil;
 end class;
 Server.UDP  = UDP;
-Server.HTP = HttpServer;
-Server.HTP = HttpServer;
+Server.HTTP = HttpServerBase;
+Server.HTP  = HttpServerBase;
