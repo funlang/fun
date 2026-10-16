@@ -49,6 +49,7 @@ n=0; bad=0; skip=0
 TAB="$(printf '\t')"
 while IFS="$TAB" read -r ins hex; do
     [ -z "$ins" ] && continue
+    hex="$(printf '%s' "$hex" | tr -d '\r')"   # Fun's Println ends lines with CRLF
     n=$((n + 1))
     printf '.text\n%s\n' "$ins" > "$TMP/one.s"
     if ! "$AS" -o "$TMP/one.o" "$TMP/one.s" 2>/dev/null; then
@@ -60,7 +61,11 @@ while IFS="$TAB" read -r ins hex; do
     want="$("$OD" -d "$TMP/one.o" \
             | awk -F'\t' '/^[ \t]*[0-9a-f]+:/{gsub(/ /,"",$2); print $2; exit}' \
             | tr -d ' ' | tr 'a-f' 'A-F')"
-    if [ "$want" = "$(printf '%s' "$hex" | tr 'a-f' 'A-F')" ]; then
+    # objdump prints the 4-byte instruction as spaced octets (memory order) on
+    # some builds and as the whole word on others; accept either orientation.
+    fun_hex="$(printf '%s' "$hex" | tr 'a-f' 'A-F')"
+    fun_rev="$(printf '%s' "$fun_hex" | sed 's/\(..\)\(..\)\(..\)\(..\)/\4\3\2\1/')"
+    if [ "$want" = "$fun_hex" ] || [ "$want" = "$fun_rev" ]; then
         :
     else
         echo "MISMATCH   $ins  fun=$hex  as=$want"

@@ -30,12 +30,24 @@ subs x6, x7, #16
 cmp x8, #7
 `);
 
+show('addsub_boundary', `#!asm
+add x0, x1, #4095
+sub x2, x3, #4095
+adds x4, x5, #4095
+subs x6, x7, #4095
+`);
+
 show('addsub_reg', `#!asm
 add x0, x1, x2
 add x3, x4, x5, lsl #3
 subs x6, x7, x8
 neg x9, x10
 cmp x11, x12
+`);
+
+show('cmn', `#!asm
+cmn x0, #1
+cmn w3, #7
 `);
 
 show('logic_reg', `#!asm
@@ -72,6 +84,7 @@ mov w2, w3
 mov x4, sp
 mov sp, x5
 mov w6, wsp
+mov wsp, w0
 `);
 
 show('mov_imm', `#!asm
@@ -89,6 +102,8 @@ show('csel', `#!asm
 csel x0, x1, x2, eq
 csel x3, x4, x5, gt
 csel w6, w7, w8, lt
+csel x0, x1, x2, ne
+csel x0, x1, x2, hi
 `);
 
 show('loadstore', `#!asm
@@ -102,6 +117,13 @@ ldr x2, [x3, x4, lsl #3]
 ldr x5, [x1, x2]
 ldr w6, [x1, x2, lsl #2]
 ldrb w7, [x1, x2, lsl #0]
+`);
+
+show('sp_loadstore', `#!asm
+ldr x0, [sp, #16]
+str w2, [sp, #12]
+ldrb w1, [sp]
+strh w3, [sp, #6]
 `);
 
 show('pair', `#!asm
@@ -133,6 +155,14 @@ show('branch_num', `#!asm
 b #8
 bl #-4
 b.ne #-8
+`);
+
+show('call_sub', `#!asm
+bl inc
+ret
+inc:
+add x0, x0, #1
+ret
 `);
 
 show('shift_ext', `#!asm
@@ -177,6 +207,7 @@ b.ge #0
 b.lt #0
 b.gt #0
 b.le #0
+b.al #0
 `);
 
 // `<name>` callback: address is host-specific, so only assert it encoded.

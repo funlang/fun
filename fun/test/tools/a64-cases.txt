@@ -131,3 +131,17 @@ ldrh w8, [x1]
 strh w9, [sp], #4
 ldrh w11, [x1, x2, lsl #1]
 strb w12, [x1]
+cmn x0, #1
+cmn w3, #7
+ldr x0, [sp, #16]
+str w2, [sp, #12]
+ldrb w1, [sp]
+strh w3, [sp, #6]
+add x0, x1, #4095
+sub x2, x3, #4095
+adds x4, x5, #4095
+subs x6, x7, #4095
+b.al #0
+mov wsp, w0
+csel x0, x1, x2, ne
+csel x0, x1, x2, hi
