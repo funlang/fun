@@ -6,6 +6,32 @@
 
 ## [未发布]
 
+- 标准库新增 HTTP 服务端与客户端。`fun/lib/http-server.fun` 是单线程、平台
+  无关的服务端（`HttpServer(port)` 或 `HttpServer('addr:port')`），路由支持
+  字面量段、`:name` 参数与 `*` 通配尾巴（方法不匹配回 405 并带 `Allow`，无匹配
+  回 404），支持路由组与全局 / 组内 / 单路由中间件、参数与查询串、静态文件、
+  `json` / `text` / `html` 响应以及访问日志，可由自身的 poll 循环（`run`）
+  驱动，也可一次推进一步（`runOnce`）。`fun/lib/http-client.fun` 是一次调用的
+  阻塞客户端，`HttpClient(args) -> [rc, code, message, headers, body]`，落在
+  宿主平台的 lib-ajax 后端上，同一份调用在各平台通用。服务端的 HTTP 分帧与
+  keep-alive 位于 `lib-winsock-base.fun`；暂时只在 Linux/macOS 可用：Windows
+  的 winsock 后端还没有 RunOnce/Run（消息泵驱动是后续工作）。
+
+- Windows 的 `lib-ajax.fun` 现在也提供与 Unix 后端一致的 `Http(args)`，
+  于是 `HttpClient` 不再需要退回 `Ajax`：它强制同步传输，把最终响应头以
+  `Ajax.headers`（键名小写，与 `lib-ajax-unx` 相同）暴露出来，并返回同样的
+  `[rc, code, message, headers, body]`。加上此前 `HttpServer` ->
+  `HttpServerBase` 的更名（再别名为 `Server.HTTP` / `Server.HTP`，顺带修掉
+  重复赋给 `HTP` 的笔误），服务端/客户端这轮工作暴露的 Windows 缺口就补齐了。
+
+- `getapi` 新增 `variadic: <n>` 标记，告诉 FFI 前多少个参数是固定的，libffi
+  据此按变参调用准备（`ffi_prep_cif_var`，若所载 libffi 拒绝则退回固定形式）。
+  Darwin arm64 需要它，因为那里的变参尾巴走栈；libcurl 绑定的
+  `curl_easy_setopt` 用上了它，lib-ajax 的测试因此能在 macOS 上跑。
+
+- `funcmd` 会指出找不到的文件：指定的脚本不存在时打印 `not found: <file>`
+  （仍为非零退出），而不是一言不发地失败。
+
 - Delphi 构建恢复可用。`pcrd` 动态分支（`-dPCRE_LINKDLL`）的移植层把 FPC 的
   `dynlibs` 单元无条件写进了 `uses`，于是 `dcc32` 停在
   `pcrd.pas(542) Fatal: F1026 File not found: 'dynlibs.dcu'`——哪怕静态构建根本

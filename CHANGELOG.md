@@ -6,6 +6,40 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- The standard library gains an HTTP server and client.
+  `fun/lib/http-server.fun` is a single-threaded, platform-neutral server
+  (`HttpServer(port)` or `HttpServer('addr:port')`) with literal / `:name` /
+  `*` routing (405 with `Allow` on a method mismatch, 404 otherwise), route
+  groups and global / group / per-route middleware, parameters and query
+  strings, static files, `json` / `text` / `html` responses and an access
+  logger, driven by its own poll loop (`run`) or a step at a time
+  (`runOnce`). `fun/lib/http-client.fun` is a one-call blocking client,
+  `HttpClient(args) -> [rc, code, message, headers, body]`, that sits on the
+  host's lib-ajax backend, so the same call works on every platform. The
+  server keeps its HTTP framing and keep-alive in `lib-winsock-base.fun` and
+  is Linux/macOS only for now: the Windows winsock backend still has no
+  RunOnce/Run (its message-pump driver is a follow-up).
+
+- `lib-ajax.fun` (Windows) carries the same `Http(args)` helper as the Unix
+  backend, so `HttpClient` no longer falls back to `Ajax`: it forces the
+  synchronous transfer, exposes the final response block as `Ajax.headers`
+  (lowercased keys, like `lib-ajax-unx`) and returns the same
+  `[rc, code, message, headers, body]` set. Together with the earlier
+  `HttpServer` -> `HttpServerBase` rename (aliased back to `Server.HTTP` /
+  `Server.HTP`, whose second assignment also fixes an `HTP` typo) this closes
+  the Windows gaps the server/client work opened.
+
+- `getapi` takes a `variadic: <n>` mark that tells the FFI how many leading
+  arguments are fixed, so libffi prepares a variadic call (`ffi_prep_cif_var`,
+  falling back to the fixed form if the loaded libffi refuses it). Darwin arm64
+  needs this, since a variadic tail is passed on the stack there; the libcurl
+  binding's `curl_easy_setopt` uses it, which is what lets the lib-ajax test
+  run on macOS.
+
+- `funcmd` says which file it could not find: a missing named script now
+  prints `not found: <file>` (still a non-zero exit) instead of failing
+  without a word.
+
 - The Delphi build works again. The portability shim in `pcrd`'s dynamic branch
   (`-dPCRE_LINKDLL`) put FPC's `dynlibs` unit in the unit's `uses` clause
   unconditionally, so `dcc32` stopped at
