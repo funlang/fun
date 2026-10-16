@@ -18,7 +18,6 @@ libc-outbuf.fun	Linux libc.so.6 out-buffer probe
 # too. If getapi/ABI breaks on Darwin, they fail here rather than being hidden.
 # --- /proc and network backends -------------------------------------------
 lib-winsock-lnx-test.fun	lib-winsock netif enumeration reads /proc
-lib-ajax-lnx-test.fun	lib-ajax binds Linux libcurl.so
 run-ajax-lnx.sh	Linux curl/http server harness
 lib-e2e-lnx.fun	Linux end-to-end backend test
 # --- native code generation (not ported to macOS) -------------------------

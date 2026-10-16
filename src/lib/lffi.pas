@@ -52,10 +52,11 @@ type
   CFFIFun = class(CExp)
   private
     flag: fun.str;     // type string, e.g. 'ss:i'
+    nfix: Integer;     // variadic bindings: fixed-argument count (>0)
     hfun: fun.ptr;     // symbol address (dlsym result)
     hlib: TLibHandle;  // dlopen handle (released on destroy)
   public
-    constructor Create(alib: TLibHandle; afun: fun.ptr; const atype: fun.str);
+    constructor Create(alib: TLibHandle; afun: fun.ptr; const atype: fun.str; anfix: Integer = 0);
     destructor Destroy; override;
     function call(env: CEnv; exps: CExps): PValue; override;
   end;
@@ -182,7 +183,10 @@ begin
       raise EBase.Create('getapi: symbol "' + name + '" not found in "' + libname + '"');
   end;
 
-  f := CFFIFun.Create(hlib, hfun, CExps.FindAsVal(exps, 'type', 1, ''));
+  // 'variadic: <n>' marks a variadic symbol: n arguments are fixed, the rest
+  // form the tail (idx 99 = no positional fallback, named only).
+  f := CFFIFun.Create(hlib, hfun, CExps.FindAsVal(exps, 'type', 1, ''),
+                      CExps.FindAsVal(exps, 'variadic', 99, 0));
   setObj(val, f, VarObjNew); del(f);
 end;
 
@@ -202,12 +206,13 @@ begin
 end;
 
 //==============================================================
-constructor CFFIFun.Create(alib: TLibHandle; afun: fun.ptr; const atype: fun.str);
+constructor CFFIFun.Create(alib: TLibHandle; afun: fun.ptr; const atype: fun.str; anfix: Integer = 0);
 begin
   inherited new(nil);
   hlib := alib;
   hfun := afun;
   flag := atype;
+  nfix := anfix;
 end;
 
 destructor CFFIFun.Destroy;
@@ -307,7 +312,17 @@ begin
     'v': rtype := @ffi_type_void;
   else rtype := @ffi_type_pointer; // incl. 'w' (degrades to narrow char*)
   end;
-  st := ffi_prep_cif(@cif, cifABI, n, rtype, @at[0]);
+  if (nfix >= 1) and (nfix < n) then
+  begin
+    // Variadic binding: tell libffi which leading arguments are fixed. On
+    // Darwin arm64 the tail goes on the stack (Apple's AAPCS64), on the
+    // SysV-family targets both forms behave alike. Fall back to the fixed
+    // preparation if the loaded libffi refuses the variadic one.
+    st := ffi_prep_cif_var(@cif, cifABI, nfix, n, rtype, @at[0]);
+    if st <> FFI_OK then st := ffi_prep_cif(@cif, cifABI, n, rtype, @at[0]);
+  end
+  else
+    st := ffi_prep_cif(@cif, cifABI, n, rtype, @at[0]);
   if st <> FFI_OK then raise EBase.Create('getapi: ffi_prep_cif failed');
 
   ret := 0;

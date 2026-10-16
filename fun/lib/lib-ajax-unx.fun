@@ -48,10 +48,12 @@ var _curl_easy_cleanup = _curl.getapi('curl_easy_cleanup', 'p:v');
 var _curl_easy_strerror = _curl.getapi('curl_easy_strerror', 'i:s');
 // curl_easy_setopt is variadic. Declare the third slot once per kind of option;
 // a string, a long / pointer and a callback all arrive in the same GPR on the
-// System V ABI, so the callee reads them alike.
-var _setopt_s = _curl.getapi('curl_easy_setopt', 'pis:i'); // string option
-var _setopt_l = _curl.getapi('curl_easy_setopt', 'pin:i'); // long / pointer / callback address
-var _setopt_c = _curl.getapi('curl_easy_setopt', 'pic:i'); // Fun callback option
+// System V ABI, so the callee reads them alike. The 'variadic: 2' mark makes
+// the FFI prepare a variadic call -- required on Darwin arm64, where the tail
+// arguments pass on the stack.
+var _setopt_s = _curl.getapi('curl_easy_setopt', 'pis:i', variadic: 2); // string option
+var _setopt_l = _curl.getapi('curl_easy_setopt', 'pin:i', variadic: 2); // long / pointer / callback address
+var _setopt_c = _curl.getapi('curl_easy_setopt', 'pic:i', variadic: 2); // Fun callback option
 var _slist_append = _curl.getapi('curl_slist_append', 'ps:p');
 var _slist_free   = _curl.getapi('curl_slist_free_all', 'p:v');
 
