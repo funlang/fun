@@ -1025,12 +1025,35 @@ end;
 
 procedure CExp.assign(const val: CValue);
 begin
+  // Integer-to-integer (or empty) assignment is the hot case: every counter,
+  // loop variable and arithmetic result lands here. Bypass VariantCopy, which
+  // only matters for managed/refcounted types.
+  if PData(@val).VType = VarInteger then
+  begin
+    with PData(p_val)^ do
+      if (VType = VarInteger) or (VType <= varNull) then
+      begin
+        VInteger := PData(@val).VInteger;
+        VType    := VarInteger;
+        exit;
+      end;
+  end;
   // Value Assign
   p_val^ := val;
 end;
 
 procedure CExp.assign(val: PValue);
 begin
+  if PData(val).VType = VarInteger then
+  begin
+    with PData(p_val)^ do
+      if (VType = VarInteger) or (VType <= varNull) then
+      begin
+        VInteger := PData(val).VInteger;
+        VType    := VarInteger;
+        exit;
+      end;
+  end;
   // Value Assign
   p_val^ := val^;
 end;

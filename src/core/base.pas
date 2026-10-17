@@ -998,7 +998,9 @@ end;
 function varComp(v1, v2: PValue; isCase: fun.bool): ECompResult;
 var
   i: fun.int;
+  {$IfDef FPC}
   d1, d2: double;
+  {$EndIf}
   a, b: PData;
   anil, bnil: fun.bool;
 const

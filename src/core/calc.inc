@@ -314,7 +314,9 @@ procedure C03(env: CEnv; e1, e2: PValue);
   end;
 
 var i: fun.int;
+{$IfDef CalcOpt}
     i64: fun.int64;
+{$EndIf}
 label _;
 begin
   with PData(e1)^ do
@@ -692,38 +694,143 @@ begin
   e1^ := PData(e1).VLongWord shr PData(e2).VLongWord; // R
 end;
 
-procedure C14(env: CEnv; e1, e2: PValue);
+// Small non-negative integers are the most common thing concatenated to text
+// (counters, indexes, loop variables). Caching their decimal form avoids a
+// fresh IntToStr allocation per `&`. Filled once in InitCalc, read-only after.
+var
+  _intStr: array[0..1023] of fun.str;
+
+function _StrVal(p: PValue): fun.str;
+var
+  v: fun.int;
 begin
-  e1^ := fun.str(e1^) + fun.str(e2^); // &
+  if PData(p).VType = VarInteger then
+  begin
+    v := PData(p).VInteger;
+    if (v >= 0) and (v <= High(_intStr)) then
+      result := _intStr[v]
+    else
+      result := IntToStr(v);
+  end
+  else
+    result := fun.str(p^);
+end;
+
+procedure C14(env: CEnv; e1, e2: PValue);
+var
+  s: fun.str;
+begin
+  // Avoid two Variant->AnsiString casts when both sides already are varString
+  // (the common `s1 & s2` case). The result and the assignment below are the
+  // same; only the conversion path is shorter.
+  if (PData(e1).VType = varString) and (PData(e2).VType = varString) then
+    e1^ := fun.str(PData(e1).VString) + fun.str(PData(e2).VString) // &
+  else
+  begin
+    s := _StrVal(e1) + _StrVal(e2);
+    // `'' & 1` can return the cached "1" buffer itself. Raw primitives such as
+    // fromByte write through the pointer without COW, so make sure the result
+    // never aliases a cache entry.
+    UniqueString(s);
+    e1^ := s; // &
+  end;
 end;
 
 procedure C15(env: CEnv; e1, e2: PValue);
+{$IfDef CalcOpt}
+var i: fun.int;
+{$EndIf}
 begin
+{$IfDef CalcOpt}
+  if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
+  begin
+    // Same three-way test as varComp's integer branch (including its current
+    // subtraction overflow behaviour), just without the call/null/object scan.
+    i := PData(e1).VInteger - PData(e2).VInteger;
+    e1^ := i = 0; // =
+    exit;
+  end;
+{$EndIf}
   e1^ := _Comp(env, e1, e2) = EQ; // =
 end;
 
 procedure C16(env: CEnv; e1, e2: PValue);
+{$IfDef CalcOpt}
+var i: fun.int;
+{$EndIf}
 begin
+{$IfDef CalcOpt}
+  if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
+  begin
+    i := PData(e1).VInteger - PData(e2).VInteger;
+    e1^ := i <> 0; // !
+    exit;
+  end;
+{$EndIf}
   e1^ := _Comp(env, e1, e2) <> EQ; // !
 end;
 
 procedure C17(env: CEnv; e1, e2: PValue);
+{$IfDef CalcOpt}
+var i: fun.int;
+{$EndIf}
 begin
+{$IfDef CalcOpt}
+  if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
+  begin
+    i := PData(e1).VInteger - PData(e2).VInteger;
+    e1^ := i < 0; // <
+    exit;
+  end;
+{$EndIf}
   e1^ := _Comp(env, e1, e2) = LT; // <
 end;
 
 procedure C18(env: CEnv; e1, e2: PValue);
+{$IfDef CalcOpt}
+var i: fun.int;
+{$EndIf}
 begin
+{$IfDef CalcOpt}
+  if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
+  begin
+    i := PData(e1).VInteger - PData(e2).VInteger;
+    e1^ := i <= 0; // l
+    exit;
+  end;
+{$EndIf}
   e1^ := _Comp(env, e1, e2) <> GT; // l
 end;
 
 procedure C19(env: CEnv; e1, e2: PValue);
+{$IfDef CalcOpt}
+var i: fun.int;
+{$EndIf}
 begin
+{$IfDef CalcOpt}
+  if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
+  begin
+    i := PData(e1).VInteger - PData(e2).VInteger;
+    e1^ := i > 0; // >
+    exit;
+  end;
+{$EndIf}
   e1^ := _Comp(env, e1, e2) = GT; // >
 end;
 
 procedure C20(env: CEnv; e1, e2: PValue);
+{$IfDef CalcOpt}
+var i: fun.int;
+{$EndIf}
 begin
+{$IfDef CalcOpt}
+  if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
+  begin
+    i := PData(e1).VInteger - PData(e2).VInteger;
+    e1^ := i >= 0; // g
+    exit;
+  end;
+{$EndIf}
   e1^ := _Comp(env, e1, e2) <> LT; // g
 end;
 
@@ -767,7 +874,10 @@ var
   CX: array[#33..#126] of fun.ptr;
 
 procedure InitCalc();
+var
+  i: fun.int;
 begin
+  for i := 0 to High(_intStr) do _intStr[i] := IntToStr(i);
   CX['+'] := @C01;
   CX['-'] := @C02;
   CX['*'] := @C03;

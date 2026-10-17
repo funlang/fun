@@ -491,7 +491,9 @@ procedure _format(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   ii, i: fun.int;
   vs: array of TVarRec;
+  {$IfDef FPC}
   strs: array of fun.str;
+  {$EndIf}
 begin
   with PData(exp.value)^ do
   case VType of
