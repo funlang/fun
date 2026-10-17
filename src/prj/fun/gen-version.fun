@@ -8,8 +8,8 @@
 // (argv[1]), so the current directory does not matter.
 //
 // The numeric stamp defaults to today's local date; the release string defaults
-// to '9.0'. Pass them explicitly for a reproducible release stamp, e.g.
-//   fun src/prj/fun/gen-version.fun 20260926 9.0
+// to '9.4'. Pass them explicitly for a reproducible release stamp, e.g.
+//   fun src/prj/fun/gen-version.fun 20261017 9.4
 //
 // Why the clock and not git: this is a deliberate, release-time action, and
 // reading git's output portably would need a shell (Windows exec returns no
@@ -19,7 +19,7 @@
 // (argv[0] is the interpreter, argv[1] is this script, so user args start at 2.)
 var stamp = 2.arg();
 var release = 3.arg();
-if release = '' then release = '9.0'; end if;
+if release = '' then release = '9.4'; end if;
 
 // Validate the stamp: exactly 8 digits, else fall back to today.
 var ok = stamp.length() = 8;
@@ -60,7 +60,7 @@ var content =
   '//   running interpreter with N.time() for N in 2010..2099, or with the'    & nl &
   "//   'version' field of 'host'.arg(); both read this constant."           & nl &
   '// funRelease: curated language version string (README Version line),'   & nl &
-  "//   default '9.0' (or the explicit second argument)."                   & nl &
+  "//   default '9.4' (or the explicit second argument)."                   & nl &
   'funVersion = ' & stamp & ';' & nl &
   "funRelease = '" & release & "';" & nl;
 

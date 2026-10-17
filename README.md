@@ -4,12 +4,12 @@
 
 **English** (this file) · [简体中文](README.zh.md)
 
-- Version: **9.0**
+- Version: **9.4**
 - Website: <https://funlang.org>
 - Author: Zhang Weidong &lt;zwd@funlang.org>
 - License: MIT, plus commercial terms (see [License](#license))
 
-> **Version 9.0**: this is not a toy or a prototype — a mature language refined and production-validated for over 15 years (2010–present), with a lineage that reaches back through Nuva (2006) and TemplateScript (2005).
+> **Version 9.4**: this is not a toy or a prototype — a mature language refined and production-validated for over 15 years (2010–present), with a lineage that reaches back through Nuva (2006) and TemplateScript (2005).
 
 ---
 

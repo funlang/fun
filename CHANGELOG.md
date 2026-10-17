@@ -6,6 +6,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.4] - 2026-10-17
+
 - Scalar values stay out of the Variant RTL on the hot paths: comparison and
   logical operators write `varBoolean` results directly, scalar assignment
   fast-paths Boolean/Double as well as Integer, and `CCtwo` no longer builds a

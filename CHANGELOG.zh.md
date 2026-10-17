@@ -6,6 +6,8 @@
 
 ## [未发布]
 
+## [9.4] - 2026-10-17
+
 - 标量值在热路径上绕开 Variant RTL：比较与逻辑运算直接写 `varBoolean`，
   标量赋值对 Boolean/Double 也走快路径（不再只优化 Integer），
   `CCtwo` 不再为左操作数构造临时 `CValue`。整数 `div`/`mod` 增加带保护的

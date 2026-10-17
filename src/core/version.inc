@@ -6,6 +6,6 @@
 //   running interpreter with N.time() for N in 2010..2099, or with the
 //   'version' field of 'host'.arg(); both read this constant.
 // funRelease: curated language version string (README Version line),
-//   default '9.0' (or the explicit second argument).
-funVersion = 20260926;
-funRelease = '9.0';
+//   default '9.4' (or the explicit second argument).
+funVersion = 20261017;
+funRelease = '9.4';
