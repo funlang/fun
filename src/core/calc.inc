@@ -412,10 +412,14 @@ procedure C04(env: CEnv; e1, e2: PValue);
     begin
       _NullNumE1(e1);
       t := _Num2(e2);
+      _CheckDivZero(t);
       e1^ := e1^ / t; // /
     end
     else
+    begin
+      _CheckDivZero(e2^);
       e1^ := e1^ / e2^; // /
+    end;
 {$Else}
     e1^ := e1^ / e2^; // /
 {$EndIf}
