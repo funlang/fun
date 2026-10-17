@@ -6,6 +6,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Fix integer comparison of far-apart operands. `varComp` and the CalcOpt fast
+  paths for `<`, `>`, `<=`, `>=`, `<>` and `=` computed `a - b` before testing
+  the sign; that difference overflows int32 and reversed the result (for
+  example `2147483647 > -1` returned false). They now compare the operands
+  directly.
+
 ## [9.4] - 2026-10-17
 
 - Scalar values stay out of the Variant RTL on the hot paths: comparison and

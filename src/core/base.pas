@@ -1085,10 +1085,12 @@ begin
   // Integer
   else if (a.VType = varInteger) and (b.VType = varInteger) then
   begin
-    i := a.VInteger - b.VInteger;
-    if i = 0 then
+    // Compare directly. Subtracting first overflows int32 whenever the two
+    // operands are far apart (e.g. High(Integer) vs -1), which used to
+    // reverse the result of <, >, <=, >= and <>.
+    if a.VInteger = b.VInteger then
       result := EQ
-    else if i < 0 then
+    else if a.VInteger < b.VInteger then
       result := LT
     else
       result := GT

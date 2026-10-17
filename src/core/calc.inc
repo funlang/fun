@@ -750,17 +750,13 @@ begin
 end;
 
 procedure C15(env: CEnv; e1, e2: PValue);
-{$IfDef CalcOpt}
-var i: fun.int;
-{$EndIf}
 begin
 {$IfDef CalcOpt}
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
-    // Same three-way test as varComp's integer branch (including its current
-    // subtraction overflow behaviour), just without the call/null/object scan.
-    i := PData(e1).VInteger - PData(e2).VInteger;
-    setBool(e1, i = 0); // =
+    // Compare directly instead of subtracting: the difference of two int32
+    // values can overflow and reverse the result.
+    setBool(e1, PData(e1).VInteger = PData(e2).VInteger); // =
     exit;
   end;
 {$EndIf}
@@ -768,15 +764,11 @@ begin
 end;
 
 procedure C16(env: CEnv; e1, e2: PValue);
-{$IfDef CalcOpt}
-var i: fun.int;
-{$EndIf}
 begin
 {$IfDef CalcOpt}
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
-    i := PData(e1).VInteger - PData(e2).VInteger;
-    setBool(e1, i <> 0); // !
+    setBool(e1, PData(e1).VInteger <> PData(e2).VInteger); // !
     exit;
   end;
 {$EndIf}
@@ -784,15 +776,11 @@ begin
 end;
 
 procedure C17(env: CEnv; e1, e2: PValue);
-{$IfDef CalcOpt}
-var i: fun.int;
-{$EndIf}
 begin
 {$IfDef CalcOpt}
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
-    i := PData(e1).VInteger - PData(e2).VInteger;
-    setBool(e1, i < 0); // <
+    setBool(e1, PData(e1).VInteger < PData(e2).VInteger); // <
     exit;
   end;
 {$EndIf}
@@ -800,15 +788,11 @@ begin
 end;
 
 procedure C18(env: CEnv; e1, e2: PValue);
-{$IfDef CalcOpt}
-var i: fun.int;
-{$EndIf}
 begin
 {$IfDef CalcOpt}
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
-    i := PData(e1).VInteger - PData(e2).VInteger;
-    setBool(e1, i <= 0); // l
+    setBool(e1, PData(e1).VInteger <= PData(e2).VInteger); // l
     exit;
   end;
 {$EndIf}
@@ -816,15 +800,11 @@ begin
 end;
 
 procedure C19(env: CEnv; e1, e2: PValue);
-{$IfDef CalcOpt}
-var i: fun.int;
-{$EndIf}
 begin
 {$IfDef CalcOpt}
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
-    i := PData(e1).VInteger - PData(e2).VInteger;
-    setBool(e1, i > 0); // >
+    setBool(e1, PData(e1).VInteger > PData(e2).VInteger); // >
     exit;
   end;
 {$EndIf}
@@ -832,15 +812,11 @@ begin
 end;
 
 procedure C20(env: CEnv; e1, e2: PValue);
-{$IfDef CalcOpt}
-var i: fun.int;
-{$EndIf}
 begin
 {$IfDef CalcOpt}
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
-    i := PData(e1).VInteger - PData(e2).VInteger;
-    setBool(e1, i >= 0); // g
+    setBool(e1, PData(e1).VInteger >= PData(e2).VInteger); // g
     exit;
   end;
 {$EndIf}

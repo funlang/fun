@@ -84,3 +84,17 @@ except
   lowmod = true;
 end try;
 ?. lowmod;                   // True
+
+// Integer comparison at the int32 boundaries. The fast paths used to compute
+// a - b and test its sign; that difference overflows and reverses the result
+// for far-apart operands. All six relational operators must compare directly.
+?. 2147483647 > -1;          // True
+?. -2147483648 < 1;          // True
+?. 2147483647 > -2147483648; // True
+?. -2147483648 > 2147483647; // False
+?. 2147483647 >= -1;         // True
+?. 2147483647 <= -1;         // False
+?. -2147483648 >= 1;         // False
+?. -2147483648 <= 1;         // True
+?. 2147483647 <> -1;         // True
+?. 2147483647 = -1;          // False
