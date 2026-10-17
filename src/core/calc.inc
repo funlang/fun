@@ -431,6 +431,10 @@ begin
       case PData(e2).VType of
         VarInteger:
         begin
+          // AArch64 leaves FP exceptions masked, so x/0 would yield +Inf
+          // instead of raising here; fall back to _C04, which checks the
+          // divisor explicitly on FPC.
+          if PData(e2).VInteger = 0 then goto _;
           {i        := VInteger / PData(e2).VInteger;
           asm
             jo _
@@ -442,6 +446,7 @@ begin
         end;
         VarDouble:
         begin
+          if PData(e2).VDouble = 0 then goto _;
           VDouble  := VInteger / PData(e2).VDouble;
           VType    := VarDouble;
           exit;
@@ -453,11 +458,13 @@ begin
       case PData(e2).VType of
         VarInteger:
         begin
+          if PData(e2).VInteger = 0 then goto _;
           VDouble  := VDouble  / PData(e2).VInteger;
           exit;
         end;
         VarDouble:
         begin
+          if PData(e2).VDouble = 0 then goto _;
           VDouble  := VDouble  / PData(e2).VDouble;
           exit;
         end;
