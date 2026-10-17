@@ -229,7 +229,7 @@ while IFS="$(printf '\t')" read -r name script testmode; do
         if [ -n "${GITHUB_ACTIONS:-}" ]; then
             echo "::error file=fun/$script title=$name::$result"
             if [ -n "$detail" ]; then
-                echo "::error file=fun/$script title=$name diff::$(_ann=$(printf '%s' "$detail" | sed -n '4,7p' | tr -d '\r' | tr '\n' '~' | cut -c1-500); printf '%s' "$_ann")"
+                echo "::error file=fun/$script title=$name diff::$(_ann=$(printf '%s' "$detail" | sed -n '4,12p' | tr -d '\r' | tr '\n' '~' | cut -c1-1000); printf '%s' "$_ann")"
             elif [ -n "$out" ]; then
                 echo "::error file=fun/$script title=$name out::$(_ann=$(printf '%s' "$out" | tail -n 4 | tr -d '\r' | tr '\n' '~' | cut -c1-500); printf '%s' "$_ann")"
             fi
