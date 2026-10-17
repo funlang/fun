@@ -28,8 +28,10 @@
 #   PCRE_SRC=/abs/path/to/pcre ./make-linux-x86_64.sh
 #   TCC_SRC=/abs/path/to/tcc ./make-linux-x86_64.sh
 #
-# Extra FPC switches can be appended, e.g.:
-#   ./make-linux-x86_64.sh -dCalcOpt
+# Integer/double arithmetic fast paths (src/core/calc.inc) are on by default;
+# they avoid the much slower Variant RTL for the common operand types. Set
+# NO_CALC_OPT=1 to build the plain Variant-only path (useful for differential
+# benchmarking). Extra FPC switches can still be appended:
 #   ./make-linux-x86_64.sh -dFunTraceback  # opt-in: append a function traceback to
 #                                         # runtime errors (a small per-call cost;
 #                                         # the default build reports only file:line)
@@ -167,8 +169,13 @@ fi
 
 # --- Build funcmd ------------------------------------------------
 echo "Building funcmd with $FPC_BIN"
+CALC_FLAGS="-dCalcOpt"
+if [ -n "${NO_CALC_OPT:-}" ]; then
+    CALC_FLAGS=""
+    echo "NO_CALC_OPT set - building without arithmetic fast paths."
+fi
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $CALC_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) -------------
 # Refresh fun/funcmd on every build, so a run from the repo root is just

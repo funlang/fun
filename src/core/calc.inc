@@ -150,9 +150,9 @@ begin
         VarInteger:
         begin
           i        := VInteger + PData(e2).VInteger;
-          asm
-            jo _
-          end;
+          // Signed-overflow test in plain Pascal (no flags/asm), so this fast
+          // path also builds on non-x86 targets.
+          if ((i xor VInteger) and (i xor PData(e2).VInteger)) < 0 then goto _;
           VInteger := i;
           exit;
         end;
@@ -182,9 +182,8 @@ begin
     else if (VType = VarLongWord) and (PData(e2).VType = VarLongWord) then
     begin
       j         := VLongWord + PData(e2).VLongWord;
-      asm
-        jo _
-      end;
+      // Unsigned carry: the sum wrapped below the first operand.
+      if j < VLongWord then goto _;
       VLongWord := j;
       exit;
     end;
@@ -242,9 +241,9 @@ begin
         VarInteger:
         begin
           i        := VInteger - PData(e2).VInteger;
-          asm
-            //jo _
-          end;
+          // Signed-overflow test: operands differ in sign and the result's
+          // sign differs from the minuend's.
+          if ((VInteger xor PData(e2).VInteger) and (VInteger xor i)) < 0 then goto _;
           VInteger := i;
           exit;
         end;
@@ -315,6 +314,7 @@ procedure C03(env: CEnv; e1, e2: PValue);
   end;
 
 var i: fun.int;
+    i64: fun.int64;
 label _;
 begin
   with PData(e1)^ do
@@ -324,10 +324,9 @@ begin
       case PData(e2).VType of
         VarInteger:
         begin
-          i        := VInteger * PData(e2).VInteger;
-          asm
-            jo _
-          end;
+          i64      := fun.int64(VInteger) * fun.int64(PData(e2).VInteger);
+          if (i64 < Low(Integer)) or (i64 > High(Integer)) then goto _;
+          i        := i64;
           VInteger := i;
           exit;
         end;
@@ -488,8 +487,11 @@ begin
 {$EndIf}
 end;
 
+// The div/mod fast paths are opt-in only (CalcOptDivMod): unlike + - *, the
+// integer forms raise hardware/compiler-specific exceptions on overflow and
+// division by zero, so the Variant path stays the single source of truth.
 procedure C05(env: CEnv; e1, e2: PValue);
-{$IfDef CalcOpt}
+{$IfDef CalcOptDivMod}
   procedure _C05;
 {$IfDef FPC}
   var t: CValue;
@@ -571,8 +573,9 @@ begin
 {$EndIf}
 end;
 
+// See C05: div/mod stay on the Variant path by default.
 procedure C06(env: CEnv; e1, e2: PValue);
-{$IfDef CalcOpt}
+{$IfDef CalcOptDivMod}
   procedure _C06;
 {$IfDef FPC}
   var t: CValue;
