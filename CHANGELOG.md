@@ -6,6 +6,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.4.1] - 2026-10-17
+
 - Fix integer comparison of far-apart operands. `varComp` and the CalcOpt fast
   paths for `<`, `>`, `<=`, `>=`, `<>` and `=` computed `a - b` before testing
   the sign; that difference overflows int32 and reversed the result (for
