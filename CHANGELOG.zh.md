@@ -6,6 +6,13 @@
 
 ## [未发布]
 
+- 标量值在热路径上绕开 Variant RTL：比较与逻辑运算直接写 `varBoolean`，
+  标量赋值对 Boolean/Double 也走快路径（不再只优化 Integer），
+  `CCtwo` 不再为左操作数构造临时 `CValue`。整数 `div`/`mod` 增加带保护的
+  快路径，除数为零和 `Low(Integer) div -1` 仍回退到 RTL。在自带基准上，
+  `1>2` 从约 193 降到约 130 ns/次，`if 1>2` 从约 166 降到约 130 ns，
+  `not 1>2` 从约 343 降到约 196 ns，`7 div 3` 大约减半。
+
 - 标准库新增 HTTP 服务端与客户端。`fun/lib/http-server.fun` 是单线程、平台
   无关的服务端（`HttpServer(port)` 或 `HttpServer('addr:port')`），路由支持
   字面量段、`:name` 参数与 `*` 通配尾巴（方法不匹配回 405 并带 `Allow`，无匹配

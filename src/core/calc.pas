@@ -83,8 +83,8 @@ end;
 
 procedure CCone.calc(env: CEnv);
 begin
-  // Value Assign
-  p_val^ := exp.calcValue(env)^;
+  // Value Assign (one capture; p_val must not alias exp's storage)
+  copyValue(p_val, exp.calcValue(env));
   DoCalc(env, p_val, @NullValue, op);
 end;
 
@@ -107,10 +107,14 @@ var
   v: CValue;
   p: PValue;
 begin
+  // The left operand must be captured on the Pascal stack, not in p_val: a
+  // recursive call on the right re-enters this same AST node and overwrites
+  // p_val (fact(n) = n * fact(n-1) depends on this). Assigning p_val only after
+  // the right side is evaluated keeps that reentry safe while avoiding the
+  // extra CValue(v) temporary the old code built.
   v      := (exp.calcValue(env))^;
   p      := exp2.calcValue(env);
-  // Value Assign
-  p_val^ := CValue(v);
+  copyValue(p_val, @v);
   DoCalc(env, p_val, p, op);
 end;
 
@@ -123,33 +127,33 @@ end;
 //==============================================================
 procedure CCAnd.calc(env: CEnv);
 var
-  v: CData;
+  v: CValue;
   p: PValue;
 begin
-  v      := PData(exp.calcValue(env))^;
-  // Value Assign
-  p_val^ := CValue(v);
-  if funBoolOf(p_val) then
+  v := (exp.calcValue(env))^;
+  if funBoolOf(@v) then
   begin
     p      := exp2.calcValue(env);
-    p_val^ := p^;
-  end;
+    copyValue(p_val, p);
+  end
+  else
+    copyValue(p_val, @v);
 end;
 
 //==============================================================
 procedure CCOr.calc(env: CEnv);
 var
-  v: CData;
+  v: CValue;
   p: PValue;
 begin
-  v      := PData(exp.calcValue(env))^;
-  // Value Assign
-  p_val^ := CValue(v);
-  if not funBoolOf(p_val) then
+  v := (exp.calcValue(env))^;
+  if not funBoolOf(@v) then
   begin
     p      := exp2.calcValue(env);
-    p_val^ := p^;
-  end;
+    copyValue(p_val, p);
+  end
+  else
+    copyValue(p_val, @v);
 end;
 
 initialization

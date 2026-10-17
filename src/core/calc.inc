@@ -500,11 +500,11 @@ begin
 {$EndIf}
 end;
 
-// The div/mod fast paths are opt-in only (CalcOptDivMod): unlike + - *, the
-// integer forms raise hardware/compiler-specific exceptions on overflow and
-// division by zero, so the Variant path stays the single source of truth.
+// Integer div/mod keep the Variant path as the source of truth for exceptional
+// cases: a zero divisor and Low(Integer) div/mod -1 both fall through to the
+// RTL, so the exception type and message stay exactly as before.
 procedure C05(env: CEnv; e1, e2: PValue);
-{$IfDef CalcOptDivMod}
+{$IfDef CalcOpt}
   procedure _C05;
 {$IfDef FPC}
   var t: CValue;
@@ -534,10 +534,11 @@ begin
       case PData(e2).VType of
         VarInteger:
         begin
-          i        := VInteger div PData(e2).VInteger;
-          asm
-            //jo _
-          end;
+          // Zero and Low(Integer) / -1 both raise on the RTL path.
+          if (PData(e2).VInteger = 0) or
+             ((VInteger = Low(Integer)) and (PData(e2).VInteger = -1)) then
+            goto _;
+          i := VInteger div PData(e2).VInteger;
           VInteger := i;
           exit;
         end;
@@ -586,9 +587,9 @@ begin
 {$EndIf}
 end;
 
-// See C05: div/mod stay on the Variant path by default.
+// See C05: only the plain Integer/Integer case is fast-pathed.
 procedure C06(env: CEnv; e1, e2: PValue);
-{$IfDef CalcOptDivMod}
+{$IfDef CalcOpt}
   procedure _C06;
 {$IfDef FPC}
   var t: CValue;
@@ -618,10 +619,11 @@ begin
       case PData(e2).VType of
         VarInteger:
         begin
-          i        := VInteger mod PData(e2).VInteger;
-          asm
-            //jo _
-          end;
+          // Zero and Low(Integer) mod -1 both raise on the RTL path.
+          if (PData(e2).VInteger = 0) or
+             ((VInteger = Low(Integer)) and (PData(e2).VInteger = -1)) then
+            goto _;
+          i := VInteger mod PData(e2).VInteger;
           VInteger := i;
           exit;
         end;
@@ -758,11 +760,11 @@ begin
     // Same three-way test as varComp's integer branch (including its current
     // subtraction overflow behaviour), just without the call/null/object scan.
     i := PData(e1).VInteger - PData(e2).VInteger;
-    e1^ := i = 0; // =
+    setBool(e1, i = 0); // =
     exit;
   end;
 {$EndIf}
-  e1^ := _Comp(env, e1, e2) = EQ; // =
+  setBool(e1, _Comp(env, e1, e2) = EQ); // =
 end;
 
 procedure C16(env: CEnv; e1, e2: PValue);
@@ -774,11 +776,11 @@ begin
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
     i := PData(e1).VInteger - PData(e2).VInteger;
-    e1^ := i <> 0; // !
+    setBool(e1, i <> 0); // !
     exit;
   end;
 {$EndIf}
-  e1^ := _Comp(env, e1, e2) <> EQ; // !
+  setBool(e1, _Comp(env, e1, e2) <> EQ); // !
 end;
 
 procedure C17(env: CEnv; e1, e2: PValue);
@@ -790,11 +792,11 @@ begin
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
     i := PData(e1).VInteger - PData(e2).VInteger;
-    e1^ := i < 0; // <
+    setBool(e1, i < 0); // <
     exit;
   end;
 {$EndIf}
-  e1^ := _Comp(env, e1, e2) = LT; // <
+  setBool(e1, _Comp(env, e1, e2) = LT); // <
 end;
 
 procedure C18(env: CEnv; e1, e2: PValue);
@@ -806,11 +808,11 @@ begin
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
     i := PData(e1).VInteger - PData(e2).VInteger;
-    e1^ := i <= 0; // l
+    setBool(e1, i <= 0); // l
     exit;
   end;
 {$EndIf}
-  e1^ := _Comp(env, e1, e2) <> GT; // l
+  setBool(e1, _Comp(env, e1, e2) <> GT); // l
 end;
 
 procedure C19(env: CEnv; e1, e2: PValue);
@@ -822,11 +824,11 @@ begin
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
     i := PData(e1).VInteger - PData(e2).VInteger;
-    e1^ := i > 0; // >
+    setBool(e1, i > 0); // >
     exit;
   end;
 {$EndIf}
-  e1^ := _Comp(env, e1, e2) = GT; // >
+  setBool(e1, _Comp(env, e1, e2) = GT); // >
 end;
 
 procedure C20(env: CEnv; e1, e2: PValue);
@@ -838,16 +840,16 @@ begin
   if (PData(e1).VType = VarInteger) and (PData(e2).VType = VarInteger) then
   begin
     i := PData(e1).VInteger - PData(e2).VInteger;
-    e1^ := i >= 0; // g
+    setBool(e1, i >= 0); // g
     exit;
   end;
 {$EndIf}
-  e1^ := _Comp(env, e1, e2) <> LT; // g
+  setBool(e1, _Comp(env, e1, e2) <> LT); // g
 end;
 
 procedure C21(env: CEnv; e1, e2: PValue);
 begin
-  e1^ := _CompIn(env, e1, e2); // i
+  setBool(e1, _CompIn(env, e1, e2)); // i
 end;
 
 procedure C22(env: CEnv; e1, e2: PValue);
@@ -857,27 +859,27 @@ end;
 
 procedure C23(env: CEnv; e1, e2: PValue);
 begin
-  e1^ := _MatchNot(env, e1, e2); // $
+  setBool(e1, _MatchNot(env, e1, e2)); // $
 end;
 
 procedure C24(env: CEnv; e1, e2: PValue);
 begin
-  e1^ := not funBoolOf(e1); // n
+  setBool(e1, not funBoolOf(e1)); // n
 end;
 
 procedure C25(env: CEnv; e1, e2: PValue);
 begin
-  e1^ := funBoolOf(e1) and funBoolOf(e2); // a
+  setBool(e1, funBoolOf(e1) and funBoolOf(e2)); // a
 end;
 
 procedure C26(env: CEnv; e1, e2: PValue);
 begin
-  e1^ := funBoolOf(e1) or  funBoolOf(e2); // o
+  setBool(e1, funBoolOf(e1) or  funBoolOf(e2)); // o
 end;
 
 procedure C27(env: CEnv; e1, e2: PValue);
 begin
-  e1^ := funBoolOf(e1) xor funBoolOf(e2); // x
+  setBool(e1, funBoolOf(e1) xor funBoolOf(e2)); // x
 end;
 
 //==============================================================

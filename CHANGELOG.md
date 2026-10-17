@@ -6,6 +6,15 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Scalar values stay out of the Variant RTL on the hot paths: comparison and
+  logical operators write `varBoolean` results directly, scalar assignment
+  fast-paths Boolean/Double as well as Integer, and `CCtwo` no longer builds a
+  temporary `CValue` for its left operand. Integer `div`/`mod` gain guarded
+  fast paths that still fall through to the RTL for a zero divisor and
+  `Low(Integer) div -1`. On the shipped benchmark, `1>2` drops from ~193 to
+  ~130 ns/iteration, `if 1>2` from ~166 to ~130 ns, `not 1>2` from ~343 to
+  ~196 ns, and `7 div 3` roughly halves.
+
 - The standard library gains an HTTP server and client.
   `fun/lib/http-server.fun` is a single-threaded, platform-neutral server
   (`HttpServer(port)` or `HttpServer('addr:port')`) with literal / `:name` /

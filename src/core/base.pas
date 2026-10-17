@@ -177,6 +177,17 @@ function rawPtr(val: PValue): fun.ptr;
 procedure setObj(val: PValue; obj: CBase; vt: fun.word = VarObject);
 procedure clear(val: PValue);
 
+// Write a Boolean result straight into a Variant's fields when the target
+// does not own a managed payload. FPC's `Variant := Boolean` goes through the
+// RTL and costs ~50ns, versus ~2ns for the two field writes below; comparison
+// and logical operators produce a Boolean on every evaluation.
+procedure setBool(val: PValue; b: fun.bool);
+
+// Copy src into dst, keeping the scalar fast paths (Integer/Double/Boolean)
+// out of VariantCopy. Falls back to the RTL for managed values and for a
+// destination that still holds one (which must be cleared/released).
+procedure copyValue(dst, src: PValue);
+
 procedure add(obj: CBase);
 procedure del(obj: CBase);
 
@@ -346,6 +357,56 @@ begin
       VInt64 := 0;
     end;
   end;
+end;
+
+// Variant types that own an allocation and therefore must be cleared by the
+// RTL before the storage can be reused. Custom Fun objects count because
+// VarObjNew is reference counted by setObj/clear above.
+function isManagedVar(vt: TVarType): fun.bool;
+begin
+  result := isStr(vt) or
+            (vt = varDispatch) or
+            (vt = varVariant) or
+            (vt = varUnknown) or
+            (vt >= VarObject);
+end;
+
+procedure setBool(val: PValue; b: fun.bool);
+begin
+  if isManagedVar(PData(val)^.VType) then
+    // Let the RTL release the old payload.
+    val^ := b
+  else
+  begin
+    PData(val)^.VType    := varBoolean;
+    PData(val)^.VBoolean := b;
+  end;
+end;
+
+procedure copyValue(dst, src: PValue);
+var
+  st, dt: TVarType;
+begin
+  st := PData(src)^.VType;
+  dt := PData(dst)^.VType;
+  if (st = varInteger) and ((dt = varInteger) or (dt <= varNull)) then
+  begin
+    PData(dst)^.VInteger := PData(src)^.VInteger;
+    PData(dst)^.VType    := varInteger;
+  end
+  else if (st = varDouble) and not isManagedVar(dt) then
+  begin
+    PData(dst)^.VDouble := PData(src)^.VDouble;
+    PData(dst)^.VType   := varDouble;
+  end
+  else if (st = varBoolean) and not isManagedVar(dt) then
+  begin
+    PData(dst)^.VBoolean := PData(src)^.VBoolean;
+    PData(dst)^.VType    := varBoolean;
+  end
+  else
+    // Value Assign
+    dst^ := src^;
 end;
 
 //==============================================================

@@ -1,6 +1,7 @@
 all.fun	demo/all.fun	snap
 assign.fun	demo/assign.fun	snap
 calc.fun	demo/calc.fun	snap
+calc-fastpath.fun	test/calc-fastpath.fun	snap
 case.fun	demo/case.fun	snap
 class-base.fun	demo/class-base.fun	snap
 class-op.fun	demo/class-op.fun	snap
