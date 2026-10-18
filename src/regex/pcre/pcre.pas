@@ -241,7 +241,8 @@ begin
       // Second use of this pattern: now the JIT cost is likely to be repaid.
       C.EnableJit;
       C.AddRef;
-      Exit(C);
+      Result := C;
+      Exit;
     end;
   end;
 
@@ -936,6 +937,8 @@ begin
   OffsetCount := 0;
   LastOffset  := 1;
 end;
+
+initialization
 
 finalization
   // Drop idle patterns. A pattern still referenced by a live CPcre is left
