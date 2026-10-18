@@ -109,8 +109,8 @@ jobs:
           path: ~/fpc-cache
           key: fpc-dmg-3.2.2-intelarm64
 
-      - name: Cache Homebrew downloads (macOS arm64)
-        if: runner.os == 'macOS' && runner.arch == 'ARM64'
+      - name: Cache Homebrew downloads (macOS)
+        if: runner.os == 'macOS'
         uses: actions/cache@v4
         with:
           path: ~/Library/Caches/Homebrew
