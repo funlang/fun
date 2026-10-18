@@ -59,6 +59,7 @@ lib-proc-test.fun	test/lib-proc-test.fun	snap
 lib-unicode-test.fun	test/lib-unicode-test.fun	snap
 lib-bnf-dedup.fun	test/lib-bnf-dedup.fun	snap
 lib-regex-replace.fun	test/lib-regex-replace.fun	snap
+lib-regex-cache.fun	test/lib-regex-cache.fun	snap
 portability-probe.fun	test/portability-probe.fun	snap
 lib-tcc-test.fun	test/lib-tcc-test.fun	snap
 lib-jit-test.fun	test/lib-jit-test.fun	snap

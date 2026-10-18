@@ -6,6 +6,23 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Regex matching no longer recompiles the same pattern on every call. The
+  compiled PCRE code is shared through a small LRU cache keyed by pattern text
+  and options, with reference counting so a lazy match object always keeps its
+  code alive; each regex literal also holds its own reference, so the hot path
+  skips the cache lookup. A pattern used a second time is upgraded to PCRE's JIT
+  engine; the upgrade is deferred so a one-shot `toRegex()` pays no JIT cost.
+  Global `match`/`replace` now write into one growable buffer instead of
+  splicing the subject once per match, turning the former O(n^2) replacement
+  loop into a single pass. On the bundled Linux x86_64 build, 200 global
+  replacements over a ~100 KB subject drop from ~7.3 s to ~0.24 s, repeated
+  literal matching improves by ~1.4-1.5x, and a global match by ~3x.
+
+- Global regex replacement now computes `$_` (and the other subject
+  references) from the original subject. The old in-place loop rewrote the
+  subject between matches, so `'abcabc'.replace(/b/g, '[$_]')` produced
+  `a[abcabc]ca[a[abcabc]cabc]c`; it now yields `a[abcabc]ca[abcabc]c`.
+
 ## [9.4.1] - 2026-10-17
 
 - Fix integer comparison of far-apart operands. `varComp` and the CalcOpt fast

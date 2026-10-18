@@ -73,17 +73,23 @@ if [ -n "$PCRE_SRC" ] && [ -f "$PCRE_SRC/pcre_compile.c" ]; then
         [ -f "$PCRE_SRC/config.h" ]          || cp "$PCRE_SRC/config.h.generic"          "$PCRE_SRC/config.h"          2>/dev/null || true
         [ -f "$PCRE_SRC/pcre.h" ]            || cp "$PCRE_SRC/pcre.h.generic"            "$PCRE_SRC/pcre.h"            2>/dev/null || true
         [ -f "$PCRE_SRC/pcre_chartables.c" ] || cp "$PCRE_SRC/pcre_chartables.c.dist"   "$PCRE_SRC/pcre_chartables.c" 2>/dev/null || true
-        echo "Building PCRE 8 from $PCRE_SRC"
+        # SUPPORT_JIT builds the PCRE 8 JIT engine; see make-linux-x86_64.sh.
+        PCRE_CFLAGS="-O2 -fPIC -ffunction-sections -fdata-sections -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -DSUPPORT_JIT"
+        PCRE_STAMP="$PCRE_LIB/.buildflags"
+        if [ ! -f "$PCRE_STAMP" ] || [ "$(cat "$PCRE_STAMP" 2>/dev/null)" != "$PCRE_CFLAGS" ]; then
+            rm -f "$PCRE_LIB"/*.o "$PCRE_LIB/libpcre.a"
+            printf '%s\n' "$PCRE_CFLAGS" > "$PCRE_STAMP"
+        fi
+        echo "Building PCRE 8 from $PCRE_SRC (with JIT)"
         for f in pcre_byte_order pcre_chartables pcre_compile pcre_config \
                  pcre_default_tables pcre_dfa_exec pcre_exec pcre_fullinfo \
-                 pcre_get pcre_globals pcre_maketables pcre_newline \
+                 pcre_get pcre_globals pcre_jit_compile pcre_maketables pcre_newline \
                  pcre_refcount pcre_study pcre_tables pcre_ucd \
                  pcre_valid_utf8 pcre_version pcre_xclass pcre_string_utils; do
             [ -f "$PCRE_SRC/$f.c" ] || continue
             if [ ! -f "$PCRE_LIB/$f.o" ] || [ "$PCRE_SRC/$f.c" -nt "$PCRE_LIB/$f.o" ]; then
-                "$CC" -c -O2 -fPIC -ffunction-sections -fdata-sections \
-                    -DHAVE_CONFIG_H -DSUPPORT_PCRE8 \
-                    -I"$PCRE_SRC" "$PCRE_SRC/$f.c" -o "$PCRE_LIB/$f.o"
+                # shellcheck disable=SC2086
+                "$CC" -c $PCRE_CFLAGS -I"$PCRE_SRC" "$PCRE_SRC/$f.c" -o "$PCRE_LIB/$f.o"
             fi
         done
         rm -f "$PCRE_LIB/libpcre.a"

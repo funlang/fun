@@ -216,6 +216,16 @@ const
   {$EXTERNALSYM PCRE_EXTRA_TABLES}
   PCRE_EXTRA_MATCH_LIMIT_RECURSION = $0010;
   {$EXTERNALSYM PCRE_EXTRA_MATCH_LIMIT_RECURSION}
+  PCRE_EXTRA_EXECUTABLE_JIT = $0040;
+  {$EXTERNALSYM PCRE_EXTRA_EXECUTABLE_JIT}
+
+  (* Options for pcre_study() *)
+
+  PCRE_STUDY_JIT_COMPILE = $0001;
+  {$EXTERNALSYM PCRE_STUDY_JIT_COMPILE}
+
+  PCRE_ERROR_JIT_STACKLIMIT = -27;
+  {$EXTERNALSYM PCRE_ERROR_JIT_STACKLIMIT}
 
 type
   real_pcre = packed record
@@ -301,6 +311,11 @@ function GetPCREFreeCallback: pcre_free_callback;
 {$EXTERNALSYM GetPCREFreeCallback}
 procedure CallPCREFree(P: Pointer);
 {$EXTERNALSYM CallPCREFree}
+
+function CallPCREStudy(code: PPCRE; options: Integer; const errptr: PPAnsiChar): PPCREExtra;
+{$EXTERNALSYM CallPCREStudy}
+procedure CallPCREFreeStudy(extra: PPCREExtra);
+{$EXTERNALSYM CallPCREFreeStudy}
 
 procedure SetPCREStackMallocCallback(const Value: pcre_stack_malloc_callback);
 {$EXTERNALSYM SetPCREStackMallocCallback}
@@ -405,6 +420,9 @@ function pcre_refcount(argument_re: PPCRE; adjust: Integer): Integer;
 function pcre_study(const code: PPCRE; options: Integer; const errptr: PPAnsiChar): PPCREExtra;
   {$IFDEF PCRE_EXPORT_CDECL} cdecl; {$ENDIF PCRE_EXPORT_CDECL}
 {$EXTERNALSYM pcre_study}
+procedure pcre_free_study(extra: PPCREExtra);
+  {$IFDEF PCRE_EXPORT_CDECL} cdecl; {$ENDIF PCRE_EXPORT_CDECL}
+{$EXTERNALSYM pcre_free_study}
 function pcre_version: PAnsiChar; {$IFDEF PCRE_EXPORT_CDECL} cdecl; {$ENDIF PCRE_EXPORT_CDECL}
 {$EXTERNALSYM pcre_version}
 
@@ -477,6 +495,9 @@ type
   pcre_study_func = function(const code: PPCRE; options: Integer; const errptr: PPAnsiChar): PPCREExtra;
   {$IFDEF PCRE_EXPORT_CDECL} cdecl; {$ENDIF PCRE_EXPORT_CDECL}
   {$EXTERNALSYM pcre_study_func}
+  pcre_free_study_func = procedure(extra: PPCREExtra);
+  {$IFDEF PCRE_EXPORT_CDECL} cdecl; {$ENDIF PCRE_EXPORT_CDECL}
+  {$EXTERNALSYM pcre_free_study_func}
   pcre_version_func = function: PAnsiChar; {$IFDEF PCRE_EXPORT_CDECL} cdecl; {$ENDIF PCRE_EXPORT_CDECL}
   {$EXTERNALSYM pcre_version_func}
 
@@ -517,6 +538,8 @@ var
   {$EXTERNALSYM pcre_refcount}
   pcre_study: pcre_study_func = nil;
   {$EXTERNALSYM pcre_study}
+  pcre_free_study: pcre_free_study_func = nil;
+  {$EXTERNALSYM pcre_free_study}
   pcre_version: pcre_version_func = nil;
   {$EXTERNALSYM pcre_version}
 
@@ -644,6 +667,9 @@ function pcre_get_substring_list; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_maketables; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_refcount; {$IfDef Darwin}cdecl;{$EndIf} external;
 function pcre_study; {$IfDef Darwin}cdecl;{$EndIf} external;
+{$IfDef UNIX}
+procedure pcre_free_study; {$IfDef Darwin}cdecl;{$EndIf} external;
+{$EndIf UNIX}
 function pcre_version; {$IfDef Darwin}cdecl;{$EndIf} external;
 {$EndIf PCRE_WinDLL}
 
@@ -810,6 +836,7 @@ const
   PCREMakeTablesExportName = 'pcre_maketables';
   PCRERefCountExportName = 'pcre_refcount';
   PCREStudyExportName = 'pcre_study';
+  PCREFreeStudyExportName = 'pcre_free_study';
   PCREVersionExportName = 'pcre_version';
   PCREMallocExportName = 'pcre_malloc';
   PCREFreeExportName = 'pcre_free';
@@ -905,6 +932,53 @@ begin
   pcre_free(P);
   {$ELSE ~PCRE_STATICLINK}
   pcre_free_func^(P);
+  {$ENDIF ~PCRE_STATICLINK}
+end;
+
+{$IfNDef UNIX}{$IfNDef PCRE_LINKDLL}{$IfNDef PCRE_LINKONREQUEST}
+// The bundled bcc32 pcre_study.obj predates pcre_free_study (PCRE 8.20), so
+// the Windows static path frees the extra block with PCRE's allocator. The
+// same is safe for the pcre3.dll build, whose free path already routes through
+// the DLL. Only the extra block is released; JIT code is not built there.
+procedure pcre_free_study(extra: PPCREExtra);
+begin
+  if extra <> nil then CallPCREFree(extra);
+end;
+{$EndIf PCRE_LINKONREQUEST}{$EndIf PCRE_LINKDLL}{$EndIf UNIX}
+
+function CallPCREStudy(code: PPCRE; options: Integer; const errptr: PPAnsiChar): PPCREExtra;
+begin
+  {$IFDEF PCRE_STATICLINK}
+  Result := pcre_study(code, options, errptr);
+  {$ELSE ~PCRE_STATICLINK}
+  {$IFDEF PCRE_LINKONREQUEST}
+  if Assigned(pcre_study) then
+    Result := pcre_study(code, options, errptr)
+  else
+    Result := nil;
+  {$ELSE ~PCRE_LINKONREQUEST}
+  Result := pcre_study(code, options, errptr);
+  {$ENDIF ~PCRE_LINKONREQUEST}
+  {$ENDIF ~PCRE_STATICLINK}
+end;
+
+procedure CallPCREFreeStudy(extra: PPCREExtra);
+begin
+  if extra = nil then Exit;
+  {$IFDEF PCRE_STATICLINK}
+  pcre_free_study(extra);
+  {$ELSE ~PCRE_STATICLINK}
+  {$IFDEF PCRE_LINKONREQUEST}
+  if Assigned(pcre_free_study) then
+    pcre_free_study(extra)
+  else
+    // Older dynamically loaded PCRE builds may not export pcre_free_study;
+    // free the block itself at least, so a pattern replacement cannot grow
+    // the heap without bound.
+    CallPCREFree(extra);
+  {$ELSE ~PCRE_LINKONREQUEST}
+  pcre_free_study(extra);
+  {$ENDIF ~PCRE_LINKONREQUEST}
   {$ENDIF ~PCRE_STATICLINK}
 end;
 
@@ -1059,6 +1133,7 @@ begin
   @pcre_maketables := Value;
   @pcre_refcount := Value;
   @pcre_study := Value;
+  @pcre_free_study := Value;
   @pcre_version := Value;
   {$ENDIF PCRE_LINKONREQUEST}
   pcre_malloc_func := nil;
@@ -1126,6 +1201,7 @@ begin
     @pcre_maketables := GetSymbol(PCREMakeTablesExportName);
     @pcre_refcount := GetSymbol(PCRERefCountExportName);
     @pcre_study := GetSymbol(PCREStudyExportName);
+    @pcre_free_study := GetSymbol(PCREFreeStudyExportName);
     @pcre_version := GetSymbol(PCREVersionExportName);
     {$ENDIF PCRE_LINKONREQUEST}
     pcre_malloc_func := GetSymbol(PCREMallocExportName);
@@ -1172,6 +1248,7 @@ function pcre_get_substring_list; external libpcremodulename name PCREGetSubStri
 function pcre_maketables; external libpcremodulename name PCREMakeTablesExportName;
 function pcre_refcount; external libpcremodulename name PCRERefCountExportName;
 function pcre_study; external libpcremodulename name PCREStudyExportName;
+procedure pcre_free_study; external libpcremodulename name PCREFreeStudyExportName;
 function pcre_version; external libpcremodulename name PCREVersionExportName;
 {$ENDIF PCRE_LINKDLL}
 

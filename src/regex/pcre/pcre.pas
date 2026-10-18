@@ -33,6 +33,34 @@ type
   PCREString = AnsiString;
 {$ENDIF UNICODE}
 
+  // A compiled pattern, shared by every CPcre that uses the same text and
+  // options. PCRE's compiled code is immutable, so one copy can serve any
+  // number of matches; only the subject/offset state lives in CPcre. The
+  // cache in this unit keeps recently used patterns alive, which is what makes
+  // a regex evaluated inside a loop cheap after the first iteration.
+  TPcreCode = class
+  private
+    FRefCount: Integer;
+    FInCache: Boolean;
+    FJitDone: Boolean;
+    FLastUsed: Int64;
+    FHash: LongWord;
+    FPattern: PCREString;
+    FOptions: Integer;
+    FRegex: Pointer;
+    FHints: Pointer;
+  public
+    constructor Create(const APattern: PCREString; AOptions: Integer);
+    destructor Destroy; override;
+    procedure AddRef;
+    procedure EnableJit;
+    procedure Release;
+    property Regex: Pointer read FRegex;
+    property Hints: Pointer read FHints;
+    property Pattern: PCREString read FPattern;
+    property Options: Integer read FOptions;
+  end;
+
 type
   CPcreAction = function (Sender: TObject): string of object;
 
@@ -40,12 +68,13 @@ type
   CPcre = class
   private
     FCompiled: Boolean;
+    FCode: TPcreCode;
     FPattern, FReplacement, FSubject: PCREString;
     FOptions: CPcreOptions;
     FPcreAction: CPcreAction;
     FActionTag: Pointer;
     FState: CPcreState;
-    FStop, LastOffset: Integer;
+    FStop, LastOffset, FMatchCount: Integer;
     function GetMatched: PCREString;
     function GetMatchedLength: Integer;
     function GetMatchedOffset: Integer;
@@ -78,6 +107,7 @@ type
     class function EscapePatternChars(const S: string): string;
   public
     procedure Compile;
+    procedure UseCode(ACode: TPcreCode);
     function Match: Boolean;
     function MatchOne: PCREString;
     function MatchAll: PCREString;
@@ -88,6 +118,7 @@ type
     function SubjectLeft: PCREString;
     function SubjectRight: PCREString;
     property Compiled: Boolean read FCompiled;
+    property Code: TPcreCode read FCode;
     property Success: Boolean read GetSuccess;
     property Matched: PCREString read GetMatched;
     property MatchedLength: Integer read GetMatchedLength;
@@ -110,6 +141,139 @@ implementation
 
 uses SysUtils, {$IfNDef UNIX}Windows, {$ENDIF}
      pcrd;
+
+const
+  // Enough for the literal patterns of a normal script (and for a handful of
+  // dynamically built ones). Entries are evicted least-recently-used, and only
+  // when no CPcre still refers to them, so eviction never frees live code.
+  PcreCacheLimit = 64;
+
+var
+  PcreCache: array[0..PcreCacheLimit-1] of TPcreCode;
+  PcreCacheCount: Integer = 0;
+  PcreCacheClock: Int64 = 0;
+
+function PcreHash(const S: PCREString; Options: Integer): LongWord;
+var
+  I: Integer;
+begin
+  Result := LongWord($811C9DC5) xor LongWord(Options);
+  for I := 1 to Length(S) do
+    Result := (Result xor LongWord(Ord(S[I]))) * 16777619;
+end;
+
+//==============================================================
+constructor TPcreCode.Create(const APattern: PCREString; AOptions: Integer);
+var
+  Error: PAnsiChar;
+  ErrorOffset: Integer;
+begin
+  inherited Create;
+  FRefCount := 1;
+  FPattern  := APattern;
+  FOptions  := AOptions;
+  FHash     := PcreHash(APattern, AOptions);
+  FRegex    := pcrd.pcre_compile(PAnsiChar(APattern), AOptions,
+                                 @Error, @ErrorOffset, nil);
+  if FRegex = nil then
+    raise Exception.Create(Format('RE Compile() - Error in regex at offset %d: %s',
+      [ErrorOffset, AnsiString(Error)]));
+  // No study yet. Most dynamically built patterns are used once, and paying
+  // for either machine code or start-bit analysis would make one-shot
+  // toRegex() slower than before the cache existed. Reuse upgrades the
+  // pattern in EnableJit below.
+  FHints := nil;
+end;
+
+destructor TPcreCode.Destroy;
+begin
+  if FHints <> nil then CallPCREFreeStudy(PPCREExtra(FHints));
+  if FRegex <> nil then CallPCREFree(FRegex);
+  inherited Destroy;
+end;
+
+procedure TPcreCode.AddRef;
+begin
+  Inc(FRefCount);
+end;
+
+// Upgrade a pattern that has been used at least twice to PCRE's JIT. pcre_exec
+// picks the machine code up through the extra block automatically. If the JIT
+// declines the pattern, keep the existing interpreter study data.
+procedure TPcreCode.EnableJit;
+var
+  Extra: PPCREExtra;
+  Error: PAnsiChar;
+begin
+  if FJitDone then Exit;
+  FJitDone := True;
+  Extra := CallPCREStudy(PPCRE(FRegex), PCRE_STUDY_JIT_COMPILE, @Error);
+  if Extra <> nil then
+  begin
+    if FHints <> nil then CallPCREFreeStudy(PPCREExtra(FHints));
+    FHints := Extra;
+  end;
+end;
+
+procedure TPcreCode.Release;
+begin
+  Dec(FRefCount);
+  if (FRefCount <= 0) and not FInCache then
+    Free;
+end;
+
+// Find a cached compiled pattern, or compile and cache a new one. The returned
+// object carries one reference for the caller.
+function PcreGetCode(const APattern: PCREString; AOptions: Integer): TPcreCode;
+var
+  I, Victim: Integer;
+  H: LongWord;
+  C: TPcreCode;
+begin
+  H := PcreHash(APattern, AOptions);
+  Inc(PcreCacheClock);
+  for I := 0 to PcreCacheCount - 1 do
+  begin
+    C := PcreCache[I];
+    if (C.FHash = H) and (C.FOptions = AOptions) and (C.FPattern = APattern) then
+    begin
+      C.FLastUsed := PcreCacheClock;
+      // Second use of this pattern: now the JIT cost is likely to be repaid.
+      C.EnableJit;
+      C.AddRef;
+      Exit(C);
+    end;
+  end;
+
+  C := TPcreCode.Create(APattern, AOptions);
+  C.FLastUsed := PcreCacheClock;
+  if PcreCacheCount < PcreCacheLimit then
+  begin
+    PcreCache[PcreCacheCount] := C;
+    Inc(PcreCacheCount);
+    C.FInCache := True;
+  end
+  else
+  begin
+    Victim := -1;
+    for I := 0 to PcreCacheCount - 1 do
+      if PcreCache[I].FRefCount <= 0 then
+        if (Victim < 0) or (PcreCache[I].FLastUsed < PcreCache[Victim].FLastUsed) then
+          Victim := I;
+    if Victim >= 0 then
+    begin
+      PcreCache[Victim].FInCache := False;
+      PcreCache[Victim].Release; // frees it if nobody else holds it
+      PcreCache[Victim] := C;
+      C.FInCache := True;
+    end;
+    // If every entry is in use, leave this one uncached; C is still owned by
+    // the caller and will free itself on release.
+  end;
+  Result := C;
+end;
+
+//==============================================================
 
 function FirstCap(const S: string): string;
 begin
@@ -181,24 +345,41 @@ end;
 procedure CPcre.CleanUp;
 begin
   FCompiled := False;
-  CallPCREFree(pregex);
+  if FCode <> nil then
+  begin
+    FCode.Release;
+    FCode := nil;
+  end
+  else if pregex <> nil then
+    CallPCREFree(pregex);
   pregex := nil;
   hints := nil;
   OffsetCount := 0;
 end;
 
 procedure CPcre.Compile;
-var
-  Error: PAnsiChar;
-  ErrorOffset: Integer;
 begin
   if FPattern = '' then
     raise Exception.Create('RE Compile() - Please specify a regular expression in Pattern first');
   CleanUp;
-  pregex := pcre_compile(PAnsiChar(FPattern), pcreOptions, @Error, @ErrorOffset, chartable);
-  if pregex = nil then
-    raise Exception.Create(Format('RE Compile() - Error in regex at offset %d: %s', [ErrorOffset, AnsiString(Error)]));
-  FCompiled := True
+  FCode := PcreGetCode(FPattern, pcreOptions);
+  pregex := FCode.Regex;
+  hints := FCode.Hints;
+  FCompiled := True;
+end;
+
+// Attach an already compiled pattern (owned by a CRegex or another cache)
+// instead of looking it up again. The CPcre takes its own reference, so the
+// code stays valid even if the caller is destroyed first.
+procedure CPcre.UseCode(ACode: TPcreCode);
+begin
+  CleanUp;
+  if ACode = nil then Exit;
+  ACode.AddRef;
+  FCode := ACode;
+  pregex := ACode.Regex;
+  hints := ACode.Hints;
+  FCompiled := True;
 end;
 
 (* Backreference overview:
@@ -405,7 +586,7 @@ end;
 
 destructor CPcre.Destroy;
 begin
-  CallPCREFree(pregex);
+  CleanUp;
   inherited Destroy;
 end;
 
@@ -490,12 +671,34 @@ begin
   if FStart > 1 then LastOffset := FStart;
   
   if not Compiled then Compile;
+  // EnableJit() may replace the extra block while another CPcre still refers
+  // to this shared code, so always take the current pointer.
+  if FCode <> nil then hints := FCode.Hints;
   if preNotBOL in State then Opts := PCRE_NOTBOL else Opts := 0;
   if preNotEOL in State then Opts := Opts or PCRE_NOTEOL;
   if preNotEmpty in State then Opts := Opts or PCRE_NOTEMPTY;
   if FStart-1 > FStop then OffsetCount := -1
-    else OffsetCount := pcre_exec(pregex, hints, FSubjectPChar, FStop, FStart-1, Opts, @Offsets[0], High(Offsets));
+  else
+  begin
+    OffsetCount := pcre_exec(pregex, hints, FSubjectPChar, FStop, FStart-1, Opts, @Offsets[0], High(Offsets));
+    // The JIT uses the machine stack by default. Deeply recursive patterns can
+    // exhaust it; retry with the interpreter rather than reporting no match.
+    if (OffsetCount = PCRE_ERROR_JIT_STACKLIMIT) and (hints <> nil) then
+      OffsetCount := pcre_exec(pregex, nil, FSubjectPChar, FStop, FStart-1, Opts, @Offsets[0], High(Offsets));
+  end;
   Result := OffsetCount > 0;
+  if Result then
+  begin
+    Inc(FMatchCount);
+    // A single global match/replace can also be worth compiling. After a
+    // handful of interpreter matches, upgrade and use the machine code for
+    // the rest of this subject.
+    if (FMatchCount = 16) and (FCode <> nil) then
+    begin
+      FCode.EnableJit;
+      hints := FCode.Hints;
+    end;
+  end;
   // Convert offsets into PCREString indices
   if Result then begin
     for I := 0 to OffsetCount*2-1 do
@@ -518,12 +721,62 @@ begin
   end;
 end;
 
-function CPcre.MatchAll: PCREString;
+// Append helpers for the single-pass MatchAll/ReplaceAll paths. They keep one
+// growable buffer, so N matches cost O(total length) instead of repeatedly
+// reallocating and copying the accumulated result.
+procedure AppendText(var Buf: PCREString; var Len: Integer; const S: PCREString);
+var
+  Cap, Need: Integer;
 begin
-  Result := '';
-  repeat
-    Result := Result + MatchOne;
-  until not Success;
+  if Length(S) = 0 then Exit;
+  Need := Len + Length(S);
+  Cap  := Length(Buf);
+  if Need > Cap then
+  begin
+    if Cap = 0 then Cap := Need
+    else
+      while Cap < Need do Cap := Cap * 2;
+    SetLength(Buf, Cap);
+  end;
+  Move(PAnsiChar(S)^, (PAnsiChar(Buf) + Len)^, Length(S));
+  Inc(Len, Length(S));
+end;
+
+procedure AppendRange(var Buf: PCREString; var Len: Integer;
+  const S: PCREString; Start0, Count: Integer);
+var
+  Cap, Need: Integer;
+begin
+  if Count <= 0 then Exit;
+  Need := Len + Count;
+  Cap  := Length(Buf);
+  if Need > Cap then
+  begin
+    if Cap = 0 then Cap := Need
+    else
+      while Cap < Need do Cap := Cap * 2;
+    SetLength(Buf, Cap);
+  end;
+  Move((PAnsiChar(S) + Start0)^, (PAnsiChar(Buf) + Len)^, Count);
+  Inc(Len, Count);
+end;
+
+function CPcre.MatchAll: PCREString;
+var
+  Buf: PCREString;
+  Len: Integer;
+begin
+  Buf := '';
+  Len := 0;
+  while Match do
+  begin
+    if Assigned(FPcreAction) then
+      AppendText(Buf, Len, FPcreAction(FActionTag))
+    else
+      AppendText(Buf, Len, Matched);
+  end;
+  SetLength(Buf, Len);
+  Result := Buf;
 end;
 
 function CPcre.NamedGroup(const Name: PCREString): Integer;
@@ -595,14 +848,39 @@ begin
 end;
 
 function CPcre.ReplaceAll: Boolean;
+var
+  Buf: PCREString;
+  Len, Pos0, MatchOff, MatchLen: Integer;
+  Repl: PCREString;
 begin
-  if Match then begin
-    Result := True;
-    repeat
-      Replace
-    until not Match;
-  end
-  else Result := False;
+  Result := Match;
+  if not Result then Exit;
+
+  Buf    := '';
+  Len    := 0;
+  Pos0   := 0;
+  repeat
+    MatchOff := MatchedOffset - 1; // 0-based
+    MatchLen := MatchedLength;
+    if MatchOff > Pos0 then
+      AppendRange(Buf, Len, FSubject, Pos0, MatchOff - Pos0);
+    if Assigned(FPcreAction) then
+      Repl := FPcreAction(FActionTag)
+    else
+      Repl := ComputeReplacement;
+    AppendText(Buf, Len, Repl);
+    Pos0 := MatchOff + MatchLen;
+  until not Match;
+
+  if Pos0 < Length(FSubject) then
+    AppendRange(Buf, Len, FSubject, Pos0, Length(FSubject) - Pos0);
+  SetLength(Buf, Len);
+
+  FSubject    := Buf;
+  FSubjectPChar := PAnsiChar(FSubject);
+  FStart      := Length(FSubject) + 2; // one past the last possible start
+  FStop       := Length(FSubject);
+  OffsetCount := 0;
 end;
 
 procedure CPcre.SetOptions(Value: CPcreOptions);
@@ -659,5 +937,16 @@ begin
   LastOffset  := 1;
 end;
 
+finalization
+  // Drop idle patterns. A pattern still referenced by a live CPcre is left
+  // alone; its owner releases it later.
+  while PcreCacheCount > 0 do
+  begin
+    Dec(PcreCacheCount);
+    PcreCache[PcreCacheCount].FInCache := False;
+    if PcreCache[PcreCacheCount].FRefCount <= 0 then
+      PcreCache[PcreCacheCount].Free;
+    PcreCache[PcreCacheCount] := nil;
+  end;
 
 end.

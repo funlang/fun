@@ -22,16 +22,21 @@ unit regex;
 interface
 
 uses fun, base, core, host
+     , pcre
      ;
 
 type
   CRegex = class(CExp)
   private
+    FCode: TPcreCode;
+    FCodeOptions: CPcreOptions;
     function g: fun.bool;
+    procedure prepare(re: CPcre);
   protected
     options: fun.str;
     pattern: fun.str;
   public
+    destructor Destroy; override;
     procedure match(env: CEnv; const s: fun.str; exp: CExp; val: PValue);
     function parse(const r: fun.str): CExp; overload;
     function parse(const p, o: fun.str): CExp; overload;
@@ -70,8 +75,7 @@ type
   
 implementation
 
-uses SysUtils,
-     pcre;
+uses SysUtils;
 
 function ParseRegex(const r: fun.str; var o: fun.str): fun.str;
 var
@@ -157,6 +161,47 @@ begin
   result := Pos('g', options) > 0;
 end;
 
+destructor CRegex.Destroy;
+begin
+  if FCode <> nil then FCode.Release;
+  inherited Destroy;
+end;
+
+// Give the per-call CPcre a compiled pattern. A literal regex is evaluated
+// many times, so the first call keeps the code here and later calls skip the
+// global cache lookup entirely. Options are part of the key because the same
+// CRegex is never reused with different options unless parse() is called again.
+procedure CRegex.prepare(re: CPcre);
+var
+  o: CPcreOptions;
+begin
+  o := ParseOptions(options);
+  re.Pattern := pattern;
+  re.Options := o;
+  if (FCode <> nil) and (FCodeOptions = o) then
+  begin
+    // Second use of this literal: JIT-compile it once, then every later call
+    // gets the machine code through the shared extra block.
+    FCode.EnableJit;
+    re.UseCode(FCode);
+  end
+  else
+  begin
+    if FCode <> nil then
+    begin
+      FCode.Release;
+      FCode := nil;
+    end;
+    re.Compile;
+    FCode := re.Code;
+    if FCode <> nil then
+    begin
+      FCode.AddRef;
+      FCodeOptions := o;
+    end;
+  end;
+end;
+
 procedure CRegex.match(env: CEnv; const s: fun.str; exp: CExp; val: PValue);
 var
   re: CPcre;
@@ -166,8 +211,7 @@ begin
   re := CPcre.Create;
   mt := nil;
   try
-    re.Pattern := pattern;
-    re.Options := ParseOptions(options);
+    prepare(re);
     re.Subject := s;
     if (exp <> nil) and (exp.asObj <> nil) then // fun call
     begin
@@ -218,6 +262,12 @@ end;
 
 function CRegex.parse(const p, o: fun.str): CExp;
 begin
+  if FCode <> nil then
+  begin
+    FCode.Release;
+    FCode := nil;
+  end;
+  FCodeOptions := [];
   assign(CBase(self));
   result  := self;
   pattern := p;
@@ -232,8 +282,7 @@ begin
   re := CPcre.Create;
   mt := nil;
   try
-    re.Pattern := pattern;
-    re.Options := ParseOptions(options);
+    prepare(re);
     re.Subject := s;
     if exp.asObj <> nil then // fun call
     begin
