@@ -17,9 +17,9 @@
 # and is shared with fun/test/run-windows-regression.bat.
 #
 # Two kinds of checks:
-#   snap  - output must match a snapshot byte for byte (a mismatch prints the
-#           first 20 diff lines, so a failure on another host/word size can be
-#           read directly instead of hunted for)
+#   snap  - output must match a snapshot byte for byte apart from line-ending
+#           style (a mismatch prints the first 20 diff lines, so a failure on
+#           another host/word size can be read directly instead of hunted for)
 #   smoke - only exit code 0 and no crash markers (for nondeterministic output)
 #
 # HOST PLATFORMS
@@ -95,10 +95,36 @@ if [ ! -f "$SKIPFILE" ] && [ "$PLATFORM_BASE" != "$PLATFORM" ] \
     SKIPFILE="$HERE/regression-skip-$PLATFORM_BASE.txt"
 fi
 
-# --update writes into the host's own snapshot dir on non-Linux hosts, so the
-# shared Linux snapshots stay the common baseline; Linux keeps writing to
-# expected/ directly (unchanged).
-if [ "$PLATFORM" = "linux" ]; then SNAPDIR="$EXPECTED"; else SNAPDIR="$PLATFORM_EXPECTED"; fi
+# --update writes into the host's own snapshot dir. `?.` emits the platform's
+# native newline, so a POSIX update must not overwrite the CRLF snapshots that
+# the Windows runner compares against.
+SNAPDIR="$PLATFORM_EXPECTED"
+
+# Snapshot comparison ignores the line-ending style: snapshots are stored with
+# CRLF for the Windows runner, while `?.` now emits LF on POSIX. A literal CR
+# before LF (or at the end of the captured text) is the only thing dropped;
+# other bytes, including non-UTF-8 payloads, are compared unchanged.
+CR="$(printf '\r')"
+
+# Snapshots captured by the old runner end with a lone CR instead of LF
+# (command substitution stripped the final LF). After removing EOL CRs, make
+# both sides end with a newline so that representation is not a difference.
+ensure_final_newline() {
+    [ -s "$1" ] || return 0
+    if [ "$(tail -c 1 "$1" | od -An -t u1 | tr -d ' \t\n')" != "10" ]; then
+        printf '\n' >> "$1"
+    fi
+}
+
+# Old snapshots end with a lone CR: the capture stripped the final LF, so the
+# CR is the last byte of what was a CRLF. Put that LF back before normalizing.
+cat_snapshot() {
+    cat "$1"
+    [ -s "$1" ] || return 0
+    if [ "$(tail -c 1 "$1" | od -An -t u1 | tr -d ' \t\n')" = "13" ]; then
+        printf '\n'
+    fi
+}
 
 cd "$ROOT" || exit 2
 
@@ -184,12 +210,20 @@ while IFS="$(printf '\t')" read -r name script testmode; do
 
     total=$((total + 1))
     detail=''
+    tmpfile="$(mktemp "${TMPDIR:-/tmp}/funreg-run.XXXXXX")"
     if [ "$testmode" = "shell" ]; then
-        out="$(sh "fun/$script" 2>&1 | tr -d '\r')"
+        sh "fun/$script" > "$tmpfile" 2>&1
+        rc=$?
+        out="$(tr -d '\r' < "$tmpfile"; printf x)"
     else
-        out="$("$FUNCMD" "fun/$script" 2>&1)"
+        "$FUNCMD" "fun/$script" > "$tmpfile" 2>&1
+        rc=$?
+        out="$(cat "$tmpfile"; printf x)"
     fi
-    rc=$?
+    # The sentinel keeps the output's trailing newlines, which command
+    # substitution would otherwise strip; only the sentinel is removed.
+    out="${out%x}"
+    rm -f "$tmpfile"
     result=""
     snap="$(snapshot_for "$name")"
 
@@ -202,17 +236,27 @@ while IFS="$(printf '\t')" read -r name script testmode; do
             result="PASS"
         fi
     elif [ "$update" = "1" ]; then
+        mkdir -p "$SNAPDIR"
         printf '%s' "$out" > "$SNAPDIR/$name.txt"
         result="SNAPSHOT"
     elif [ "$rc" -ne 0 ]; then
         result="FAIL(rc=$rc)"
     elif [ ! -f "$snap" ]; then
         result="FAIL(no snapshot; run --update)"
-    elif ! printf '%s' "$out" | diff -q - "$snap" >/dev/null 2>&1; then
-        result="FAIL(output differs)"
-        detail=$(printf '%s' "$out" | diff -u "$snap" - | head -20)
     else
-        result="PASS"
+        tmpout="$(mktemp "${TMPDIR:-/tmp}/funreg-out.XXXXXX")"
+        tmpsnap="$(mktemp "${TMPDIR:-/tmp}/funreg-snap.XXXXXX")"
+        printf '%s' "$out" | sed "s/${CR}\$//" > "$tmpout"
+        cat_snapshot "$snap" | sed "s/${CR}\$//" > "$tmpsnap"
+        ensure_final_newline "$tmpout"
+        ensure_final_newline "$tmpsnap"
+        if ! diff -q "$tmpout" "$tmpsnap" >/dev/null 2>&1; then
+            result="FAIL(output differs)"
+            detail=$(diff -u "$tmpsnap" "$tmpout" | head -20)
+        else
+            result="PASS"
+        fi
+        rm -f "$tmpout" "$tmpsnap"
     fi
 
     case "$result" in

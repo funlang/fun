@@ -560,12 +560,13 @@ jobs:
       - name: Regression (portable subset)
         shell: pwsh
         run: |
-          # Fun terminates lines with CRLF on every platform, and the POSIX
-          # runner captures with $(...), which drops the trailing newline, so a
-          # shared snapshot ends its last line with a lone CR. A Windows redirect
-          # keeps that final LF, so re-add exactly one "\n" (verified against
-          # every shared snapshot) instead of rewriting line endings - the
-          # snapshots are already CRLF.
+          # The shared snapshots are kept CRLF for this runner (POSIX `?.` now
+          # emits LF, and the POSIX runner compares with line endings
+          # normalized). Their last line ends with a lone CR because the old
+          # POSIX capture dropped the trailing LF. A Windows redirect keeps
+          # that final LF, so re-add exactly one "\n" (verified against every
+          # shared snapshot) instead of rewriting line endings - the snapshots
+          # are already CRLF.
           #
           # Copy bytes, not text: some snapshots (set-named.fun) carry raw
           # non-UTF-8 bytes, and ReadAllText/WriteAllText would decode and
