@@ -97,6 +97,19 @@ type
     function parse(avar, aexp: CExp): CNode;
     procedure run(env: CEnv); override;
   end;
+
+  // Assignment to a plain variable. The first run resolves the target slot
+  // kind and caches it; later runs read/write the slots directly instead of
+  // repeating the virtual assign -> stack.Push chain.
+  CAssignFast = class(CAssign)
+  private
+    FInit: Boolean;
+    FFast: Boolean;
+    FTargetIsRE: Boolean;
+    FSourceIsId: Boolean;
+  public
+    procedure run(env: CEnv); override;
+  end;
   
   CCall = class(CRuna)
   protected
@@ -247,6 +260,7 @@ type
     procedure assign(obj: CNew); overload; override;
     procedure assign(const val: CValue); overload; override;
     procedure assign(val: PValue); overload; override;
+    function DirectTarget: PValue;
   end;
   
   CLeft = class(CExp)
@@ -578,6 +592,72 @@ begin
   /// exp = evar op exp <- evar op= exp
   /// done in parser
   evar.assign(exp.calcValue(env));
+end;
+
+procedure CAssignFast.run(env: CEnv);
+var
+  t, s: CId;
+  src, dst: PValue;
+begin
+  if not FInit then
+  begin
+    FInit := True;
+    FFast := False;
+    if not (evar is CId) or (evar is CId2) then Exit;
+    t := CId(evar);
+    t.find(true);
+    if t.evar is CVarRE then
+      FTargetIsRE := True
+    else if t.evar is CVar then
+      FTargetIsRE := False
+    else
+      Exit;
+    if exp is CId and not (exp is CId2) then
+    begin
+      s := CId(exp);
+      s.find(false);
+      // Self-assignment can alias the target's stack slot; keep the generic
+      // path for that rare case.
+      if s.evar = t.evar then Exit;
+      // Read p_val directly only for plain variables; other CId targets
+      // (constants, optional cells) keep the generic value path.
+      if (s.evar is CVarRE) or (s.evar is CVar) then
+        FSourceIsId := True;
+    end;
+    FFast := True;
+  end;
+
+  if not FFast then
+  begin
+    inherited run(env);
+    Exit;
+  end;
+
+  t := CId(evar);
+  if FSourceIsId then
+  begin
+    s := CId(exp);
+    s.find(false);
+    src := CExp(s.evar).p_val;
+  end
+  else
+    src := exp.calcValue(env);
+
+  if FTargetIsRE then
+  begin
+    dst := CVarRE(t.evar).DirectTarget;
+    if dst = nil then
+    begin
+      // A scope entry still has to push this variable's slot.
+      CVarRE(t.evar).assign(src);
+      Exit;
+    end;
+  end
+  else
+    dst := CExp(t.evar).p_val;
+
+  if dst <> src then
+    copyValue(dst, src);
 end;
 
 //==============================================================
@@ -1332,6 +1412,11 @@ procedure CVarRE.assign(val: PValue);
 begin
   stack.Push();
   inherited assign(val);
+end;
+
+function CVarRE.DirectTarget: PValue;
+begin
+  result := stack.DirectTarget;
 end;
 
 //==============================================================

@@ -154,6 +154,8 @@ type
     constructor Create(aowner: CFunStack; p: PValue; pp: PPValue);
     procedure Parse(p: PValue; pp: PPValue);
     procedure Push;
+    function CanWriteDirect: Boolean;
+    function DirectTarget: PValue;
   end;
   
 
@@ -941,6 +943,21 @@ end;
 procedure CVarStack.Push;
 begin
   owner.PushVar(self);
+end;
+
+function CVarStack.CanWriteDirect: Boolean;
+begin
+  // Mirror CFunStack.PushVar: no push is needed when the variable is already
+  // at the current scope level.
+  result := not ((owner.level > owner.start) and (level < owner.level - owner.start));
+end;
+
+function CVarStack.DirectTarget: PValue;
+begin
+  if CanWriteDirect then
+    result := pp_val^
+  else
+    result := nil;
 end;
 
 procedure CVarStack.PushVar;

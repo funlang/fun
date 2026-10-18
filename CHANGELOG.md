@@ -25,6 +25,14 @@ This project records notable changes in the style of [Keep a Changelog](https://
   subject between matches, so `'abcabc'.replace(/b/g, '[$_]')` produced
   `a[abcabc]ca[a[abcabc]cabc]c`; it now yields `a[abcabc]ca[abcabc]c`.
 
+- Plain variable assignments are specialized at parse time. The first run
+  resolves the target slot once; later runs read simple `CId` sources and write
+  the scalar slot directly instead of repeating the virtual assign and scope
+  push. On the bundled Linux x86_64 build, `x = i` drops from ~56 to ~38
+  ns/iter and a global `gx = i` from ~52 to ~33 ns/iter. Fields, indices,
+  self-assignments and scope entries that still need a push keep the generic
+  path.
+
 ## [9.4.1] - 2026-10-17
 
 - Fix integer comparison of far-apart operands. `varComp` and the CalcOpt fast

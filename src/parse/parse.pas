@@ -545,7 +545,10 @@ begin
     e := CCTwo.new(Curr).parse(evar.node, ParseOp(op), exp.node);
     base.add(evar.node);
   end;
-  result.node := CAssign.new(Curr, true).parse(evar.node, e);
+  if (CExp(evar.node) is CId) and not (CExp(evar.node) is CId2) then
+    result.node := CAssignFast.new(Curr, true).parse(CExp(evar.node), e)
+  else
+    result.node := CAssign.new(Curr, true).parse(CExp(evar.node), e);
   DoLogCmd(result);
 end;
 
