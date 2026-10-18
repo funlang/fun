@@ -6,6 +6,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.4.2] - 2026-10-18
+
 - Regex matching no longer recompiles the same pattern on every call. The
   compiled PCRE code is shared through a small LRU cache keyed by pattern text
   and options, with reference counting so a lazy match object always keeps its
