@@ -84,7 +84,7 @@ if [ -n "$PCRE_SRC" ] && [ -f "$PCRE_SRC/pcre_compile.c" ]; then
         for f in pcre_byte_order pcre_chartables pcre_compile pcre_config \
                  pcre_default_tables pcre_dfa_exec pcre_exec pcre_fullinfo \
                  pcre_get pcre_globals pcre_jit_compile pcre_maketables pcre_newline \
-                 pcre_refcount pcre_study pcre_tables pcre_ucd \
+                 pcre_ord2utf8 pcre_refcount pcre_study pcre_tables pcre_ucd \
                  pcre_valid_utf8 pcre_version pcre_xclass pcre_string_utils; do
             [ -f "$PCRE_SRC/$f.c" ] || continue
             if [ ! -f "$PCRE_LIB/$f.o" ] || [ "$PCRE_SRC/$f.c" -nt "$PCRE_LIB/$f.o" ]; then
