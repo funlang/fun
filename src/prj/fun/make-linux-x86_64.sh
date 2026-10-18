@@ -126,7 +126,11 @@ if [ -n "$PCRE_SRC" ] && [ -f "$PCRE_SRC/pcre_compile.c" ]; then
         # harmless on x86_64.
         LIBGCC="$(gcc -print-libgcc-file-name 2>/dev/null)"
         if [ -n "$LIBGCC" ]; then LIBGCC_FLAG="-k$LIBGCC"; else LIBGCC_FLAG="-k-lgcc"; fi
-        PCRE_FLAGS="-dRegex -Fl$PCRE_LIB -k-lc $LIBGCC_FLAG -k--gc-sections"
+        # FPC passes -k flags before the linker response file that names
+        # libpcre.a, so an archive listed there is normally scanned too early
+        # to satisfy a later reference. -u makes __clear_cache undefined from
+        # the start, which pulls its member from libgcc regardless of order.
+        PCRE_FLAGS="-dRegex -Fl$PCRE_LIB -k-lc $LIBGCC_FLAG -k--undefined=__clear_cache -k--gc-sections"
         echo "Regex enabled (PCRE 8)."
     else
         echo "gcc not found - building WITHOUT regex." >&2
