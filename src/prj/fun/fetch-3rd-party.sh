@@ -43,9 +43,11 @@ done
 fetch() {
     url="$1"; out="$2"
     if command -v curl >/dev/null 2>&1; then
-        curl -fSL --retry 3 -o "$out" "$url"
+        # --retry-all-errors also covers DNS/connect failures, which plain
+        # --retry does not; runners occasionally lose name resolution.
+        curl -fSL --retry 5 --retry-all-errors --retry-delay 5 -o "$out" "$url"
     elif command -v wget >/dev/null 2>&1; then
-        wget -O "$out" "$url"
+        wget --tries=5 --waitretry=5 -O "$out" "$url"
     else
         echo "need curl or wget to download $url" >&2
         exit 1

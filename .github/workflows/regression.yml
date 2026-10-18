@@ -164,7 +164,15 @@ jobs:
         if: runner.os == 'macOS'
         run: brew link --force --overwrite openssl@3 || brew install openssl@3
 
+      - name: Cache third-party C sources
+        id: cache-third
+        uses: actions/cache@v4
+        with:
+          path: src/3rd
+          key: third-party-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/prj/fun/fetch-3rd-party.sh') }}
+
       - name: Fetch third-party C sources
+        if: steps.cache-third.outputs.cache-hit != 'true'
         run: |
           if [ "${{ matrix.fetch_all }}" = "true" ]; then
             src/prj/fun/fetch-3rd-party.sh
