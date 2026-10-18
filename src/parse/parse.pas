@@ -630,7 +630,10 @@ begin
     // CVar or CId ?
     // => CId
     e := CId.new(c).parse(id.text, v);
-    result.node := CAssign.new(c, true).parse(e, exp);
+    // Same node as a statement assignment: the target is always a plain CId
+    // here, and the first run still falls back to the generic path when the
+    // declared slot needs its initial scope push.
+    result.node := CAssignFast.new(c, true).parse(e, exp);
     DoLogCmd(result);
   end
   else

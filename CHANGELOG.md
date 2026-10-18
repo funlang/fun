@@ -6,6 +6,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Variable declarations with an initializer now use the same parse-time
+  assignment specialization as plain assignments. A `var` inside a loop resolves
+  its slot once and reuses it instead of repeating the generic assign and
+  scope-push chain. On the bundled Linux x86_64 build `var d = i` drops from
+  ~57 to ~38 ns/iter, matching a plain assignment in the same scope.
+
 ## [9.4.2] - 2026-10-18
 
 - Regex matching no longer recompiles the same pattern on every call. The
