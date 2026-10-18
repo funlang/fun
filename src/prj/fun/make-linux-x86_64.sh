@@ -120,7 +120,13 @@ if [ -n "$PCRE_SRC" ] && [ -f "$PCRE_SRC/pcre_compile.c" ]; then
         done
         rm -f "$PCRE_LIB/libpcre.a"
         ar rcs "$PCRE_LIB/libpcre.a" "$PCRE_LIB"/*.o
-        PCRE_FLAGS="-dRegex -Fl$PCRE_LIB -k-lc -k--gc-sections"
+        # libgcc supplies __clear_cache on aarch64, where the PCRE JIT flushes
+        # the instruction cache after generating code. Pass the archive path
+        # from gcc so ld finds it without relying on its own search path; it is
+        # harmless on x86_64.
+        LIBGCC="$(gcc -print-libgcc-file-name 2>/dev/null)"
+        if [ -n "$LIBGCC" ]; then LIBGCC_FLAG="-k$LIBGCC"; else LIBGCC_FLAG="-k-lgcc"; fi
+        PCRE_FLAGS="-dRegex -Fl$PCRE_LIB -k-lc $LIBGCC_FLAG -k--gc-sections"
         echo "Regex enabled (PCRE 8)."
     else
         echo "gcc not found - building WITHOUT regex." >&2
