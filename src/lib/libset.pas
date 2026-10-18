@@ -338,7 +338,7 @@ function _asJson(hash: CHash; cs: CSet; lev: fun.int; format: fun.int = 0; json:
     if fd then
       add(#10)
     else
-      add(#13#10)
+      add({$IfDef Unix}#10{$Else}#13#10{$EndIf})
     ;
   end;
 
