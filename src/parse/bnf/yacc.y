@@ -140,7 +140,7 @@ Cmd         : _end Bloc                 { builder.BuildEnd($1, $2, $2); }
             
             | FunCall                   { builder.BuildCall($1); }
             | "?"     Exp               { builder.BuildEcho($1, $2, $2); }
-            | "?" "." Exp               { builder.BuildEcho($1, $3, $3, #13#10); }
+            | "?" "." Exp               { builder.BuildEcho($1, $3, $3, {$IfDef Unix}#10{$Else}#13#10{$EndIf}); }
             | "?" "," Exp               { builder.BuildEcho($1, $3, $3, ' '); }
             | "?" ":" Exp               { builder.BuildEcho($1, $3, $3, #9); }
             ;

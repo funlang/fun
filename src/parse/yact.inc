@@ -156,7 +156,7 @@
          builder.BuildEcho(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A53; begin
-         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], #13#10); 
+         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], {$IfDef Unix}#10{$Else}#13#10{$EndIf}); 
        end;
        procedure A54; begin
          builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], ' '); 
