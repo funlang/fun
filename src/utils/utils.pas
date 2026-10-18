@@ -25,6 +25,15 @@ uses fun;
 
 procedure InitTick;
 function GetTick: fun.uint;
+{$IfDef FunStartupTiming}
+// Nanosecond-resolution monotonic clock for startup profiling
+// (-dFunStartupTiming in funcmd.dpr). Not part of the script-visible API.
+function GetNanoTick: fun.uint64;
+// Startup profiling hooks, also used inside this unit (FindCmdLine), so the
+// caller only has to start the clock once with TimeMark('main').
+procedure TimeMark(const name: fun.str);
+procedure DumpProfile;
+{$EndIf}
 
 function FindParam(const id: fun.str; idx: fun.int = 0): fun.str;
 function FindParamAsBool(const id: fun.str; idx: fun.int = 0): fun.bool;
@@ -79,6 +88,15 @@ end;
 //==============================================================
 var
   tick: fun.uint;
+{$IfDef FunStartupTiming}
+  {$IfNDef UNIX}
+  qpcFreq: int64 = 0;
+  {$EndIf}
+  profileStart:  fun.uint64;
+  profilePrev:   fun.uint64;
+  profileLog:    fun.str;
+  profileDumped: fun.bool;
+{$EndIf}
 
 function GetTickCount: fun.uint;
 {$IfDef UNIX}
@@ -122,6 +140,72 @@ begin
   result := i - tick;
   tick   := i;
 end;
+
+{$IfDef FunStartupTiming}
+function GetNanoTick: fun.uint64;
+{$IfDef UNIX}
+var
+  {$IfDef Darwin}
+  tv: timeval;
+  {$Else}
+  ts: timespec;
+  {$EndIf}
+{$Else}
+var
+  qpc: int64;
+{$EndIf}
+begin
+{$IfDef UNIX}
+  {$IfDef Darwin}
+  if fpgettimeofday(@tv, nil) = 0 then
+    result := int64(tv.tv_sec) * 1000000000 + int64(tv.tv_usec) * 1000
+  else
+    result := 0;
+  {$Else}
+  if clock_gettime(CLOCK_MONOTONIC, @ts) = 0 then
+    result := int64(ts.tv_sec) * 1000000000 + int64(ts.tv_nsec)
+  else
+    result := 0;
+  {$EndIf}
+{$Else}
+  qpc := 0;
+  if qpcFreq = 0 then QueryPerformanceFrequency(qpcFreq);
+  if (qpcFreq > 0) and QueryPerformanceCounter(qpc) then
+    // Do not multiply the whole counter first: qpc * 1e9 overflows Int64
+    // after ~15 minutes of uptime at the usual 10 MHz QPC frequency.
+    result := (qpc div qpcFreq) * 1000000000
+            + ((qpc mod qpcFreq) * 1000000000) div qpcFreq
+  else
+    result := int64(Windows.GetTickCount) * 1000000;
+{$EndIf}
+end;
+
+procedure DumpProfile;
+begin
+  if not profileDumped and (profileLog <> '') then
+  begin
+    profileDumped := true;
+    WriteErr(profileLog);
+    profileLog := '';
+  end;
+end;
+
+procedure TimeMark(const name: fun.str);
+var
+  t: fun.uint64;
+begin
+  t := GetNanoTick;
+  if profileStart = 0 then profileStart := t;
+  if profilePrev  = 0 then profilePrev  := t;
+  // Buffer the lines: a WriteFile to a Windows console costs close to 1 ms,
+  // which would otherwise land in the next phase's delta and dominate it.
+  profileLog := profileLog + 'FUNTIME ' + name +
+                ' total=' + IntToStr(t - profileStart) +
+                'ns delta=' + IntToStr(t - profilePrev) + 'ns' + sLineBreak;
+  profilePrev := t;
+  if name = 'cleanup' then DumpProfile;
+end;
+{$EndIf}
 
 //==============================================================
 function FindParamById(const id: fun.str): fun.str;
@@ -191,8 +275,11 @@ begin
 {$IfNDef UNIX}
 {$IfNDef WinCE}
   try
+    {$IfDef FunStartupTiming}TimeMark('cmdline-getproc');{$EndIf}
     AttachConsole := GetProc(LoadLib(kernel32), 'AttachConsole');
+    {$IfDef FunStartupTiming}TimeMark('cmdline-attach');{$EndIf}
     result := AttachConsole(-1) <> 0;
+    {$IfDef FunStartupTiming}TimeMark('cmdline-attached');{$EndIf}
   except
     result := false;
   end;

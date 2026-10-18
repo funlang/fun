@@ -197,6 +197,9 @@ var
   r: CFunRunner;
   p: fun.ptr;
   f: fun.str;
+{$IfDef FunStartupTiming}
+  fs: fun.str;
+{$EndIf}
 
 {$IfDef FunDll}
 
@@ -297,6 +300,9 @@ end;
 {$EndIf}{$EndIf}
 
 begin
+{$IfDef FunStartupTiming}{$IfNdef FunDll}
+  TimeMark('main');
+{$EndIf}{$EndIf}
 {$IfNdef FunDll}
 {$IfDef FPC}{$IfNDef UNIX}
   // FPC initialises its default datetime/number formats from the OS locale on
@@ -321,12 +327,18 @@ begin
   gui   := FindParamAsBool('gui');
   v     := FindParamAsBool('v'  ) or FindParamAsBool('?');
   log   := FindParam(      'log');
+  {$IfDef FunStartupTiming}
+  TimeMark('params');
+  {$EndIf}
   // A named script means a command-line run, even where no console is attached
   // (stdout redirected to a file, a CI runner, a scheduled task). FindCmdLine
   // only detects a parent console via AttachConsole, which is false in those
   // cases, so without this a redirected run was mistaken for a GUI launch and
   // printed nothing (isLog stayed false). Unix FindCmdLine is always true.
   if not gui then gui := (not FindCmdLine) and (FindParam('fun', 1) = '');
+  {$IfDef FunStartupTiming}
+  TimeMark('cmdline');
+  {$EndIf}
   isLog := not gui or (log <> '');
 
   hlog := 0;
@@ -373,13 +385,31 @@ _Error:
 
 
 _Run:
+  {$IfDef FunStartupTiming}
+  TimeMark('cli-ready');
+  {$EndIf}
   r := CFunRunner.Create;
   _ENV := r;
   r.resetTrace;
+  {$IfDef FunStartupTiming}
+  TimeMark('env-ready');
+  {$EndIf}
 
   try
     InitTick;
-    if p = nil then p := CFunParser.ParseOrLoad(f);
+    if p = nil then
+    begin
+      {$IfDef FunStartupTiming}
+      fs := CIO.Load(f);
+      TimeMark('loaded');
+      p := CFunParser.Parse(fs, CFunParser, f);
+      {$Else}
+      p := CFunParser.ParseOrLoad(f);
+      {$EndIf}
+    end;
+    {$IfDef FunStartupTiming}
+    TimeMark('parsed');
+    {$EndIf}
     if v then
     begin
       Println('--------------------------------');
@@ -387,6 +417,9 @@ _Run:
       Println('--------------------------------');
     end;
     CRun(p).run(r);
+    {$IfDef FunStartupTiming}
+    TimeMark('executed');
+    {$EndIf}
     if v then
     begin
       Println('--------------------------------');
@@ -397,13 +430,23 @@ _Run:
     on E: EBase do
       begin
         hadError := true;
+        {$IfDef FunStartupTiming}
+        TimeMark('error');
+        DumpProfile;
+        {$EndIf}
         PrintErr(E.Message);
       end;
   end;
 
   try
     del(p);
+    {$IfDef FunStartupTiming}
+    TimeMark('ast-freed');
+    {$EndIf}
     del(r);
+    {$IfDef FunStartupTiming}
+    TimeMark('env-freed');
+    {$EndIf}
   except
   end;
 
@@ -413,8 +456,18 @@ _Exit:
     if isLog then
     begin
       Flush(Output);
-      CIO.Close(hlog);
+      {$IfDef FunStartupTiming}
+      TimeMark('flushed');
+      {$EndIf}
+      // hlog is 0 when no -log file was opened. FileClose(0) would close
+      // whatever the RTL has in slot 0 instead of doing nothing.
+      if hlog <> 0 then CIO.Close(hlog);
     end;
+    {$IfDef FunStartupTiming}
+    // FreeCmdLine -> FreeConsole closes the stderr handle on Windows, so the
+    // buffered profile must be written while the console is still attached.
+    TimeMark('cleanup');
+    {$EndIf}
     if not gui then FreeCmdLine;
   except
   end;
