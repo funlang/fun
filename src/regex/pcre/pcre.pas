@@ -853,9 +853,18 @@ var
   Buf: PCREString;
   Len, Pos0, MatchOff, MatchLen: Integer;
   Repl: PCREString;
+  FixedRepl: PCREString;
+  LiteralRepl: Boolean;
 begin
   Result := Match;
   if not Result then Exit;
+
+  // A replacement with no $ or \ references is the same text for every match.
+  // Skip ComputeReplacement's per-match scan in that common case.
+  FixedRepl   := FReplacement;
+  LiteralRepl := (not Assigned(FPcreAction))
+                 and (Pos('$', FixedRepl) = 0)
+                 and (Pos('\', FixedRepl) = 0);
 
   Buf    := '';
   Len    := 0;
@@ -867,6 +876,8 @@ begin
       AppendRange(Buf, Len, FSubject, Pos0, MatchOff - Pos0);
     if Assigned(FPcreAction) then
       Repl := FPcreAction(FActionTag)
+    else if LiteralRepl then
+      Repl := FixedRepl
     else
       Repl := ComputeReplacement;
     AppendText(Buf, Len, Repl);

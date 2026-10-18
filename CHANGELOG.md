@@ -17,6 +17,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
   loop into a single pass. On the bundled Linux x86_64 build, 200 global
   replacements over a ~100 KB subject drop from ~7.3 s to ~0.24 s, repeated
   literal matching improves by ~1.4-1.5x, and a global match by ~3x.
+  Replacements without `$` or `\` references skip the per-match replacement
+  scan, making literal global replacement another 25-40% faster.
 
 - Global regex replacement now computes `$_` (and the other subject
   references) from the original subject. The old in-place loop rewrote the
