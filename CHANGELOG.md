@@ -6,6 +6,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.4.3] - 2026-10-18
+
 - Variable declarations with an initializer now use the same parse-time
   assignment specialization as plain assignments. A `var` inside a loop resolves
   its slot once and reuses it instead of repeating the generic assign and

@@ -8,4 +8,4 @@
 // funRelease: curated language version string (README Version line),
 //   default '9.4' (or the explicit second argument).
 funVersion = 20261018;
-funRelease = '9.4';
+funRelease = '9.4.3';
