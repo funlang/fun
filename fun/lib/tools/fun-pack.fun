@@ -115,8 +115,10 @@ var warns = new [];
 fun exists(p)
   result = false;
   if p <> '' then
+    var t = p;
+    if _isWin then t = t.replace('/', '\\'); end if;
     try
-      result = not not p.find();
+      result = not not t.find();
     except
       result = false;
     end try;
@@ -200,8 +202,8 @@ end fun;
 fun listDir(dir)
   result = new [];
   if _isWin then
-    var pat = dir;
-    if pat <> '' and pat.substr(pat.length() - 1) <> '/' then pat &= '/'; end if;
+    var pat = dir.replace('/', '\\');
+    if pat <> '' and pat.substr(pat.length() - 1) <> '\\' then pat &= '\\'; end if;
     var data = 0.toChar().x(592);   // WIN32_FIND_DATAA, d_name at 44
     var h = _findFirst(pat & '*', data);
     if h <= 0 then return; end if;
@@ -243,7 +245,7 @@ fun isDir(p)
     t = t.substr(0, t.length() - 1);   // "dir/" is not accepted everywhere
   end if;
   if _isWin then
-    var a = _getAttrs(t);
+    var a = _getAttrs(t.replace('/', '\\'));
     result = a >= 0 and (a bit and 16) <> 0;   // FILE_ATTRIBUTE_DIRECTORY
   else
     var dp = _opendir(t);

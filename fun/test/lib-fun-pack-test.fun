@@ -33,19 +33,26 @@ var _pid = _getpid();
 
 // run cmd in dir and return its exit code; all output goes to logFile so the
 // snapshot stays free of temp paths (system() returns the raw wait status on
-// POSIX and the command exit code on Windows)
+// POSIX and the command exit code on Windows).
+//
+// Windows runs the command through a generated .bat: cmd /c rewrites commands
+// that start with a quote (it strips the first and last quote), which broke the
+// redirection and the arguments.
 fun runIn(dir, cmd, logFile)
-  var c = cmd;
-  if dir <> '' then
-    if _isWin then
-      c = 'cd /d ' & q(dir) & ' && ' & c;
-    else
-      c = 'cd ' & q(dir) & ' && ' & c;
-    end if;
+  if _isWin then
+    var crlf = 13.toChar() & 10.toChar();
+    var bat  = logFile & '.bat';
+    var body = '@echo off' & crlf;
+    if dir <> '' then body &= 'cd /d ' & q(dir) & crlf; end if;
+    body &= cmd & ' >' & q(logFile) & ' 2>&1' & crlf;
+    bat.save(body);
+    result = _system(q(q(bat)));   // ""...bat"" survives cmd's quote rules
+  else
+    var c = cmd;
+    if dir <> '' then c = 'cd ' & q(dir) & ' && ' & c; end if;
+    c &= ' >' & q(logFile) & ' 2>&1';
+    result = _system(c) div 256;
   end if;
-  c &= ' >' & q(logFile) & ' 2>&1';
-  var rc = _system(c);
-  if _isWin then result = rc; else result = rc div 256; end if;
 end fun;
 
 // diagnostics for a failed step. Lines carry "failed" because the Windows CI
@@ -103,7 +110,12 @@ var res  = app & 'res' & sep;
   "var r = 'res/hello.txt'.load();" & nl &
   "var extra = 'no';" & nl &
   "if 'stray.txt'.find() then extra = 'yes'; end if;" & nl &
-  "2.arg().save(Add(2, 3) & '|' & str2hex('A') & '|' & r & '|' & extra & '|' & d);" & nl);
+  "var outArg = 2.arg();" & nl &
+  "if outArg = '' then" & nl &
+  "  (0.arg() & '.diag').save('no-arg|entry=' & 1.arg() & '|next=' & 3.arg());" & nl &
+  "else" & nl &
+  "  outArg.save(Add(2, 3) & '|' & str2hex('A') & '|' & r & '|' & extra & '|' & d);" & nl &
+  "end if;" & nl);
 (app & 'util.fun').save("fun Add(a, b)" & nl &
   "  result = a + b;" & nl &
   "end fun;" & nl);
@@ -132,7 +144,10 @@ var rc2 = runIn('', q(out) & ' ' & q(resultFile), base & 'run1.log');
 var got = loadIf(resultFile);
 ?. 'output: ' & (got = expect);
 fail('run', rc2, base & 'run1.log', base);
-if got <> expect then ?. 'failed output: [' & got & ']'; end if;
+if got <> expect then
+  ?. 'failed output: [' & got & ']';
+  ?. 'failed diag: ' & logTail(out & '.diag');
+end if;
 
 // 3. the everyday flow: cd into the project and pack with a relative entry
 //    while the interpreter lives elsewhere (absolute path)
@@ -147,4 +162,7 @@ var rc4 = runIn('', q(out2) & ' ' & q(resultFile2), base & 'run2.log');
 var got2 = loadIf(resultFile2);
 ?. 'output 2: ' & (got2 = expect);
 fail('run2', rc4, base & 'run2.log', base);
-if got2 <> expect then ?. 'failed output 2: [' & got2 & ']'; end if;
+if got2 <> expect then
+  ?. 'failed output 2: [' & got2 & ']';
+  ?. 'failed diag 2: ' & logTail(out2 & '.diag');
+end if;
