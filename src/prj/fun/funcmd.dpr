@@ -46,7 +46,6 @@ uses
 {$EndIf}
 {$EndIf}{$EndIf}
   SysUtils,
-  Classes,
   fun in '..\..\core\fun.pas',
   base in '..\..\core\base.pas',
   core in '..\..\core\core.pas',

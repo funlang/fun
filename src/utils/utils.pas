@@ -85,7 +85,6 @@ procedure FreeBundle;
 implementation
 
 uses SysUtils
-     {$IfDef FunPack}, Classes{$EndIf}
      {$IfNDef UNIX}, Windows{$Else}
        {$IfDef Linux}, Linux{$EndIf}
        , unixtype
@@ -443,28 +442,28 @@ begin
 end;
 
 // little-endian value of n (<= 8) bytes at at; -1 on a short read
-function _LE(fs: TFileStream; at: Int64; n: Integer): Int64;
+function _LE(h: THandle; at: Int64; n: Integer): Int64;
 var
   b: array[0..7] of Byte;
   i: Integer;
 begin
   result := 0;
   if n > 8 then n := 8;
-  fs.Position := at;
-  if fs.Read(b, n) <> n then begin result := -1; exit; end;
+  if FileSeek(h, at, 0) < 0 then begin result := -1; exit; end;
+  if FileRead(h, b, n) <> n then begin result := -1; exit; end;
   for i := n - 1 downto 0 do
     result := (result shl 8) or b[i];
 end;
 
-function _ReadStr(fs: TFileStream; at: Int64; n: Integer): fun.str;
+function _ReadStr(h: THandle; at: Int64; n: Integer): fun.str;
 var
   s: fun.str;
 begin
   s := '';
   if n <= 0 then begin result := s; exit; end;
   SetLength(s, n);
-  fs.Position := at;
-  if fs.Read(s[1], n) <> n then s := '';
+  if FileSeek(h, at, 0) < 0 then exit;
+  if FileRead(h, s[1], n) <> n then s := '';
   result := s;
 end;
 
@@ -533,7 +532,7 @@ end;
 
 function UnpackBundle(const exe: fun.str): fun.str;
 var
-  fs, fo: TFileStream;
+  h, fo: THandle;
   size, zipStart, zipLen, i, ents, cd, p, method, nl, xl, cl, loff,
   dataOff, csize, left, got, stopAt, cdOfs: Int64;
   tmp, name, rel, dest: fun.str;
@@ -543,13 +542,14 @@ begin
   result := '';
   BundleDir := '';
   if not FileExists(exe) then exit;
-  fs := TFileStream.Create(exe, fmOpenRead or fmShareDenyNone);
-  fo := nil;
+  h := FileOpen(exe, fmOpenRead or fmShareDenyNone);
+  if h = THandle(-1) then exit;
+  fo := THandle(-1);
   try
-    size := fs.Size;
+    size := FileSeek(h, 0, 2);
     if size < 64 then exit;
-    if _ReadStr(fs, size - 16, 8) <> _BundleMagic then exit;
-    zipLen := _LE(fs, size - 8, 8);
+    if _ReadStr(h, size - 16, 8) <> _BundleMagic then exit;
+    zipLen := _LE(h, size - 8, 8);
     if (zipLen <= 0) or (zipLen > size - 16) then exit;
     zipStart := size - 16 - zipLen;
     cd := -1;
@@ -558,12 +558,12 @@ begin
     if stopAt < zipStart then stopAt := zipStart;
     while i >= stopAt do
     begin
-      if _LE(fs, i, 4) = $06054B50 then begin cd := i; break; end;
+      if _LE(h, i, 4) = $06054B50 then begin cd := i; break; end;
       Dec(i);
     end;
     if cd < 0 then exit;
-    ents  := _LE(fs, cd + 10, 2);
-    cdOfs := _LE(fs, cd + 16, 4);
+    ents  := _LE(h, cd + 10, 2);
+    cdOfs := _LE(h, cd + 16, 4);
     if (ents < 0) or (cdOfs < 0) or (cdOfs >= zipLen) then exit;
     p     := zipStart + cdOfs;
     tmp  := IncludeTrailingPathDelimiter(GetTempDir) + 'fun-pack-' + IntToStr(GetTickCount);
@@ -574,24 +574,24 @@ begin
     failed := false;
     for i := 0 to ents - 1 do
     begin
-      if _LE(fs, p, 4) <> $02014B50 then begin failed := true; break; end;
-      method := _LE(fs, p + 10, 2);
-      csize  := _LE(fs, p + 20, 4);
-      nl     := _LE(fs, p + 28, 2);
-      xl     := _LE(fs, p + 30, 2);
-      cl     := _LE(fs, p + 32, 2);
-      loff   := _LE(fs, p + 42, 4);
-      name   := _ReadStr(fs, p + 46, nl);
+      if _LE(h, p, 4) <> $02014B50 then begin failed := true; break; end;
+      method := _LE(h, p + 10, 2);
+      csize  := _LE(h, p + 20, 4);
+      nl     := _LE(h, p + 28, 2);
+      xl     := _LE(h, p + 30, 2);
+      cl     := _LE(h, p + 32, 2);
+      loff   := _LE(h, p + 42, 4);
+      name   := _ReadStr(h, p + 46, nl);
       if method <> 0 then begin failed := true; break; end;
       if (csize < 0) or (nl < 0) or (loff < 0) or (loff >= zipLen) then
       begin failed := true; break; end;
-      dataOff := zipStart + loff + 30 + _LE(fs, zipStart + loff + 26, 2)
-                                    + _LE(fs, zipStart + loff + 28, 2);
+      dataOff := zipStart + loff + 30 + _LE(h, zipStart + loff + 26, 2)
+                                    + _LE(h, zipStart + loff + 28, 2);
       if (dataOff < zipStart) or (dataOff + csize > zipStart + zipLen) then
       begin failed := true; break; end;
       if name = '.funpack/entry' then
       begin
-        rel    := _TrimRel(_ReadStr(fs, dataOff, csize));
+        rel    := _TrimRel(_ReadStr(h, dataOff, csize));
         marker := rel <> '';
       end
       else
@@ -601,22 +601,24 @@ begin
         begin
           dest := tmp + PathDelim + dest;
           if ExtractFileDir(dest) <> '' then ForceDirectories(ExtractFileDir(dest));
-          fo := TFileStream.Create(dest, fmCreate);
-          fs.Position := dataOff;
+          fo := FileCreate(dest);
+          if fo = THandle(-1) then begin failed := true; break; end;
+          if FileSeek(h, dataOff, 0) < 0 then begin failed := true; break; end;
           left := csize;
           while left > 0 do
           begin
             got := left; if got > SizeOf(buf) then got := SizeOf(buf);
-            fs.Read(buf, got);
-            fo.Write(buf, got);
+            if FileRead(h, buf, got) <> got then begin failed := true; break; end;
+            if FileWrite(fo, buf, got) <> got then begin failed := true; break; end;
             left := left - got;
           end;
-          FreeAndNil(fo);
+          FileClose(fo);
+          fo := THandle(-1);
+          if failed then break;
         end;
       end;
       p := p + 46 + nl + xl + cl;
     end;
-    if fo <> nil then FreeAndNil(fo);
     if marker and not failed then
       result := tmp + PathDelim + _SafeRel(rel)
     else
@@ -625,7 +627,8 @@ begin
       BundleDir := '';
     end;
   finally
-    fs.Free;
+    if fo <> THandle(-1) then FileClose(fo);
+    FileClose(h);
   end;
 end;
 
