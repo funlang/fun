@@ -44,6 +44,7 @@
 // The tool itself has no `use` imports, so it runs from any working directory;
 // the project's own imports are resolved against this file's location.
 var _dllInfo = '';
+var _bs = 92.toChar();   // a single backslash: '\\' is TWO characters in Fun
 var _facts = 'host'.arg().getJson(fd: true);
 var _isWin = _facts.os = 'windows';
 var _isMac = _facts.os = 'macos';
@@ -61,7 +62,7 @@ var entry = 2.arg();
 if entry = nil or entry = '' then
   raise 'usage: fun pack <entry.fun> [-o <out>] [-a <file-or-dir>]';
 end if;
-if _isWin then entry = entry.replace('\\', '/'); end if;
+if _isWin then entry = entry.replace(_bs, '/'); end if;
 
 var outFile = '';
 var adds = new [];   // -a paths, in command-line order
@@ -70,12 +71,12 @@ while ai.arg() <> '' do
   if ai.arg() = '-o' then
     outFile = (ai + 1).arg();
     if outFile = '' then raise '-o needs a value'; end if;
-    if _isWin then outFile = outFile.replace('\\', '/'); end if;
+    if _isWin then outFile = outFile.replace(_bs, '/'); end if;
     ai += 2;
   elsif ai.arg() = '-a' then
     var av = (ai + 1).arg();
     if av = '' then raise '-a needs a value'; end if;
-    if _isWin then av = av.replace('\\', '/'); end if;
+    if _isWin then av = av.replace(_bs, '/'); end if;
     adds.@add(av);
     ai += 2;
   else
@@ -102,7 +103,7 @@ fun parentDir(d)
 end fun;
 
 // fun-pack.fun lives in <repo>/fun/lib/tools: the repo dirs follow from it
-if _isWin then selfPath = selfPath.replace('\\', '/'); end if;
+if _isWin then selfPath = selfPath.replace(_bs, '/'); end if;
 var toolsDir = dirname(selfPath);
 var libDir   = parentDir(toolsDir);
 var repoRoot = parentDir(parentDir(libDir));
@@ -119,7 +120,7 @@ fun exists(p)
     var t = p;
     if _isWin then
       // find() proved unreliable for Windows paths; attributes are not
-      result = _getAttrs(t.replace('/', '\\')) >= 0;
+      result = _getAttrs(t.replace('/', _bs)) >= 0;
     else
       try
         result = not not t.find();
@@ -207,8 +208,8 @@ end fun;
 fun listDir(dir)
   result = new [];
   if _isWin then
-    var pat = dir.replace('/', '\\');
-    if pat <> '' and pat.substr(pat.length() - 1) <> '\\' then pat &= '\\'; end if;
+    var pat = dir.replace('/', _bs);
+    if pat <> '' and pat.substr(pat.length() - 1) <> _bs then pat &= _bs; end if;
     var data = 0.toChar().x(592);   // WIN32_FIND_DATAA, d_name at 44
     var h = _findFirst(pat & '*', data);
     if h <= 0 then return; end if;
@@ -250,7 +251,7 @@ fun isDir(p)
     t = t.substr(0, t.length() - 1);   // "dir/" is not accepted everywhere
   end if;
   if _isWin then
-    var a = _getAttrs(t.replace('/', '\\'));
+    var a = _getAttrs(t.replace('/', _bs));
     result = a >= 0 and (a bit and 16) <> 0;   // FILE_ATTRIBUTE_DIRECTORY
   else
     var dp = _opendir(t);
@@ -472,7 +473,7 @@ end if;
 // so copy the ones shipped next to funcmd into the output directory.
 if _isWin then
   var exePath = 0.arg();
-  exePath = exePath.replace('\\', '/');
+  exePath = exePath.replace(_bs, '/');
   var rtDir  = dirname(exePath);
   var outDir = dirname(outFile);
   var di = 0;
