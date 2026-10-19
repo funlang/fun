@@ -116,12 +116,16 @@ fun exists(p)
   result = false;
   if p <> '' then
     var t = p;
-    if _isWin then t = t.replace('/', '\\'); end if;
-    try
-      result = not not t.find();
-    except
-      result = false;
-    end try;
+    if _isWin then
+      // find() proved unreliable for Windows paths; attributes are not
+      result = _getAttrs(t.replace('/', '\\')) >= 0;
+    else
+      try
+        result = not not t.find();
+      except
+        result = false;
+      end try;
+    end if;
   end if;
 end fun;
 
@@ -478,13 +482,22 @@ if _isWin then
   dlls.@add('zlib1.dll');
   dlls.@add('libtcc.dll');
   dlls.@add('tcc.dll');
+  var copied = '';
   while di < dlls.@count() do
     var dsrc = rtDir & dlls[di];
-    if exists(dsrc) then
-      (outDir & dlls[di]).save(dsrc.load(cp: 0xffff), cp: 0xffff);
+    var data = '';
+    try
+      data = dsrc.load(cp: 0xffff);   // a present file; no exists()/find() here
+    except
+      data = '';
+    end try;
+    if data <> '' then
+      (outDir & dlls[di]).save(data, cp: 0xffff);
+      copied &= ' ' & dlls[di];
     end if;
     di += 1;
   end do;
+  ?. 'runtime dlls:' & copied;
 end if;
 
 var wi = 0;

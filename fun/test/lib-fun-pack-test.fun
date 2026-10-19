@@ -61,9 +61,22 @@ end fun;
 fun yn(p)
   result = false;
   try
-    result = not not p.find();
+    var probe = p.load(cp: 0xffff);   // load-based: find() is unreliable on Windows
+    result = true;
   except
   end try;
+end fun;
+
+fun dirOf(p)
+  var i = p.length() - 1;
+  while i >= 0 do
+    var ch = p.substr(i, 1);
+    if ch = '/' or ch = 92.toChar() then
+      result = p.substr(0, i + 1);
+      exit;
+    end if;
+    i -= 1;
+  end do;
 end fun;
 
 fun logTail(p)
@@ -123,8 +136,9 @@ var res  = app & 'res' & sep;
 (app & 'data.txt').save('EMB');         // embedded via use ':data.txt'
 (app & 'stray.txt').save('keep-out');   // not declared with -a: must stay out
 
-var funcmd = q(absPath(0.arg()));
-var expect = '5|41|hello-resource|no|EMB';
+var funcmdAbs = absPath(0.arg());
+var funcmd    = q(funcmdAbs);
+var expect    = '5|41|hello-resource|no|EMB';
 
 // 1. pack through the `fun pack` subcommand (absolute entry)
 var out = base & 'packed';
@@ -147,6 +161,9 @@ fail('run', rc2, base & 'run1.log', base);
 if got <> expect then
   ?. 'failed output: [' & got & ']';
   ?. 'failed diag: ' & logTail(out & '.diag');
+  ?. 'failed pack log: ' & logTail(base & 'pack1.log');
+  ?. 'failed selfcheck: ' & yn(funcmdAbs);
+  ?. 'failed runtime pcre3: ' & yn(dirOf(funcmdAbs) & 'pcre3.dll');
 end if;
 
 // 3. the everyday flow: cd into the project and pack with a relative entry
@@ -165,4 +182,6 @@ fail('run2', rc4, base & 'run2.log', base);
 if got2 <> expect then
   ?. 'failed output 2: [' & got2 & ']';
   ?. 'failed diag 2: ' & logTail(out2 & '.diag');
+  ?. 'failed pack2 log: ' & logTail(base & 'pack2.log');
+  ?. 'failed runtime pcre3 2: ' & yn(dirOf(funcmdAbs) & 'pcre3.dll');
 end if;
