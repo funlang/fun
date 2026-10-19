@@ -1,0 +1,6 @@
+count > 0: True
+names non-empty: True
+loopback address seen: True
+ipv4 dotted: True
+an iface is up: True
+loopback flag on 127.0.0.1: True
