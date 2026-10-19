@@ -76,7 +76,9 @@ src/regex/pcre/**    linguist-vendored
 # They are data, not source, so keep them out of the language bars.
 # Use the negative attribute form (`-linguist-detectable`); assigning
 # `linguist-detectable=false` is only a string value to some hosts.
-*.fd.2            -linguist-detectable
+# `linguist-generated` is the older, widely supported exclusion and keeps
+# the tables out of stats on hosts whose linguist predates detectable.
+*.fd.2            -linguist-detectable linguist-generated
 *.tbl             -linguist-detectable
 *.syntax          -linguist-detectable
 *.presets         -linguist-detectable
