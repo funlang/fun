@@ -48,21 +48,38 @@ fun runIn(dir, cmd, logFile)
   if _isWin then result = rc; else result = rc div 256; end if;
 end fun;
 
-// diagnostics for a failed step: exit code plus its output (capped)
-fun fail(tag, rc, logFile)
+// diagnostics for a failed step. Lines carry "failed" because the Windows CI
+// runner only forwards log lines matching FAIL/failed/mismatch to the check-run
+// annotation, which is the only readable view of that job.
+fun yn(p)
+  result = false;
+  try
+    result = not not p.find();
+  except
+  end try;
+end fun;
+
+fun logTail(p)
+  result = '';
+  if yn(p) then
+    var s = p.load().replace(nl, ' | ');
+    if s.length() > 300 then s = s.substr(0, 300); end if;
+    result = s;
+  end if;
+end fun;
+
+fun fail(tag, rc, logFile, base)
   if rc <> 0 then
-    ?. tag & ' rc=' & rc;
-    var s = '';
-    if logFile.find() then s = logFile.load(); end if;
-    s = s.replace(nl, ' | ');
-    if s.length() > 400 then s = s.substr(0, 400); end if;
-    ?. 'err: ' & s;
+    ?. 'failed ' & tag & ': rc=' & rc;
+    ?. 'failed ' & tag & ' log: ' & logTail(logFile);
+    ?. 'failed ' & tag & ' dlls: pcre3=' & yn(base & 'pcre3.dll') &
+       ' ffi=' & yn(base & 'ffi.dll');
   end if;
 end fun;
 
 fun loadIf(p)
   result = '';
-  if p.find() then result = p.load(); end if;
+  if yn(p) then result = p.load(); end if;
 end fun;
 
 fun absPath(p)
@@ -95,6 +112,7 @@ var res  = app & 'res' & sep;
 (app & 'stray.txt').save('keep-out');   // not declared with -a: must stay out
 
 var funcmd = q(absPath(0.arg()));
+var expect = '5|41|hello-resource|no|EMB';
 
 // 1. pack through the `fun pack` subcommand (absolute entry)
 var out = base & 'packed';
@@ -104,14 +122,17 @@ var rc = runIn(HostCurrPath(), funcmd & ' pack ' & q(app & 'app.fun') &
                ' -a ' & q(app & 'res') & ' -o ' & q(out), base & 'pack1.log');
 ?. 'packed: ' & (rc = 0);
 ?. 'single file: ' & (out.size() > 0);
-fail('pack', rc, base & 'pack1.log');
+fail('pack', rc, base & 'pack1.log', base);
+if rc = 0 and not (out.size() > 0) then ?. 'failed pack: no output file'; end if;
 
 // 2. run the produced executable; 2.arg() of the script is the first real
 //    argument, exactly as when the script is run by funcmd directly
 var rc2 = runIn('', q(out) & ' ' & q(resultFile), base & 'run1.log');
 ?. 'ran: ' & (rc2 = 0);
-?. 'output: ' & (loadIf(resultFile) = '5|41|hello-resource|no|EMB');
-fail('run', rc2, base & 'run1.log');
+var got = loadIf(resultFile);
+?. 'output: ' & (got = expect);
+fail('run', rc2, base & 'run1.log', base);
+if got <> expect then ?. 'failed output: [' & got & ']'; end if;
 
 // 3. the everyday flow: cd into the project and pack with a relative entry
 //    while the interpreter lives elsewhere (absolute path)
@@ -119,9 +140,11 @@ var out2 = base & 'packed2';
 if _isWin then out2 &= '.exe'; end if;
 var rc3 = runIn(app, funcmd & ' pack app.fun -a res -o ' & q(out2), base & 'pack2.log');
 ?. 'packed from project dir: ' & (rc3 = 0);
-fail('pack2', rc3, base & 'pack2.log');
+fail('pack2', rc3, base & 'pack2.log', base);
 var resultFile2 = base & 'result2.txt';
 var rc4 = runIn('', q(out2) & ' ' & q(resultFile2), base & 'run2.log');
 ?. 'ran from project dir: ' & (rc4 = 0);
-?. 'output 2: ' & (loadIf(resultFile2) = '5|41|hello-resource|no|EMB');
-fail('run2', rc4, base & 'run2.log');
+var got2 = loadIf(resultFile2);
+?. 'output 2: ' & (got2 = expect);
+fail('run2', rc4, base & 'run2.log', base);
+if got2 <> expect then ?. 'failed output 2: [' & got2 & ']'; end if;
