@@ -482,7 +482,9 @@ var
   p: fun.str;
 begin
   p := IncludeTrailingPathDelimiter(dir);
-  if FindFirst(p + '*', faAnyFile, sr) = 0 then
+  // Qualify these: on Windows the RTL unit also exports DeleteFile/FindClose
+  // with different signatures (PChar / handle), and it shadows SysUtils here.
+  if SysUtils.FindFirst(p + '*', faAnyFile, sr) = 0 then
   begin
     repeat
       if (sr.Name <> '.') and (sr.Name <> '..') then
@@ -490,12 +492,12 @@ begin
         if (sr.Attr and faDirectory) <> 0 then
           _DeleteTree(p + sr.Name)
         else
-          DeleteFile(p + sr.Name);
+          SysUtils.DeleteFile(p + sr.Name);
       end;
-    until FindNext(sr) <> 0;
-    FindClose(sr);
+    until SysUtils.FindNext(sr) <> 0;
+    SysUtils.FindClose(sr);
   end;
-  RemoveDir(dir);
+  SysUtils.RemoveDir(dir);
 end;
 
 // zip entry name -> a relative path with the host separator, or '' when the
