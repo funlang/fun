@@ -162,7 +162,6 @@ if got <> expect then
   ?. 'failed output: [' & got & ']';
   ?. 'failed diag: ' & logTail(out & '.diag');
   ?. 'failed pack log: ' & logTail(base & 'pack1.log');
-  ?. 'failed packdiag: ' & logTail(out & '.packdiag');
   ?. 'failed selfcheck: ' & yn(funcmdAbs);
   ?. 'failed runtime pcre3: ' & yn(dirOf(funcmdAbs) & 'pcre3.dll');
 end if;
@@ -184,6 +183,5 @@ if got2 <> expect then
   ?. 'failed output 2: [' & got2 & ']';
   ?. 'failed diag 2: ' & logTail(out2 & '.diag');
   ?. 'failed pack2 log: ' & logTail(base & 'pack2.log');
-  ?. 'failed packdiag 2: ' & logTail(out2 & '.packdiag');
   ?. 'failed runtime pcre3 2: ' & yn(dirOf(funcmdAbs) & 'pcre3.dll');
 end if;
