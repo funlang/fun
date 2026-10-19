@@ -74,10 +74,12 @@ src/regex/pcre/**    linguist-vendored
 # section (Roff): Gitee reported ~31% "Roff" for these generated assembler
 # tables. `*.tbl` and the editor syntax assets collide in the same way.
 # They are data, not source, so keep them out of the language bars.
-*.fd.2            linguist-detectable=false
-*.tbl             linguist-detectable=false
-*.syntax          linguist-detectable=false
-*.presets         linguist-detectable=false
+# Use the negative attribute form (`-linguist-detectable`); assigning
+# `linguist-detectable=false` is only a string value to some hosts.
+*.fd.2            -linguist-detectable
+*.tbl             -linguist-detectable
+*.syntax          -linguist-detectable
+*.presets         -linguist-detectable
 
 # ---- Explicitly binary (never convert) ------------------------------------
 *.exe   binary
