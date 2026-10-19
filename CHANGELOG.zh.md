@@ -6,6 +6,31 @@
 
 ## [未发布]
 
+## [9.4.4] - 2026-10-19
+
+- 新增单文件打包：`fun pack <entry.fun> [-o <out>] [-a <path>]`。输出文件是
+  解释器加上以 STORE 方式压缩的 zip 尾部数据，包含项目文件与声明的资源。
+  启动时解压到临时目录，按正常的 `use`/资源路径运行入口脚本，并将参数整体
+  后移一位，使 `2.arg()` 对应第一个真实参数。打包工具
+  （`fun/lib/tools/fun-pack.fun`）会解析 `use` 依赖、处理 `-a` 文件/目录，
+  并在 Windows 上把运行时 DLL 复制到输出旁边。构建可用
+  `-dFunPack`/`-dFunPackUser` 控制，`FUNPACK=user` 只生成消费者运行时，
+  不包含 `pack` 子命令。
+
+- 新增 `Netif()`：在 Linux 和 macOS 上枚举 IPv4 网络接口，返回
+  `[name, ip, family, up, loopback]` 集合，底层使用 `getifaddrs(3)`；
+  Windows 后端后续补充。
+
+- 修复 macOS 上当解析器指针位于 4 GB 以上时的 DNS 解析：`ReadU64` 丢失高位，
+  导致域名查询失败或返回错误数据。
+
+- 新增可选的启动阶段性能分析（`-dFunStartupTiming`），把各阶段耗时输出到
+  stderr；普通构建不受影响。
+
+- 从解释器中移除 RTL 的 `Classes` 单元（Linux x86_64 构建约减小 120 KiB），
+  并把生成的汇编表后缀从 `.fd.2` 改为 `.fd2`，避免代码托管平台把它们误判为
+  roff 手册页计入语言统计。
+
 ## [9.4.3] - 2026-10-18
 
 - 带初始值的变量声明现在复用普通赋值在解析期做的特化。循环内的 `var` 只解析

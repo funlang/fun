@@ -6,6 +6,35 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.4.4] - 2026-10-19
+
+- Add single-file packaging with `fun pack <entry.fun> [-o <out>] [-a <path>]`.
+  The output is the interpreter with the project files and declared resources
+  appended as a STORE-only zip trailer. On start it extracts them to a temp
+  directory and runs the entry through the normal `use`/resource paths, with
+  the script arguments shifted by one so `2.arg()` is the first real
+  argument. The tool (`fun/lib/tools/fun-pack.fun`) resolves `use` imports,
+  honours `-a` files/directories and copies the Windows runtime DLLs next to
+  the output. Builds can opt out with `-dFunPack`/`-dFunPackUser`, and
+  `FUNPACK=user` produces a consumer-only runtime without the `pack`
+  subcommand.
+
+- Add `Netif()`, IPv4 network-interface enumeration on Linux and macOS. It
+  returns a set of `[name, ip, family, up, loopback]` entries backed by
+  `getifaddrs(3)`; the Windows backend is a follow-up.
+
+- Fix DNS resolution on macOS when a resolver pointer lives above 4 GB:
+  `ReadU64` dropped the high bits, so name lookups could fail or return
+  garbage.
+
+- Add an opt-in startup profiler (`-dFunStartupTiming`) that reports phase
+  timings to stderr. Normal builds are unchanged.
+
+- Drop the RTL `Classes` unit from the interpreter (about 120 KiB smaller on
+  the Linux x86_64 build) and rename the generated assembler tables from
+  `.fd.2` to `.fd2`, so hosts no longer misclassify them as roff pages in
+  language statistics.
+
 ## [9.4.3] - 2026-10-18
 
 - Variable declarations with an initializer now use the same parse-time
