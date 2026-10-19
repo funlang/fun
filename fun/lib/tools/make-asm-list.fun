@@ -4,14 +4,14 @@
 // make-asm-list: rebuild the derived assembler-table files from the editable
 // asm-list.fd.
 //
-// lib-asm-pro embeds ':asm-list.fd.2.gz' at parse time; at run time it
+// lib-asm-pro embeds ':asm-list.fd2.gz' at parse time; at run time it
 // inflates the blob (raw deflate) and feeds SseDecompress + getJson(fd: true,
 // sse: true) (core: lib/libase.pas). The on-disk chain is:
 //
 //   asm-list.fd              fd text: "#!kvd:=" then one "key=value" per line
-//     -- sort by line, prefix dedup --> asm-list.fd.2
+//     -- sort by line, prefix dedup --> asm-list.fd2
 //        "N)rest" = first N characters of the previous line, then rest
-//     -- raw deflate (windowBits -15) --> asm-list.fd.2.gz
+//     -- raw deflate (windowBits -15) --> asm-list.fd2.gz
 //
 // Sorting by line first is the point of the .2 form: "N)rest" only records how
 // much of the previous line is reused, so neighbouring keys sharing a long
@@ -24,7 +24,7 @@
 //
 // Usage, from the repository root:
 //   src/prj/fun/funcmd fun/lib/tools/make-asm-list.fun [src.fd [dst]]
-// Defaults: src = fun/lib/asm-list.fd, dst = src & '.2'. The sorted fd is
+// Defaults: src = fun/lib/asm-list.fd, dst = src & '2'. The sorted fd is
 // written back to src (so the next run is a no-op) and dst / dst & '.gz' are
 // written beside it.
 
@@ -66,7 +66,7 @@ end fun;
 var src = 2.arg();
 if src = nil or src = '' then src = 'fun/lib/asm-list.fd'; end if;
 var dst = 3.arg();
-if dst = nil or dst = '' then dst = src & '.2'; end if;
+if dst = nil or dst = '' then dst = src & '2'; end if;
 
 var text = src.load();
 if text = nil then raise '$src not found.'.eval(); end if;
@@ -91,4 +91,4 @@ dst.save(two);
 (dst & '.gz').save(gz);
 
 ?. 'asm-list: ' & ents.@count() & ' entries; ' &
-   src & ' -> ' & two.length() & ' fd.2 -> ' & gz.length() & ' fd.2.gz';
+   src & ' -> ' & two.length() & ' fd2 -> ' & gz.length() & ' fd2.gz';

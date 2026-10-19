@@ -65,7 +65,7 @@ var _a64_cpu = 'host'.arg().getJson(fd: true).cpu;
 var asms_a64 = A64AsmsInit();
 fun A64AsmsInit()
   if zlib then
-    use ':asm-list-a64.fd.2.gz' as gz;
+    use ':asm-list-a64.fd2.gz' as gz;
     result = inflate(gz).getJson(fd: true, sse: true);
   else
     raise 'lib-asm-a64: zlib is required for the asm list';

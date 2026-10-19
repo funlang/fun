@@ -51,7 +51,7 @@ fun/test/expected/**   -text
 *.yaml    text eol=lf
 *.cfg     text eol=lf
 *.fd      text eol=lf
-*.fd.2    text eol=lf
+*.fd2     text eol=lf
 .gitignore      text eol=lf
 .gitattributes  text eol=lf
 
@@ -70,15 +70,16 @@ src/3rd/**           linguist-vendored
 src/regex/pcre/**    linguist-vendored
 
 # ---- Language statistics ---------------------------------------------------
-# Host detectors read the final suffix, so `*.fd.2` looks like a man page
-# section (Roff): Gitee reported ~31% "Roff" for these generated assembler
-# tables. `*.tbl` and the editor syntax assets collide in the same way.
+# Host detectors read the final suffix, so the old `*.fd.2` looked like a man
+# page section (Roff): Gitee reported ~31% "Roff" for these generated assembler
+# tables. `*.fd2` is not a man-page suffix. `*.tbl` and the editor syntax
+# assets collide in the same way.
 # They are data, not source, so keep them out of the language bars.
 # Use the negative attribute form (`-linguist-detectable`); assigning
 # `linguist-detectable=false` is only a string value to some hosts.
 # `linguist-generated` is the older, widely supported exclusion and keeps
 # the tables out of stats on hosts whose linguist predates detectable.
-*.fd.2            -linguist-detectable linguist-generated
+*.fd2             -linguist-detectable linguist-generated
 *.tbl             -linguist-detectable
 *.syntax          -linguist-detectable
 *.presets         -linguist-detectable

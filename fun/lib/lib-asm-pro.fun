@@ -18,7 +18,7 @@ fun AsmsInit()
     all = inflate(gz); #
     // Rebuild the derived table with fun/lib/tools/make-asm-list.fun
     // (sort -> prefix dedup -> raw deflate); see port-decisions.md D23.
-    use ':asm-list.fd.2.gz' as gz;
+    use ':asm-list.fd2.gz' as gz;
     //?, gz.length(); ?, str2hex(gz.substr(len:4)); ?, str2hex(gz.substr(-4));
     all = inflate(gz); //?. all.length();
     //all = SseDecompress(all);

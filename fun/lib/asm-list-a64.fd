@@ -5,7 +5,7 @@
 # built by the same tool:
 #   src/prj/fun/funcmd fun/lib/tools/make-asm-list.fun \
 #       fun/lib/asm-list-a64.fd
-# (sort by line -> prefix dedup -> asm-list-a64.fd.2 -> .fd.2.gz, which
+# (sort by line -> prefix dedup -> asm-list-a64.fd2 -> .fd2.gz, which
 # lib-asm-a64.fun embeds at parse time).
 #
 # key   = "<mnemonic> <op-shape>,..."   e.g. add x,x,#
