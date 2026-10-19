@@ -102,6 +102,7 @@ var _shutdown = LibC().getapi('shutdown', 'ii:i');
 var _close    = LibC().getapi('close',    'i:i');
 var _poll     = LibC().getapi('poll',     'iii:i');
 var _memcpy   = LibC().getapi('memcpy',   'ppn:p');
+var _strtoull = LibC().getapi('strtoull', 'pii:l'); // pointer-width reads, see ReadU64
 // errno accessor: glibc has __errno_location(), Darwin has __error().
 var _errno_loc = LibC().getapi(DyLib('__errno_location', '__error'), ':p');
 var _strerror = LibC().getapi('strerror', 'i:s');
@@ -125,10 +126,16 @@ fun ErrMsg()
 end fun;
 
 // read one pointer-width (8-byte) little-endian value at byte offset off.
-// str2int only reads 4 bytes, so assemble the high half explicitly.
+// Fun's arithmetic is 32-bit, so the halves cannot be combined as
+// low + high * 2^32; reassemble the bytes as big-endian hex text instead and
+// parse it with strtoull (the lib-proc-darwin _read64 recipe).
 fun ReadU64(s, off)
-  var t = s.substr(off, 8);
-  result = t.toNum(ptr: 1) + t.substr(4).toNum(ptr: 1) * 4294967296;
+  var h = str2hex(s.substr(off, 8));
+  var big = h.substr(14,2) & h.substr(12,2) & h.substr(10,2) & h.substr(8,2)
+          & h.substr(6,2) & h.substr(4,2) & h.substr(2,2) & h.substr(0,2);
+  var tb = ' '.x(20);
+  ('0x' & big).move(tb.toNum(-1));
+  result = _strtoull(tb.toNum(-1), 0, 16);
 end fun;
 
 //--------------------------------------------------------------
