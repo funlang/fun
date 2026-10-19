@@ -2,7 +2,8 @@
 // a local module, a repo-relative stdlib module, an embedded data file, a
 // declared resource and an undeclared stray file), pack it through `fun pack`,
 // run the produced executable and check what it wrote. Only booleans are
-// printed, so the snapshot is the same on every host.
+// printed on success, so the snapshot is the same on every host; a failing run
+// adds an rc/err line (and never crashes on the missing output file).
 //
 // lib-os is deliberately avoided: its Windows backend creates WScript.Shell at
 // load time (COM newobj), which the FPC Windows build does not provide. Process
@@ -19,20 +20,21 @@ fun q(s)
   result = dq & s & dq;
 end fun;
 
-var _pid;
+var _getpid;
 var _system;
 if _isWin then
-  _pid    = 'kernel32'.getapi('GetCurrentProcessId', ':i');
+  _getpid = 'kernel32'.getapi('GetCurrentProcessId', ':i');
   _system = LibC().getapi('system', 'a:i');   // ANSI command line on Windows
 else
-  _pid    = LibC().getapi('getpid', ':i');
+  _getpid = LibC().getapi('getpid', ':i');
   _system = LibC().getapi('system', 's:i');
 end if;
+var _pid = _getpid();
 
-// run cmd in dir and return its exit code; the output is discarded so the
-// snapshot never carries temp paths (system() returns the raw wait status on
-// POSIX, the command exit code on Windows)
-fun runIn(dir, cmd)
+// run cmd in dir and return its exit code; all output goes to logFile so the
+// snapshot stays free of temp paths (system() returns the raw wait status on
+// POSIX and the command exit code on Windows)
+fun runIn(dir, cmd, logFile)
   var c = cmd;
   if dir <> '' then
     if _isWin then
@@ -41,9 +43,26 @@ fun runIn(dir, cmd)
       c = 'cd ' & q(dir) & ' && ' & c;
     end if;
   end if;
-  if _isWin then c &= ' >NUL 2>&1'; else c &= ' >/dev/null 2>&1'; end if;
+  c &= ' >' & q(logFile) & ' 2>&1';
   var rc = _system(c);
   if _isWin then result = rc; else result = rc div 256; end if;
+end fun;
+
+// diagnostics for a failed step: exit code plus its output (capped)
+fun fail(tag, rc, logFile)
+  if rc <> 0 then
+    ?. tag & ' rc=' & rc;
+    var s = '';
+    if logFile.find() then s = logFile.load(); end if;
+    s = s.replace(nl, ' | ');
+    if s.length() > 400 then s = s.substr(0, 400); end if;
+    ?. 'err: ' & s;
+  end if;
+end fun;
+
+fun loadIf(p)
+  result = '';
+  if p.find() then result = p.load(); end if;
 end fun;
 
 fun absPath(p)
@@ -82,23 +101,27 @@ var out = base & 'packed';
 if _isWin then out &= '.exe'; end if;
 var resultFile = base & 'result.txt';
 var rc = runIn(HostCurrPath(), funcmd & ' pack ' & q(app & 'app.fun') &
-               ' -a ' & q(app & 'res') & ' -o ' & q(out));
+               ' -a ' & q(app & 'res') & ' -o ' & q(out), base & 'pack1.log');
 ?. 'packed: ' & (rc = 0);
 ?. 'single file: ' & (out.size() > 0);
+fail('pack', rc, base & 'pack1.log');
 
 // 2. run the produced executable; 2.arg() of the script is the first real
 //    argument, exactly as when the script is run by funcmd directly
-var rc2 = runIn('', q(out) & ' ' & q(resultFile));
+var rc2 = runIn('', q(out) & ' ' & q(resultFile), base & 'run1.log');
 ?. 'ran: ' & (rc2 = 0);
-?. 'output: ' & (resultFile.load() = '5|41|hello-resource|no|EMB');
+?. 'output: ' & (loadIf(resultFile) = '5|41|hello-resource|no|EMB');
+fail('run', rc2, base & 'run1.log');
 
 // 3. the everyday flow: cd into the project and pack with a relative entry
 //    while the interpreter lives elsewhere (absolute path)
 var out2 = base & 'packed2';
 if _isWin then out2 &= '.exe'; end if;
-var rc3 = runIn(app, funcmd & ' pack app.fun -a res -o ' & q(out2));
+var rc3 = runIn(app, funcmd & ' pack app.fun -a res -o ' & q(out2), base & 'pack2.log');
 ?. 'packed from project dir: ' & (rc3 = 0);
+fail('pack2', rc3, base & 'pack2.log');
 var resultFile2 = base & 'result2.txt';
-var rc4 = runIn('', q(out2) & ' ' & q(resultFile2));
+var rc4 = runIn('', q(out2) & ' ' & q(resultFile2), base & 'run2.log');
 ?. 'ran from project dir: ' & (rc4 = 0);
-?. 'output 2: ' & (resultFile2.load() = '5|41|hello-resource|no|EMB');
+?. 'output 2: ' & (loadIf(resultFile2) = '5|41|hello-resource|no|EMB');
+fail('run2', rc4, base & 'run2.log');

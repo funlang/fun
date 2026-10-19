@@ -238,11 +238,15 @@ end fun;
 
 fun isDir(p)
   result = false;
+  var t = p;
+  if t.length() > 1 and t.substr(t.length() - 1) = '/' then
+    t = t.substr(0, t.length() - 1);   // "dir/" is not accepted everywhere
+  end if;
   if _isWin then
-    var a = _getAttrs(p);
+    var a = _getAttrs(t);
     result = a >= 0 and (a bit and 16) <> 0;   // FILE_ATTRIBUTE_DIRECTORY
   else
-    var dp = _opendir(p);
+    var dp = _opendir(t);
     if dp <> nil then _closedir(dp); result = true; end if;
   end if;
 end fun;
