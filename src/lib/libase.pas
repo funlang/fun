@@ -39,12 +39,14 @@ type
     function accept(exp: CExp): fun.bool; override;
   end;
 
+{$IfDef FunPack}
 // Bundled-app mode (a single-file exe with a zip trailer): the launcher sets
 // these so the script sees 1.arg() = the bundled entry and 2.arg() = its first
 // real argument, exactly like `funcmd app.fun ...`.
 var
   ArgScript: fun.str = '';
   ArgShift : fun.int = 0;
+{$EndIf}
 
 implementation
 
@@ -210,12 +212,16 @@ begin
     exit;
   end;
   i := exp.asInt;
+{$IfDef FunPack}
   if i = 0 then
     val^ := ParamStr(0)
   else if (i = 1) and (ArgScript <> '') then
     val^ := ArgScript
   else
     val^ := ParamStr(i + ArgShift);
+{$Else}
+  val^ := ParamStr(i);
+{$EndIf}
 end;
 
 //==============================================================

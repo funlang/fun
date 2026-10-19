@@ -512,6 +512,7 @@ jobs:
           # something fpc reads as a path plus a stray 'lib' source file.
           $argv = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs', '-Twin64',
                     '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx',
+                    '-dFunPack',
                     "-Fu$((Resolve-Path '..\..\lib').Path)")
 
           $built = $null

@@ -57,9 +57,35 @@ procedure WriteErr(const s: fun.str);
 // Delphi builds are byte-exact already and keep the plain RTL write.
 procedure WriteOut(const s: fun.str);
 
+{$IfDef FunPack}
+// ---------------------------------------------------------------- fun tools
+// "fun <tool>" runs lib/tools/fun-<tool>.fun from the release tree (next to
+// the executable) or from fun/lib/tools in a development checkout. The tool
+// takes the script's argv slot, so it still sees 1.arg() = its own path.
+//
+// To add a tool, list its command name here; the script name is derived as
+// fun-<command>.fun, so no other dispatch change is needed.
+function IsFunTool(const name: fun.str): fun.bool;
+function FindFunTool(const name: fun.str): fun.str;
+
+// ---------------------------------------------------------------- bundled app
+// A packaged single-file app is this executable with a zip payload (STORE
+// entries only) and a 16-byte trailer ('FUNBUNDL' + uint64 payload size)
+// appended by fun/lib/tools/fun-pack.fun. UnpackBundle extracts the payload to
+// a temp directory and returns the entry script's path; '' means "no bundle".
+// BundleDir is that temp directory, or '' when nothing was unpacked.
+var
+  BundleDir: fun.str;
+
+function UnpackBundle(const exe: fun.str): fun.str;
+// Remove the bundle's temp directory after the script has run.
+procedure FreeBundle;
+{$EndIf}
+
 implementation
 
 uses SysUtils
+     {$IfDef FunPack}, Classes{$EndIf}
      {$IfNDef UNIX}, Windows{$Else}
        {$IfDef Linux}, Linux{$EndIf}
        , unixtype
@@ -379,5 +405,236 @@ begin
   // Unix, WinCE and Delphi: the RTL write is already byte-exact.
   Write(Output, s);
 end;
+
+{$IfDef FunPack}
+//==============================================================
+// Bundled-app runtime and "fun <tool>" dispatch
+//==============================================================
+const
+  _BundleMagic = 'FUNBUNDL';
+
+  // Enabled tool commands. The script is lib/tools/fun-<name>.fun.
+  FunTools: array[0..0] of fun.str = ('pack');
+
+function IsFunTool(const name: fun.str): fun.bool;
+var
+  i: Integer;
+begin
+  result := false;
+  if name = '' then exit;
+  for i := Low(FunTools) to High(FunTools) do
+    if FunTools[i] = name then begin result := true; exit; end;
+end;
+
+function FindFunTool(const name: fun.str): fun.str;
+var
+  rel: fun.str;
+begin
+  rel := 'lib' + PathDelim + 'tools' + PathDelim + 'fun-' + name + '.fun';
+  result := ExtractFilePath(ParamStr(0)) + rel;
+  if FileExists(result) then exit;
+  // a development build lives in src/prj/fun, three levels below the repo root
+  result := ExtractFilePath(ParamStr(0)) + '..' + PathDelim + '..' + PathDelim +
+            '..' + PathDelim + 'fun' + PathDelim + rel;
+  if FileExists(result) then exit;
+  result := 'fun' + PathDelim + rel;
+  if FileExists(result) then exit;
+  result := ExtractFilePath(ParamStr(0)) + rel;   // reported when nothing was found
+end;
+
+// little-endian value of n (<= 8) bytes at at; -1 on a short read
+function _LE(fs: TFileStream; at: Int64; n: Integer): Int64;
+var
+  b: array[0..7] of Byte;
+  i: Integer;
+begin
+  result := 0;
+  if n > 8 then n := 8;
+  fs.Position := at;
+  if fs.Read(b, n) <> n then begin result := -1; exit; end;
+  for i := n - 1 downto 0 do
+    result := (result shl 8) or b[i];
+end;
+
+function _ReadStr(fs: TFileStream; at: Int64; n: Integer): fun.str;
+var
+  s: fun.str;
+begin
+  s := '';
+  if n <= 0 then begin result := s; exit; end;
+  SetLength(s, n);
+  fs.Position := at;
+  if fs.Read(s[1], n) <> n then s := '';
+  result := s;
+end;
+
+function _TrimRel(s: fun.str): fun.str;
+begin
+  result := s;
+  while (result <> '') and ((result[Length(result)] = #13) or
+        (result[Length(result)] = #10) or (result[Length(result)] = ' ')) do
+    SetLength(result, Length(result) - 1);
+end;
+
+procedure _DeleteTree(const dir: fun.str);
+var
+  sr: TSearchRec;
+  p: fun.str;
+begin
+  p := IncludeTrailingPathDelimiter(dir);
+  if FindFirst(p + '*', faAnyFile, sr) = 0 then
+  begin
+    repeat
+      if (sr.Name <> '.') and (sr.Name <> '..') then
+      begin
+        if (sr.Attr and faDirectory) <> 0 then
+          _DeleteTree(p + sr.Name)
+        else
+          DeleteFile(p + sr.Name);
+      end;
+    until FindNext(sr) <> 0;
+    FindClose(sr);
+  end;
+  RemoveDir(dir);
+end;
+
+// zip entry name -> a relative path with the host separator, or '' when the
+// name is unsafe (absolute, drive-qualified, or has an empty/'.'/'..' segment).
+function _SafeRel(name: fun.str): fun.str;
+var
+  seg, rest, out: fun.str;
+  k: Integer;
+begin
+  result := '';
+  if (name = '') or (Pos(':', name) > 0) or (Pos('\', name) > 0) then exit;
+  if name[1] = '/' then exit;
+  out  := '';
+  rest := name;
+  while rest <> '' do
+  begin
+    k := Pos('/', rest);
+    if k > 0 then
+    begin
+      seg  := Copy(rest, 1, k - 1);
+      rest := Copy(rest, k + 1, Length(rest));
+    end
+    else
+    begin
+      seg  := rest;
+      rest := '';
+    end;
+    if (seg = '') or (seg = '.') or (seg = '..') then exit;
+    if out = '' then out := seg else out := out + PathDelim + seg;
+  end;
+  result := out;
+end;
+
+function UnpackBundle(const exe: fun.str): fun.str;
+var
+  fs, fo: TFileStream;
+  size, zipStart, zipLen, i, ents, cd, p, method, nl, xl, cl, loff,
+  dataOff, csize, left, got, stopAt, cdOfs: Int64;
+  tmp, name, rel, dest: fun.str;
+  buf: array[0..65535] of Byte;
+  marker, failed: fun.bool;
+begin
+  result := '';
+  BundleDir := '';
+  if not FileExists(exe) then exit;
+  fs := TFileStream.Create(exe, fmOpenRead or fmShareDenyNone);
+  fo := nil;
+  try
+    size := fs.Size;
+    if size < 64 then exit;
+    if _ReadStr(fs, size - 16, 8) <> _BundleMagic then exit;
+    zipLen := _LE(fs, size - 8, 8);
+    if (zipLen <= 0) or (zipLen > size - 16) then exit;
+    zipStart := size - 16 - zipLen;
+    cd := -1;
+    i  := zipStart + zipLen - 22;
+    stopAt := i - 65557;              // EOCD + max archive comment
+    if stopAt < zipStart then stopAt := zipStart;
+    while i >= stopAt do
+    begin
+      if _LE(fs, i, 4) = $06054B50 then begin cd := i; break; end;
+      Dec(i);
+    end;
+    if cd < 0 then exit;
+    ents  := _LE(fs, cd + 10, 2);
+    cdOfs := _LE(fs, cd + 16, 4);
+    if (ents < 0) or (cdOfs < 0) or (cdOfs >= zipLen) then exit;
+    p     := zipStart + cdOfs;
+    tmp  := IncludeTrailingPathDelimiter(GetTempDir) + 'fun-pack-' + IntToStr(GetTickCount);
+    while DirectoryExists(tmp) do tmp := tmp + 'x';
+    ForceDirectories(tmp);
+    BundleDir := tmp;
+    marker := false;
+    failed := false;
+    for i := 0 to ents - 1 do
+    begin
+      if _LE(fs, p, 4) <> $02014B50 then begin failed := true; break; end;
+      method := _LE(fs, p + 10, 2);
+      csize  := _LE(fs, p + 20, 4);
+      nl     := _LE(fs, p + 28, 2);
+      xl     := _LE(fs, p + 30, 2);
+      cl     := _LE(fs, p + 32, 2);
+      loff   := _LE(fs, p + 42, 4);
+      name   := _ReadStr(fs, p + 46, nl);
+      if method <> 0 then begin failed := true; break; end;
+      if (csize < 0) or (nl < 0) or (loff < 0) or (loff >= zipLen) then
+      begin failed := true; break; end;
+      dataOff := zipStart + loff + 30 + _LE(fs, zipStart + loff + 26, 2)
+                                    + _LE(fs, zipStart + loff + 28, 2);
+      if (dataOff < zipStart) or (dataOff + csize > zipStart + zipLen) then
+      begin failed := true; break; end;
+      if name = '.funpack/entry' then
+      begin
+        rel    := _TrimRel(_ReadStr(fs, dataOff, csize));
+        marker := rel <> '';
+      end
+      else
+      begin
+        dest := _SafeRel(name);
+        if dest <> '' then
+        begin
+          dest := tmp + PathDelim + dest;
+          if ExtractFileDir(dest) <> '' then ForceDirectories(ExtractFileDir(dest));
+          fo := TFileStream.Create(dest, fmCreate);
+          fs.Position := dataOff;
+          left := csize;
+          while left > 0 do
+          begin
+            got := left; if got > SizeOf(buf) then got := SizeOf(buf);
+            fs.Read(buf, got);
+            fo.Write(buf, got);
+            left := left - got;
+          end;
+          FreeAndNil(fo);
+        end;
+      end;
+      p := p + 46 + nl + xl + cl;
+    end;
+    if fo <> nil then FreeAndNil(fo);
+    if marker and not failed then
+      result := tmp + PathDelim + _SafeRel(rel)
+    else
+    begin
+      _DeleteTree(tmp);
+      BundleDir := '';
+    end;
+  finally
+    fs.Free;
+  end;
+end;
+
+procedure FreeBundle;
+begin
+  if BundleDir <> '' then
+  begin
+    _DeleteTree(BundleDir);
+    BundleDir := '';
+  end;
+end;
+{$EndIf}
 
 end.

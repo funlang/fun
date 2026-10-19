@@ -88,7 +88,7 @@ build_cpu() {
   export PATH ZIG
 
   # --- Optional features ----------------------------------------------------
-  FEATURES=""
+  FEATURES="-dFunPack"
   FU_EXTRA=""
   FL_EXTRA=""
   if [ -f "$UNITS_HASH/md5.ppu" ] && [ -f "$UNITS_HASH/sha1.ppu" ]; then

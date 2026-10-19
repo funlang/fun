@@ -22,6 +22,10 @@
 # advapi32.dll; on Linux src/libmd5.inc now has a portable branch built on
 # FPC's bundled md5/sha1 units (see the {$IfDef Linux} block there).
 #
+# -dFunPack enables "fun pack" and the single-file bundled-app runtime. The
+# feature lives behind this define so a minimal FPC/Delphi build can omit it;
+# the standard FPC build scripts turn it on.
+#
 # Usage:
 #   ./make-linux-x86_64.sh            # FPC resolved from PATH
 #   FPC=/path/to/fpc ./make-linux-x86_64.sh
@@ -197,7 +201,7 @@ if [ -n "${NO_CALC_OPT:-}" ]; then
     echo "NO_CALC_OPT set - building without arithmetic fast paths."
 fi
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $CALC_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 -dFunPack $CALC_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) -------------
 # Refresh fun/funcmd on every build, so a run from the repo root is just
