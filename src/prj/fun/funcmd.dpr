@@ -31,6 +31,11 @@ library funcmd;
 {$IFEND}
 {$EndIf}
 
+// FunPack (full: create and run bundles) implies FunPackUser (run only).
+{$IfDef FunPack}
+  {$Define FunPackUser}
+{$EndIf}
+
 //{$APPTYPE CONSOLE}
 
 uses
@@ -354,7 +359,7 @@ begin
   if v then PrintVer();
 
   p   := nil;
-{$IfDef FunPack}
+{$IfDef FunPackUser}
   // a packaged app carries its script payload in this executable's tail; in
   // that mode every command-line argument belongs to the script
   f := UnpackBundle(ParamStr(0));
@@ -365,6 +370,9 @@ begin
     SetCurrentDir(BundleDir); // relative imports/resources resolve inside the bundle
     goto _Run;
   end;
+{$EndIf}
+
+{$IfDef FunPack}
   // "fun <tool>": dispatch to a whitelisted lib/tools/fun-<tool>.fun. The
   // subcommand takes the script's argv slot, so the tool still sees
   // 1.arg() = its own path and 2.arg() = the first real argument.
@@ -478,7 +486,7 @@ _Run:
   end;
 
 _Exit:
-{$IfDef FunPack}
+{$IfDef FunPackUser}
   FreeBundle;
 {$EndIf}
   if hadError then ExitCode := 1;

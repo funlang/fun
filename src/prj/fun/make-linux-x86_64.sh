@@ -24,7 +24,9 @@
 #
 # -dFunPack enables "fun pack" and the single-file bundled-app runtime. The
 # feature lives behind this define so a minimal FPC/Delphi build can omit it;
-# the standard FPC build scripts turn it on.
+# the standard FPC build scripts turn it on. FUNPACK=user builds only the
+# consumer runtime (-dFunPackUser): bundled apps run, but there is no
+# "fun pack" subcommand.
 #
 # Usage:
 #   ./make-linux-x86_64.sh            # FPC resolved from PATH
@@ -200,8 +202,13 @@ if [ -n "${NO_CALC_OPT:-}" ]; then
     CALC_FLAGS=""
     echo "NO_CALC_OPT set - building without arithmetic fast paths."
 fi
+PACK_FLAGS="-dFunPack"
+if [ "${FUNPACK:-}" = "user" ]; then
+    PACK_FLAGS="-dFunPackUser"
+    echo "FUNPACK=user - building only the bundled-app consumer."
+fi
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 -dFunPack $CALC_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) -------------
 # Refresh fun/funcmd on every build, so a run from the repo root is just

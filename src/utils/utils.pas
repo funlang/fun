@@ -19,6 +19,13 @@
 // SOFTWARE.
 unit utils;
 
+// FunPack is the full feature (create bundles + run them). FunPackUser is the
+// consumer-only subset (run a bundle, no "fun pack" subcommand). Defining
+// FunPack implies FunPackUser, so existing -dFunPack builds are unchanged.
+{$IfDef FunPack}
+  {$Define FunPackUser}
+{$EndIf}
+
 interface
 
 uses fun;
@@ -67,7 +74,9 @@ procedure WriteOut(const s: fun.str);
 // fun-<command>.fun, so no other dispatch change is needed.
 function IsFunTool(const name: fun.str): fun.bool;
 function FindFunTool(const name: fun.str): fun.str;
+{$EndIf}
 
+{$IfDef FunPackUser}
 // ---------------------------------------------------------------- bundled app
 // A packaged single-file app is this executable with a zip payload (STORE
 // entries only) and a 16-byte trailer ('FUNBUNDL' + uint64 payload size)
@@ -407,11 +416,9 @@ end;
 
 {$IfDef FunPack}
 //==============================================================
-// Bundled-app runtime and "fun <tool>" dispatch
+// "fun <tool>" dispatch
 //==============================================================
 const
-  _BundleMagic = 'FUNBUNDL';
-
   // Enabled tool commands. The script is lib/tools/fun-<name>.fun.
   FunTools: array[0..0] of fun.str = ('pack');
 
@@ -440,6 +447,14 @@ begin
   if FileExists(result) then exit;
   result := ExtractFilePath(ParamStr(0)) + rel;   // reported when nothing was found
 end;
+{$EndIf}
+
+{$IfDef FunPackUser}
+//==============================================================
+// Bundled-app runtime (consumer side)
+//==============================================================
+const
+  _BundleMagic = 'FUNBUNDL';
 
 // little-endian value of n (<= 8) bytes at at; -1 on a short read
 function _LE(h: THandle; at: Int64; n: Integer): Int64;

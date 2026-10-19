@@ -88,7 +88,11 @@ build_cpu() {
   export PATH ZIG
 
   # --- Optional features ----------------------------------------------------
-  FEATURES="-dFunPack"
+  if [ "${FUNPACK:-}" = "user" ]; then
+    FEATURES="-dFunPackUser"
+  else
+    FEATURES="-dFunPack"
+  fi
   FU_EXTRA=""
   FL_EXTRA=""
   if [ -f "$UNITS_HASH/md5.ppu" ] && [ -f "$UNITS_HASH/sha1.ppu" ]; then

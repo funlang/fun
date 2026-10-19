@@ -115,8 +115,13 @@ fi
 
 # --- Build funcmd --------------------------------------------------------
 echo "Building funcmd with $FPC_BIN"
+PACK_FLAGS="-dFunPack"
+if [ "${FUNPACK:-}" = "user" ]; then
+    PACK_FLAGS="-dFunPackUser"
+    echo "FUNPACK=user - building only the bundled-app consumer."
+fi
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -dMD5 -dFunPack $PCRE_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -dMD5 $PACK_FLAGS $PCRE_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) ---------------------
 ROOT="$(cd "$HERE/../../.." && pwd)"

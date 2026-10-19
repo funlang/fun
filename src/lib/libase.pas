@@ -28,6 +28,11 @@ unit libase;
   {$IfDef WinFFI}{$Define UnixFFI}{$EndIf}
 {$EndIf}
 
+// FunPack (full: create and run bundles) implies FunPackUser (run only).
+{$IfDef FunPack}
+  {$Define FunPackUser}
+{$EndIf}
+
 interface
 
 uses fun, base, core, host;
@@ -39,7 +44,7 @@ type
     function accept(exp: CExp): fun.bool; override;
   end;
 
-{$IfDef FunPack}
+{$IfDef FunPackUser}
 // Bundled-app mode (a single-file exe with a zip trailer): the launcher sets
 // these so the script sees 1.arg() = the bundled entry and 2.arg() = its first
 // real argument, exactly like `funcmd app.fun ...`.
@@ -212,7 +217,7 @@ begin
     exit;
   end;
   i := exp.asInt;
-{$IfDef FunPack}
+{$IfDef FunPackUser}
   if i = 0 then
     val^ := ParamStr(0)
   else if (i = 1) and (ArgScript <> '') then

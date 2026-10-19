@@ -56,7 +56,11 @@ export PATH ZIG
 
 # --- optional -dMD5 when the hash units are present -----------------------
 FU_EXTRA=""
-FEATURES="-dFunPack"
+if [ "${FUNPACK:-}" = "user" ]; then
+  FEATURES="-dFunPackUser"
+else
+  FEATURES="-dFunPack"
+fi
 if [ -f "$UNITS_HASH/md5.ppu" ] && [ -f "$UNITS_HASH/sha1.ppu" ]; then
   FEATURES="$FEATURES -dMD5"
   FU_EXTRA="$FU_EXTRA -Fu$UNITS_HASH"
