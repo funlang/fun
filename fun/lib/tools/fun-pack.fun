@@ -29,7 +29,9 @@
 // At run time the process working directory is the extracted payload root, so
 // relative reads behave as in development; relative *writes* land in the temp
 // directory and are removed with it on exit. On Windows the output name gets an
-// '.exe' suffix when missing.
+// '.exe' suffix when missing, and the runtime support DLLs that ship next to
+// funcmd (pcre3.dll is a static import; ffi.dll for getapi, ...) are copied
+// into the output directory, so a Windows result is the exe plus those DLLs.
 //
 // Files that already carry a bundle trailer are skipped, so re-packing in the
 // same directory does not swallow earlier builds.
@@ -166,13 +168,23 @@ var _findClose;
 var _getAttrs;
 var _memcpy;
 if _isWin then
-  _findFirst = 'kernel32'.getapi('FindFirstFileA', 'sp:l');
+  _findFirst = 'kernel32'.getapi('FindFirstFileA', 'ap:l');
   _findNext  = 'kernel32'.getapi('FindNextFileA',  'ip:i');
-  _findClose = 'kernel32'.getapi('FindClose',      'p:i');
-  _getAttrs  = 'kernel32'.getapi('GetFileAttributesA', 's:i');
+  _findClose = 'kernel32'.getapi('FindClose',      'i:i');
+  _getAttrs  = 'kernel32'.getapi('GetFileAttributesA', 'a:i');
 else
   _opendir  = LibC().getapi('opendir',  's:p');
-  _readdir  = LibC().getapi('readdir',  'p:p');
+  if _isMac then
+    // x86_64 libSystem's plain readdir is the legacy 32-bit-inode variant;
+    // arm64 only ships the 64-bit layout (and no $INODE64 alias)
+    try
+      _readdir = LibC().getapi('readdir$INODE64', 'p:p');
+    except
+      _readdir = LibC().getapi('readdir', 'p:p');
+    end try;
+  else
+    _readdir = LibC().getapi('readdir', 'p:p');
+  end if;
   _closedir = LibC().getapi('closedir', 'p:i');
   _memcpy   = LibC().getapi('memcpy',   'ppn:p');
 end if;
@@ -442,6 +454,31 @@ if not _isWin then
     LibC().getapi('chmod', 'si:i')(outFile, 0x1ED);   // 0755
   except
   end try;
+end if;
+
+// Windows: the runtime links against support DLLs that must sit next to the
+// executable (pcre3.dll is a static import, so the loader needs it at start),
+// so copy the ones shipped next to funcmd into the output directory.
+if _isWin then
+  var exePath = 0.arg();
+  exePath = exePath.replace('\\', '/');
+  var rtDir  = dirname(exePath);
+  var outDir = dirname(outFile);
+  var di = 0;
+  var dlls = new [];
+  dlls.@add('pcre3.dll');
+  dlls.@add('ffi.dll');
+  dlls.@add('libffi-8.dll');
+  dlls.@add('zlib1.dll');
+  dlls.@add('libtcc.dll');
+  dlls.@add('tcc.dll');
+  while di < dlls.@count() do
+    var dsrc = rtDir & dlls[di];
+    if exists(dsrc) then
+      (outDir & dlls[di]).save(dsrc.load(cp: 0xffff), cp: 0xffff);
+    end if;
+    di += 1;
+  end do;
 end if;
 
 var wi = 0;
