@@ -475,6 +475,29 @@ begin
     SetLength(result, Length(result) - 1);
 end;
 
+// GetTempDir is not available in older Delphi (2006); GetTempPath is.
+function _TempDir: fun.str;
+{$IfDef UNIX}
+begin
+  result := GetTempDir;
+end;
+{$Else}
+var
+  buf: array[0..MAX_PATH] of Char;
+  n: DWORD;
+begin
+  buf[0] := #0;
+  n := GetTempPath(SizeOf(buf), buf);
+  if (n > 0) and (n < SizeOf(buf)) then
+  begin
+    buf[n] := #0;
+    result := buf;
+  end
+  else
+    result := '.';
+end;
+{$EndIf}
+
 procedure _DeleteTree(const dir: fun.str);
 var
   sr: TSearchRec;
@@ -566,13 +589,15 @@ begin
     cdOfs := _LE(h, cd + 16, 4);
     if (ents < 0) or (cdOfs < 0) or (cdOfs >= zipLen) then exit;
     p     := zipStart + cdOfs;
-    tmp  := IncludeTrailingPathDelimiter(GetTempDir) + 'fun-pack-' + IntToStr(GetTickCount);
+    tmp  := IncludeTrailingPathDelimiter(_TempDir) + 'fun-pack-' + IntToStr(GetTickCount);
     while DirectoryExists(tmp) do tmp := tmp + 'x';
     ForceDirectories(tmp);
     BundleDir := tmp;
     marker := false;
     failed := false;
-    for i := 0 to ents - 1 do
+    // Int64 cannot be a Delphi for-loop control variable (E2032).
+    i := 0;
+    while i < ents do
     begin
       if _LE(h, p, 4) <> $02014B50 then begin failed := true; break; end;
       method := _LE(h, p + 10, 2);
@@ -618,6 +643,7 @@ begin
         end;
       end;
       p := p + 46 + nl + xl + cl;
+      Inc(i);
     end;
     if marker and not failed then
       result := tmp + PathDelim + _SafeRel(rel)
