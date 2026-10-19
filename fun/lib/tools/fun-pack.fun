@@ -43,6 +43,7 @@
 //
 // The tool itself has no `use` imports, so it runs from any working directory;
 // the project's own imports are resolved against this file's location.
+var _dllInfo = '';
 var _facts = 'host'.arg().getJson(fd: true);
 var _isWin = _facts.os = 'windows';
 var _isMac = _facts.os = 'macos';
@@ -483,6 +484,7 @@ if _isWin then
   dlls.@add('libtcc.dll');
   dlls.@add('tcc.dll');
   var copied = '';
+  _dllInfo = 'rt=' & rtDir & ' outdir=' & outDir;
   while di < dlls.@count() do
     var dsrc = rtDir & dlls[di];
     var data = '';
@@ -497,6 +499,7 @@ if _isWin then
     end if;
     di += 1;
   end do;
+  _dllInfo = _dllInfo & ' copied=[' & copied & ']';
   ?. 'runtime dlls:' & copied;
 end if;
 
@@ -507,3 +510,7 @@ while wi < warns.@count() do
 end do;
 ?. 'packed ' & zipN & ' files into ' & outFile &
    ' (' & z.length() & ' bytes payload)';
+if _isWin then
+  (outFile & '.packdiag').save('done|n=' & zipN & '|warns=' & warns.@count() &
+    '|' & _dllInfo);
+end if;
