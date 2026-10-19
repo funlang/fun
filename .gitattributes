@@ -69,6 +69,16 @@ fun/demos/notepad--/notepad--*.syntax   text eol=lf
 src/3rd/**           linguist-vendored
 src/regex/pcre/**    linguist-vendored
 
+# ---- Language statistics ---------------------------------------------------
+# Host detectors read the final suffix, so `*.fd.2` looks like a man page
+# section (Roff): Gitee reported ~31% "Roff" for these generated assembler
+# tables. `*.tbl` and the editor syntax assets collide in the same way.
+# They are data, not source, so keep them out of the language bars.
+*.fd.2            linguist-detectable=false
+*.tbl             linguist-detectable=false
+*.syntax          linguist-detectable=false
+*.presets         linguist-detectable=false
+
 # ---- Explicitly binary (never convert) ------------------------------------
 *.exe   binary
 *.dll   binary
