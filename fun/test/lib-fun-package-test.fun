@@ -325,3 +325,69 @@ var rt = loadIf(dproj & 'package.fun');
 fail('dep add/remove', a1 + a2, alog);
 ?. 'add dependency: ' & (a1 = 0 and at.subpos("'tmpdep'") >= 0);
 ?. 'remove dependency: ' & (a2 = 0 and rt.subpos("'tmpdep'") < 0);
+
+// --- CI diagnostics: only failing checks add lines. The success output stays
+// byte-identical, so the expected snapshot does not change.
+fun report(label, ok)
+  if not ok then ?. 'failed ' & label; end if;
+end fun;
+
+report('init', rc1 = 0);
+report('manifest', yn(proj & 'package.fun'));
+report('template', yn(proj & 'src' & sep & 'main.fun'));
+report('run', rc2 = 0);
+report('run output', got2 = 'hello, hello');
+report('flat', rc3 = 0);
+report('flat output', got3 = 'hello, flat');
+report('space arg', rc3b = 0 and got3b = 'hello, two words');
+report('init again refused', rc4 <> 0);
+report('existing manifest', yn(empty & 'package.fun'));
+report('existing kept', yn(empty & 'keep.txt'));
+report('existing no template', not yn(empty & 'src' & sep & 'main.fun'));
+report('lib manifest', m6.subpos("lib: 'src/lib.fun'") >= 0 and m6.subpos("bin: ''") >= 0);
+report('plain script', rc7 = 0);
+report('plain script output', got7 = 'plain-ok');
+report('pack defaults', rc8 = 0 and packed.size() > 0);
+report('pack runs', rc9 = 0);
+report('pack output', got9 = 'hello, packed');
+report('run missing manifest', rc10 <> 0);
+report('git fixture', g1 = 0 and g2 = 0 and g3 = 0 and g4 = 0);
+report('dep deps', d0 = 0 and d1 = 0 and d2 = 0);
+report('tidy', t1 = 0);
+report('resolved both', dt.subpos("'gitdep'") >= 0 and dt.subpos("commit: '") >= 0 and dt.subpos("'pathdep'") >= 0);
+report('dep run', r1 = 0);
+report('dep run output', ro = 'git-dep-ok-path-dep-ok');
+report('dep flat output', f1 = 0 and fo = 'git-dep-ok-path-dep-ok');
+report('tidy idempotent', t2 = 0 and t2o = 'up to date');
+report('dep pack', p1 = 0 and pout.size() > 0);
+report('dep bundle', b1 = 0);
+report('dep bundle output', bo = 'git-dep-ok-path-dep-ok');
+report('dep bundle stdout', bstdout = 'git-dep-ok-path-dep-ok');
+report('cache reuse commit', e2 = 0 and commitOf(dt) <> '' and commitOf(dt) = commitOf(dt2));
+report('stale run refused', s0 = 0 and s1 <> 0);
+report('stale restored', s2 = 0 and s3 = 0);
+report('add dependency', a1 = 0 and at.subpos("'tmpdep'") >= 0);
+report('remove dependency', a2 = 0 and rt.subpos("'tmpdep'") < 0);
+
+if t2 <> 0 or t2o <> 'up to date' then
+  ?. 'failed tidy idempotent detail: rc=' & t2 & ' out=[' & t2o & ']';
+end if;
+if e2 <> 0 or commitOf(dt) = '' or commitOf(dt) <> commitOf(dt2) then
+  ?. 'failed cache reuse detail: e2=' & e2 & ' c1=[' & commitOf(dt) & '] c2=[' & commitOf(dt2) & ']';
+end if;
+if s0 <> 0 or s1 = 0 then
+  ?. 'failed stale refused detail: s0=' & s0 & ' s1=' & s1;
+end if;
+if s2 <> 0 or s3 <> 0 then
+  ?. 'failed stale restored detail: s2=' & s2 & ' s3=' & s3;
+end if;
+if not (dt.subpos("'gitdep'") >= 0 and dt.subpos("commit: '") >= 0 and dt.subpos("'pathdep'") >= 0) then
+  ?. 'failed resolved detail: gitdep=' & (dt.subpos("'gitdep'") >= 0) &
+     ' commit=' & (dt.subpos("commit: '") >= 0) & ' pathdep=' & (dt.subpos("'pathdep'") >= 0);
+end if;
+if a1 <> 0 or at.subpos("'tmpdep'") < 0 then
+  ?. 'failed add detail: rc=' & a1 & ' key=' & (at.subpos("'tmpdep'") >= 0) & ' log=' & logTail(alog);
+end if;
+if a2 <> 0 or rt.subpos("'tmpdep'") >= 0 then
+  ?. 'failed remove detail: rc=' & a2 & ' key=' & (rt.subpos("'tmpdep'") >= 0) & ' log=' & logTail(alog);
+end if;
