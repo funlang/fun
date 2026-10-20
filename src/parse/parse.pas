@@ -1003,15 +1003,20 @@ end;
 
 class function CParser.ParseFileName(const fn: fun.str; prev: CNode): fun.str;
 var
-  path, ret, fname, fp, dir, sep: fun.str;
+  path, ret, fname: fun.str;
+  {$IfDef FunPack}
+  fp, dir, sep: fun.str;
   fpLen, i: Integer;
+  {$EndIf}
 begin
   fname  := CIO.Norm(fn);
   result := fname;
+  {$IfDef FunPack}
   {$IfDef UNIX}
   sep := ':';
   {$Else}
   sep := ';';
+  {$EndIf}
   {$EndIf}
   if not FileExists(result) then
   begin
@@ -1036,6 +1041,7 @@ begin
         if not FileExists(ret) then ret := path + 'app/' + fname;
         {$EndIf}
         if     FileExists(ret) then result := ret;
+        {$IfDef FunPack}
         if not FileExists(result) then
         begin
           // FUN_PATH: last-resort lookup for bare names (set by the package
@@ -1068,6 +1074,7 @@ begin
             end;
           end;
         end;
+        {$EndIf}
       end;
     end;
   end;
