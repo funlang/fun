@@ -24,26 +24,7 @@ use 'fun-package-model.fun';
 
 var _isWin = IsWindows();
 var _facts = 'host'.arg().getJson(fd: true);
-
-var _system = LibC().getapi('system', 's:i');
-var _putenv;
-var _setEnv;
-var _exit;
-var _exitProcess;
-var _rmdir;
-var _pidFn;
-if _isWin then
-  _setEnv = 'kernel32'.getapi('SetEnvironmentVariableA', 'ss:i');
-  _exitProcess = 'kernel32'.getapi('ExitProcess', 'i:');
-  _rmdir = 'kernel32'.getapi('RemoveDirectoryA', 's:i');
-  _pidFn = 'kernel32'.getapi('GetCurrentProcessId', ':i');
-else
-  _putenv = LibC().getapi('putenv', 's:i');
-  _exit = LibC().getapi('exit', 'i:');
-  _rmdir = LibC().getapi('rmdir', 's:i');
-  _pidFn = LibC().getapi('getpid', ':i');
-end if;
-var _pid = _pidFn();
+var _pid = UtilPid();
 
 fun buildCmd(entry)
   var cmd = UtilQuote(0.arg()) & ' ' & UtilQuote(entry);
@@ -60,21 +41,17 @@ fun runChild(cmd)
   // cmd /c strips one outer quote pair when the command line holds several;
   // the extra pair keeps "exe" "script" "arg" intact.
   if _isWin then c = '"' & c & '"'; end if;
-  var rc = _system(c);
+  var rc = UtilSystem(c);
   result = UtilExitCode(rc);
 end fun;
 
 fun exitWith(code)
   if code = 0 then return; end if;
-  if _isWin then _exitProcess(code); else _exit(code); end if;
+  UtilExit(code);
 end fun;
 
 fun setReady()
-  if _isWin then
-    _setEnv('FUN_PACKAGE_READY', '1');
-  else
-    _putenv('FUN_PACKAGE_READY=1');
-  end if;
+  UtilSetEnv('FUN_PACKAGE_READY', '1');
 end fun;
 
 fun verAtLeast(have, need)
@@ -118,7 +95,7 @@ fun setFunPath(dir)
   var old = UtilEnv('FUN_PATH');
   var fp = dir;
   if old <> '' then fp &= UtilPathSep() & old; end if;
-  if _isWin then _setEnv('FUN_PATH', fp); else _putenv('FUN_PATH=' & fp); end if;
+  UtilSetEnv('FUN_PATH', fp);
 end fun;
 
 fun clearShims(dir)
@@ -128,9 +105,7 @@ fun clearShims(dir)
     if UtilExists(p) then p.move(); end if;
     i += 1;
   end do;
-  var t = trimDir(dir);
-  if _isWin then t = t.replace('/', 92.toChar()); end if;
-  _rmdir(t);
+  UtilRmDir(dir);
 end fun;
 
 fun loadPkg()

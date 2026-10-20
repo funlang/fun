@@ -121,10 +121,10 @@ while ai.arg() <> '' do
   end if;
 end do;
 if outFile = '' then
-  outFile = entry.replace(/^.*[\x2f]/, '').replace(/\.\w+$/, '');
+  outFile = baseName(entry).replace(/\.\w+$/, '');
 end if;
 if _isWin then
-  var ob = outFile.replace(/^.*[\x2f]/, '');
+  var ob = baseName(outFile);
   if ob.length() < 4 or ob.substr(ob.length() - 4).lower() <> '.exe' then
     outFile &= '.exe';
   end if;
@@ -200,7 +200,7 @@ fun relFor(p)
   elsif repoRoot = '' then
     result = p;
   else
-    result = p.replace(/^.*[\x2f]/, '');
+    result = baseName(p);
   end if;
   if result.substr(0, 2) = './' then result = result.substr(2); end if;
 end fun;
@@ -294,7 +294,7 @@ fun addEmbed(name, importer)
   noScan[resolved] = true;
   addFile(resolved, zp);
   if name.subpos('/') < 0 and depPayload(resolved) = '' then
-    addFile(resolved, resolved.replace(/^.*[\x2f]/, ''));
+    addFile(resolved, baseName(resolved));
   end if;
 end fun;
 
@@ -323,7 +323,7 @@ fun scanFile(src)
         else
           addFile(resolved, relFor(resolved));
           if name.subpos('/') < 0 and _depUse[name] = nil then
-            addFile(resolved, resolved.replace(/^.*[\x2f]/, ''));
+            addFile(resolved, baseName(resolved));
           end if;
           scanFile(resolved);
         end if;

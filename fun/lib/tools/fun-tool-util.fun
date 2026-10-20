@@ -28,6 +28,10 @@ var _utilFindClose;
 var _utilMemcpy;
 var _utilRmdir;
 var _utilPidFn;
+var _utilSetEnv;
+var _utilSetEnvUnix;
+var _utilExitProcess;
+var _utilExit;
 if _utilWin then
   _utilGetEnvA = 'kernel32'.getapi('GetEnvironmentVariableA', 'spi:i');
   _utilGetEnvW = 'kernel32'.getapi('GetEnvironmentVariableW', 'spi:i');
@@ -38,6 +42,8 @@ if _utilWin then
   _utilFindClose = 'kernel32'.getapi('FindClose',      'i:i');
   _utilRmdir     = 'kernel32'.getapi('RemoveDirectoryA', 's:i');
   _utilPidFn     = 'kernel32'.getapi('GetCurrentProcessId', ':i');
+  _utilSetEnv    = 'kernel32'.getapi('SetEnvironmentVariableA', 'ss:i');
+  _utilExitProcess = 'kernel32'.getapi('ExitProcess', 'i:');
 else
   _utilGetenv  = LibC().getapi('getenv', 's:p');
   _utilStrlen  = LibC().getapi('strlen', 'p:i');
@@ -58,6 +64,8 @@ else
   _utilMemcpy   = LibC().getapi('memcpy',   'ppn:p');
   _utilRmdir    = LibC().getapi('rmdir',    's:i');
   _utilPidFn    = LibC().getapi('getpid',   ':i');
+  _utilSetEnvUnix = LibC().getapi('setenv', 'ssi:i');
+  _utilExit     = LibC().getapi('exit',     'i:');
 end if;
 
 fun UtilPathSep()
@@ -230,6 +238,23 @@ end fun;
 
 fun UtilPid()
   result = _utilPidFn();
+end fun;
+
+fun UtilSetEnv(name, value)
+  if _utilWin then
+    result = _utilSetEnv(name, value);
+  else
+    // setenv copies both strings; putenv would keep a pointer to a temporary
+    result = _utilSetEnvUnix(name, value, 1);
+  end if;
+end fun;
+
+fun UtilExit(code)
+  if _utilWin then _utilExitProcess(code); else _utilExit(code); end if;
+end fun;
+
+fun UtilSystem(cmd)
+  result = _utilSystem(cmd);
 end fun;
 
 // remove a directory tree; a missing path is a no-op
