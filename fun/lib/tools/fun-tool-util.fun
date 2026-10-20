@@ -163,7 +163,9 @@ fun UtilRunIn(dir, cmd, logFile)
     if d <> '' then body &= 'cd /d ' & UtilQuote(d) & crlf; end if;
     body &= cmd & ' >' & UtilQuote(logFile) & ' 2>&1' & crlf;
     bat.save(body);
-    result = _utilSystem(UtilQuote(UtilQuote(bat)));
+    // cmd /c strips one outer quote pair; keep a plain ""pair"" (the MSVCRT
+    // escaping in UtilQuote would turn the inner quotes into literals).
+    result = _utilSystem('""' & bat & '""');
   else
     var c = cmd;
     if d <> '' then c = 'cd ' & UtilQuote(d) & ' && ' & c; end if;
