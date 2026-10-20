@@ -178,6 +178,8 @@ begin
   Println('  ' + exeName + ' [-fun:]<file.fun or .foo/.fxx> [-key:<key.ini>] [-log[:<log.txt>]] [-gui] [-v]');
 {$IfDef FunPack}
   Println('  ' + exeName + ' pack <file.fun> [-o <out>] [-a <file-or-dir>]  bundle into one executable');
+  Println('  ' + exeName + ' package init [dir] [--bin|--lib]           create package.fun and a template');
+  Println('  ' + exeName + ' run [args]                              run the package bin');
 {$EndIf}
   Println('');
 end;
@@ -279,7 +281,7 @@ exports Run;
 {$Else}
 
   v, gui: fun.bool;
-  log, fnGiven: fun.str;
+  log, fnGiven, tool: fun.str;
   hlog: fun.int;
 
   {$IfDef _C_}
@@ -373,6 +375,18 @@ begin
 {$EndIf}
 
 {$IfDef FunPack}
+  // "fun run": the tool reads package.fun and starts the entry. ArgShift = -1
+  // keeps the subcommand in slot 2, so 3.arg() is the first user argument.
+  if ParamStr(1) = 'run' then
+  begin
+    f := FindFunTool('run');
+    fnGiven := f;
+    if not FileExists(f) then goto _Error;
+    ArgScript := f;
+    ArgShift  := -1;
+    goto _Run;
+  end;
+
   // "fun <tool>": dispatch to a whitelisted lib/tools/fun-<tool>.fun. The
   // subcommand takes the script's argv slot, so the tool still sees
   // 1.arg() = its own path and 2.arg() = the first real argument.
@@ -418,6 +432,23 @@ _Error:
   if key <> '' then ParseKeyAlias(key);
   {$EndIf}
 
+{$IfDef FunPack}
+  // A package manifest makes a plain bare-script run project-aware, unless an
+  // outer package run already set the guard. The tool re-reads the manifest
+  // and starts the child with the same argv layout.
+  if (ParamStr(1) = f) and FileExists('package.fun') and
+     (GetEnvironmentVariable('FUN_PACKAGE_READY') = '') then
+  begin
+    tool := FindFunTool('run');
+    if FileExists(tool) then
+    begin
+      f := tool;
+      ArgScript := tool;
+      ArgShift  := -1;
+      goto _Run;
+    end;
+  end;
+{$EndIf}
 
 _Run:
   {$IfDef FunStartupTiming}

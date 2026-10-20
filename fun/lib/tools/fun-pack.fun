@@ -6,7 +6,11 @@
 // funcmd's UnpackBundle() extracts it to a temp directory at startup, chdirs
 // there and runs the entry script, so the packaged app is a single file.
 //
-//     fun pack <entry.fun> -o <out>
+//     fun pack [entry.fun] -o <out>
+//
+// With package.fun in the cwd the entry defaults to the manifest bin and paths
+// are project-relative; a manifest with dependencies is refused until
+// dependency bundling lands.
 //
 // `fun pack` runs this tool through the interpreter; invoking it directly
 // (funcmd <path-to>/fun-pack.fun ...) works too, from any working directory.
@@ -57,15 +61,43 @@ end fun;
 // --- arguments -----------------------------------------------------------
 // 1.arg() is this script, the first user argument is 2.arg()
 var selfPath = 1.arg();
+
+// A package.fun in the cwd supplies the default entry and the project root.
+// Dependencies are not bundled yet; refusing is better than a broken bundle.
+var pkg = nil;
+var hasPkg = false;
+try
+  var probe = 'package.fun'.load();
+  hasPkg = probe <> '';
+except
+  hasPkg = false;
+end try;
+if hasPkg then
+  pkg = 'package.fun'.compile().package();
+  if pkg.dependencies <> nil and pkg.dependencies.@count() > 0 then
+    raise "pack: package '" & (pkg.name or '?') & "' declares dependencies; they are not bundled yet";
+  end if;
+end if;
+
 var entry = 2.arg();
-if entry = nil or entry = '' then
+var ai = 2;
+if entry <> '' and entry.substr(0, 1) <> '-' then
+  ai = 3;
+elsif hasPkg then
+  entry = pkg.bin;
+  if entry = nil or entry = '' then
+    raise "pack: package '" & (pkg.name or '?') & "' has no bin entry";
+  end if;
+else
   raise 'usage: fun pack <entry.fun> [-o <out>] [-a <file-or-dir>]';
 end if;
 if _isWin then entry = entry.replace(_bs, '/'); end if;
+if hasPkg and (entry.subpos('..') >= 0 or entry.match(/^([a-zA-Z]:|\x2f)/)) then
+  raise 'pack: the entry must be relative to the package directory';
+end if;
 
 var outFile = '';
 var adds = new [];   // -a paths, in command-line order
-var ai = 3;
 while ai.arg() <> '' do
   if ai.arg() = '-o' then
     outFile = (ai + 1).arg();
@@ -106,7 +138,8 @@ if _isWin then selfPath = selfPath.replace(_bs, '/'); end if;
 var toolsDir = dirname(selfPath);
 var libDir   = parentDir(toolsDir);
 var repoRoot = parentDir(parentDir(libDir));
-var root     = dirname(entry);
+var root     = '';
+if not hasPkg then root = dirname(entry); end if;   // manifest: paths are already project-relative
 
 // --- files ---------------------------------------------------------------
 var seen  = new [];   // zip path -> true
@@ -392,6 +425,9 @@ while ai2 < adds.@count() do
     if wd = '' then wd = './'; end if;
     walk(wd);
   else
+    if hasPkg and (ap.match(/^([a-zA-Z]:|\x2f)/) or ap.subpos('..') >= 0) then
+      raise '-a path must be inside the project directory: ' & ap;
+    end if;
     if ap.substr(0, root.length()) <> root then
       raise '-a path must be inside the project root (' & root & '): ' & ap;
     end if;
