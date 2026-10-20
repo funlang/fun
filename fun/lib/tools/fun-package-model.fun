@@ -352,7 +352,8 @@ var PkgResLibs = new [];
 var PkgResSeen = new [];
 var PkgResRoot = nil;
 
-fun pkgResolve(parentDir, m, name, tag, rejectQuote)
+// validate one dependency declaration and resolve its effective location
+fun pkgDecl(parentDir, m, name, tag)
   if not name.match(/^[a-z][a-z0-9_-]*$/) then
     raise tag & ": invalid dependency name '" & name & "'";
   end if;
@@ -367,9 +368,26 @@ fun pkgResolve(parentDir, m, name, tag, rejectQuote)
   var git = sourceIsGit(src);
   var eff = src;
   if not git then
+    if ver <> '' then
+      raise tag & ": path dependency '" & name & "' cannot have a version";
+    end if;
     eff = HostFullPath(trimDir(parentDir) & '/' & src);
     if IsWindows() then eff = eff.replace(92.toChar(), '/'); end if;
   end if;
+  var r = new [];
+  r.src = src;
+  r.ver = ver;
+  r.git = git;
+  r.eff = eff;
+  result = r;
+end fun;
+
+fun pkgResolve(parentDir, m, name, tag, rejectQuote)
+  var decl = pkgDecl(parentDir, m, name, tag);
+  var src = decl.src;
+  var ver = decl.ver;
+  var git = decl.git;
+  var eff = decl.eff;
   var k = PkgResSeen[name];
   if k <> nil then
     var ki = k - 1;

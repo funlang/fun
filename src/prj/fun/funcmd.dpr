@@ -378,27 +378,17 @@ begin
 {$EndIf}
 
 {$IfDef FunPack}
-  // "fun run": the tool reads package.fun and starts the entry. ArgShift = -1
-  // keeps the subcommand in slot 2, so 3.arg() is the first user argument.
-  if ParamStr(1) = 'run' then
-  begin
-    f := FindFunTool('run');
-    fnGiven := f;
-    if not FileExists(f) then goto _Error;
-    ArgScript := f;
-    ArgShift  := -1;
-    goto _Run;
-  end;
-
-  // "fun <tool>": dispatch to a whitelisted lib/tools/fun-<tool>.fun. The
-  // subcommand takes the script's argv slot, so the tool still sees
-  // 1.arg() = its own path and 2.arg() = the first real argument.
-  if IsFunTool(ParamStr(1)) then
+  // "fun <tool>" dispatches to lib/tools/fun-<tool>.fun. The subcommand takes
+  // the script's argv slot, so the tool sees 1.arg() = its own path and
+  // 2.arg() = the first real argument. "run" keeps the subcommand in slot 2
+  // (ArgShift = -1), so its user arguments start at 3.arg().
+  if (ParamStr(1) = 'run') or IsFunTool(ParamStr(1)) then
   begin
     f := FindFunTool(ParamStr(1));
     fnGiven := f;
     if not FileExists(f) then goto _Error;
     ArgScript := f;
+    if ParamStr(1) = 'run' then ArgShift := -1;
     goto _Run;
   end;
 {$EndIf}

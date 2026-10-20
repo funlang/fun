@@ -18,8 +18,6 @@ use 'fun-package-model.fun';
 
 var _nl = 10.toChar();
 var _facts = 'host'.arg().getJson(fd: true);
-var _isWin = IsWindows();
-var _bs = 92.toChar();
 var _pid = UtilPid();
 
 fun hasEntries(absDir)
@@ -95,6 +93,27 @@ fun findEntry(entries, name)
   result = -1;
 end fun;
 
+// load the dependencies set once; add/remove mutate `entries` and save it
+// back through saveDeps, which keeps the surrounding manifest bytes intact
+fun loadDeps(tag)
+  var d = new [];
+  if not UtilExists('package.fun') then raise tag & ': package.fun not found'; end if;
+  d.text = 'package.fun'.load();
+  d.setAt = findDepOpen(d.text);
+  if d.setAt < 0 then raise tag & ': dependencies field not found'; end if;
+  d.setEnd = findBracketEnd(d.text, d.setAt);
+  if d.setEnd < 0 then raise tag & ': dependencies set is not closed'; end if;
+  d.indent = linePad(d.text, d.setAt);
+  d.entries = parseEntries(d.text.substr(d.setAt + 1, d.setEnd - d.setAt - 2));
+  result = d;
+end fun;
+
+fun saveDeps(d, entries)
+  var backup = d.text;
+  'package.fun'.save(replaceRange(d.text, d.setAt + 1, d.setEnd - 1, buildInner(entries, d.indent)));
+  result = backup;
+end fun;
+
 fun replaceRange(t, startPos, endPos, s)
   result = t.substr(0, startPos) & s & t.substr(endPos);
 end fun;
@@ -145,15 +164,8 @@ fun cmdAdd()
   checkName(name);
   checkValue('source', src);
   checkValue('version', ver);
-  if not UtilExists('package.fun') then raise 'add: package.fun not found'; end if;
-
-  var text = 'package.fun'.load();
-  var setAt = findDepOpen(text);
-  if setAt < 0 then raise 'add: dependencies field not found'; end if;
-  var setEnd = findBracketEnd(text, setAt);
-  if setEnd < 0 then raise 'add: dependencies set is not closed'; end if;
-  var indent = linePad(text, setAt);
-  var entries = parseEntries(text.substr(setAt + 1, setEnd - setAt - 2));
+  var d = loadDeps('add');
+  var entries = d.entries;
   var entry = "'" & name & "': [source: '" & src & "'";
   if ver <> '' then entry &= ", version: '" & ver & "'"; end if;
   entry &= ']';
@@ -164,8 +176,7 @@ fun cmdAdd()
     entries.@add(name & 31.toChar() & entry);
   end if;
 
-  var backup = text;
-  'package.fun'.save(replaceRange(text, setAt + 1, setEnd - 1, buildInner(entries, indent)));
+  var backup = saveDeps(d, entries);
   var ok = false;
   try
     ok = verifyAdd(name, src, ver);
@@ -184,15 +195,8 @@ fun cmdRemove()
   if name = '' then raise 'usage: fun package remove <name>'; end if;
   if 4.arg() <> '' then raise "remove: unexpected argument '" & 4.arg() & "'"; end if;
   checkName(name);
-  if not UtilExists('package.fun') then raise 'remove: package.fun not found'; end if;
-
-  var text = 'package.fun'.load();
-  var setAt = findDepOpen(text);
-  if setAt < 0 then raise 'remove: dependencies field not found'; end if;
-  var setEnd = findBracketEnd(text, setAt);
-  if setEnd < 0 then raise 'remove: dependencies set is not closed'; end if;
-  var indent = linePad(text, setAt);
-  var entries = parseEntries(text.substr(setAt + 1, setEnd - setAt - 2));
+  var d = loadDeps('remove');
+  var entries = d.entries;
   var idx = findEntry(entries, name);
   if idx < 0 then raise "remove: dependency '" & name & "' not found"; end if;
 
@@ -203,8 +207,7 @@ fun cmdRemove()
     i += 1;
   end do;
 
-  var backup = text;
-  'package.fun'.save(replaceRange(text, setAt + 1, setEnd - 1, buildInner(kept, indent)));
+  var backup = saveDeps(d, kept);
   var ok = false;
   try
     ok = verifyRemove(name);
@@ -425,19 +428,11 @@ fun fetchGit(name, src, ver)
 end fun;
 
 fun resolveDep(parentDir, m, name)
-  var d = nil;
-  if m.dependencies <> nil then d = m.dependencies[name]; end if;
-  if d = nil then raise "package: dependency '" & name & "' is not declared in " & trimDir(parentDir); end if;
-  var src = d.source or '';
-  var ver = d.version or '';
-  if src = '' then raise "package: dependency '" & name & "' has no source"; end if;
-  var git = sourceIsGit(src);
-  var eff = src;
-  if not git then
-    if ver <> '' then raise "package: path dependency '" & name & "' cannot have a version"; end if;
-    eff = HostFullPath(trimDir(parentDir) & '/' & src);
-    if _isWin then eff = eff.replace(_bs, '/'); end if;
-  end if;
+  var decl = pkgDecl(parentDir, m, name, 'package');
+  var src = decl.src;
+  var ver = decl.ver;
+  var git = decl.git;
+  var eff = decl.eff;
 
   var idx = rsFind(name);
   if idx >= 0 then
