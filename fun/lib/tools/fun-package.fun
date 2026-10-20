@@ -421,9 +421,9 @@ fun hashOfTree(dir, logFile)
 end fun;
 
 fun commitDate(dir, logFile)
-  var rc = UtilRunIn(dir, 'git show -s --date=short --no-patch HEAD', logFile);
+  var rc = UtilRunIn(dir, 'git show -s --date=short HEAD', logFile);
   if rc <> 0 then
-    raise 'package: git show -s --date=short --no-patch HEAD failed: ' & logTail(logFile);
+    raise 'package: git show -s --date=short HEAD failed: ' & logTail(logFile);
   end if;
   var text = logFile.load();
   var at = text.subpos('Date:');

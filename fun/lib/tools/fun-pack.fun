@@ -8,9 +8,10 @@
 //
 //     fun pack [entry.fun] -o <out>
 //
-// With package.fun in the cwd the entry defaults to the manifest bin and paths
-// are project-relative; a manifest with dependencies is refused until
-// dependency bundling lands.
+// With package.fun in the cwd the entry defaults to the manifest bin, paths
+// are project-relative, and dependencies come from the manifest's resolved
+// block (written by `fun package tidy`): they are bundled under
+// '.funpack/packages/<name>/' and exposed through root-level shims.
 //
 // `fun pack` runs this tool through the interpreter; invoking it directly
 // (funcmd <path-to>/fun-pack.fun ...) works too, from any working directory.
@@ -21,8 +22,9 @@
 //
 //     fun pack main.fun -o dist/app -a public -a assets/logo.png
 //
-// An added path must sit inside the project root (the entry's directory) and
-// keeps its root-relative path, so `-a public` serves the same 'public/...'
+// An added path must sit inside the project root (the entry's directory, or
+// the package directory when package.fun is present) and keeps its
+// root-relative path, so `-a public` serves the same 'public/...'
 // paths the script uses at development time. Dependencies outside the root
 // (e.g. use 'fun/lib/lib-json.fun') keep their repository-relative path, and
 // bare stdlib names (use 'lib-x.fun') are also placed at the payload root.
