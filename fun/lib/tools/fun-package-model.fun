@@ -35,8 +35,16 @@ end fun;
 fun skipString(t, i, q)
   i += 1;
   while i < t.length() do
-    if t.substr(i, 1) = q then result = i + 1; return; end if;
-    i += 1;
+    if t.substr(i, 1) = q then
+      if t.substr(i + 1, 1) = q then
+        i += 2;   // '' inside a string is an escaped quote
+      else
+        result = i + 1;
+        return;
+      end if;
+    else
+      i += 1;
+    end if;
   end do;
   result = i;
 end fun;
@@ -44,6 +52,16 @@ end fun;
 fun skipLine(t, i)
   var n = t.substr(i).subpos(10.toChar());
   if n < 0 then result = t.length(); else result = i + n + 1; end if;
+end fun;
+
+// '#' to end of line, or '#* ... *#' across lines
+fun skipComment(t, i)
+  if t.substr(i + 1, 1) = '*' then
+    var e = t.substr(i + 2).subpos('*#');
+    if e < 0 then result = t.length(); else result = i + e + 4; end if;
+  else
+    result = skipLine(t, i);
+  end if;
 end fun;
 
 fun trimText(s)
@@ -61,8 +79,8 @@ fun findDepOpen(t)
     if c = '/' and t.substr(i + 1, 1) = '/' then
       i = skipLine(t, i);
     elsif c = '#' then
-      i = skipLine(t, i);
-    elsif c = "'" or c = '"' then
+      i = skipComment(t, i);
+    elsif c = "'" or c = '"' or c = '`' then
       i = skipString(t, i, c);
     elsif isAlpha(c) then
       var j = i;
@@ -96,8 +114,8 @@ fun findBracketEnd(t, setAt)
     if c = '/' and t.substr(i + 1, 1) = '/' then
       i = skipLine(t, i);
     elsif c = '#' then
-      i = skipLine(t, i);
-    elsif c = "'" or c = '"' then
+      i = skipComment(t, i);
+    elsif c = "'" or c = '"' or c = '`' then
       i = skipString(t, i, c);
     else
       if c = '[' then depth += 1;
@@ -118,8 +136,8 @@ fun segKey(seg)
     if c = '/' and seg.substr(i + 1, 1) = '/' then
       i = skipLine(seg, i);
     elsif c = '#' then
-      i = skipLine(seg, i);
-    elsif c = "'" or c = '"' then
+      i = skipComment(seg, i);
+    elsif c = "'" or c = '"' or c = '`' then
       var e = skipString(seg, i, c);
       var key = seg.substr(i + 1, e - i - 2);
       var j = e;
@@ -153,8 +171,8 @@ fun parseEntries(inner)
     elsif c = '/' and inner.substr(i + 1, 1) = '/' then
       i = skipLine(inner, i);
     elsif c = '#' then
-      i = skipLine(inner, i);
-    elsif c = "'" or c = '"' then
+      i = skipComment(inner, i);
+    elsif c = "'" or c = '"' or c = '`' then
       i = skipString(inner, i, c);
     else
       if c = '[' or c = '(' or c = '{' then depth += 1;
@@ -247,4 +265,91 @@ fun readLib(dir, name)
   var lp = trimDir(dir) & '/' & l;
   if not UtilExists(lp) then raise "package: dependency '" & name & "' lib not found: " & l; end if;
   result = l;
+end fun;
+
+// --- resolved dependency graph (read-only) -------------------------------
+// run and pack both consume the block `fun package tidy` wrote. This walks it
+// once and keeps the result in parallel arrays, so the two launchers cannot
+// drift on name validation, cache lookup or conflict detection.
+var PkgResNames = new [];
+var PkgResSrc = new [];
+var PkgResVer = new [];
+var PkgResDirs = new [];
+var PkgResLibs = new [];
+var PkgResSeen = new [];
+var PkgResRoot = nil;
+
+fun pkgResolve(parentDir, m, name, tag, rejectQuote)
+  if not name.match(/^[a-z][a-z0-9_-]*$/) then
+    raise tag & ": invalid dependency name '" & name & "'";
+  end if;
+  var d = nil;
+  if m.dependencies <> nil then d = m.dependencies[name]; end if;
+  if d = nil then
+    raise tag & ": dependency '" & name & "' is not declared in " & trimDir(parentDir);
+  end if;
+  var src = d.source or '';
+  var ver = d.version or '';
+  if src = '' then raise tag & ": dependency '" & name & "' has no source"; end if;
+  var git = sourceIsGit(src);
+  var eff = src;
+  if not git then
+    eff = HostFullPath(trimDir(parentDir) & '/' & src);
+    if IsWindows() then eff = eff.replace(92.toChar(), '/'); end if;
+  end if;
+  var k = PkgResSeen[name];
+  if k <> nil then
+    var ki = k - 1;
+    if PkgResSrc[ki] <> eff or PkgResVer[ki] <> ver then
+      raise tag & ": version conflict for '" & name & "'";
+    end if;
+    return;
+  end if;
+  var r = nil;
+  if PkgResRoot <> nil then r = PkgResRoot[name]; end if;
+  if r = nil then
+    raise tag & ": package '" & name & "' is not installed; run 'fun package tidy'";
+  end if;
+  if (r.source or '') <> eff or (r.version or '') <> ver then
+    raise tag & ": package '" & name & "' changed since tidy; run 'fun package tidy'";
+  end if;
+  var dir = eff;
+  if git then
+    var commit = r.commit or '';
+    if commit = '' then raise tag & ": resolved commit for '" & name & "' is missing"; end if;
+    dir = cacheDirFor(src, commit);
+  end if;
+  if not UtilIsDir(dir) then
+    raise tag & ": cache for '" & name & "' is missing; run 'fun package tidy'";
+  end if;
+  var lib = readLib(dir, name);
+  var lp = trimDir(dir) & '/' & lib;
+  if rejectQuote and lp.subpos("'") >= 0 then
+    raise tag & ": dependency path cannot contain a quote";
+  end if;
+  var idx = PkgResNames.@count();
+  PkgResNames.@add(name);
+  PkgResSrc.@add(eff);
+  PkgResVer.@add(ver);
+  PkgResDirs.@add(dir);
+  PkgResLibs.@add(lp);
+  PkgResSeen[name] = idx + 1;
+
+  var m2 = readPkg(dir);
+  var names = depNamesOf(dir);
+  var i = 0;
+  while i < names.@count() do
+    pkgResolve(dir, m2, names[i], tag, rejectQuote);
+    i += 1;
+  end do;
+end fun;
+
+fun pkgResGraph(m, rootDir, tag, rejectQuote)
+  PkgResRoot = m.resolved;
+  var names = depNamesOf(rootDir);
+  var i = 0;
+  while i < names.@count() do
+    pkgResolve(rootDir, m, names[i], tag, rejectQuote);
+    i += 1;
+  end do;
 end fun;

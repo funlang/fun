@@ -19,125 +19,11 @@ use 'fun-package-model.fun';
 var _nl = 10.toChar();
 var _facts = 'host'.arg().getJson(fd: true);
 var _isWin = IsWindows();
-var _isMac = IsMac();
 var _bs = 92.toChar();
-
-// --- host file checks: WinAPI on Windows, libc dirent elsewhere -----------
-var _opendir;
-var _readdir;
-var _closedir;
-var _findFirst;
-var _findNext;
-var _findClose;
-var _getAttrs;
-var _memcpy;
-var _rmdir;
-var _pidFn;
-if _isWin then
-  _findFirst = 'kernel32'.getapi('FindFirstFileA', 'ap:l');
-  _findNext  = 'kernel32'.getapi('FindNextFileA',  'ip:i');
-  _findClose = 'kernel32'.getapi('FindClose',      'i:i');
-  _getAttrs  = 'kernel32'.getapi('GetFileAttributesA', 'a:i');
-  _rmdir     = 'kernel32'.getapi('RemoveDirectoryA', 's:i');
-  _pidFn     = 'kernel32'.getapi('GetCurrentProcessId', ':i');
-else
-  _opendir  = LibC().getapi('opendir',  's:p');
-  if _isMac then
-    // x86_64's plain readdir is the legacy 32-bit-inode layout; arm64 ships
-    // only the 64-bit variant and has no $INODE64 alias
-    try
-      _readdir = LibC().getapi('readdir$INODE64', 'p:p');
-    except
-      _readdir = LibC().getapi('readdir', 'p:p');
-    end try;
-  else
-    _readdir = LibC().getapi('readdir', 'p:p');
-  end if;
-  _closedir = LibC().getapi('closedir', 'p:i');
-  _memcpy   = LibC().getapi('memcpy',   'ppn:p');
-  _rmdir    = LibC().getapi('rmdir',    's:i');
-  _pidFn    = LibC().getapi('getpid',   ':i');
-end if;
-var _pid = _pidFn();
-
-fun cstr(b, off, maxLen)
-  var n = 0;
-  while n < maxLen and b.toByte(off + n) <> 0 do n += 1; end do;
-  result = b.substr(off, n);
-end fun;
-
-// entry names in dir; [] when dir cannot be opened
-fun listDir(dir)
-  result = new [];
-  if _isWin then
-    var pat = dir.replace('/', _bs);
-    if pat <> '' and pat.substr(pat.length() - 1) <> _bs then pat &= _bs; end if;
-    var data = 0.toChar().x(592);   // WIN32_FIND_DATAA, d_name at 44
-    var h = _findFirst(pat & '*', data);
-    if h <= 0 then return; end if;
-    var more = true;
-    while more do
-      var nm = cstr(data, 44, 260);
-      if nm <> '.' and nm <> '..' then result.@add(nm); end if;
-      more = _findNext(h, data) <> 0;
-    end do;
-    _findClose(h);
-  else
-    var dp = _opendir(dir);
-    if dp = nil then return; end if;
-    // struct dirent (64-bit): d_name at 21 on Darwin, 19 on Linux
-    var noff = 19;
-    if _isMac then noff = 21; end if;
-    var de = _readdir(dp);
-    while de <> 0 do
-      var hd = 0.toChar().x(24);
-      _memcpy(hd.toNum(-1), de, 24);
-      var reclen = hd.toByte(16) bit or (hd.toByte(17) << 8);
-      if reclen > noff and reclen < 2048 then
-        var b = 0.toChar().x(2048);
-        _memcpy(b.toNum(-1), de, reclen);
-        var nm = cstr(b, noff, reclen - noff);
-        if nm <> '.' and nm <> '..' then result.@add(nm); end if;
-      end if;
-      de = _readdir(dp);
-    end do;
-    _closedir(dp);
-  end if;
-end fun;
-
-fun isDir(p)
-  result = false;
-  var t = trimDir(p);
-  if t = '' then return; end if;
-  if _isWin then
-    var a = _getAttrs(t.replace('/', _bs));
-    result = a >= 0 and (a bit and 16) <> 0;   // FILE_ATTRIBUTE_DIRECTORY
-  else
-    var dp = _opendir(t);
-    if dp <> nil then _closedir(dp); result = true; end if;
-  end if;
-end fun;
-
-fun exists(p)
-  result = false;
-  if p = '' then return; end if;
-  if _isWin then
-    result = _getAttrs(p.replace('/', _bs)) >= 0;
-  else
-    try
-      result = not not p.find();
-    except
-      result = false;
-    end try;
-  end if;
-end fun;
-
-fun isDirAbs(p)
-  result = isDir(trimDir(p));
-end fun;
+var _pid = UtilPid();
 
 fun hasEntries(absDir)
-  var names = listDir(trimDir(absDir));
+  var names = UtilListDir(trimDir(absDir));
   var i = 0;
   while i < names.@count() do
     if names[i] <> '.git' then result = true; return; end if;
@@ -259,7 +145,7 @@ fun cmdAdd()
   checkName(name);
   checkValue('source', src);
   checkValue('version', ver);
-  if not exists('package.fun') then raise 'add: package.fun not found'; end if;
+  if not UtilExists('package.fun') then raise 'add: package.fun not found'; end if;
 
   var text = 'package.fun'.load();
   var setAt = findDepOpen(text);
@@ -298,7 +184,7 @@ fun cmdRemove()
   if name = '' then raise 'usage: fun package remove <name>'; end if;
   if 4.arg() <> '' then raise "remove: unexpected argument '" & 4.arg() & "'"; end if;
   checkName(name);
-  if not exists('package.fun') then raise 'remove: package.fun not found'; end if;
+  if not UtilExists('package.fun') then raise 'remove: package.fun not found'; end if;
 
   var text = 'package.fun'.load();
   var setAt = findDepOpen(text);
@@ -370,41 +256,19 @@ fun rsAdd(name, src, ver, commit, hash, at, dir, lib)
   result = idx;
 end fun;
 
-fun trimSpace(s)
-  var a = 0;
-  var b = s.length();
-  while a < b and isTrim(s.substr(a, 1)) do a += 1; end do;
-  while b > a and isTrim(s.substr(b - 1, 1)) do b -= 1; end do;
-  result = s.substr(a, b - a);
-end fun;
-
 fun logTail(p)
   result = '';
-  if exists(p) then
+  if UtilExists(p) then
     var s = p.load().replace(13.toChar(), '').replace(10.toChar(), ' | ');
     if s.length() > 240 then s = s.substr(0, 240); end if;
     result = s;
   end if;
 end fun;
 
-fun removeTree(dir)
-  if not isDir(dir) then return; end if;
-  var names = listDir(dir);
-  var i = 0;
-  while i < names.@count() do
-    var p = trimDir(dir) & '/' & names[i];
-    if isDir(p) then removeTree(p); else p.move(); end if;
-    i += 1;
-  end do;
-  var t = trimDir(dir);
-  if _isWin then t = t.replace('/', _bs); end if;
-  _rmdir(t);
-end fun;
-
 fun gitOut(dir, cmd, logFile)
   var rc = UtilRunIn(dir, 'git ' & cmd, logFile);
   if rc <> 0 then raise 'package: git ' & cmd & ' failed: ' & logTail(logFile); end if;
-  result = trimSpace(logFile.load().replace(13.toChar(), '').replace(10.toChar(), ''));
+  result = trimText(logFile.load().replace(13.toChar(), '').replace(10.toChar(), ''));
 end fun;
 
 // No '%' on purpose: commands run through a batch file on Windows, where a
@@ -417,7 +281,7 @@ fun hashOfTree(dir, logFile)
   if nl < 0 then nl = text.length(); end if;
   var line = text.substr(0, nl);
   if line.substr(0, 5) <> 'tree ' then raise 'package: cannot read the tree hash: ' & line; end if;
-  result = trimSpace(line.substr(5));
+  result = trimText(line.substr(5));
 end fun;
 
 fun commitDate(dir, logFile)
@@ -431,7 +295,7 @@ fun commitDate(dir, logFile)
   var rest = text.substr(at + 5);
   var nl = rest.subpos(10.toChar());
   if nl >= 0 then rest = rest.substr(0, nl); end if;
-  result = trimSpace(rest);
+  result = trimText(rest);
 end fun;
 
 // a cached tag or commit is reusable without network; branches are not
@@ -444,8 +308,8 @@ fun findCached(src, ver)
   var base = UtilFunHome() & 'packages';
   var par = parentOf(key);
   if par <> '' then base &= '/' & par; end if;
-  if not isDir(base) then return; end if;
-  var names = listDir(base);
+  if not UtilIsDir(base) then return; end if;
+  var names = UtilListDir(base);
   var i = 0;
   while i < names.@count() do
     var nm = names[i];
@@ -459,7 +323,7 @@ fun findCached(src, ver)
       else
         var rc = UtilRunIn(base & '/' & nm, 'git rev-parse --verify ' & UtilQuote('refs/tags/' & ver), _rsLog);
         if rc = 0 then
-          var got = trimSpace(_rsLog.load().replace(13.toChar(), '').replace(10.toChar(), ''));
+          var got = trimText(_rsLog.load().replace(13.toChar(), '').replace(10.toChar(), ''));
           if got = commit then match = true; end if;
         end if;
       end if;
@@ -483,13 +347,13 @@ fun requireGit(name)
   var log = tmpDir & '/git-' & _pid & '.log';
   var rc = UtilRunIn(tmpDir, 'git --version', log);
   if rc <> 0 then
-    if exists(log) then log.move(); end if;
-    if exists(log & '.bat') then (log & '.bat').move(); end if;
+    if UtilExists(log) then log.move(); end if;
+    if UtilExists(log & '.bat') then (log & '.bat').move(); end if;
     raise "package: git not found in PATH; install git or add it to PATH and try again (needed for dependency '" & name & "')";
   end if;
   _gitReady = true;
-  if exists(log) then log.move(); end if;
-  if exists(log & '.bat') then (log & '.bat').move(); end if;
+  if UtilExists(log) then log.move(); end if;
+  if UtilExists(log & '.bat') then (log & '.bat').move(); end if;
 end fun;
 
 fun fetchGit(name, src, ver)
@@ -502,7 +366,7 @@ fun fetchGit(name, src, ver)
   end if;
   var dir = '';
   if pinned <> '' then dir = cacheDirFor(src, pinned); end if;
-  if pinned <> '' and isDir(dir) then
+  if pinned <> '' and UtilIsDir(dir) then
     var tree = hashOfTree(dir, _rsLog);
     var at = commitDate(dir, _rsLog);
     var hash = 'git-tree:' & tree;
@@ -527,10 +391,10 @@ fun fetchGit(name, src, ver)
   var dl = UtilFunHome() & 'cache/download';
   UtilEnsureDir(dl);
   var tmp = dl & 'clone-' & _pid;
-  if isDir(tmp) then removeTree(tmp); end if;
+  if UtilIsDir(tmp) then UtilRemoveTree(tmp); end if;
   var rc = UtilRunIn(dl, 'git clone ' & UtilQuote(src) & ' ' & UtilQuote(tmp), _rsLog);
   if rc <> 0 then
-    if isDir(tmp) then removeTree(tmp); end if;
+    if UtilIsDir(tmp) then UtilRemoveTree(tmp); end if;
     raise "package: git clone failed for '" & name & "': " & logTail(_rsLog);
   end if;
   var ref = pinned;
@@ -538,21 +402,21 @@ fun fetchGit(name, src, ver)
   if ref <> '' then
     rc = UtilRunIn(tmp, 'git checkout ' & UtilQuote(ref), _rsLog);
     if rc <> 0 then
-      removeTree(tmp);
+      UtilRemoveTree(tmp);
       raise "package: version '" & ref & "' not found for '" & name & "': " & logTail(_rsLog);
     end if;
   end if;
   var commit = gitOut(tmp, 'rev-parse HEAD', _rsLog);
   if pinned <> '' and commit <> pinned then
-    removeTree(tmp);
+    UtilRemoveTree(tmp);
     raise "package: '" & name & "' did not resolve to the pinned commit " & pinned;
   end if;
   var tree = hashOfTree(tmp, _rsLog);
   var at = commitDate(tmp, _rsLog);
   var dest = cacheDirFor(src, commit);
   var lib = readLib(tmp, name);
-  if isDir(dest) then
-    removeTree(tmp);
+  if UtilIsDir(dest) then
+    UtilRemoveTree(tmp);
   else
     UtilEnsureDir(parentOf(dest));
     tmp.move(dest);
@@ -587,7 +451,7 @@ fun resolveDep(parentDir, m, name)
   if git then
     fetchGit(name, src, ver);
   else
-    if not isDir(eff) then raise "package: path dependency '" & name & "' not found: " & eff; end if;
+    if not UtilIsDir(eff) then raise "package: path dependency '" & name & "' not found: " & eff; end if;
     rsAdd(name, eff, '', '', '', '', eff, readLib(eff, name));
   end if;
 
@@ -670,7 +534,7 @@ fun replaceResolved(text, block)
 end fun;
 
 fun cmdTidy()
-  if not exists('package.fun') then raise 'tidy: package.fun not found in ' & HostCurrPath(); end if;
+  if not UtilExists('package.fun') then raise 'tidy: package.fun not found in ' & HostCurrPath(); end if;
   var text = 'package.fun'.load();
   var m = 'package.fun'.compile().package();
   _rsOld = m.resolved;
@@ -738,7 +602,7 @@ fun cmdTidy()
     end if;
     ?. 'tidy:' & report;
   end if;
-  if exists(_rsLog) then _rsLog.move(); end if;
+  if UtilExists(_rsLog) then _rsLog.move(); end if;
 end fun;
 
 fun usage()
@@ -824,12 +688,12 @@ fun cmdInit()
   if not wantBin and not wantLib then wantBin = true; end if;
 
   var target = trimDir(HostFullPath(dirArg));
-  var existing = isDirAbs(target);
-  if not existing and exists(target) then
+  var existing = UtilIsDir(target);
+  if not existing and UtilExists(target) then
     raise 'init: not a directory: ' & target;
   end if;
   var manifest = target & '/package.fun';
-  if exists(manifest) then
+  if UtilExists(manifest) then
     raise 'init: package.fun already exists in ' & target;
   end if;
 

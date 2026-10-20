@@ -57,86 +57,7 @@ var _isWin = _facts.os = 'windows';
 var _isMac = _facts.os = 'macos';
 
 // --- dependency graph (resolved by `fun package tidy`) --------------------
-var _pNames = new [];
-var _pSrc = new [];
-var _pVer = new [];
-var _pDirs = new [];
-var _pLibs = new [];
-var _pSeen = new [];
 var _depUse = new [];
-var _packRootResolved = nil;
-
-fun packResolve(parentDir, m, name)
-  if not name.match(/^[a-z][a-z0-9_-]*$/) then
-    raise "pack: invalid dependency name '" & name & "'";
-  end if;
-  var d = nil;
-  if m.dependencies <> nil then d = m.dependencies[name]; end if;
-  if d = nil then raise "pack: dependency '" & name & "' is not declared in " & trimDir(parentDir); end if;
-  var src = d.source or '';
-  var ver = d.version or '';
-  if src = '' then raise "pack: dependency '" & name & "' has no source"; end if;
-  var git = sourceIsGit(src);
-  var eff = src;
-  if not git then
-    eff = HostFullPath(trimDir(parentDir) & '/' & src);
-    if _isWin then eff = eff.replace(_bs, '/'); end if;
-  end if;
-  var k = _pSeen[name];
-  if k <> nil then
-    var ki = k - 1;
-    if _pSrc[ki] <> eff or _pVer[ki] <> ver then
-      raise "pack: version conflict for '" & name & "'";
-    end if;
-    return;
-  end if;
-  var r = nil;
-  if _packRootResolved <> nil then r = _packRootResolved[name]; end if;
-  if r = nil then
-    raise "pack: package '" & name & "' is not installed; run 'fun package tidy'";
-  end if;
-  if (r.source or '') <> eff or (r.version or '') <> ver then
-    raise "pack: package '" & name & "' changed since tidy; run 'fun package tidy'";
-  end if;
-  var dir = eff;
-  if git then
-    var commit = r.commit or '';
-    if commit = '' then raise "pack: resolved commit for '" & name & "' is missing"; end if;
-    dir = cacheDirFor(src, commit);
-  end if;
-  if not UtilIsDir(dir) then
-    raise "pack: cache for '" & name & "' is missing; run 'fun package tidy'";
-  end if;
-  var libRel = readLib(dir, name);
-  var abs = trimDir(dir) & '/' & libRel;
-  var idx = _pNames.@count();
-  _pNames.@add(name);
-  _pSrc.@add(eff);
-  _pVer.@add(ver);
-  _pDirs.@add(dir);
-  _pLibs.@add(abs);
-  _pSeen[name] = idx + 1;
-  _depUse[name & '.fun'] = abs;
-
-  var m2 = readPkg(dir);
-  var names = depNamesOf(dir);
-  var i = 0;
-  while i < names.@count() do
-    packResolve(dir, m2, names[i]);
-    i += 1;
-  end do;
-end fun;
-
-fun packResolveAll(m)
-  _packRootResolved = m.resolved;
-  var rootDir = HostCurrPath();
-  var names = depNamesOf(rootDir);
-  var i = 0;
-  while i < names.@count() do
-    packResolve(rootDir, m, names[i]);
-    i += 1;
-  end do;
-end fun;
 
 // --- arguments -----------------------------------------------------------
 // 1.arg() is this script, the first user argument is 2.arg()
@@ -155,7 +76,12 @@ end try;
 if hasPkg then
   pkg = 'package.fun'.compile().package();
   if pkg.dependencies <> nil and pkg.dependencies.@count() > 0 then
-    packResolveAll(pkg);
+    pkgResGraph(pkg, HostCurrPath(), 'pack', false);
+    var ri = 0;
+    while ri < PkgResNames.@count() do
+      _depUse[PkgResNames[ri] & '.fun'] = PkgResLibs[ri];
+      ri += 1;
+    end do;
   end if;
 end if;
 
@@ -226,31 +152,14 @@ var seen  = new [];   // zip path -> true
 var files = new [];   // [src: host path, zip: payload path]
 var warns = new [];
 
-fun exists(p)
-  result = false;
-  if p <> '' then
-    var t = p;
-    if _isWin then
-      // find() proved unreliable for Windows paths; attributes are not
-      result = _getAttrs(t.replace('/', _bs)) >= 0;
-    else
-      try
-        result = not not t.find();
-      except
-        result = false;
-      end try;
-    end if;
-  end if;
-end fun;
-
 fun depPayload(src)
   var s = src;
   if _isWin then s = s.replace(_bs, '/'); end if;
   var i = 0;
-  while i < _pDirs.@count() do
-    var d = trimDir(_pDirs[i]);
+  while i < PkgResDirs.@count() do
+    var d = trimDir(PkgResDirs[i]);
     if s.substr(0, d.length() + 1) = d & '/' then
-      result = '.funpack/packages/' & _pNames[i] & '/' & s.substr(d.length() + 1);
+      result = '.funpack/packages/' & PkgResNames[i] & '/' & s.substr(d.length() + 1);
       return;
     end if;
     i += 1;
@@ -296,99 +205,6 @@ fun relFor(p)
   if result.substr(0, 2) = './' then result = result.substr(2); end if;
 end fun;
 
-// --- host directory listing (libc dirent / FindFirstFileA) ---------------
-var _opendir;
-var _readdir;
-var _closedir;
-var _findFirst;
-var _findNext;
-var _findClose;
-var _getAttrs;
-var _memcpy;
-if _isWin then
-  _findFirst = 'kernel32'.getapi('FindFirstFileA', 'ap:l');
-  _findNext  = 'kernel32'.getapi('FindNextFileA',  'ip:i');
-  _findClose = 'kernel32'.getapi('FindClose',      'i:i');
-  _getAttrs  = 'kernel32'.getapi('GetFileAttributesA', 'a:i');
-else
-  _opendir  = LibC().getapi('opendir',  's:p');
-  if _isMac then
-    // x86_64 libSystem's plain readdir is the legacy 32-bit-inode variant;
-    // arm64 only ships the 64-bit layout (and no $INODE64 alias)
-    try
-      _readdir = LibC().getapi('readdir$INODE64', 'p:p');
-    except
-      _readdir = LibC().getapi('readdir', 'p:p');
-    end try;
-  else
-    _readdir = LibC().getapi('readdir', 'p:p');
-  end if;
-  _closedir = LibC().getapi('closedir', 'p:i');
-  _memcpy   = LibC().getapi('memcpy',   'ppn:p');
-end if;
-
-// NUL-terminated name inside a byte buffer, at off, at most maxLen bytes
-fun cstr(b, off, maxLen)
-  var n = 0;
-  while n < maxLen and b.toByte(off + n) <> 0 do n += 1; end do;
-  result = b.substr(off, n);
-end fun;
-
-// entry names in directory dir; [] when dir cannot be opened
-fun listDir(dir)
-  result = new [];
-  if _isWin then
-    var pat = dir.replace('/', _bs);
-    if pat <> '' and pat.substr(pat.length() - 1) <> _bs then pat &= _bs; end if;
-    var data = 0.toChar().x(592);   // WIN32_FIND_DATAA, d_name at 44
-    var h = _findFirst(pat & '*', data);
-    if h <= 0 then return; end if;
-    var more = true;
-    while more do
-      var nm = cstr(data, 44, 260);
-      if nm <> '.' and nm <> '..' then result.@add(nm); end if;
-      more = _findNext(h, data) <> 0;
-    end do;
-    _findClose(h);
-  else
-    var dp = _opendir(dir);
-    if dp = nil then return; end if;
-    // struct dirent (64-bit): d_name at 21 on Darwin (d_namlen@18, d_type@20),
-    // at 19 on Linux (d_type@17); d_reclen@16 on both.
-    var noff = 19;
-    if _isMac then noff = 21; end if;
-    var de = _readdir(dp);
-    while de <> 0 do
-      var hd = 0.toChar().x(24);
-      _memcpy(hd.toNum(-1), de, 24);
-      var reclen = hd.toByte(16) bit or (hd.toByte(17) << 8);
-      if reclen > noff and reclen < 2048 then
-        var b = 0.toChar().x(2048);
-        _memcpy(b.toNum(-1), de, reclen);
-        var nm = cstr(b, noff, reclen - noff);
-        if nm <> '.' and nm <> '..' then result.@add(nm); end if;
-      end if;
-      de = _readdir(dp);
-    end do;
-    _closedir(dp);
-  end if;
-end fun;
-
-fun isDir(p)
-  result = false;
-  var t = p;
-  if t.length() > 1 and t.substr(t.length() - 1) = '/' then
-    t = t.substr(0, t.length() - 1);   // "dir/" is not accepted everywhere
-  end if;
-  if _isWin then
-    var a = _getAttrs(t.replace('/', _bs));
-    result = a >= 0 and (a bit and 16) <> 0;   // FILE_ATTRIBUTE_DIRECTORY
-  else
-    var dp = _opendir(t);
-    if dp <> nil then _closedir(dp); result = true; end if;
-  end if;
-end fun;
-
 // --- collect project tree + dependency graph -----------------------------
 // the output file is skipped when it sits inside the project root (re-packing
 // a previous build must not swallow it)
@@ -399,14 +215,14 @@ if outFile.substr(0, root.length()) = root then
 end if;
 
 fun walk(dir)
-  var names = listDir(dir);
+  var names = UtilListDir(dir);
   var ni = 0;
   while ni < names.@count() do
     var nm = names[ni];
     ni += 1;
     if nm <> '.git' and nm <> '.DS_Store' and nm <> 'Thumbs.db' then
       var p = dir & nm;
-      if isDir(p) then
+      if UtilIsDir(p) then
         walk(p & '/');
       elsif relFor(p) <> outRel then
         addFile(p, relFor(p));
@@ -423,14 +239,14 @@ end fun;
 fun tryPaths(nm, importer)
   result = '';
   var t = dirname(importer) & nm;
-  if result = '' and exists(t) then result = t; end if;
+  if result = '' and UtilExists(t) then result = t; end if;
   t = root & nm;
-  if result = '' and exists(t) then result = t; end if;
+  if result = '' and UtilExists(t) then result = t; end if;
   t = repoRoot & nm;
-  if result = '' and exists(t) then result = t; end if;
+  if result = '' and UtilExists(t) then result = t; end if;
   t = libDir & nm;
-  if result = '' and exists(t) then result = t; end if;
-  if result = '' and exists(nm) then result = nm; end if;
+  if result = '' and UtilExists(t) then result = t; end if;
+  if result = '' and UtilExists(nm) then result = nm; end if;
   if result = '' and nm.subpos('/') < 0 and _depUse[nm] <> nil then result = _depUse[nm]; end if;
 end fun;
 
@@ -535,15 +351,15 @@ while ai2 < adds.@count() do
     end if;
     var ad = ap;
     if ad.substr(ad.length() - 1) <> '/' then ad &= '/'; end if;
-    if isDir(ad) then walk(ad); else addFile(ap, relFor(ap)); end if;
+    if UtilIsDir(ad) then walk(ad); else addFile(ap, relFor(ap)); end if;
   end if;
 end do;
 var fi = 0;
 var pi = 0;
-while pi < _pNames.@count() do
-  var plib = _pLibs[pi];
-  var prel = plib.substr(trimDir(_pDirs[pi]).length() + 1);
-  addFile(plib, '.funpack/packages/' & _pNames[pi] & '/' & prel);
+while pi < PkgResNames.@count() do
+  var plib = PkgResLibs[pi];
+  var prel = plib.substr(trimDir(PkgResDirs[pi]).length() + 1);
+  addFile(plib, '.funpack/packages/' & PkgResNames[pi] & '/' & prel);
   pi += 1;
 end do;
 
@@ -585,13 +401,13 @@ fun zipAdd(zipPath, data)
 end fun;
 
 var si = 0;
-while si < _pNames.@count() do
-  var srel = _pLibs[si].substr(trimDir(_pDirs[si]).length() + 1);
-  var sname = _pNames[si] & '.fun';
+while si < PkgResNames.@count() do
+  var srel = PkgResLibs[si].substr(trimDir(PkgResDirs[si]).length() + 1);
+  var sname = PkgResNames[si] & '.fun';
   if seen[sname] <> nil then
-    warns.@add("dependency '" & _pNames[si] & "' shadows project file " & sname);
+    warns.@add("dependency '" & PkgResNames[si] & "' shadows project file " & sname);
   else
-    zipAdd(sname, "use '.funpack/packages/" & _pNames[si] & '/' & srel & "';" & 10.toChar());
+    zipAdd(sname, "use '.funpack/packages/" & PkgResNames[si] & '/' & srel & "';" & 10.toChar());
   end if;
   si += 1;
 end do;
