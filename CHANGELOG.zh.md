@@ -6,6 +6,30 @@
 
 ## [未发布]
 
+## [9.4.5] - 2026-10-20
+
+- 新增基于清单的包管理。一个项目就是含 `package.fun` 清单的目录：
+  `fun package init [dir] [--bin|--lib]` 写入清单和可运行模板，
+  `add`/`remove` 只修改 `dependencies` 集合，`tidy` 把精确版本安装到共享的
+  `~/.fun` 缓存（可用 `FUN_HOME` 覆盖），校验 git tree hash 并重写自动生成
+  的 `resolved` 块。路径依赖原地使用，只有 git 依赖需要 `git`。
+
+- 新增 `fun run [args...]`，从项目根目录运行清单中的 `bin`，并带上其依赖。
+  在含 `package.fun` 的目录里，普通的 `fun <脚本>` 也走同一个项目感知启动
+  器，脚本无需改动导入路径即可获得依赖查找；`FUN_PACKAGE_READY=1` 可绕过
+  项目模式。运行过程只读：依赖缺失或过期时提示 `run 'fun package tidy'`，
+  不会自行拉取。
+
+- 当存在 `package.fun` 时，`fun pack` 默认使用清单中的 `bin`，按项目根目录
+  解析路径，并把已解析的依赖嵌入到 `.funpack/packages/<name>/`，通过根目录
+  shim 暴露，因此打包后的应用无需 `~/.fun` 即可运行。
+
+- 修复打包后的控制台应用在 stdout 被重定向（未检测到控制台）时丢失输出的
+  问题；`-gui` 仍按原样抑制输出。
+
+- 在双语文档中补充包管理说明，新增可运行的 `fun/demos/package-demo`，并把
+  包管理端到端测试加入回归列表。
+
 - 让 GitHub 将 `.fun` 脚本识别为 Ada。linguist 没有 Fun 条目，而 `*.fun`
   是 Standard ML 的后缀之一，仓库因此被标记为 "Standard ML"，脚本也按 SML
   高亮。Fun 语法源自 Ada，故在 `.gitattributes` 中为 `*.fun` 设置

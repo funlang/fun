@@ -6,6 +6,36 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.4.5] - 2026-10-20
+
+- Add manifest-driven packages. A project is a directory with a `package.fun`
+  manifest: `fun package init [dir] [--bin|--lib]` writes the manifest and a
+  runnable template, `fun package add`/`remove` edit only the `dependencies`
+  set, and `fun package tidy` installs the exact revisions into the shared
+  `~/.fun` cache (`FUN_HOME` overrides it), verifies git tree hashes and
+  rewrites the generated `resolved` block. Path dependencies are used in
+  place; only git dependencies need `git`.
+
+- Add `fun run [args...]`, which runs the manifest `bin` from the project
+  root with its dependencies available. In a directory with `package.fun`, a
+  plain `fun <script>` uses the same project-aware launcher, so scripts gain
+  the dependency lookup without changing their import paths;
+  `FUN_PACKAGE_READY=1` bypasses project mode. Runs are read-only: a missing
+  or stale dependency stops with `run 'fun package tidy'` instead of fetching
+  anything.
+
+- `fun pack` now defaults to the manifest `bin` when `package.fun` is
+  present, resolves paths against the project root, and embeds resolved
+  dependencies under `.funpack/packages/<name>/` behind root-level shims, so
+  a packed app runs without `~/.fun`.
+
+- Fix bundled console apps dropping their output when stdout is redirected
+  (no console detected); `-gui` still suppresses it.
+
+- Document packages in both READMEs and add the runnable
+  `fun/demos/package-demo` plus an end-to-end package test in the regression
+  suite.
+
 - Have GitHub classify `.fun` scripts as Ada. Linguist has no Fun entry and
   `*.fun` is one of Standard ML's suffixes there, so the repository was
   reported as "Standard ML" and every script was highlighted as SML. Fun's
