@@ -1003,10 +1003,16 @@ end;
 
 class function CParser.ParseFileName(const fn: fun.str; prev: CNode): fun.str;
 var
-  path, ret, fname: fun.str;
+  path, ret, fname, fp, dir, sep: fun.str;
+  fpLen, i: Integer;
 begin
   fname  := CIO.Norm(fn);
   result := fname;
+  {$IfDef UNIX}
+  sep := ':';
+  {$Else}
+  sep := ';';
+  {$EndIf}
   if not FileExists(result) then
   begin
     if (result[2] <> ':') and (Pos('\\', result) <> 1) then
@@ -1030,6 +1036,38 @@ begin
         if not FileExists(ret) then ret := path + 'app/' + fname;
         {$EndIf}
         if     FileExists(ret) then result := ret;
+        if not FileExists(result) then
+        begin
+          // FUN_PATH: last-resort lookup for bare names (set by the package
+          // runner); unset keeps the historical result unchanged.
+          fp := GetEnvironmentVariable('FUN_PATH');
+          if (fp <> '') and (Pos('/', fn) = 0) and (Pos('\', fn) = 0) and
+             (Copy(fn, 1, 1) <> ':') then
+          begin
+            fpLen := Length(fp);
+            i := 1;
+            dir := '';
+            while i <= fpLen + 1 do
+            begin
+              if (i > fpLen) or (Copy(fp, i, 1) = sep) then
+              begin
+                if dir <> '' then
+                begin
+                  ret := IncludeTrailingPathDelimiter(dir) + fname;
+                  if FileExists(ret) then
+                  begin
+                    result := ret;
+                    exit;
+                  end;
+                end;
+                dir := '';
+              end
+              else
+                dir := dir + Copy(fp, i, 1);
+              Inc(i);
+            end;
+          end;
+        end;
       end;
     end;
   end;

@@ -5,6 +5,7 @@ run: True
 run output: True
 flat: True
 flat output: True
+space arg: True
 init again refused: True
 existing manifest: True
 existing kept: True
@@ -16,3 +17,19 @@ pack defaults: True
 pack runs: True
 pack output: True
 run missing manifest: True
+git fixture: True
+dep deps: True
+tidy: True
+resolved both: True
+dep run: True
+dep run output: True
+dep flat output: True
+tidy idempotent: True
+dep pack: True
+dep bundle: True
+dep bundle output: True
+cache reuse commit: True
+stale run refused: True
+stale restored: True
+add dependency: True
+remove dependency: True

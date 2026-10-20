@@ -15,9 +15,12 @@
 // mode again. That variable is also the escape hatch for a broken manifest:
 //     FUN_PACKAGE_READY=1 fun <script.fun>
 //
-// v1 runs from the manifest directory only and does not resolve dependencies
-// yet (that is the tidy/cache stage); a manifest with dependencies is refused.
+// Dependencies come from the manifest's resolved block (written by
+// `fun package tidy`): the launcher verifies them read-only, writes temp shims
+// and prepends their directory to FUN_PATH before starting the child.
 use '../lib-host.fun';
+use 'fun-tool-util.fun';
+use 'fun-package-model.fun';
 
 var _isWin = IsWindows();
 var _facts = 'host'.arg().getJson(fd: true);
@@ -29,18 +32,45 @@ var _putenv;
 var _setEnv;
 var _exit;
 var _exitProcess;
+var _rmdir;
+var _pidFn;
 if _isWin then
   _setEnv = 'kernel32'.getapi('SetEnvironmentVariableA', 'ss:i');
   _exitProcess = 'kernel32'.getapi('ExitProcess', 'i:');
+  _rmdir = 'kernel32'.getapi('RemoveDirectoryA', 's:i');
+  _pidFn = 'kernel32'.getapi('GetCurrentProcessId', ':i');
 else
   _putenv = LibC().getapi('putenv', 's:i');
   _exit = LibC().getapi('exit', 'i:');
+  _rmdir = LibC().getapi('rmdir', 's:i');
+  _pidFn = LibC().getapi('getpid', ':i');
 end if;
+var _pid = _pidFn();
 
 fun quote(s)
   if _isWin then
+    // MSVCRT argv rules: backslashes before a quote are doubled (and one
+    // escapes the quote); trailing backslashes are doubled before the close.
     var dq = 34.toChar();
-    result = dq & s & dq;
+    var bs = 92.toChar();
+    var out = dq;
+    var n = 0;
+    var i = 0;
+    while i < s.length() do
+      var c = s.substr(i, 1);
+      if c = bs then
+        n += 1;
+      elsif c = dq then
+        out &= bs.x(n * 2 + 1) & dq;
+        n = 0;
+      else
+        if n > 0 then out &= bs.x(n); n = 0; end if;
+        out &= c;
+      end if;
+      i += 1;
+    end do;
+    if n > 0 then out &= bs.x(n * 2); end if;
+    result = out & dq;
   else
     var sq = 39.toChar();
     result = sq & s.replace(sq, sq & 92.toChar() & sq & sq) & sq;
@@ -124,6 +154,128 @@ fun exists(p)
   end if;
 end fun;
 
+fun isDir(p)
+  var d = trimDir(p);
+  if d = '' then result = false; return; end if;
+  if _isWin then
+    var a = _getAttrs(d.replace('/', 92.toChar()));
+    result = a >= 0 and (a bit and 16) <> 0;   // FILE_ATTRIBUTE_DIRECTORY
+  else
+    var fs = (d & '/').find();
+    result = fs.@count() > 0;
+  end if;
+end fun;
+
+var _dNames = new [];
+var _dSrc = new [];
+var _dVer = new [];
+var _dLibs = new [];
+var _dSeen = new [];
+var _rootResolved = nil;
+
+fun resolveRun(parentDir, m, name)
+  if not name.match(/^[a-z][a-z0-9_-]*$/) then
+    raise "run: invalid dependency name '" & name & "'";
+  end if;
+  var d = nil;
+  if m.dependencies <> nil then d = m.dependencies[name]; end if;
+  if d = nil then raise "run: dependency '" & name & "' is not declared in " & trimDir(parentDir); end if;
+  var src = d.source or '';
+  var ver = d.version or '';
+  if src = '' then raise "run: dependency '" & name & "' has no source"; end if;
+  var git = sourceIsGit(src);
+  var eff = src;
+  if not git then
+    eff = HostFullPath(trimDir(parentDir) & '/' & src);
+    if _isWin then eff = eff.replace(92.toChar(), '/'); end if;
+  end if;
+  var k = _dSeen[name];
+  if k <> nil then
+    var ki = k - 1;
+    if _dSrc[ki] <> eff or _dVer[ki] <> ver then
+      raise "run: version conflict for '" & name & "'";
+    end if;
+    return;
+  end if;
+  var r = nil;
+  if _rootResolved <> nil then r = _rootResolved[name]; end if;
+  if r = nil then
+    raise "run: package '" & name & "' is not installed; run 'fun package tidy'";
+  end if;
+  if (r.source or '') <> eff or (r.version or '') <> ver then
+    raise "run: package '" & name & "' changed since tidy; run 'fun package tidy'";
+  end if;
+  var dir = eff;
+  if git then
+    var commit = r.commit or '';
+    if commit = '' then raise "run: resolved commit for '" & name & "' is missing"; end if;
+    dir = cacheDirFor(src, commit);
+  end if;
+  if not isDir(dir) then
+    raise "run: cache for '" & name & "' is missing; run 'fun package tidy'";
+  end if;
+  var m2 = readPkg(dir);
+  var lib = m2.lib or '';
+  if lib = '' then raise "run: dependency '" & name & "' has no lib entry"; end if;
+  if lib.subpos('..') >= 0 or lib.substr(0, 1) = '/' then
+    raise "run: dependency '" & name & "' has an unsafe lib path";
+  end if;
+  var lp = trimDir(dir) & '/' & lib;
+  if not exists(lp) then raise "run: dependency '" & name & "' lib not found: " & lib; end if;
+  if lp.subpos("'") >= 0 then raise "run: dependency path cannot contain a quote"; end if;
+  var idx = _dNames.@count();
+  _dNames.@add(name);
+  _dSrc.@add(eff);
+  _dVer.@add(ver);
+  _dLibs.@add(lp);
+  _dSeen[name] = idx + 1;
+
+  var names = depNamesOf(dir);
+  var i = 0;
+  while i < names.@count() do
+    resolveRun(dir, m2, names[i]);
+    i += 1;
+  end do;
+end fun;
+
+fun buildShims()
+  var home = UtilFunHome() & 'tmp';
+  UtilEnsureDir(home);
+  var dir = home & '/run-' & _pid;
+  var n = 1;
+  while isDir(dir) do
+    n += 1;
+    dir = home & '/run-' & _pid & '-' & n;
+  end do;
+  UtilEnsureDir(dir);
+  var i = 0;
+  while i < _dNames.@count() do
+    var body = "use '" & _dLibs[i] & "';" & 10.toChar();
+    (dir & '/' & _dNames[i] & '.fun').save(body);
+    i += 1;
+  end do;
+  result = dir;
+end fun;
+
+fun setFunPath(dir)
+  var old = UtilEnv('FUN_PATH');
+  var fp = dir;
+  if old <> '' then fp &= UtilPathSep() & old; end if;
+  if _isWin then _setEnv('FUN_PATH', fp); else _putenv('FUN_PATH=' & fp); end if;
+end fun;
+
+fun clearShims(dir)
+  var i = 0;
+  while i < _dNames.@count() do
+    var p = dir & '/' & _dNames[i] & '.fun';
+    if exists(p) then p.move(); end if;
+    i += 1;
+  end do;
+  var t = trimDir(dir);
+  if _isWin then t = t.replace('/', 92.toChar()); end if;
+  _rmdir(t);
+end fun;
+
 fun loadPkg()
   var mf = 'package.fun';
   if not exists(mf) then
@@ -143,7 +295,14 @@ if p['fun'] <> '' and not verAtLeast(_facts['fun'], p['fun']) then
         ' or newer (host ' & _facts['fun'] & ')';
 end if;
 if p.dependencies <> nil and p.dependencies.@count() > 0 then
-  raise "run: package '" & p.name & "' declares dependencies; dependency support is not available yet";
+  _rootResolved = p.resolved;
+  var root = HostCurrPath();
+  var names = depNamesOf(root);
+  var di = 0;
+  while di < names.@count() do
+    resolveRun(root, p, names[di]);
+    di += 1;
+  end do;
 end if;
 
 var entry = '';
@@ -158,4 +317,11 @@ end if;
 if not exists(entry) then raise 'run: entry not found: ' & entry; end if;
 
 setReady();
-exitWith(runChild(buildCmd(entry)));
+var shimDir = '';
+if _dNames.@count() > 0 then
+  shimDir = buildShims();
+  setFunPath(shimDir);
+end if;
+var code = runChild(buildCmd(entry));
+if shimDir <> '' then clearShims(shimDir); end if;
+exitWith(code);

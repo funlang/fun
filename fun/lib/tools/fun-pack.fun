@@ -45,17 +45,95 @@
 // plain string literals (computed/conditional uses are not scanned); '.git',
 // '.DS_Store' and 'Thumbs.db' are not packed.
 //
-// The tool itself has no `use` imports, so it runs from any working directory;
-// the project's own imports are resolved against this file's location.
+// The package-model import is resolved against this file's location, so the
+// tool still runs from any working directory.
+use 'fun-package-model.fun';
+
 var _bs = 92.toChar();   // a single backslash: '\\' is TWO characters in Fun
 var _facts = 'host'.arg().getJson(fd: true);
 var _isWin = _facts.os = 'windows';
 var _isMac = _facts.os = 'macos';
 
-fun LibC()
-  if _isWin then result = 'msvcrt.dll';
-  elsif _isMac then result = 'libSystem.B.dylib';
-  else result = 'libc.so.6'; end if;
+// --- dependency graph (resolved by `fun package tidy`) --------------------
+var _pNames = new [];
+var _pSrc = new [];
+var _pVer = new [];
+var _pDirs = new [];
+var _pLibs = new [];
+var _pSeen = new [];
+var _depUse = new [];
+var _packRootResolved = nil;
+
+fun packResolve(parentDir, m, name)
+  if not name.match(/^[a-z][a-z0-9_-]*$/) then
+    raise "pack: invalid dependency name '" & name & "'";
+  end if;
+  var d = nil;
+  if m.dependencies <> nil then d = m.dependencies[name]; end if;
+  if d = nil then raise "pack: dependency '" & name & "' is not declared in " & trimDir(parentDir); end if;
+  var src = d.source or '';
+  var ver = d.version or '';
+  if src = '' then raise "pack: dependency '" & name & "' has no source"; end if;
+  var git = sourceIsGit(src);
+  var eff = src;
+  if not git then
+    eff = HostFullPath(trimDir(parentDir) & '/' & src);
+    if _isWin then eff = eff.replace(_bs, '/'); end if;
+  end if;
+  var k = _pSeen[name];
+  if k <> nil then
+    var ki = k - 1;
+    if _pSrc[ki] <> eff or _pVer[ki] <> ver then
+      raise "pack: version conflict for '" & name & "'";
+    end if;
+    return;
+  end if;
+  var r = nil;
+  if _packRootResolved <> nil then r = _packRootResolved[name]; end if;
+  if r = nil then
+    raise "pack: package '" & name & "' is not installed; run 'fun package tidy'";
+  end if;
+  if (r.source or '') <> eff or (r.version or '') <> ver then
+    raise "pack: package '" & name & "' changed since tidy; run 'fun package tidy'";
+  end if;
+  var dir = eff;
+  if git then
+    var commit = r.commit or '';
+    if commit = '' then raise "pack: resolved commit for '" & name & "' is missing"; end if;
+    dir = cacheDirFor(src, commit);
+  end if;
+  if not UtilIsDir(dir) then
+    raise "pack: cache for '" & name & "' is missing; run 'fun package tidy'";
+  end if;
+  var libRel = readLib(dir, name);
+  var abs = trimDir(dir) & '/' & libRel;
+  var idx = _pNames.@count();
+  _pNames.@add(name);
+  _pSrc.@add(eff);
+  _pVer.@add(ver);
+  _pDirs.@add(dir);
+  _pLibs.@add(abs);
+  _pSeen[name] = idx + 1;
+  _depUse[name & '.fun'] = abs;
+
+  var m2 = readPkg(dir);
+  var names = depNamesOf(dir);
+  var i = 0;
+  while i < names.@count() do
+    packResolve(dir, m2, names[i]);
+    i += 1;
+  end do;
+end fun;
+
+fun packResolveAll(m)
+  _packRootResolved = m.resolved;
+  var rootDir = HostCurrPath();
+  var names = depNamesOf(rootDir);
+  var i = 0;
+  while i < names.@count() do
+    packResolve(rootDir, m, names[i]);
+    i += 1;
+  end do;
 end fun;
 
 // --- arguments -----------------------------------------------------------
@@ -75,7 +153,7 @@ end try;
 if hasPkg then
   pkg = 'package.fun'.compile().package();
   if pkg.dependencies <> nil and pkg.dependencies.@count() > 0 then
-    raise "pack: package '" & (pkg.name or '?') & "' declares dependencies; they are not bundled yet";
+    packResolveAll(pkg);
   end if;
 end if;
 
@@ -163,14 +241,32 @@ fun exists(p)
   end if;
 end fun;
 
+fun depPayload(src)
+  var s = src;
+  if _isWin then s = s.replace(_bs, '/'); end if;
+  var i = 0;
+  while i < _pDirs.@count() do
+    var d = trimDir(_pDirs[i]);
+    if s.substr(0, d.length() + 1) = d & '/' then
+      result = '.funpack/packages/' & _pNames[i] & '/' & s.substr(d.length() + 1);
+      return;
+    end if;
+    i += 1;
+  end do;
+  result = '';
+end fun;
+
 fun addFile(src, zipPath)
-  if seen[zipPath] <> nil then return; end if;
-  seen[zipPath] = true;
+  var zp = zipPath;
+  var dp = depPayload(src);
+  if dp <> '' then zp = dp; end if;
+  if seen[zp] <> nil then return; end if;
+  seen[zp] = true;
   // new [] + field assignment, not a [src: ..] literal: object literals in a
   // function body are one shared instance, mutated on every call.
   var e = new [];
   e.src = src;
-  e.zip = zipPath;
+  e.zip = zp;
   files.@add(e);
 end fun;
 
@@ -333,6 +429,7 @@ fun tryPaths(nm, importer)
   t = libDir & nm;
   if result = '' and exists(t) then result = t; end if;
   if result = '' and exists(nm) then result = nm; end if;
+  if result = '' and nm.subpos('/') < 0 and _depUse[nm] <> nil then result = _depUse[nm]; end if;
 end fun;
 
 fun endsWith(s, tail)
@@ -368,14 +465,17 @@ fun addEmbed(name, importer)
     warns.@add('cannot resolve :' & name & ' (from ' & importer & ')');
     return;
   end if;
-  var zp = relFor(resolved);
-  if zp = '' or zp.substr(0, 1) = '/' or zp.substr(0, 3) = '../' or zp.substr(1, 1) = ':' then
-    warns.@add('cannot place :' & name & ' (' & resolved & ')');
-    return;
+  var zp = depPayload(resolved);
+  if zp = '' then
+    zp = relFor(resolved);
+    if zp = '' or zp.substr(0, 1) = '/' or zp.substr(0, 3) = '../' or zp.substr(1, 1) = ':' then
+      warns.@add('cannot place :' & name & ' (' & resolved & ')');
+      return;
+    end if;
   end if;
   noScan[resolved] = true;
   addFile(resolved, zp);
-  if name.subpos('/') < 0 then
+  if name.subpos('/') < 0 and depPayload(resolved) = '' then
     addFile(resolved, resolved.replace(/^.*[\x2f]/, ''));
   end if;
 end fun;
@@ -404,7 +504,7 @@ fun scanFile(src)
           warns.@add('cannot resolve ' & name & ' (from ' & src & ')');
         else
           addFile(resolved, relFor(resolved));
-          if name.subpos('/') < 0 then
+          if name.subpos('/') < 0 and _depUse[name] = nil then
             addFile(resolved, resolved.replace(/^.*[\x2f]/, ''));
           end if;
           scanFile(resolved);
@@ -437,6 +537,14 @@ while ai2 < adds.@count() do
   end if;
 end do;
 var fi = 0;
+var pi = 0;
+while pi < _pNames.@count() do
+  var plib = _pLibs[pi];
+  var prel = plib.substr(trimDir(_pDirs[pi]).length() + 1);
+  addFile(plib, '.funpack/packages/' & _pNames[pi] & '/' & prel);
+  pi += 1;
+end do;
+
 while fi < files.@count() do
   scanFile(files[fi].src);
   fi += 1;
@@ -474,6 +582,17 @@ fun zipAdd(zipPath, data)
               le32(0) & le32(off) & zipPath;
 end fun;
 
+var si = 0;
+while si < _pNames.@count() do
+  var srel = _pLibs[si].substr(trimDir(_pDirs[si]).length() + 1);
+  var sname = _pNames[si] & '.fun';
+  if seen[sname] <> nil then
+    warns.@add("dependency '" & _pNames[si] & "' shadows project file " & sname);
+  else
+    zipAdd(sname, "use '.funpack/packages/" & _pNames[si] & '/' & srel & "';" & 10.toChar());
+  end if;
+  si += 1;
+end do;
 zipAdd('.funpack/entry', entry.substr(root.length()));
 var zf = 0;
 while zf < files.@count() do
