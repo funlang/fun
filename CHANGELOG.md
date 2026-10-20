@@ -6,6 +6,13 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Have GitHub classify `.fun` scripts as Ada. Linguist has no Fun entry and
+  `*.fun` is one of Standard ML's suffixes there, so the repository was
+  reported as "Standard ML" and every script was highlighted as SML. Fun's
+  syntax is Ada-derived, so `.gitattributes` now sets
+  `linguist-language=Ada` on `*.fun`; drop it once Fun is registered with
+  linguist.
+
 ## [9.4.4] - 2026-10-19
 
 - Add single-file packaging with `fun pack <entry.fun> [-o <out>] [-a <path>]`.

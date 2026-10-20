@@ -84,6 +84,16 @@ src/regex/pcre/**    linguist-vendored
 *.syntax          -linguist-detectable
 *.presets         -linguist-detectable
 
+# Fun has no github/linguist entry, and `*.fun` is already one of Standard
+# ML's suffixes there, so GitHub reports this repository as "Standard ML" and
+# highlights every script as SML. Fun's syntax is Ada-derived (`if ... then
+# ... elsif ... end if`, `case ... is ... end case`, `loop ... end loop`,
+# `fun ... end fun`, `:=`, `;`-terminated statements), so label the scripts as
+# Ada until Fun itself is registered with linguist. This only steers the
+# language bar and the web highlighter; it does not change the files, and it
+# is safe to drop once `Fun` exists in languages.yml.
+*.fun             linguist-language=Ada
+
 # ---- Explicitly binary (never convert) ------------------------------------
 *.exe   binary
 *.dll   binary

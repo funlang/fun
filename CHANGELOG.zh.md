@@ -6,6 +6,11 @@
 
 ## [未发布]
 
+- 让 GitHub 将 `.fun` 脚本识别为 Ada。linguist 没有 Fun 条目，而 `*.fun`
+  是 Standard ML 的后缀之一，仓库因此被标记为 "Standard ML"，脚本也按 SML
+  高亮。Fun 语法源自 Ada，故在 `.gitattributes` 中为 `*.fun` 设置
+  `linguist-language=Ada`；待 Fun 注册进 linguist 后可移除。
+
 ## [9.4.4] - 2026-10-19
 
 - 新增单文件打包：`fun pack <entry.fun> [-o <out>] [-a <path>]`。输出文件是
