@@ -64,6 +64,23 @@ fun skipComment(t, i)
   end if;
 end fun;
 
+// Fun's opAny token starts with '.' and may contain '#', '/', etc., so `.#`
+// is an operator, not a comment. Scan past such a token before interpreting
+// its characters. -1 means "not an opAny token here".
+fun opChar(c)
+  result = '~!#%^&*-+=\\|<>/?'.subpos(c) >= 0;
+end fun;
+
+fun opEnd(t, i)
+  if t.substr(i, 1) <> '.' or not opChar(t.substr(i + 1, 1)) then
+    result = -1;
+    return;
+  end if;
+  var j = i + 1;
+  while j < t.length() and opChar(t.substr(j, 1)) do j += 1; end do;
+  result = j;
+end fun;
+
 fun trimText(s)
   var a = 0;
   var b = s.length();
@@ -76,7 +93,10 @@ fun findDepOpen(t)
   var i = 0;
   while i < t.length() do
     var c = t.substr(i, 1);
-    if c = '/' and t.substr(i + 1, 1) = '/' then
+    var oe = opEnd(t, i);
+    if oe >= 0 then
+      i = oe;
+    elsif c = '/' and t.substr(i + 1, 1) = '/' then
       i = skipLine(t, i);
     elsif c = '#' then
       i = skipComment(t, i);
@@ -111,7 +131,10 @@ fun findBracketEnd(t, setAt)
   var i = setAt;
   while i < t.length() do
     var c = t.substr(i, 1);
-    if c = '/' and t.substr(i + 1, 1) = '/' then
+    var oe = opEnd(t, i);
+    if oe >= 0 then
+      i = oe;
+    elsif c = '/' and t.substr(i + 1, 1) = '/' then
       i = skipLine(t, i);
     elsif c = '#' then
       i = skipComment(t, i);
@@ -133,7 +156,10 @@ fun segKey(seg)
   var i = 0;
   while i < seg.length() do
     var c = seg.substr(i, 1);
-    if c = '/' and seg.substr(i + 1, 1) = '/' then
+    var oe = opEnd(seg, i);
+    if oe >= 0 then
+      i = oe;
+    elsif c = '/' and seg.substr(i + 1, 1) = '/' then
       i = skipLine(seg, i);
     elsif c = '#' then
       i = skipComment(seg, i);
@@ -160,7 +186,10 @@ fun parseEntries(inner)
   while i <= n do
     var c = '';
     if i < n then c = inner.substr(i, 1); end if;
-    if (i = n) or ((c = ',') and (depth = 0)) then
+    var oe = opEnd(inner, i);
+    if oe >= 0 then
+      i = oe;
+    elsif (i = n) or ((c = ',') and (depth = 0)) then
       var seg = trimText(inner.substr(start, i - start));
       if seg <> '' then
         var key = segKey(seg);
