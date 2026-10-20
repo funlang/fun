@@ -18,6 +18,7 @@
 - [为什么是 Fun](#为什么是-fun)
 - [核心特性](#核心特性)
 - [快速开始](#快速开始)
+- [包管理](#包管理)
 - [体验 Fun 语言](#体验-fun-语言)
 - [能力阶梯](#能力阶梯)
 - [FD 数据格式](#fd-数据格式)
@@ -112,6 +113,50 @@ Hello, fun!
 9
 9
 ```
+
+---
+
+## 包管理
+
+下文 `fun` 指命令行程序（Windows 上是 `fun.exe`）。一个项目就是一个带
+`package.fun` 清单的目录，`fun package init` 生成清单和最小模板：
+
+```text
+fun package init myapp          # package.fun + src/main.fun
+fun package init mylib --lib    # package.fun + src/lib.fun
+```
+
+```fun
+fun package()
+  result = [
+    name: 'myapp',
+    version: '0.1.0',
+    bin: 'src/main.fun',
+    lib: '',
+    'fun': '9.4',
+    dependencies: [
+      'hello': [source: 'github.com/acme/hello', version: 'v1.0.0'],
+      'local': [source: '../libs/local']
+    ],
+    // >>> generated - do not edit; run 'fun package tidy' to refresh
+    resolved: []
+    // <<< generated
+  ];
+end fun;
+```
+
+- `fun package add <name> <source> [--version <v>]` / `remove <name>` 只改
+  `dependencies` 段；版本只接受精确的 tag、分支或 commit。
+- `fun package tidy` 把声明的版本装进共享的 `~/.fun` 缓存（`FUN_HOME` 可
+  覆盖），校验 git tree 哈希，并写回 `resolved` 段；path 依赖就地使用，
+  只有 git 依赖需要 `git`。
+- `fun run [args...]` 以清单目录为根运行 `bin`；在项目里 `fun <script>` 是
+  同一个启动器的平铺模式，带依赖运行指定脚本。
+- `fun pack` 把应用和依赖库打成单个可执行文件，产物运行时不依赖 `~/.fun`。
+
+运行期只读校验：缺失或陈旧的依赖会提示 `run 'fun package tidy'`，不会联网
+或改清单。`FUN_PACKAGE_READY=1` 可跳过项目模式（清单损坏时的逃生口）。可运行
+示例见 [`fun/demos/package-demo`](fun/demos/package-demo)。
 
 ---
 
@@ -424,6 +469,7 @@ float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scala
 
 - [`fun/demo`](fun/demo) —— 语法演示：函数、闭包、柯里化、类、对象、集合、正则与异常处理。
 - [`fun/demos`](fun/demos) —— 完整应用与基准测试：记事本 `notepad--`、`odbc-search`，以及性能 / 汇编 / JIT 基准。
+- [`fun/demos/package-demo`](fun/demos/package-demo) —— 带路径依赖的小项目：`tidy`、`run`（项目/平铺）与 `pack`。
 
 ---
 

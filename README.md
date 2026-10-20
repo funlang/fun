@@ -18,6 +18,7 @@
 - [Why Fun](#why-fun)
 - [Core features](#core-features)
 - [Quick start](#quick-start)
+- [Packages](#packages)
 - [A taste of Fun](#a-taste-of-fun)
 - [The capability ladder](#the-capability-ladder)
 - [The FD data format](#the-fd-data-format)
@@ -112,6 +113,55 @@ Hello, fun!
 9
 9
 ```
+
+---
+
+## Packages
+
+`fun` below is the command-line binary (`fun.exe` on Windows). A project is a
+directory with a `package.fun` manifest; `fun package init` creates the
+manifest and a minimal template:
+
+```text
+fun package init myapp          # package.fun + src/main.fun
+fun package init mylib --lib    # package.fun + src/lib.fun
+```
+
+```fun
+fun package()
+  result = [
+    name: 'myapp',
+    version: '0.1.0',
+    bin: 'src/main.fun',
+    lib: '',
+    'fun': '9.4',
+    dependencies: [
+      'hello': [source: 'github.com/acme/hello', version: 'v1.0.0'],
+      'local': [source: '../libs/local']
+    ],
+    // >>> generated - do not edit; run 'fun package tidy' to refresh
+    resolved: []
+    // <<< generated
+  ];
+end fun;
+```
+
+- `fun package add <name> <source> [--version <v>]` and `remove <name>` edit
+  only the `dependencies` set; versions are exact tags, branches, or commits.
+- `fun package tidy` installs the declared revisions into the shared `~/.fun`
+  cache (`FUN_HOME` overrides it), verifies git tree hashes, and writes the
+  `resolved` block. Path dependencies are used in place; only git
+  dependencies need `git`.
+- `fun run [args...]` runs the manifest `bin` from the project root. Inside a
+  project, `fun <script>` is the flat mode of the same launcher: it runs the
+  given script with the project's dependencies available.
+- `fun pack` embeds the app and its dependency libraries into one executable;
+  the result runs without `~/.fun`.
+
+Runs are read-only: a missing or stale dependency reports
+`run 'fun package tidy'` instead of fetching anything. `FUN_PACKAGE_READY=1`
+skips project mode (useful for a broken manifest). See
+[`fun/demos/package-demo`](fun/demos/package-demo) for a runnable example.
 
 ---
 
@@ -440,6 +490,7 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (61 modules)
 
 - [`fun/demo`](fun/demo) — syntax demos: functions, closures, currying, classes, objects, sets, regex, and exception handling.
 - [`fun/demos`](fun/demos) — full applications and benchmarks: the `notepad--` editor, `odbc-search`, and performance/assembly/JIT benchmarks.
+- [`fun/demos/package-demo`](fun/demos/package-demo) — a small package with a path dependency: `tidy`, `run` (project and flat mode), and `pack`.
 
 ---
 
