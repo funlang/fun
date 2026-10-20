@@ -472,7 +472,28 @@ fun findCached(src, ver)
   end do;
 end fun;
 
+// Git is only needed when a git dependency is resolved; path-only manifests
+// keep working on machines without git. Run/pack never reach this (they read
+// the cache), so the check lives in tidy's fetch path.
+var _gitReady = false;
+fun requireGit(name)
+  if _gitReady then return; end if;
+  var tmpDir = UtilFunHome() & 'tmp';
+  UtilEnsureDir(tmpDir);
+  var log = tmpDir & '/git-' & _pid & '.log';
+  var rc = UtilRunIn(tmpDir, 'git --version', log);
+  if rc <> 0 then
+    if exists(log) then log.move(); end if;
+    if exists(log & '.bat') then (log & '.bat').move(); end if;
+    raise "package: git not found in PATH; install git or add it to PATH and try again (needed for dependency '" & name & "')";
+  end if;
+  _gitReady = true;
+  if exists(log) then log.move(); end if;
+  if exists(log & '.bat') then (log & '.bat').move(); end if;
+end fun;
+
 fun fetchGit(name, src, ver)
+  requireGit(name);
   var pin = nil;
   if _rsOld <> nil then pin = _rsOld[name]; end if;
   var pinned = '';
