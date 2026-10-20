@@ -407,6 +407,33 @@ fun gitOut(dir, cmd, logFile)
   result = trimSpace(logFile.load().replace(13.toChar(), '').replace(10.toChar(), ''));
 end fun;
 
+// No '%' on purpose: commands run through a batch file on Windows, where a
+// percent sign is expanded by cmd before git ever sees it.
+fun hashOfTree(dir, logFile)
+  var rc = UtilRunIn(dir, 'git cat-file -p HEAD', logFile);
+  if rc <> 0 then raise 'package: git cat-file -p HEAD failed: ' & logTail(logFile); end if;
+  var text = logFile.load();
+  var nl = text.subpos(10.toChar());
+  if nl < 0 then nl = text.length(); end if;
+  var line = text.substr(0, nl);
+  if line.substr(0, 5) <> 'tree ' then raise 'package: cannot read the tree hash: ' & line; end if;
+  result = trimSpace(line.substr(5));
+end fun;
+
+fun commitDate(dir, logFile)
+  var rc = UtilRunIn(dir, 'git show -s --date=short --no-patch HEAD', logFile);
+  if rc <> 0 then
+    raise 'package: git show -s --date=short --no-patch HEAD failed: ' & logTail(logFile);
+  end if;
+  var text = logFile.load();
+  var at = text.subpos('Date:');
+  if at < 0 then raise 'package: cannot read the commit date'; end if;
+  var rest = text.substr(at + 5);
+  var nl = rest.subpos(10.toChar());
+  if nl >= 0 then rest = rest.substr(0, nl); end if;
+  result = trimSpace(rest);
+end fun;
+
 // a cached tag or commit is reusable without network; branches are not
 // (their head may have moved, and only a clone can tell)
 fun findCached(src, ver)
@@ -455,8 +482,8 @@ fun fetchGit(name, src, ver)
   var dir = '';
   if pinned <> '' then dir = cacheDirFor(src, pinned); end if;
   if pinned <> '' and isDir(dir) then
-    var tree = gitOut(dir, 'show -s --format=%T HEAD', _rsLog);
-    var at = gitOut(dir, 'show -s --format=%cs HEAD', _rsLog);
+    var tree = hashOfTree(dir, _rsLog);
+    var at = commitDate(dir, _rsLog);
     var hash = 'git-tree:' & tree;
     if pin.hash <> nil and (pin.hash or '') <> '' and (pin.hash or '') <> hash then
       raise "package: cache for '" & name & "' is corrupted; remove " & dir & ' and run tidy again';
@@ -469,8 +496,8 @@ fun fetchGit(name, src, ver)
     var cached = findCached(src, ver);
     if cached <> '' then
       var ccommit = gitOut(cached, 'rev-parse HEAD', _rsLog);
-      var ctree = gitOut(cached, 'show -s --format=%T HEAD', _rsLog);
-      var cat = gitOut(cached, 'show -s --format=%cs HEAD', _rsLog);
+      var ctree = hashOfTree(cached, _rsLog);
+      var cat = commitDate(cached, _rsLog);
       result = rsAdd(name, src, ver, ccommit, 'git-tree:' & ctree, cat, cached, readLib(cached, name));
       return;
     end if;
@@ -499,8 +526,8 @@ fun fetchGit(name, src, ver)
     removeTree(tmp);
     raise "package: '" & name & "' did not resolve to the pinned commit " & pinned;
   end if;
-  var tree = gitOut(tmp, 'show -s --format=%T HEAD', _rsLog);
-  var at = gitOut(tmp, 'show -s --format=%cs HEAD', _rsLog);
+  var tree = hashOfTree(tmp, _rsLog);
+  var at = commitDate(tmp, _rsLog);
   var dest = cacheDirFor(src, commit);
   var lib = readLib(tmp, name);
   if isDir(dest) then
