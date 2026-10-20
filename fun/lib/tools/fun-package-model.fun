@@ -54,11 +54,12 @@ fun skipLine(t, i)
   if n < 0 then result = t.length(); else result = i + n + 1; end if;
 end fun;
 
-// '#' to end of line, or '#* ... *#' across lines
+// '#' to end of line, or '#* ... #' across lines. The closing delimiter is a
+// bare '#', not '*#' (see the Fun lexer rule #\*[^#]*#).
 fun skipComment(t, i)
   if t.substr(i + 1, 1) = '*' then
-    var e = t.substr(i + 2).subpos('*#');
-    if e < 0 then result = t.length(); else result = i + e + 4; end if;
+    var e = t.substr(i + 2).subpos('#');
+    if e < 0 then result = t.length(); else result = i + e + 3; end if;
   else
     result = skipLine(t, i);
   end if;
@@ -81,6 +82,33 @@ fun opEnd(t, i)
   result = j;
 end fun;
 
+fun isLower(c)
+  result = 'abcdefghijklmnopqrstuvwxyz'.subpos(c) >= 0;
+end fun;
+
+// /regex/flags or %regex%flags; -1 when this is division or an unterminated
+// literal. Regex bodies cannot contain whitespace or their delimiter.
+fun skipRegex(t, i)
+  var q = t.substr(i, 1);
+  var c1 = t.substr(i + 1, 1);
+  if c1 = '' or c1 = q or isTrim(c1) then result = -1; return; end if;
+  var j = i + 1;
+  while j < t.length() do
+    var c = t.substr(j, 1);
+    if c = q then
+      j += 1;
+      while j < t.length() and isLower(t.substr(j, 1)) do j += 1; end do;
+      result = j;
+      return;
+    elsif isTrim(c) then
+      result = -1;
+      return;
+    end if;
+    j += 1;
+  end do;
+  result = -1;
+end fun;
+
 fun trimText(s)
   var a = 0;
   var b = s.length();
@@ -93,8 +121,12 @@ fun findDepOpen(t)
   var i = 0;
   while i < t.length() do
     var c = t.substr(i, 1);
+    var re = -1;
+    if c = '/' or c = '%' then re = skipRegex(t, i); end if;
     var oe = opEnd(t, i);
-    if oe >= 0 then
+    if re >= 0 then
+      i = re;
+    elsif oe >= 0 then
       i = oe;
     elsif c = '/' and t.substr(i + 1, 1) = '/' then
       i = skipLine(t, i);
@@ -131,8 +163,12 @@ fun findBracketEnd(t, setAt)
   var i = setAt;
   while i < t.length() do
     var c = t.substr(i, 1);
+    var re = -1;
+    if c = '/' or c = '%' then re = skipRegex(t, i); end if;
     var oe = opEnd(t, i);
-    if oe >= 0 then
+    if re >= 0 then
+      i = re;
+    elsif oe >= 0 then
       i = oe;
     elsif c = '/' and t.substr(i + 1, 1) = '/' then
       i = skipLine(t, i);
@@ -156,8 +192,12 @@ fun segKey(seg)
   var i = 0;
   while i < seg.length() do
     var c = seg.substr(i, 1);
+    var re = -1;
+    if c = '/' or c = '%' then re = skipRegex(seg, i); end if;
     var oe = opEnd(seg, i);
-    if oe >= 0 then
+    if re >= 0 then
+      i = re;
+    elsif oe >= 0 then
       i = oe;
     elsif c = '/' and seg.substr(i + 1, 1) = '/' then
       i = skipLine(seg, i);
@@ -186,8 +226,12 @@ fun parseEntries(inner)
   while i <= n do
     var c = '';
     if i < n then c = inner.substr(i, 1); end if;
+    var re = -1;
+    if c = '/' or c = '%' then re = skipRegex(inner, i); end if;
     var oe = opEnd(inner, i);
-    if oe >= 0 then
+    if re >= 0 then
+      i = re;
+    elsif oe >= 0 then
       i = oe;
     elsif (i = n) or ((c = ',') and (depth = 0)) then
       var seg = trimText(inner.substr(start, i - start));
