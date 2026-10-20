@@ -370,6 +370,9 @@ begin
     ArgScript := f;
     ArgShift  := -1;
     SetCurrentDir(BundleDir); // relative imports/resources resolve inside the bundle
+    // A bundle is a console app: keep its output when stdout is redirected
+    // (no console is detected), unless -gui was requested.
+    if not FindParamAsBool('gui') then isLog := true;
     goto _Run;
   end;
 {$EndIf}

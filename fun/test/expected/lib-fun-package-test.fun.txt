@@ -28,6 +28,7 @@ tidy idempotent: True
 dep pack: True
 dep bundle: True
 dep bundle output: True
+dep bundle stdout: True
 cache reuse commit: True
 stale run refused: True
 stale restored: True

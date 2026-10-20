@@ -242,7 +242,10 @@ fail('dep add', d1 + d2, dlog);
 ?. 'dep deps: ' & (d0 = 0 and d1 = 0 and d2 = 0);
 (dproj & 'src' & sep & 'main.fun').save("use 'gitdep.fun';" & nl &
   "use 'pathdep.fun';" & nl &
-  "?. gitHello() & '-' & pathHello();" & nl);
+  "var out = 2.arg();" & nl &
+  "var msg = gitHello() & '-' & pathHello();" & nl &
+  "?. msg;" & nl &
+  "if out <> '' then out.save(msg); end if;" & nl);
 
 var tlog = base & 'dep-tidy.log';
 var t1 = runIn(dproj, funcmd & ' package tidy', tlog);
@@ -282,13 +285,20 @@ if _isWin then pout &= '.exe'; end if;
 var oldHome = _funHome;
 _funHome = base & 'emptyhome';
 var blog = base & 'dep-bundle.log';
-var b1 = runIn('', q(pout), blog);
-var bo = line(loadIf(blog));
+var bres = base & 'dep-bundle.txt';
+var b1 = runIn('', q(pout) & ' ' & q(bres), blog);
+var bo = line(loadIf(bres));
+var bstdout = line(loadIf(blog));
 _funHome = oldHome;
 fail('dep bundle', b1, blog);
 ?. 'dep bundle: ' & (b1 = 0);
 ?. 'dep bundle output: ' & (bo = 'git-dep-ok-path-dep-ok');
-if bo <> 'git-dep-ok-path-dep-ok' then ?. 'failed dep bundle output: [' & bo & ']'; end if;
+if bo <> 'git-dep-ok-path-dep-ok' then
+  ?. 'failed dep bundle output: [' & bo & ']';
+  if not yn(bres) then ?. 'failed dep bundle result file missing'; end if;
+end if;
+?. 'dep bundle stdout: ' & (bstdout = 'git-dep-ok-path-dep-ok');
+if bstdout <> 'git-dep-ok-path-dep-ok' then ?. 'failed dep bundle stdout: [' & bstdout & ']'; end if;
 
 var d2proj = base & 'dep2 app' & sep;
 var t3log = base & 'dep2.log';
