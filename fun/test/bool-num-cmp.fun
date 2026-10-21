@@ -53,3 +53,5 @@ ok((t = t) = true, 'true = true');
 ok((t = f) = false, 'true <> false');
 ok((t = 'x') = false, 'true = x is false');
 ok(('x' = t) = false, 'x = true is false');
+
+// CI cache probe: a comment-only change under fun/ must not rebuild funcmd.
