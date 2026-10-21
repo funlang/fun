@@ -62,5 +62,6 @@ LOAD  lib-xml
 LOAD  lib-yaml
 LOAD  lib-zlib
 LOAD  test
+LOAD  uuid
 
-loaded=58 failed=6
+loaded=59 failed=6
