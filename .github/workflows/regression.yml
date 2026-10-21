@@ -76,6 +76,9 @@ jobs:
             build: ./make-macos.sh
             fetch_all: false
     runs-on: ${{ matrix.os }}
+    # A hard ceiling: install/hdiutil steps have hung on macOS runners before,
+    # and the default six-hour limit is not a useful failure mode.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -181,6 +184,17 @@ jobs:
             # Intel runners have no Homebrew bottle for fpc, so use the official
             # universal dmg (fpc-3.2.2-intelarm64-macosx.mpkg), which installs
             # fine there. Cache the installed tree (and the 274 MB download).
+            #
+            # hdiutil has been seen to hang on runners, so every phase is
+            # bounded. The ::warning annotations also leave a visible trail
+            # outside the (admin-only) job log.
+            run_limited() {
+              secs="$1"; shift
+              if command -v timeout >/dev/null 2>&1; then timeout "$secs" "$@"
+              elif command -v gtimeout >/dev/null 2>&1; then gtimeout "$secs" "$@"
+              else "$@"
+              fi
+            }
             if [ "${{ steps.cache-fpc-macos-x64.outputs.cache-hit }}" = "true" ]; then
               echo "restoring cached FPC install from $HOME/fpc-install.tar"
               sudo tar -xf "$HOME/fpc-install.tar" -C / || true
@@ -196,40 +210,57 @@ jobs:
                 cp -f fpc.dmg "$CACHE/fpc.dmg"
               fi
               ls -l fpc.dmg
+              echo "::warning title=fpc-intel phase::dmg ready"
               MOUNT="$RUNNER_TEMP/fpcmnt"
               mkdir -p "$MOUNT"
-              if ! hdiutil attach fpc.dmg -nobrowse -mountpoint "$MOUNT"; then
-                echo "::error title=macos fpc install::hdiutil attach failed"; exit 1
+              if ! run_limited 90 hdiutil attach fpc.dmg -nobrowse -mountpoint "$MOUNT"; then
+                echo "::error title=macos fpc install::hdiutil attach failed or timed out"; exit 1
               fi
+              echo "::warning title=fpc-intel phase::dmg attached"
               # The dmg layout (volume root vs a wrapper folder, package at any
               # depth) varies, so locate the package instead of hard-coding it.
               # FPC's package is not notarized, so allow it explicitly.
               PKG="$(find "$MOUNT" \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
               [ -n "$PKG" ] || { echo "::error title=macos fpc install::no package in the dmg"; exit 1; }
               echo "installing $PKG on macOS $(sw_vers -productVersion) $(uname -m)"
-              out="$(sudo installer -pkg "$PKG" -target / -allowUntrusted 2>&1)" || {
-                echo "::error title=macos fpc install::installer failed: $(printf '%s' "$out" | tail -n 3 | tr '\n' '~' | cut -c1-500)"
+              out="$(run_limited 300 sudo installer -pkg "$PKG" -target / -allowUntrusted 2>&1)" || {
+                echo "::error title=macos fpc install::installer failed or timed out: $(printf '%s' "$out" | tail -n 3 | tr '\n' '~' | cut -c1-500)"
                 exit 1
               }
-              hdiutil detach "$MOUNT" || true
+              echo "::warning title=fpc-intel phase::installer done"
+              # Detach must never block the build; a stale mount is harmless.
+              run_limited 60 hdiutil detach "$MOUNT" || true
+              echo "::warning title=fpc-intel phase::dmg detached"
 
               # Snapshot exactly what the receipts put on disk; fall back to a
               # known-path list if the packages registered no receipt.
               payload="$RUNNER_TEMP/fpc-payload.txt"
               : > "$payload"
-              for id in $(sudo pkgutil --pkgs | grep -iE 'freepascal|fpc' || true); do
-                sudo pkgutil --files "$id" 2>/dev/null | sed 's|^/*||' >> "$payload" || true
+              for id in $(run_limited 60 sudo pkgutil --pkgs | grep -iE 'freepascal|fpc' || true); do
+                run_limited 60 sudo pkgutil --files "$id" 2>/dev/null | sed 's|^/*||' >> "$payload" || true
               done
+              echo "::warning title=fpc-intel phase::payload $(wc -l < "$payload" | tr -d ' ') paths"
+              saved=0
               if [ -s "$payload" ]; then
-                sudo tar -cf "$HOME/fpc-install.tar" -C / -T "$payload" || true
+                if run_limited 240 sudo tar -cf "$HOME/fpc-install.tar" -C / -T "$payload"; then saved=1; fi
               else
-                sudo tar -cf "$HOME/fpc-install.tar" -C / \
+                if run_limited 240 sudo tar -cf "$HOME/fpc-install.tar" -C / \
                   usr/local/lib/fpc/3.2.2 etc/fpc.cfg \
                   usr/local/bin/fpc usr/local/bin/fpcres \
                   usr/local/bin/ppc386 usr/local/bin/ppcx64 \
-                  usr/local/bin/ppcarm usr/local/bin/ppca64 2>/dev/null || true
+                  usr/local/bin/ppcarm usr/local/bin/ppca64 2>/dev/null; then saved=1; fi
               fi
-              ls -l "$HOME/fpc-install.tar" || true
+              # Never let a partial archive become the next run's cache: verify
+              # it parses and contains the driver before keeping it.
+              if [ "$saved" = "1" ] && ! run_limited 60 tar -tf "$HOME/fpc-install.tar" 2>/dev/null | grep -q 'usr/local/bin/fpc$'; then
+                saved=0
+              fi
+              if [ "$saved" = "1" ]; then
+                echo "::warning title=fpc-intel phase::cached $(ls -l "$HOME/fpc-install.tar" | awk '{print $5}') bytes"
+              else
+                rm -f "$HOME/fpc-install.tar"
+                echo "::warning title=fpc-intel phase::install cache not written (tar failed, timed out, or incomplete)"
+              fi
             fi
           fi
           fpc -iV || { echo "::error title=macos fpc install::fpc not on PATH after install"; exit 1; }
@@ -276,6 +307,7 @@ jobs:
   windows-x64:
     name: windows-x64
     runs-on: windows-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
