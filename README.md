@@ -190,8 +190,9 @@ per file, prints `PASS`/`FAIL` per file, and exits non-zero when any test
 fails. A project only needs `package.fun` (a `bin` entry is not required);
 manifest dependencies are available through the same launcher as `fun run`.
 
-- Assertions: `assert.equal`, `not_equal`, `is_true`, `is_false`, `raises`,
-  `fail`; each takes an optional trailing message.
+- Assertions: `assert.equal`, `not_equal`, `is_true`, `is_false`, `match`,
+  `contains`, `greater`, `less`, `is_nil`, `not_nil`, `raises`, `fail`; each
+  takes an optional trailing message.
 - `test.fun`, the globals `test`/`assert`/`runTests`, the aliases `as test` /
   `as assert`, and dependency keys `test`/`assert` are reserved. A third-party
   test library can be imported under another alias.

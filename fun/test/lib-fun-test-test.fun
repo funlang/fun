@@ -132,6 +132,14 @@ var proj = base & 'main proj' & sep;
   "test('raises and is_false', {" & nl &
   "  assert.raises({ assert.fail('boom inside'); }, 'boom inside');" & nl &
   '  assert.is_false(2 < 1);' & nl &
+  '});' & nl & nl &
+  "test('matchers', {" & nl &
+  "  assert.match('hello world', /^hello/);" & nl &
+  "  assert.contains('hello world', 'lo wo');" & nl &
+  '  assert.greater(3, 2);' & nl &
+  '  assert.less(2, 3);' & nl &
+  '  assert.is_nil(nil);' & nl &
+  "  assert.not_nil('x');" & nl &
   '});' & nl);
 (proj & 'tests' & sep & 'nested' & sep & 'deep_test.fun').save(
   "use 'test.fun';" & nl &
@@ -172,12 +180,12 @@ var mo = loadIf(mlog);
 check('test exits 0', m1 = 0);
 check('smoke found', has(mo, 'smoke_test.fun') and has(mo, 'PASS (1)'));
 check('src test found', has(mo, 'src/b_test.fun'));
-check('tests helper reuse', has(mo, 'tests/a_test.fun') and has(mo, 'PASS (3)'));
+check('tests helper reuse', has(mo, 'tests/a_test.fun') and has(mo, 'PASS (4)'));
 check('nested test found', has(mo, 'tests/nested/deep_test.fun'));
 check('dist excluded', not has(mo, 'skip_test.fun'));
 check('path dep excluded', not has(mo, 'dep_test.fun'));
 check('helper not a test', not has(mo, 'helpers.fun'));
-check('summary', has(mo, '4 files, 6 tests: all passed'));
+check('summary', has(mo, '4 files, 7 tests: all passed'));
 
 // --- lib-only package (no bin) -------------------------------------------
 var libp = base & 'libonly' & sep;
@@ -221,6 +229,9 @@ var failp = base & 'failing' & sep;
   '});' & nl & nl &
   "test('explicit fail', {" & nl &
   "  assert.fail('unexpected state');" & nl &
+  '});' & nl & nl &
+  "test('matcher failure', {" & nl &
+  "  assert.match('abc', /xyz/, 'must match');" & nl &
   '});' & nl);
 (failp & 'crash_test.fun').save(
   "use 'test.fun';" & nl &
@@ -234,8 +245,9 @@ check('crash marked FAIL', has(fo, 'crash_test.fun') and has(fo, 'boom at load')
 check('custom message shown', has(fo, 'not ok custom message') and has(fo, 'math is broken'));
 check('diagnostic shown', has(fo, 'expected 3, got 2'));
 check('assert.fail shown', has(fo, 'not ok explicit fail') and has(fo, 'unexpected state'));
+check('matcher failure shown', has(fo, 'not ok matcher failure') and has(fo, 'must match'));
 check('passing test quiet', not has(fo, 'ok passing'));
-check('failure summary', has(fo, '2 files, 3 tests: 1 passed, 2 failed; 1 file failed to run'));
+check('failure summary', has(fo, '2 files, 4 tests: 1 passed, 3 failed; 1 file failed to run'));
 
 // --- reserved names and shadowing ----------------------------------------
 var resp = base & 'reserved' & sep;

@@ -14,6 +14,7 @@ crash marked FAIL: True
 custom message shown: True
 diagnostic shown: True
 assert.fail shown: True
+matcher failure shown: True
 passing test quiet: True
 failure summary: True
 reserved dependency key: True

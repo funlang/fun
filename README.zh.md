@@ -184,8 +184,9 @@ fun test
 `package.fun`（不要求 `bin`）；清单里的依赖通过和 `fun run` 相同的项目
 启动器生效。
 
-- 断言：`assert.equal`、`not_equal`、`is_true`、`is_false`、`raises`、`fail`，
-  每个都可带最后一个自定义消息参数。
+- 断言：`assert.equal`、`not_equal`、`is_true`、`is_false`、`match`、`contains`、
+  `greater`、`less`、`is_nil`、`not_nil`、`raises`、`fail`，每个都可带最后一个
+  自定义消息参数。
 - `test.fun`、全局名 `test`/`assert`/`runTests`、别名 `as test`/`as assert`、
   依赖键 `test`/`assert` 为保留名；三方测试库请换别名导入。
 - `dist/`、`.` 开头目录和 path 依赖目录不会参与发现。
