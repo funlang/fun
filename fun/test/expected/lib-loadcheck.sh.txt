@@ -61,5 +61,6 @@ LOAD  lib-winsock
 LOAD  lib-xml
 LOAD  lib-yaml
 LOAD  lib-zlib
+LOAD  test
 
-loaded=57 failed=6
+loaded=58 failed=6

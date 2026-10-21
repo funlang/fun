@@ -1,0 +1,30 @@
+tidy: True
+test exits 0: True
+smoke found: True
+src test found: True
+tests helper reuse: True
+nested test found: True
+dist excluded: True
+path dep excluded: True
+helper not a test: True
+summary: True
+lib-only package: True
+failure exits 1: True
+crash marked FAIL: True
+custom message shown: True
+diagnostic shown: True
+assert.fail shown: True
+passing test quiet: True
+failure summary: True
+reserved dependency key: True
+reserved alias: True
+root shadow: True
+test dir shadow: True
+third-party alias: True
+untidied dependency: True
+no tests found: True
+missing manifest: True
+help: True
+unknown argument: True
+pack ignores tests: True
+packed app runs: True

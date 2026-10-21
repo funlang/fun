@@ -96,3 +96,4 @@ fractal-asm-x64.fun	test/fractal-asm-x64.fun	smoke
 lib-netif-test.fun	test/lib-netif-test.fun	snap
 lib-fun-pack-test.fun	test/lib-fun-pack-test.fun	snap
 lib-fun-package-test.fun	test/lib-fun-package-test.fun	snap
+lib-fun-test-test.fun	test/lib-fun-test-test.fun	snap
