@@ -30,6 +30,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Homebrew installs FPC (arm64) and openssl@3. Its per-install auto-update and
+# cleanup dominate a bottle that is already in the download cache, so skip
+# them: CI only needs the files in the Cellar.
+env:
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+  HOMEBREW_NO_ENV_HINTS: 1
+
 # Cancel an in-progress run when the same ref is pushed again.
 concurrency:
   group: regression-${{ github.ref }}
@@ -100,10 +108,32 @@ jobs:
 
       - name: Install OpenSSL (lib-crypto tests)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libssl-dev
+        run: |
+          # The runner image already ships libssl-dev on most images; only pay
+          # for an apt index refresh + install when it is actually missing.
+          if dpkg -s libssl-dev >/dev/null 2>&1; then
+            echo "libssl-dev already installed"
+          else
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends libssl-dev
+          fi
+
+      # The dmg install copies a few hundred MB into /usr/local and takes ~30s
+      # on the Intel runner. Cache the installed tree (as a tarball, since
+      # actions/cache cannot write into /usr/local directly) and restore it
+      # with sudo: a hit skips both the hdiutil mount and the installer.
+      # The tar is intentionally uncompressed - actions/cache zstd-compresses
+      # its contents itself, so gzipping here only adds CPU time.
+      - name: Cache installed FPC 3.2.2 (macOS Intel)
+        if: runner.os == 'macOS' && runner.arch == 'X64'
+        id: cache-fpc-macos-x64
+        uses: actions/cache@v4
+        with:
+          path: ~/fpc-install.tar
+          key: fpc-3.2.2-macos-x64-prefix-v1
 
       - name: Cache FPC installer dmg (macOS Intel)
-        if: runner.os == 'macOS' && runner.arch == 'X64'
+        if: runner.os == 'macOS' && runner.arch == 'X64' && steps.cache-fpc-macos-x64.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: ~/fpc-cache
@@ -131,32 +161,57 @@ jobs:
             cd "$RUNNER_TEMP"
             # Intel runners have no Homebrew bottle for fpc, so use the official
             # universal dmg (fpc-3.2.2-intelarm64-macosx.mpkg), which installs
-            # fine there. Cache the 274 MB download between runs.
-            CACHE="$HOME/fpc-cache"; mkdir -p "$CACHE"
-            if [ -f "$CACHE/fpc.dmg" ]; then
-              cp -f "$CACHE/fpc.dmg" fpc.dmg
-            else
-              curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o fpc.dmg \
-                "https://downloads.sourceforge.net/project/freepascal/Mac%20OS%20X/3.2.2/fpc-3.2.2.intelarm64-macosx.dmg"
-              cp -f fpc.dmg "$CACHE/fpc.dmg"
+            # fine there. Cache the installed tree (and the 274 MB download).
+            if [ "${{ steps.cache-fpc-macos-x64.outputs.cache-hit }}" = "true" ]; then
+              echo "restoring cached FPC install from $HOME/fpc-install.tar"
+              sudo tar -xf "$HOME/fpc-install.tar" -C / || true
             fi
-            ls -l fpc.dmg
-            MOUNT="$RUNNER_TEMP/fpcmnt"
-            mkdir -p "$MOUNT"
-            if ! hdiutil attach fpc.dmg -nobrowse -mountpoint "$MOUNT"; then
-              echo "::error title=macos fpc install::hdiutil attach failed"; exit 1
+
+            if [ "$(fpc -iV 2>/dev/null)" != "3.2.2" ]; then
+              CACHE="$HOME/fpc-cache"; mkdir -p "$CACHE"
+              if [ -f "$CACHE/fpc.dmg" ]; then
+                cp -f "$CACHE/fpc.dmg" fpc.dmg
+              else
+                curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o fpc.dmg \
+                  "https://downloads.sourceforge.net/project/freepascal/Mac%20OS%20X/3.2.2/fpc-3.2.2.intelarm64-macosx.dmg"
+                cp -f fpc.dmg "$CACHE/fpc.dmg"
+              fi
+              ls -l fpc.dmg
+              MOUNT="$RUNNER_TEMP/fpcmnt"
+              mkdir -p "$MOUNT"
+              if ! hdiutil attach fpc.dmg -nobrowse -mountpoint "$MOUNT"; then
+                echo "::error title=macos fpc install::hdiutil attach failed"; exit 1
+              fi
+              # The dmg layout (volume root vs a wrapper folder, package at any
+              # depth) varies, so locate the package instead of hard-coding it.
+              # FPC's package is not notarized, so allow it explicitly.
+              PKG="$(find "$MOUNT" \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
+              [ -n "$PKG" ] || { echo "::error title=macos fpc install::no package in the dmg"; exit 1; }
+              echo "installing $PKG on macOS $(sw_vers -productVersion) $(uname -m)"
+              out="$(sudo installer -pkg "$PKG" -target / -allowUntrusted 2>&1)" || {
+                echo "::error title=macos fpc install::installer failed: $(printf '%s' "$out" | tail -n 3 | tr '\n' '~' | cut -c1-500)"
+                exit 1
+              }
+              hdiutil detach "$MOUNT" || true
+
+              # Snapshot exactly what the receipts put on disk; fall back to a
+              # known-path list if the packages registered no receipt.
+              payload="$RUNNER_TEMP/fpc-payload.txt"
+              : > "$payload"
+              for id in $(sudo pkgutil --pkgs | grep -iE 'freepascal|fpc' || true); do
+                sudo pkgutil --files "$id" 2>/dev/null | sed 's|^/*||' >> "$payload" || true
+              done
+              if [ -s "$payload" ]; then
+                sudo tar -cf "$HOME/fpc-install.tar" -C / -T "$payload" || true
+              else
+                sudo tar -cf "$HOME/fpc-install.tar" -C / \
+                  usr/local/lib/fpc/3.2.2 etc/fpc.cfg \
+                  usr/local/bin/fpc usr/local/bin/fpcres \
+                  usr/local/bin/ppc386 usr/local/bin/ppcx64 \
+                  usr/local/bin/ppcarm usr/local/bin/ppca64 2>/dev/null || true
+              fi
+              ls -l "$HOME/fpc-install.tar" || true
             fi
-            # The dmg layout (volume root vs a wrapper folder, package at any
-            # depth) varies, so locate the package instead of hard-coding it.
-            # FPC's package is not notarized, so allow it explicitly.
-            PKG="$(find "$MOUNT" \( -name '*.mpkg' -o -name '*.pkg' \) | head -n 1)"
-            [ -n "$PKG" ] || { echo "::error title=macos fpc install::no package in the dmg"; exit 1; }
-            echo "installing $PKG on macOS $(sw_vers -productVersion) $(uname -m)"
-            out="$(sudo installer -pkg "$PKG" -target / -allowUntrusted 2>&1)" || {
-              echo "::error title=macos fpc install::installer failed: $(printf '%s' "$out" | tail -n 3 | tr '\n' '~' | cut -c1-500)"
-              exit 1
-            }
-            hdiutil detach "$MOUNT" || true
           fi
           fpc -iV || { echo "::error title=macos fpc install::fpc not on PATH after install"; exit 1; }
 
@@ -299,7 +354,48 @@ jobs:
           path: C:\FPC
           key: fpc-3.2.2-win64-and-cross
 
+      # The three helper DLLs below are pure build artifacts of pinned inputs
+      # (PCRE 8.45, FPC 3.2.2's libffi, our libffitest.c). Cache each one
+      # separately: a hit skips the download + gcc/pacman work (about 18s per
+      # run), and one best-effort build failing never poisons another's cache.
+      - name: Restore pcre3.dll (win64)
+        id: cache-pcre-win
+        uses: actions/cache/restore@v4
+        with:
+          path: src\prj\fun\pcre3.dll
+          key: win64-pcre3-pcre-8.45-v1
+
+      - name: Restore ffi.dll (win64)
+        id: cache-ffi-win
+        uses: actions/cache/restore@v4
+        with:
+          path: src\prj\fun\ffi.dll
+          key: win64-ffi-fpc-3.2.2-v1
+
+      - name: Restore libffitest.dll (win64)
+        id: cache-libffitest-win
+        uses: actions/cache/restore@v4
+        with:
+          path: fun\test\ffi\libffitest.dll
+          key: win64-libffitest-v1
+
+      - name: Mark cached win64 helper DLLs
+        shell: pwsh
+        run: |
+          # GITHUB_ENV is not part of a cache, so set the feature flags from
+          # whichever DLLs the restore above actually produced.
+          if (Test-Path 'src\prj\fun\pcre3.dll') {
+            "FUN_PCRE_DLL=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host "pcre3.dll restored from cache"
+          }
+          if (Test-Path 'src\prj\fun\ffi.dll') {
+            "FUN_FFI_DLL=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host "ffi.dll restored from cache"
+          }
+          $global:LASTEXITCODE = 0
+
       - name: Build pcre3.dll for win64 (regex, best effort)
+        if: steps.cache-pcre-win.outputs.cache-hit != 'true'
         working-directory: src\prj\fun
         shell: pwsh
         run: |
@@ -395,6 +491,7 @@ jobs:
           $global:LASTEXITCODE = 0
 
       - name: Get libffi for win64 (getapi, best effort)
+        if: steps.cache-ffi-win.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           # FPC's bundled `ffi` unit has a WIN64 target (FFI_DEFAULT_ABI =
@@ -421,6 +518,7 @@ jobs:
           $global:LASTEXITCODE = 0
 
       - name: Build libffitest.dll for win64 (FFI tests, best effort)
+        if: steps.cache-libffitest-win.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           # The FFI suite (fun/test/ffi/ffi-*.fun) calls a small C helper that
@@ -481,6 +579,32 @@ jobs:
             Write-Host "::warning title=libffitest (win64)::$($_.Exception.Message)"
           }
           $global:LASTEXITCODE = 0
+
+      - name: Save pcre3.dll (win64)
+        if: steps.cache-pcre-win.outputs.cache-hit != 'true'
+        # Best effort, matching the build above: never fail the job because a
+        # cache could not be written.
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: src\prj\fun\pcre3.dll
+          key: win64-pcre3-pcre-8.45-v1
+
+      - name: Save ffi.dll (win64)
+        if: steps.cache-ffi-win.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: src\prj\fun\ffi.dll
+          key: win64-ffi-fpc-3.2.2-v1
+
+      - name: Save libffitest.dll (win64)
+        if: steps.cache-libffitest-win.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: fun\test\ffi\libffitest.dll
+          key: win64-libffitest-v1
 
       - name: Build funcmd.exe
         working-directory: src\prj\fun
