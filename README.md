@@ -19,6 +19,7 @@
 - [Core features](#core-features)
 - [Quick start](#quick-start)
 - [Packages](#packages)
+- [Testing](#testing)
 - [A taste of Fun](#a-taste-of-fun)
 - [The capability ladder](#the-capability-ladder)
 - [The FD data format](#the-fd-data-format)
@@ -38,7 +39,7 @@
 In one sentence: **Fun is a scripting language that goes all the way from JSON to machine code.**
 
 - One runtime spans the whole spectrum, from high-level data work (JSON/FD) down to low-level system programming (FFI, C at runtime, JIT, machine code);
-- 61 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
+- 62 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
 - in AI-agent and domestic-IT scenarios, it is the lightweight glue connecting OSes, databases, chips, and business logic.
 
 Fun is designed around a simple premise: **data and code should be equally first-class, and a script should be able to reach down to the machine without leaving the language.**
@@ -69,7 +70,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
 - **Cross-platform** — Windows (32/64-bit), Linux, ARM, and Windows CE.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
-- **Self-hosted standard library** — 61 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
+- **Self-hosted standard library** — 62 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
 ---
 
@@ -162,6 +163,41 @@ Runs are read-only: a missing or stale dependency reports
 `run 'fun package tidy'` instead of fetching anything. `FUN_PACKAGE_READY=1`
 skips project mode (useful for a broken manifest). See
 [`fun/demos/package-demo`](fun/demos/package-demo) for a runnable example.
+
+---
+
+## Testing
+
+Test files are named `*_test.fun`; their location is free (`tests/` is the
+recommended layout). Other `.fun` files are ordinary modules, so tests can
+share helpers. A test file imports `test.fun` and registers blocks:
+
+```fun
+use 'test.fun';
+use '../src/lib.fun';
+
+test('adds', {
+  assert.equal(add(1, 2), 3);
+});
+```
+
+```text
+fun test
+```
+
+`fun test` runs every `*_test.fun` below the project root, one child process
+per file, prints `PASS`/`FAIL` per file, and exits non-zero when any test
+fails. A project only needs `package.fun` (a `bin` entry is not required);
+manifest dependencies are available through the same launcher as `fun run`.
+
+- Assertions: `assert.equal`, `not_equal`, `is_true`, `is_false`, `raises`,
+  `fail`; each takes an optional trailing message.
+- `test.fun`, the globals `test`/`assert`/`runTests`, the aliases `as test` /
+  `as assert`, and dependency keys `test`/`assert` are reserved. A third-party
+  test library can be imported under another alias.
+- `dist/`, dot-directories, and path-dependency directories are skipped.
+
+See [`fun/demos/test-demo`](fun/demos/test-demo) for a runnable example.
 
 ---
 
@@ -335,7 +371,7 @@ fun/
 │   ├── utils/         # Utility functions
 │   └── prj/fun/       # Projects & build scripts (funcmd.dpr, Delphi/FPC)
 ├── fun/
-│   ├── lib/           # Standard library (pure Fun, 61 modules)
+│   ├── lib/           # Standard library (pure Fun, 62 modules)
 │   ├── demo/          # Language syntax demos
 │   ├── demos/         # Full applications & benchmarks
 │   └── key_*.ini      # Keyword alias packs (CN / FR / PUA)
@@ -460,9 +496,9 @@ win64/aarch64 target, so there is nothing to build with.
 
 ## Standard library
 
-The standard library in [`fun/lib`](fun/lib) is written in pure Fun (61 modules):
+The standard library in [`fun/lib`](fun/lib) is written in pure Fun (62 modules):
 
-> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 61 modules written in Fun itself.
+> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 62 modules written in Fun itself.
 
 - **Data**: `lib-json`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`
 - **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`
@@ -473,6 +509,7 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (61 modules)
 - **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`
 - **UI**: `lib-ui`, `lib-ui-base`, `lib-dialog`, `lib-trayicon`
 - **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`
+- **Testing**: `test` (registration and assertions for `fun test`)
 
 > **Platform-split convention**: the Windows implementation keeps the plain
 > module name, and the Unix backend is `<name>-unx.fun` (Linux + macOS); the
@@ -491,6 +528,7 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (61 modules)
 - [`fun/demo`](fun/demo) — syntax demos: functions, closures, currying, classes, objects, sets, regex, and exception handling.
 - [`fun/demos`](fun/demos) — full applications and benchmarks: the `notepad--` editor, `odbc-search`, and performance/assembly/JIT benchmarks.
 - [`fun/demos/package-demo`](fun/demos/package-demo) — a small package with a path dependency: `tidy`, `run` (project and flat mode), and `pack`.
+- [`fun/demos/test-demo`](fun/demos/test-demo) — a lib-only package with tests, a shared helper, and a failing-assertion example.
 
 ---
 

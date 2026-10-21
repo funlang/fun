@@ -19,6 +19,7 @@
 - [核心特性](#核心特性)
 - [快速开始](#快速开始)
 - [包管理](#包管理)
+- [测试](#测试)
 - [体验 Fun 语言](#体验-fun-语言)
 - [能力阶梯](#能力阶梯)
 - [FD 数据格式](#fd-数据格式)
@@ -38,7 +39,7 @@
 一句话定位：**Fun 是一门从 JSON 一路写到机器码的脚本语言。**
 
 - 用同一个运行时，覆盖从高层数据处理（JSON/FD）到底层系统编程（FFI、运行时 C、JIT、机器码）的全谱系；
-- 自带 61 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
+- 自带 62 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
 - 在信创与 AI Agent 场景中，作为连接国产 OS、数据库、芯片与业务逻辑的轻量级胶水。
 
 Fun 的设计出发点很简单：**数据与代码都应该是头等公民，而且一段脚本应该能在不离开语言的情况下一路触达机器底层。**
@@ -69,7 +70,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
 - **跨平台** —— Windows（32/64 位）、Linux、ARM 与 Windows CE。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
-- **自托管的标准库** —— 61 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
+- **自托管的标准库** —— 62 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
 ---
 
@@ -157,6 +158,39 @@ end fun;
 运行期只读校验：缺失或陈旧的依赖会提示 `run 'fun package tidy'`，不会联网
 或改清单。`FUN_PACKAGE_READY=1` 可跳过项目模式（清单损坏时的逃生口）。可运行
 示例见 [`fun/demos/package-demo`](fun/demos/package-demo)。
+
+---
+
+## 测试
+
+测试文件名以 `_test.fun` 结尾，位置不限（推荐放在 `tests/`）。其他 `.fun`
+是普通模块，测试之间可以复用 helper。测试文件导入 `test.fun` 并注册用例：
+
+```fun
+use 'test.fun';
+use '../src/lib.fun';
+
+test('adds', {
+  assert.equal(add(1, 2), 3);
+});
+```
+
+```text
+fun test
+```
+
+`fun test` 会在项目根下查找并运行所有 `*_test.fun`，每个文件一个子进程，
+逐文件打印 `PASS`/`FAIL`，任一测试失败时以非 0 退出。项目只需要
+`package.fun`（不要求 `bin`）；清单里的依赖通过和 `fun run` 相同的项目
+启动器生效。
+
+- 断言：`assert.equal`、`not_equal`、`is_true`、`is_false`、`raises`、`fail`，
+  每个都可带最后一个自定义消息参数。
+- `test.fun`、全局名 `test`/`assert`/`runTests`、别名 `as test`/`as assert`、
+  依赖键 `test`/`assert` 为保留名；三方测试库请换别名导入。
+- `dist/`、`.` 开头目录和 path 依赖目录不会参与发现。
+
+可运行示例见 [`fun/demos/test-demo`](fun/demos/test-demo)。
 
 ---
 
@@ -330,7 +364,7 @@ fun/
 │   ├── utils/         # 工具函数
 │   └── prj/fun/       # 工程与构建脚本（funcmd.dpr，Delphi/FPC）
 ├── fun/
-│   ├── lib/           # 标准库（纯 Fun 编写，61 个模块）
+│   ├── lib/           # 标准库（纯 Fun 编写，62 个模块）
 │   ├── demo/          # 语言语法演示
 │   ├── demos/         # 完整应用与基准测试
 │   └── key_*.ini      # 关键字别名包（CN / FR / PUA）
@@ -442,9 +476,9 @@ float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scala
 
 ## 标准库
 
-标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（61 个模块）：
+标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（62 个模块）：
 
-> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——61 个模块全部用 Fun 自身写成。
+> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——62 个模块全部用 Fun 自身写成。
 
 - **数据**：`lib-json`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`
 - **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`
@@ -455,6 +489,7 @@ float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scala
 - **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`
 - **UI**：`lib-ui`、`lib-ui-base`、`lib-dialog`、`lib-trayicon`
 - **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`
+- **测试**：`test`（`fun test` 的注册与断言库）
 
 > **平台拆分惯例**：Windows 实现保留原名，Unix 后端为 `<name>-unx.fun`（Linux + macOS），
 > 旧的 `<name>-lnx.fun` 名字保留为它之上的薄包装；两者共用的逻辑放在
@@ -470,6 +505,7 @@ float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scala
 - [`fun/demo`](fun/demo) —— 语法演示：函数、闭包、柯里化、类、对象、集合、正则与异常处理。
 - [`fun/demos`](fun/demos) —— 完整应用与基准测试：记事本 `notepad--`、`odbc-search`，以及性能 / 汇编 / JIT 基准。
 - [`fun/demos/package-demo`](fun/demos/package-demo) —— 带路径依赖的小项目：`tidy`、`run`（项目/平铺）与 `pack`。
+- [`fun/demos/test-demo`](fun/demos/test-demo) —— 只有库的包及测试：共享 helper、通过用例与失败断言示例。
 
 ---
 

@@ -420,7 +420,7 @@ end;
 //==============================================================
 const
   // Enabled tool commands. The script is lib/tools/fun-<name>.fun.
-  FunTools: array[0..1] of fun.str = ('pack', 'package');
+  FunTools: array[0..2] of fun.str = ('pack', 'package', 'test');
 
 function IsFunTool(const name: fun.str): fun.bool;
 var

@@ -180,6 +180,7 @@ begin
   Println('  ' + exeName + ' pack <file.fun> [-o <out>] [-a <file-or-dir>]  bundle into one executable');
   Println('  ' + exeName + ' package init [dir] [--bin|--lib]           create package.fun and a template');
   Println('  ' + exeName + ' run [args]                              run the package bin');
+  Println('  ' + exeName + ' test                                    run the package tests');
 {$EndIf}
   Println('');
 end;
