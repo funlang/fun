@@ -82,6 +82,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Evaluate the input hash once, into a step output. GitHub re-evaluates a
+      # cache action's `key` for its post-save step; `hashFiles` at that point
+      # can see the freshly built funcmd/libtcc under src/ and would save under
+      # a different key than the one restored next run.
+      - name: Compute Pascal build input hash
+        id: src-hash
+        run: echo "value=${{ hashFiles('src/**') }}" >> "$GITHUB_OUTPUT"
+
       # Build reuse: every input to the compiled interpreter is under src/
       # (the make scripts pin the FPC flags and third-party versions), while
       # fun/ is interpreted at run time. When src/ is unchanged - a
@@ -92,7 +100,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src/prj/fun/funcmd
-          key: funcmd-${{ matrix.name }}-fpc-3.2.2-${{ hashFiles('src/**') }}
+          key: funcmd-${{ matrix.name }}-fpc-3.2.2-${{ steps.src-hash.outputs.value }}
 
       # libtcc.so is dlopen'd next to funcmd by lib-tcc.fun; it is a separate
       # artifact on Linux only.
@@ -102,7 +110,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src/prj/fun/libtcc.so
-          key: libtcc-${{ matrix.name }}-${{ hashFiles('src/**') }}
+          key: libtcc-${{ matrix.name }}-${{ steps.src-hash.outputs.value }}
 
       - name: Cache Free Pascal (Linux)
         if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || steps.cache-libtcc.outputs.cache-hit != 'true')
@@ -333,15 +341,22 @@ jobs:
           }
           $global:LASTEXITCODE = 0
 
-      # Build reuse, same rule as the unix job. auto-save (rather than
-      # restore/save) matters here: the key must be the one evaluated at this
-      # point, before the build creates funcmd.exe under src/.
+      # Freeze both hashes before the build: a cache action's key is
+      # re-evaluated for its post-save step, and funcmd.exe lives under src/.
+      - name: Compute Windows build input hashes
+        id: src-hash
+        shell: pwsh
+        run: |
+          "value=${{ hashFiles('src/**') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "dlls=${{ hashFiles('src/prj/fun/pcre3.dll', 'src/prj/fun/ffi.dll') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      # Build reuse, same rule as the unix job.
       - name: Restore built funcmd.exe
         id: cache-funcmd-win
         uses: actions/cache@v4
         with:
           path: src\prj\fun\funcmd.exe
-          key: funcmd-win64-fpc-3.2.2-${{ hashFiles('src/**') }}-${{ hashFiles('src/prj/fun/pcre3.dll', 'src/prj/fun/ffi.dll') }}
+          key: funcmd-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
 
       - name: Restore FPC cache (Windows)
         if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
