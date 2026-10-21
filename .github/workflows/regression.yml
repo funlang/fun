@@ -82,8 +82,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Free Pascal (Linux)
+      # Build reuse: every input to the compiled interpreter is under src/
+      # (the make scripts pin the FPC flags and third-party versions), while
+      # fun/ is interpreted at run time. When src/ is unchanged - a
+      # Fun-code-only change - the toolchain install and the Pascal/C build
+      # are both skipped and the suite runs against the cached binary.
+      - name: Restore built funcmd
+        id: cache-funcmd
+        uses: actions/cache@v4
+        with:
+          path: src/prj/fun/funcmd
+          key: funcmd-${{ matrix.name }}-fpc-3.2.2-${{ hashFiles('src/**') }}
+
+      # libtcc.so is dlopen'd next to funcmd by lib-tcc.fun; it is a separate
+      # artifact on Linux only.
+      - name: Restore libtcc.so (Linux)
         if: runner.os == 'Linux'
+        id: cache-libtcc
+        uses: actions/cache@v4
+        with:
+          path: src/prj/fun/libtcc.so
+          key: libtcc-${{ matrix.name }}-${{ hashFiles('src/**') }}
+
+      - name: Cache Free Pascal (Linux)
+        if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || steps.cache-libtcc.outputs.cache-hit != 'true')
         id: cache-fpc
         uses: actions/cache@v4
         with:
@@ -93,7 +115,7 @@ jobs:
           key: ${{ matrix.fpc_tar }}
 
       - name: Install Free Pascal 3.2.2 (Linux)
-        if: runner.os == 'Linux' && steps.cache-fpc.outputs.cache-hit != 'true'
+        if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || steps.cache-libtcc.outputs.cache-hit != 'true') && steps.cache-fpc.outputs.cache-hit != 'true'
         run: |
           set -e
           cd "$RUNNER_TEMP"
@@ -106,7 +128,7 @@ jobs:
           printf '%s\n\n\n\n\n\n\n\n\n\n' "$HOME/fpc-3.2.2" | ./install.sh
 
       - name: Put fpc on PATH (Linux)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || steps.cache-libtcc.outputs.cache-hit != 'true')
         run: echo "$HOME/fpc-3.2.2/bin" >> "$GITHUB_PATH"
 
       - name: Install OpenSSL (lib-crypto tests)
@@ -122,7 +144,7 @@ jobs:
           fi
 
       - name: Cache FPC installer dmg (macOS Intel)
-        if: runner.os == 'macOS' && runner.arch == 'X64'
+        if: runner.os == 'macOS' && runner.arch == 'X64' && steps.cache-funcmd.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
           path: ~/fpc-cache
@@ -132,7 +154,7 @@ jobs:
       # a hit only needs `brew link` to recreate the /opt/homebrew/bin
       # symlinks, which skips the bottle pour entirely.
       - name: Cache FPC 3.2.2 bottle install (macOS arm64)
-        if: runner.os == 'macOS' && runner.arch == 'ARM64'
+        if: runner.os == 'macOS' && runner.arch == 'ARM64' && steps.cache-funcmd.outputs.cache-hit != 'true'
         id: cache-fpc-macos-arm64
         uses: actions/cache@v4
         with:
@@ -149,7 +171,7 @@ jobs:
           key: brew-downloads-${{ runner.arch }}
 
       - name: Install Free Pascal 3.2.2 (macOS)
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.cache-funcmd.outputs.cache-hit != 'true'
         run: |
           set -e
           if [ "$(uname -m)" = "arm64" ]; then
@@ -219,6 +241,7 @@ jobs:
         run: brew link --force --overwrite openssl@3 || brew install openssl@3
 
       - name: Cache third-party C sources
+        if: steps.cache-funcmd.outputs.cache-hit != 'true' || (runner.os == 'Linux' && steps.cache-libtcc.outputs.cache-hit != 'true')
         id: cache-third
         uses: actions/cache@v4
         with:
@@ -226,7 +249,7 @@ jobs:
           key: third-party-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/prj/fun/fetch-3rd-party.sh') }}
 
       - name: Fetch third-party C sources
-        if: steps.cache-third.outputs.cache-hit != 'true'
+        if: (steps.cache-funcmd.outputs.cache-hit != 'true' || (runner.os == 'Linux' && steps.cache-libtcc.outputs.cache-hit != 'true')) && steps.cache-third.outputs.cache-hit != 'true'
         run: |
           if [ "${{ matrix.fetch_all }}" = "true" ]; then
             src/prj/fun/fetch-3rd-party.sh
@@ -235,6 +258,7 @@ jobs:
           fi
 
       - name: Build funcmd
+        if: steps.cache-funcmd.outputs.cache-hit != 'true' || (runner.os == 'Linux' && steps.cache-libtcc.outputs.cache-hit != 'true')
         working-directory: src/prj/fun
         run: |
           log="$RUNNER_TEMP/build-${{ matrix.name }}.log"
@@ -246,6 +270,16 @@ jobs:
             exit 1
           fi
           tail -n 5 "$log"
+
+      # The build itself copies these into fun/; a cache hit has to do it too,
+      # because input-console.sh prefers fun/funcmd when it exists.
+      - name: Publish cached funcmd to fun/
+        if: steps.cache-funcmd.outputs.cache-hit == 'true'
+        run: |
+          cp -f src/prj/fun/funcmd fun/funcmd
+          if [ -f src/prj/fun/libtcc.so ]; then
+            cp -f src/prj/fun/libtcc.so fun/libtcc.so
+          fi
 
       - name: Regression
         env:
@@ -260,7 +294,57 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The helper DLLs feed the interpreter build, so restore them first: the
+      # funcmd.exe key records which capabilities the cached binary has. Both
+      # caches live before the toolchain so a full hit skips FPC as well.
+      - name: Restore pcre3.dll (win64)
+        id: cache-pcre-win
+        uses: actions/cache/restore@v4
+        with:
+          path: src\prj\fun\pcre3.dll
+          key: win64-pcre3-pcre-8.45-v1
+
+      - name: Restore ffi.dll (win64)
+        id: cache-ffi-win
+        uses: actions/cache/restore@v4
+        with:
+          path: src\prj\fun\ffi.dll
+          key: win64-ffi-fpc-3.2.2-v1
+
+      - name: Restore libffitest.dll (win64)
+        id: cache-libffitest-win
+        uses: actions/cache/restore@v4
+        with:
+          path: fun\test\ffi\libffitest.dll
+          key: win64-libffitest-v1
+
+      - name: Mark cached win64 helper DLLs
+        shell: pwsh
+        run: |
+          # GITHUB_ENV is not part of a cache, so set the feature flags from
+          # whichever DLLs the restore above actually produced.
+          if (Test-Path 'src\prj\fun\pcre3.dll') {
+            "FUN_PCRE_DLL=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host "pcre3.dll restored from cache"
+          }
+          if (Test-Path 'src\prj\fun\ffi.dll') {
+            "FUN_FFI_DLL=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+            Write-Host "ffi.dll restored from cache"
+          }
+          $global:LASTEXITCODE = 0
+
+      # Build reuse, same rule as the unix job. auto-save (rather than
+      # restore/save) matters here: the key must be the one evaluated at this
+      # point, before the build creates funcmd.exe under src/.
+      - name: Restore built funcmd.exe
+        id: cache-funcmd-win
+        uses: actions/cache@v4
+        with:
+          path: src\prj\fun\funcmd.exe
+          key: funcmd-win64-fpc-3.2.2-${{ hashFiles('src/**') }}-${{ hashFiles('src/prj/fun/pcre3.dll', 'src/prj/fun/ffi.dll') }}
+
       - name: Restore FPC cache (Windows)
+        if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
         id: cache-fpc-win
         uses: actions/cache/restore@v4
         with:
@@ -268,7 +352,7 @@ jobs:
           key: fpc-3.2.2-win64-and-cross
 
       - name: Install Free Pascal 3.2.2 (win32 + win64)
-        if: steps.cache-fpc-win.outputs.cache-hit != 'true'
+        if: steps.cache-funcmd-win.outputs.cache-hit != 'true' && steps.cache-fpc-win.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -313,6 +397,7 @@ jobs:
           }
 
       - name: Put FPC on PATH (Windows)
+        if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           # Runs for both a fresh install and a cache restore: PATH itself is not
@@ -348,51 +433,11 @@ jobs:
         # on the bring-up tests, so save explicitly - before the build/regression
         # steps, while everything above has succeeded (a failed install never
         # poisons the cache).
-        if: steps.cache-fpc-win.outputs.cache-hit != 'true'
+        if: steps.cache-funcmd-win.outputs.cache-hit != 'true' && steps.cache-fpc-win.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: C:\FPC
           key: fpc-3.2.2-win64-and-cross
-
-      # The three helper DLLs below are pure build artifacts of pinned inputs
-      # (PCRE 8.45, FPC 3.2.2's libffi, our libffitest.c). Cache each one
-      # separately: a hit skips the download + gcc/pacman work (about 18s per
-      # run), and one best-effort build failing never poisons another's cache.
-      - name: Restore pcre3.dll (win64)
-        id: cache-pcre-win
-        uses: actions/cache/restore@v4
-        with:
-          path: src\prj\fun\pcre3.dll
-          key: win64-pcre3-pcre-8.45-v1
-
-      - name: Restore ffi.dll (win64)
-        id: cache-ffi-win
-        uses: actions/cache/restore@v4
-        with:
-          path: src\prj\fun\ffi.dll
-          key: win64-ffi-fpc-3.2.2-v1
-
-      - name: Restore libffitest.dll (win64)
-        id: cache-libffitest-win
-        uses: actions/cache/restore@v4
-        with:
-          path: fun\test\ffi\libffitest.dll
-          key: win64-libffitest-v1
-
-      - name: Mark cached win64 helper DLLs
-        shell: pwsh
-        run: |
-          # GITHUB_ENV is not part of a cache, so set the feature flags from
-          # whichever DLLs the restore above actually produced.
-          if (Test-Path 'src\prj\fun\pcre3.dll') {
-            "FUN_PCRE_DLL=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            Write-Host "pcre3.dll restored from cache"
-          }
-          if (Test-Path 'src\prj\fun\ffi.dll') {
-            "FUN_FFI_DLL=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-            Write-Host "ffi.dll restored from cache"
-          }
-          $global:LASTEXITCODE = 0
 
       - name: Build pcre3.dll for win64 (regex, best effort)
         if: steps.cache-pcre-win.outputs.cache-hit != 'true'
@@ -607,6 +652,7 @@ jobs:
           key: win64-libffitest-v1
 
       - name: Build funcmd.exe
+        if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
         working-directory: src\prj\fun
         shell: pwsh
         run: |
