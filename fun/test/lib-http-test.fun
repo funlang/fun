@@ -3,6 +3,8 @@
 // every assertion prints a boolean -- a stable snapshot with no external
 // client.
 use 'fun/lib/http-server.fun';
+use 'fun/lib/http-auth.fun';
+use 'fun/lib/lib-base64.fun';
 
 fun hasRe(s, re)
   result = false;
@@ -95,6 +97,85 @@ fun badHeaderH(req, res)
   res.text('bad');
 end fun;
 
+var users = new [];
+var ua = new [];
+ua['pass'] = 'secret';
+ua['name'] = 'alice';
+ua['roles'] = new [];
+ua['roles']['admin'] = true;
+users['alice'] = ua;
+
+var ub = new [];
+ub['pass'] = 'p:a';
+ub['name'] = 'bob';
+ub['roles'] = new [];
+users['bob'] = ub;
+
+fun verifyBasic(req, c)
+  var u = users[c['user']];
+  if u = nil or u['pass'] <> c['pass'] then
+    result = false;
+    return;
+  end if;
+  var p = new [];
+  p['ok'] = true;
+  p['user'] = u['name'];
+  p['roles'] = u['roles'];
+  result = p;
+end fun;
+
+fun verifyBlocked(req, c)
+  if c['user'] = 'blocked' then
+    var r = new [];
+    r['status'] = 403;
+    r['message'] = 'blocked by policy';
+    var hs = new [];
+    hs['X-Reason'] = 'policy';
+    r['headers'] = hs;
+    result = r;
+  else
+    result = verifyBasic(req, c);
+  end if;
+end fun;
+
+fun verifyTrue(req, c)
+  result = true;
+end fun;
+
+fun verifyCustom(req, c)
+  var r = new [];
+  r['status'] = 401;
+  r['message'] = 'custom unauthorized';
+  var hs = new [];
+  hs['WWW-Authenticate'] = 'Basic realm="custom"';
+  r['headers'] = hs;
+  result = r;
+end fun;
+
+fun defaultWho(req, res)
+  res.json([user: req.auth['user'], scheme: req.auth['scheme']]);
+end fun;
+
+fun secureMe(req, res)
+  res.json([user: req.auth['user'], admin: req.auth['roles']['admin']]);
+end fun;
+
+fun optionalWho(req, res)
+  if req.auth = nil then
+    res.text('anonymous');
+  else
+    res.text('user:' & req.auth['user']);
+  end if;
+end fun;
+
+fun rawWho(req, res)
+  if req.credentials = nil then
+    res.text('no-cred');
+  else
+    res.text('user:' & req.credentials['user']);
+  end if;
+end fun;
+
 fun boom(req, res)
   raise 'kaboom';
 end fun;
@@ -115,6 +196,24 @@ s.get('/clearcookie', clearCookieH);
 s.get('/multi', multiH);
 s.get('/badheader', badHeaderH);
 s.get('/boom', boom);
+var secure = s.group('/secure');
+secure.Use(HttpBasicAuth(verifyBasic, [realm: 'api']));
+secure.get('/me', secureMe);
+var opt = s.group('/opt');
+opt.Use(HttpBasicAuth(verifyBasic, [realm: 'opt', optional: true]));
+opt.get('/who', optionalWho);
+var raw = s.group('/raw');
+raw.Use(HttpBasicAuth());
+raw.get('/who', rawWho);
+var blocked = s.group('/blocked');
+blocked.Use(HttpBasicAuth(verifyBlocked, [realm: 'blocked']));
+blocked.get('/me', secureMe);
+var dflt = s.group('/default');
+dflt.Use(HttpBasicAuth(verifyTrue, [realm: 'def']));
+dflt.get('/who', defaultWho);
+var cust = s.group('/custom');
+cust.Use(HttpBasicAuth(verifyCustom, [realm: 'ignored']));
+cust.get('/me', hello);
 var api = s.group('/api');
 api.Use(authMw);
 api.get('/orders', ordersH);
@@ -285,7 +384,109 @@ var r20 = RecvSome(c20, 4096);
 CloseSocket(c20);
 
 //--------------------------------------------------------------
-// 10. address strings: 'ip:port' and ':port' (all interfaces)
+// 10. Basic auth middleware
+//--------------------------------------------------------------
+var goodB64 = Str2Base64('alice:secret');
+var c21 = rq(p, 'GET /secure/me HTTP/1.1\r\nHost: t\r\nAuthorization: Basic ' & goodB64 & '\r\n\r\n');
+pump(s, 5);
+var r21 = RecvSome(c21, 4096);
+?. 'auth ok 200: ' & hasRe(r21, %^HTTP/1\.1\x20200%);
+?. 'auth user: ' & hasRe(r21, %"user":"alice"%);
+?. 'auth role: ' & hasRe(r21, %"admin":true%);
+CloseSocket(c21);
+
+var c22 = getReq(p, '/secure/me');
+pump(s, 5);
+var r22 = RecvSome(c22, 4096);
+?. 'auth missing 401: ' & hasRe(r22, %^HTTP/1\.1\x20401%);
+?. 'auth challenge: ' & hasRe(r22, %WWW-Authenticate:\x20Basic\x20realm="api"%);
+CloseSocket(c22);
+
+var badB64 = Str2Base64('alice:wrong');
+var c23 = rq(p, 'GET /secure/me HTTP/1.1\r\nHost: t\r\nAuthorization: Basic ' & badB64 & '\r\n\r\n');
+pump(s, 5);
+var r23 = RecvSome(c23, 4096);
+?. 'auth wrong 401: ' & hasRe(r23, %^HTTP/1\.1\x20401%);
+CloseSocket(c23);
+
+var blockB64 = Str2Base64('blocked:x');
+var c24 = rq(p, 'GET /blocked/me HTTP/1.1\r\nHost: t\r\nAuthorization: Basic ' & blockB64 & '\r\n\r\n');
+pump(s, 5);
+var r24 = RecvSome(c24, 4096);
+?. 'auth blocked 403: ' & hasRe(r24, %^HTTP/1\.1\x20403%);
+?. 'auth blocked header: ' & hasRe(r24, %X-Reason:\x20policy%);
+?. 'auth blocked body: ' & hasRe(r24, %blocked\x20by\x20policy%);
+CloseSocket(c24);
+
+var c25 = getReq(p, '/opt/who');
+pump(s, 5);
+var r25 = RecvSome(c25, 4096);
+?. 'auth optional anonymous: ' & hasRe(r25, %\r\n\r\nanonymous$%);
+CloseSocket(c25);
+
+var c26 = rq(p, 'GET /opt/who HTTP/1.1\r\nHost: t\r\nAuthorization: Basic ' & goodB64 & '\r\n\r\n');
+pump(s, 5);
+var r26 = RecvSome(c26, 4096);
+?. 'auth optional user: ' & hasRe(r26, %\r\n\r\nuser:alice$%);
+CloseSocket(c26);
+
+var c26b = rq(p, 'GET /opt/who HTTP/1.1\r\nHost: t\r\nAuthorization: Basic !!!\r\n\r\n');
+pump(s, 5);
+var r26b = RecvSome(c26b, 4096);
+?. 'auth optional bad 401: ' & hasRe(r26b, %^HTTP/1\.1\x20401%);
+CloseSocket(c26b);
+
+var c27 = getReq(p, '/raw/who');
+pump(s, 5);
+var r27 = RecvSome(c27, 4096);
+?. 'auth parse-only empty: ' & hasRe(r27, %\r\n\r\nno-cred$%);
+CloseSocket(c27);
+
+var c28 = rq(p, 'GET /raw/who HTTP/1.1\r\nHost: t\r\nAuthorization: Basic ' & goodB64 & '\r\n\r\n');
+pump(s, 5);
+var r28 = RecvSome(c28, 4096);
+?. 'auth parse-only user: ' & hasRe(r28, %\r\n\r\nuser:alice$%);
+CloseSocket(c28);
+
+var c29 = rq(p, 'GET /secure/me HTTP/1.1\r\nHost: t\r\nAuthorization: Basic !!!\r\n\r\n');
+pump(s, 5);
+var r29 = RecvSome(c29, 4096);
+?. 'auth malformed 401: ' & hasRe(r29, %^HTTP/1\.1\x20401%);
+CloseSocket(c29);
+
+var c30 = rq(p, 'GET /secure/me HTTP/1.1\r\nHost: t\r\nAuthorization: basic ' & goodB64 & '\r\n\r\n');
+pump(s, 5);
+var r30 = RecvSome(c30, 4096);
+?. 'auth lower scheme 200: ' & hasRe(r30, %^HTTP/1\.1\x20200%);
+CloseSocket(c30);
+
+var bobB64 = Str2Base64('bob:p:a');
+var c31 = rq(p, 'GET /secure/me HTTP/1.1\r\nHost: t\r\nAuthorization: Basic ' & bobB64 & '\r\n\r\n');
+pump(s, 5);
+var r31 = RecvSome(c31, 4096);
+?. 'auth colon pass 200: ' & hasRe(r31, %^HTTP/1\.1\x20200%);
+?. 'auth colon user: ' & hasRe(r31, %"user":"bob"%);
+CloseSocket(c31);
+
+var c32 = rq(p, 'GET /default/who HTTP/1.1\r\nHost: t\r\nAuthorization: Basic ' & goodB64 & '\r\n\r\n');
+pump(s, 5);
+var r32 = RecvSome(c32, 4096);
+?. 'auth default true 200: ' & hasRe(r32, %^HTTP/1\.1\x20200%);
+?. 'auth default user: ' & hasRe(r32, %"user":"alice"%);
+?. 'auth default scheme: ' & hasRe(r32, %"scheme":"basic"%);
+CloseSocket(c32);
+
+var customB64 = Str2Base64('custom:x');
+var c33 = rq(p, 'GET /custom/me HTTP/1.1\r\nHost: t\r\nAuthorization: Basic ' & customB64 & '\r\n\r\n');
+pump(s, 5);
+var r33 = RecvSome(c33, 4096);
+?. 'auth custom 401: ' & hasRe(r33, %^HTTP/1\.1\x20401%);
+?. 'auth custom challenge: ' & hasRe(r33, %WWW-Authenticate:\x20Basic\x20realm="custom"%);
+?. 'auth custom body: ' & hasRe(r33, %custom\x20unauthorized%);
+CloseSocket(c33);
+
+//--------------------------------------------------------------
+// 11. address strings: 'ip:port' and ':port' (all interfaces)
 //--------------------------------------------------------------
 var s2 = HttpServer('127.0.0.1:0');
 ?. 'addr ip:port: ' & (s2.listen() > 0);
