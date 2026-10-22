@@ -52,6 +52,13 @@
 //   * Windows: the winsock backend has no RunOnce/Run and its Start takes
 //     (hwnd, message), so listen()/runOnce()/run() here run on Linux and
 //     macOS today; wiring the Windows message-pump driver is a follow-up.
+//
+// Request/response API:
+//   * req.query(k) and req.form() are URL-decoded; req.form() parses
+//     application/x-www-form-urlencoded bodies on demand.
+//   * req.cookies / req.cookie(k) read the Cookie header.
+//   * res.cookie(name, value, opts) / res.clearCookie(name, opts) write
+//     Set-Cookie; res.addHeader(k, v) appends multi-value headers.
 
 use 'lib-winsock.fun';
 use 'lib-regex.fun';
@@ -89,18 +96,157 @@ fun _segments(p)
   if cur <> '' then result.@add(cur); end if;
 end fun;
 
+fun _hexVal(c)
+  result = '0123456789abcdef'.subpos(c.lower());
+end fun;
+
+// %XX and '+' (form/query encoding); invalid escapes stay literal
+fun _urlDecode(s)
+  var out = '';
+  var i = 0;
+  while i < s.length() do
+    var c = s.substr(i, 1);
+    if c = '+' then
+      out &= ' ';
+      i += 1;
+    elsif c = '%' and i + 2 < s.length() then
+      var hi = _hexVal(s.substr(i + 1, 1));
+      var lo = _hexVal(s.substr(i + 2, 1));
+      if hi >= 0 and lo >= 0 then
+        out &= (hi * 16 + lo).toChar();
+        i += 3;
+      else
+        out &= c;
+        i += 1;
+      end if;
+    else
+      out &= c;
+      i += 1;
+    end if;
+  end do;
+  result = out;
+end fun;
+
 fun _querySet(q)
   result = new [];
   for pair in split(/&/, q) do
     if pair <> '' then
       var i = pair.subpos('=');
       if i < 0 then
-        result[pair] = '';
+        result[_urlDecode(pair)] = '';
       else
-        result[pair.substr(0, i)] = pair.substr(i + 1);
+        result[_urlDecode(pair.substr(0, i))] = _urlDecode(pair.substr(i + 1));
       end if;
     end if;
   end do;
+end fun;
+
+// Cookie: a=1; b=2 (values may be quoted)
+fun _cookieSet(h)
+  result = new [];
+  if h = nil or h = '' then return; end if;
+  for part in split(/;/, h) do
+    var p = _trim(part);
+    if p <> '' then
+      var i = p.subpos('=');
+      if i > 0 then
+        var k = _trim(p.substr(0, i));
+        var v = _trim(p.substr(i + 1));
+        if v.length() >= 2 and v.substr(0, 1) = '"' and v.substr(v.length() - 1, 1) = '"' then
+          v = v.substr(1, v.length() - 2);
+        end if;
+        result[k] = v;
+      end if;
+    end if;
+  end do;
+end fun;
+
+fun _hasCtl(s)
+  result = s.subpos(13.toChar()) >= 0 or s.subpos(10.toChar()) >= 0;
+end fun;
+
+fun _checkHeader(k, v)
+  var ks = '' & k;
+  var vs = '' & v;
+  if ks = '' or _hasCtl(ks) or ks.subpos(':') >= 0 then
+    raise 'http-server: invalid header name or value';
+  end if;
+  if _hasCtl(vs) then
+    raise 'http-server: invalid header name or value';
+  end if;
+end fun;
+
+// names: RFC token-ish; values: no control/separator characters
+fun _cookieOk(s, isName)
+  result = false;
+  if _hasCtl(s) then return; end if;
+  if isName and s = '' then return; end if;
+  if isName then
+    if s.subpos('=') >= 0 or s.subpos(';') >= 0 or s.subpos(',') >= 0 or
+       s.subpos(' ') >= 0 or s.subpos(9.toChar()) >= 0 then return; end if;
+  else
+    if s.subpos(';') >= 0 or s.subpos(',') >= 0 or s.subpos(' ') >= 0 or
+       s.subpos(9.toChar()) >= 0 or s.subpos('"') >= 0 then return; end if;
+  end if;
+  result = true;
+end fun;
+
+fun _checkAttr(v)
+  var s = '' & v;
+  if _hasCtl(s) or s.subpos(';') >= 0 then
+    raise 'http-server: invalid cookie attribute';
+  end if;
+end fun;
+
+fun _cookieLine(name, value, opts, clear)
+  var n = '' & name;
+  var v = '' & value;
+  if not _cookieOk(n, true) or not _cookieOk(v, false) then
+    raise 'http-server: invalid cookie name or value';
+  end if;
+  var o = opts;
+  if o = nil then o = new []; end if;
+  var line = n & '=' & v;
+  var path = o['path'];
+  if path <> nil and path <> '' then
+    _checkAttr(path);
+    line &= '; Path=' & path;
+  end if;
+  var domain = o['domain'];
+  if domain <> nil and domain <> '' then
+    _checkAttr(domain);
+    line &= '; Domain=' & domain;
+  end if;
+  if clear then
+    line &= '; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  else
+    var ma = o['maxAge'];
+    if ma <> nil then
+      _checkAttr(ma);
+      line &= '; Max-Age=' & ma;
+    end if;
+    var ex = o['expires'];
+    if ex <> nil and ex <> '' then
+      _checkAttr(ex);
+      line &= '; Expires=' & ex;
+    end if;
+    if o['httpOnly'] then line &= '; HttpOnly'; end if;
+    if o['secure'] then line &= '; Secure'; end if;
+    var ss = o['sameSite'];
+    if ss <> nil and ss <> '' then
+      var sl = ss.lower();
+      if sl = 'lax' then
+        line &= '; SameSite=Lax';
+      elsif sl = 'strict' then
+        line &= '; SameSite=Strict';
+      elsif sl = 'none' then
+        line &= '; SameSite=None';
+      else
+        raise 'http-server: invalid SameSite value';
+      end if;
+    end if;
+  end if;
+  result = line;
 end fun;
 
 fun _joinList(a, b)
@@ -195,6 +341,8 @@ class HttpReq()
   var params = nil;      // :name matches (filled by the router)
   var queryS = nil;      // set: query parameters
   var headS  = nil;      // set: lowercased header names
+  var cookies = nil;     // set: request cookies
+  var formS  = nil;      // set: urlencoded form, parsed on demand
 
   fun header(k)
     result = headS[k.lower()];
@@ -202,6 +350,21 @@ class HttpReq()
 
   fun query(k)
     result = queryS[k];
+  end fun;
+
+  fun cookie(k)
+    result = cookies[k];
+  end fun;
+
+  fun form()
+    if formS = nil then
+      formS = new [];
+      var ct = header('content-type') or '';
+      if ct.lower().subpos('application/x-www-form-urlencoded') = 0 then
+        formS = _querySet(body);
+      end if;
+    end if;
+    result = formS;
   end fun;
 
   fun param(k)
@@ -226,7 +389,30 @@ class HttpRes()
   end fun;
 
   fun header(k, v)
+    _checkHeader(k, v);
     hdrs[k] = v;
+    result = this;
+  end fun;
+
+  // Append another line for the same header name (Set-Cookie, Vary, ...).
+  // Values are validated, so the embedded CRLF cannot come from input.
+  fun addHeader(k, v)
+    _checkHeader(k, v);
+    if hdrs[k] = nil then
+      hdrs[k] = v;
+    else
+      hdrs[k] = hdrs[k] & 13.toChar() & 10.toChar() & k & ': ' & v;
+    end if;
+    result = this;
+  end fun;
+
+  fun cookie(name, value, opts)
+    addHeader('Set-Cookie', _cookieLine(name, value, opts, false));
+    result = this;
+  end fun;
+
+  fun clearCookie(name, opts)
+    addHeader('Set-Cookie', _cookieLine(name, '', opts, true));
     result = this;
   end fun;
 
@@ -258,8 +444,8 @@ class HttpRes()
   end fun;
 
   fun redirect(url, c)
-    code  = c or 302;
-    hdrs['Location'] = url;
+    code = c or 302;
+    header('Location', url);
     result = this.send('');
   end fun;
 end class;
@@ -453,6 +639,7 @@ class HttpServer(addr)
     r.headS  = new [];
     r.queryS = new [];
     r.params = new [];
+    r.cookies = new [];
 
     var lines = split(/\r?\n/, header);
     if lines.@count() > 0 then
@@ -470,6 +657,7 @@ class HttpServer(addr)
         end if;
       end if;
     end do;
+    r.cookies = _cookieSet(r.headS['cookie']);
 
     var qi = req.subpos('?');
     if qi >= 0 then
