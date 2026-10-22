@@ -41,6 +41,8 @@
 //     // or: var port = s.listen(); ... s.runOnce(200) to drive yourself
 //
 // Notes:
+//   * middleware is a function (req, res, nx) or a stateful object with a
+//     run(req, res, nx) method; Use accepts either form.
 //   * the middleware continuation parameter is named `nx` because `next`
 //     (like `step`) is reserved by the language.
 //   * routing rules: literal segments beat `:name` parameters, which beat the
@@ -319,12 +321,19 @@ fun _scorePath(pat)
   result = sc;
 end fun;
 
-// run the middleware chain, then the handler; nx is a zero-argument thunk
+// run the middleware chain, then the handler; nx is a zero-argument thunk.
+// A middleware is a function (req, res, nx) or an object with a run method
+// (stateful middleware such as auth options).
 fun _runChain(mws, i, req, res, h)
   if mws = nil or i >= mws.@count() then
     h(req, res);
   else
-    mws[i](req, res, -> _runChain(mws, i + 1, req, res, h));
+    var m = mws[i];
+    if m.run <> nil then
+      m.run(req, res, -> _runChain(mws, i + 1, req, res, h));
+    else
+      m(req, res, -> _runChain(mws, i + 1, req, res, h));
+    end if;
   end if;
 end fun;
 

@@ -1,3 +1,4 @@
+LOAD  http-auth
 LOAD  http-client
 LOAD  http-server
 LOAD  lib-ado-schema
@@ -64,4 +65,4 @@ LOAD  lib-zlib
 LOAD  test
 LOAD  uuid
 
-loaded=59 failed=6
+loaded=60 failed=6

@@ -32,6 +32,30 @@ cookie cleared: True
 multi header: True
 bad header 500: True
 bad header message: True
+auth ok 200: True
+auth user: True
+auth role: True
+auth missing 401: True
+auth challenge: True
+auth wrong 401: True
+auth blocked 403: True
+auth blocked header: True
+auth blocked body: True
+auth optional anonymous: True
+auth optional user: True
+auth optional bad 401: True
+auth parse-only empty: True
+auth parse-only user: True
+auth malformed 401: True
+auth lower scheme 200: True
+auth colon pass 200: True
+auth colon user: True
+auth default true 200: True
+auth default user: True
+auth default scheme: True
+auth custom 401: True
+auth custom challenge: True
+auth custom body: True
 addr ip:port: True
 addr :port: True
 ok
