@@ -39,7 +39,7 @@
 In one sentence: **Fun is a scripting language that goes all the way from JSON to machine code.**
 
 - One runtime spans the whole spectrum, from high-level data work (JSON/FD) down to low-level system programming (FFI, C at runtime, JIT, machine code);
-- 65 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
+- 66 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
 - in AI-agent and domestic-IT scenarios, it is the lightweight glue connecting OSes, databases, chips, and business logic.
 
 Fun is designed around a simple premise: **data and code should be equally first-class, and a script should be able to reach down to the machine without leaving the language.**
@@ -70,7 +70,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
 - **Cross-platform** — Windows (32/64-bit), Linux, ARM, and Windows CE.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
-- **Self-hosted standard library** — 65 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
+- **Self-hosted standard library** — 66 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
 ---
 
@@ -372,7 +372,7 @@ fun/
 │   ├── utils/         # Utility functions
 │   └── prj/fun/       # Projects & build scripts (funcmd.dpr, Delphi/FPC)
 ├── fun/
-│   ├── lib/           # Standard library (pure Fun, 65 modules)
+│   ├── lib/           # Standard library (pure Fun, 66 modules)
 │   ├── demo/          # Language syntax demos
 │   ├── demos/         # Full applications & benchmarks
 │   └── key_*.ini      # Keyword alias packs (CN / FR / PUA)
@@ -497,16 +497,16 @@ win64/aarch64 target, so there is nothing to build with.
 
 ## Standard library
 
-The standard library in [`fun/lib`](fun/lib) is written in pure Fun (65 modules):
+The standard library in [`fun/lib`](fun/lib) is written in pure Fun (66 modules):
 
-> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 65 modules written in Fun itself.
+> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 66 modules written in Fun itself.
 
 - **Data**: `lib-json`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`
 - **Utility**: `uuid`
 - **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`
 - **Text**: `lib-string`, `lib-regex`, `lib-match`, `lib-unicode`
 - **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-time`, `lib-cmdline`, `lib-proc`
-- **Network**: `lib-winsock`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-cors`
+- **Network**: `lib-winsock`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`
 - **Databases**: `lib-orm`, `lib-orm-pro`, `lib-orm-gen`, `lib-orm-rpc`, `lib-orm-cte`, `lib-ado`, `lib-ado-schema`
 - **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`
 - **UI**: `lib-ui`, `lib-ui-base`, `lib-dialog`, `lib-trayicon`
@@ -532,6 +532,7 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (65 modules)
 - [`fun/demos/package-demo`](fun/demos/package-demo) — a small package with a path dependency: `tidy`, `run` (project and flat mode), and `pack`.
 - [`fun/demos/test-demo`](fun/demos/test-demo) — a lib-only package with tests, a shared helper, and a failing-assertion example.
 - [`fun/demos/http-cors-demo`](fun/demos/http-cors-demo) — CORS preflight, credentials, exposed headers, and a browser page.
+- [`fun/demos/http-bearer-demo`](fun/demos/http-bearer-demo) — Bearer token auth, 401 challenges, and a same-origin page.
 
 ---
 

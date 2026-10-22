@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fun Bearer demo</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 760px; padding: 0 1rem; }
+    input { padding: .4rem; width: 16rem; }
+    button { margin: 0 .5rem .5rem 0; padding: .4rem .8rem; }
+    pre { background: #f4f4f4; padding: 1rem; overflow: auto; white-space: pre-wrap; }
+    code { background: #eee; padding: .1rem .3rem; }
+  </style>
+</head>
+<body>
+  <h1>Fun Bearer demo</h1>
+  <p>API and page share <code>http://127.0.0.1:8080</code>; no CORS is involved.</p>
+  <p>
+    Token: <input id="token" value="demo-token">
+  </p>
+  <button id="public">GET /api/public</button>
+  <button id="me">GET /api/me</button>
+  <button id="bad">GET /api/me (bad token)</button>
+  <pre id="out">Click a button.</pre>
+
+  <script>
+    const out = document.getElementById('out');
+    const token = document.getElementById('token');
+
+    async function show(label, path, auth) {
+      out.textContent = label + ' ...';
+      const headers = {};
+      if (auth) headers['Authorization'] = 'Bearer ' + auth;
+      try {
+        const r = await fetch(path, { headers });
+        const body = await r.text();
+        out.textContent =
+          label + '\n' +
+          'status: ' + r.status + '\n' +
+          'WWW-Authenticate: ' + (r.headers.get('WWW-Authenticate') || '(none)') + '\n\n' +
+          body;
+      } catch (e) {
+        out.textContent = label + '\nfetch error: ' + e;
+      }
+    }
+
+    document.getElementById('public').onclick = () =>
+      show('GET /api/public', '/api/public', null);
+
+    document.getElementById('me').onclick = () =>
+      show('GET /api/me (token)', '/api/me', token.value);
+
+    document.getElementById('bad').onclick = () =>
+      show('GET /api/me (bad)', '/api/me', 'wrong-token');
+  </script>
+</body>
+</html>

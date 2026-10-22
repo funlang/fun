@@ -1,4 +1,5 @@
 LOAD  http-auth
+LOAD  http-bearer
 LOAD  http-client
 LOAD  http-cors
 LOAD  http-server
@@ -66,4 +67,4 @@ LOAD  lib-zlib
 LOAD  test
 LOAD  uuid
 
-loaded=61 failed=6
+loaded=62 failed=6
