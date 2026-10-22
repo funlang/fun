@@ -281,7 +281,7 @@ var c7 = rq(p, 'DELETE / HTTP/1.1\r\nHost: t\r\n\r\n');
 pump(s, 5);
 var r7 = RecvSome(c7, 4096);
 ?. 'del 405: ' & hasRe(r7, %^HTTP/1\.1\x20405%);
-?. 'order untouched: ' & order;
+?. 'order after 405: ' & order;
 CloseSocket(c7);
 
 //--------------------------------------------------------------
