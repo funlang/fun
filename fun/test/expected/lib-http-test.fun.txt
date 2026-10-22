@@ -23,6 +23,15 @@ static miss 404: True
 traversal 404: True
 boom 500: True
 boom message: True
+query decoded: True
+form decoded: True
+cookies parsed: True
+cookie set sid: True
+cookie set theme: True
+cookie cleared: True
+multi header: True
+bad header 500: True
+bad header message: True
 addr ip:port: True
 addr :port: True
-ok
+ok

@@ -62,6 +62,39 @@ fun echoH(req, res)
   res.text('echo:' & req.body);
 end fun;
 
+fun queryH(req, res)
+  res.text('q=' & req.query('q') & ';z=' & req.query('z'));
+end fun;
+
+fun formH(req, res)
+  var f = req.form();
+  res.text('a=' & f['a'] & ';b=' & f['b']);
+end fun;
+
+fun cookiesH(req, res)
+  res.text(req.cookie('a') & ':' & req.cookie('b'));
+end fun;
+
+fun setCookiesH(req, res)
+  res.cookie('sid', 'abc', [path: '/', httpOnly: true, sameSite: 'Lax']);
+  res.cookie('theme', 'dark', [path: '/']);
+  res.text('cookies');
+end fun;
+
+fun clearCookieH(req, res)
+  res.clearCookie('sid', [path: '/']);
+  res.text('cleared');
+end fun;
+
+fun multiH(req, res)
+  res.addHeader('X-Multi', 'one').addHeader('X-Multi', 'two').text('multi');
+end fun;
+
+fun badHeaderH(req, res)
+  res.header('X-Bad', 'a' & 13.toChar() & 10.toChar() & 'X-Injected: b');
+  res.text('bad');
+end fun;
+
 fun boom(req, res)
   raise 'kaboom';
 end fun;
@@ -74,6 +107,13 @@ s.Use(mwA);
 s.get('/', hello);
 s.get('/users/:id', userH);
 s.post('/echo', echoH);
+s.get('/query', queryH);
+s.post('/form', formH);
+s.get('/cookies', cookiesH);
+s.get('/setcookies', setCookiesH);
+s.get('/clearcookie', clearCookieH);
+s.get('/multi', multiH);
+s.get('/badheader', badHeaderH);
 s.get('/boom', boom);
 var api = s.group('/api');
 api.Use(authMw);
@@ -197,7 +237,55 @@ var r13 = RecvSome(c13, 4096);
 CloseSocket(c13);
 
 //--------------------------------------------------------------
-// 9. address strings: 'ip:port' and ':port' (all interfaces)
+// 9. URL/form decoding, cookies and multi-value headers
+//--------------------------------------------------------------
+var c14 = getReq(p, '/query?q=hello%20world&z=a+b');
+pump(s, 5);
+var r14 = RecvSome(c14, 4096);
+?. 'query decoded: ' & hasRe(r14, %\r\n\r\nq=hello\x20world;z=a\x20b$%);
+CloseSocket(c14);
+
+var fbody = 'a=1&b=hello%20world';
+var c15 = rq(p, 'POST /form HTTP/1.1\r\nHost: t\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: ' & fbody.length() & '\r\n\r\n' & fbody);
+pump(s, 5);
+var r15 = RecvSome(c15, 4096);
+?. 'form decoded: ' & hasRe(r15, %\r\n\r\na=1;b=hello\x20world$%);
+CloseSocket(c15);
+
+var c16 = rq(p, 'GET /cookies HTTP/1.1\r\nHost: t\r\nCookie: a=1; b=two\r\n\r\n');
+pump(s, 5);
+var r16 = RecvSome(c16, 4096);
+?. 'cookies parsed: ' & hasRe(r16, %\r\n\r\n1:two$%);
+CloseSocket(c16);
+
+var c17 = getReq(p, '/setcookies');
+pump(s, 5);
+var r17 = RecvSome(c17, 4096);
+?. 'cookie set sid: ' & hasRe(r17, %Set-Cookie:\x20sid=abc;\x20Path=/;\x20HttpOnly;\x20SameSite=Lax%);
+?. 'cookie set theme: ' & hasRe(r17, %Set-Cookie:\x20theme=dark;\x20Path=/%);
+CloseSocket(c17);
+
+var c18 = getReq(p, '/clearcookie');
+pump(s, 5);
+var r18 = RecvSome(c18, 4096);
+?. 'cookie cleared: ' & hasRe(r18, %Set-Cookie:\x20sid=;\x20Path=/;\x20Max-Age=0%);
+CloseSocket(c18);
+
+var c19 = getReq(p, '/multi');
+pump(s, 5);
+var r19 = RecvSome(c19, 4096);
+?. 'multi header: ' & hasRe(r19, %X-Multi:\x20one\r\nX-Multi:\x20two%);
+CloseSocket(c19);
+
+var c20 = getReq(p, '/badheader');
+pump(s, 5);
+var r20 = RecvSome(c20, 4096);
+?. 'bad header 500: ' & hasRe(r20, %^HTTP/1\.1\x20500%);
+?. 'bad header message: ' & hasRe(r20, %invalid\x20header%);
+CloseSocket(c20);
+
+//--------------------------------------------------------------
+// 10. address strings: 'ip:port' and ':port' (all interfaces)
 //--------------------------------------------------------------
 var s2 = HttpServer('127.0.0.1:0');
 ?. 'addr ip:port: ' & (s2.listen() > 0);
