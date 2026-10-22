@@ -6,6 +6,34 @@
 
 ## [未发布]
 
+## [9.4.6] - 2026-10-22
+
+- 新增 `fun test` 包测试运行器。它查找项目根目录下所有 `*_test.fun`，每个
+  文件在独立子解释器中运行（可使用清单依赖），逐文件打印 `PASS`/`FAIL`，
+  任一失败即以非零码退出。测试用 `test('名称', { ... })` 注册代码块，并使用
+  新的 `test` 标准库模块；断言包括 `equal`、`not_equal`、`is_true`、
+  `is_false`、`match`、`contains`、`greater`、`less`、`is_nil`、`not_nil`、
+  `raises` 和 `fail`，均可附加消息。项目只需 `package.fun`，无需 `bin`；
+  会跳过 `dist/`、点目录和路径依赖目录。新增可运行的
+  `fun/demos/test-demo`。
+
+- 新增 `uuid` 标准库模块。`UUID()` 从操作系统 CSPRNG（Unix 用
+  `getentropy`，Windows 用 `RtlGenRandom`）生成 RFC 9562 版本 4 UUID，
+  无种子、无全局状态、无伪随机回退；系统随机源不可用时抛出异常。
+
+- `http-server` 新增 URL 解码的查询与表单访问（`req.query(k)`、
+  `req.form()`）、Cookie 读取（`req.cookies`、`req.cookie(k)`）与写入
+  （`res.cookie`、`res.clearCookie`），以及多值响应头
+  （`res.addHeader`）。
+
+- 新增 HTTP 认证与 CORS 中间件。`HttpBasicAuth`（RFC 7617）和
+  `HttpBearerAuth`（RFC 6750）接受 `verify(req, credentials)` 钩子，可返回
+  主体或自定义失败，并支持 `realm` 与 `optional` 选项。`HttpCors` 处理预检、
+  来源/方法/请求头策略、凭据、暴露头、缓存时间及动态 `originCheck`。新增
+  `http-cors-demo` 和 `http-bearer-demo` 示例。
+
+- 标准库现有 66 个模块，两个 README 均补充了测试流程说明。
+
 ## [9.4.5] - 2026-10-20
 
 - 新增基于清单的包管理。一个项目就是含 `package.fun` 清单的目录：

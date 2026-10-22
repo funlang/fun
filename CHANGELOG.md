@@ -6,6 +6,38 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.4.6] - 2026-10-22
+
+- Add `fun test`, a package test runner. It finds every `*_test.fun` below the
+  project root, runs each file in its own child interpreter with the manifest
+  dependencies available, prints `PASS`/`FAIL` per file, and exits non-zero
+  when any test fails. Tests register blocks with `test('name', { ... })` and
+  use the new `test` standard-library module; assertions include `equal`,
+  `not_equal`, `is_true`, `is_false`, `match`, `contains`, `greater`, `less`,
+  `is_nil`, `not_nil`, `raises`, and `fail`, each with an optional message.
+  A project needs `package.fun` but no `bin`; `dist/`, dot-directories, and
+  path dependencies are skipped. Add the runnable `fun/demos/test-demo`.
+
+- Add the `uuid` standard-library module. `UUID()` returns an RFC 9562
+  version-4 UUID from the OS CSPRNG (`getentropy` on Unix, `RtlGenRandom` on
+  Windows), with no seeding, global state, or pseudo-random fallback; it
+  raises when the OS source is unavailable.
+
+- Expand `http-server` with URL-decoded query and form access
+  (`req.query(k)`, `req.form()`), cookie reading (`req.cookies`,
+  `req.cookie(k)`) and writing (`res.cookie`, `res.clearCookie`), and
+  multi-value response headers (`res.addHeader`).
+
+- Add HTTP authentication and CORS middleware. `HttpBasicAuth` (RFC 7617)
+  and `HttpBearerAuth` (RFC 6750) take a `verify(req, credentials)` hook that
+  can return a principal or a custom failure, plus `realm` and `optional`
+  options. `HttpCors` handles preflight, origin/method/header policy,
+  credentials, exposed headers, max age, and a dynamic `originCheck`. Add the
+  `http-cors-demo` and `http-bearer-demo` examples.
+
+- The standard library is now 66 modules, and both READMEs document the
+  testing workflow.
+
 ## [9.4.5] - 2026-10-20
 
 - Add manifest-driven packages. A project is a directory with a `package.fun`
