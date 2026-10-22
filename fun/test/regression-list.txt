@@ -55,6 +55,7 @@ ptr-primitives.fun	test/ptr-primitives.fun	snap
 lib-func-check.fun	test/lib-func-check.fun	snap
 lib-hash-test.fun	test/lib-hash-test.fun	snap
 lib-http-test.fun	test/lib-http-test.fun	snap
+lib-http-cors-test.fun	test/lib-http-cors-test.fun	snap
 lib-proc-test.fun	test/lib-proc-test.fun	snap
 lib-unicode-test.fun	test/lib-unicode-test.fun	snap
 lib-bnf-dedup.fun	test/lib-bnf-dedup.fun	snap

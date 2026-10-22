@@ -10,12 +10,12 @@ head 405: True
 head allow: True
 post echo: True
 del 405: True
-order untouched: A><AA><AA><A
+order after 405: A><AA><AA><AA><AA><AA><AA><A
 api no-token 401: True
-order after 401: A><AA><AA><AA>a><A
+order after 401: A><AA><AA><AA><AA><AA><AA><AA>a><A
 api token 200: True
 api body: True
-order after 200: A><AA><AA><AA>a><AA>a><a<A
+order after 200: A><AA><AA><AA><AA><AA><AA><AA>a><AA>a><a<A
 static 200: True
 static ctype: True
 static body: True

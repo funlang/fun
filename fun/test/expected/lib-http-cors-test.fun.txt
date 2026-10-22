@@ -1,0 +1,42 @@
+cors preflight 204: True
+cors allow origin: True
+cors allow methods: True
+cors allow headers: True
+cors max age: True
+cors preflight vary: True
+cors lowercase preflight: True
+cors bad origin 403: True
+cors bad origin no acao: True
+cors bad method 403: True
+cors bad header 403: True
+cors actual 200: True
+cors actual acao: True
+cors actual expose: True
+cors actual vary: True
+cors second origin: True
+cors actual bad origin no acao: True
+cors explicit null origin: True
+cors vary merge: True
+cors no origin no acao: True
+cors 404 keeps acao: True
+cors 500 keeps acao: True
+cors 405 keeps acao: True
+cors preflight bypass auth: True
+cors preflight not 401: True
+cors 401 keeps acao: True
+cors preflight unknown path: True
+cors credentials acao: True
+cors credentials acac: True
+cors credentials preflight: True
+cors default wildcard: True
+cors default no credentials: True
+cors default preflight: True
+cors default reflect header: True
+cors origincheck allow: True
+cors origincheck deny: True
+cors origincheck preflight: True
+cors string origin: True
+cors options status 200: True
+cors max age zero: True
+cors wildcard credentials rejected: True
+ok

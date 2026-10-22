@@ -43,6 +43,9 @@
 // Notes:
 //   * middleware is a function (req, res, nx) or a stateful object with a
 //     run(req, res, nx) method; Use accepts either form.
+//   * HttpServer.Use runs before route matching (all requests, including
+//     404/405); HttpGroup.Use runs after a route matches. Put request-wide
+//     middleware such as CORS on the server, before authentication.
 //   * the middleware continuation parameter is named `nx` because `next`
 //     (like `step`) is reserved by the language.
 //   * routing rules: literal segments beat `:name` parameters, which beat the
@@ -335,6 +338,50 @@ fun _runChain(mws, i, req, res, h)
       m(req, res, -> _runChain(mws, i + 1, req, res, h));
     end if;
   end if;
+end fun;
+
+// route dispatch after the global middleware chain
+fun _dispatchFinal(req, res)
+  _dispatch(_HTTP_APP, req, res);
+end fun;
+
+fun _dispatch(app, req, res)
+  var segs = _segments(req.path);
+  var best = nil;
+  var bestSc = -1;
+  var allow = new [];
+  for rt in app.routes do
+    var ps = _matchPath(segs, rt.segs);
+    if ps <> nil then
+      if rt.method = req.method then
+        var sc = _scorePath(rt.segs);
+        if sc > bestSc then
+          best   = rt;
+          bestSc = sc;
+          req.params = ps;
+        end if;
+      else
+        allow.@add(rt.method);
+      end if;
+    end if;
+  end do;
+
+  if best = nil then
+    if allow.@count() > 0 then
+      var av = '';
+      for m in allow do
+        if av <> '' then av &= ', '; end if;
+        av &= m;
+      end do;
+      res.status(405).header('Allow', av).text('method not allowed');
+    else
+      res.status(404).text('not found');
+    end if;
+    return;
+  end if;
+
+  req.route = best;
+  _runChain(best.mws, 0, req, res, best.handler);
 end fun;
 
 //--------------------------------------------------------------
@@ -676,49 +723,13 @@ class HttpServer(addr)
       r.path = req;
     end if;
 
-    // pick the most specific route under this method
-    var segs = _segments(r.path);
-    var best = nil;
-    var bestSc = -1;
-    var allow = new [];
-    for rt in app.routes do
-      var ps = _matchPath(segs, rt.segs);
-      if ps <> nil then
-        if rt.method = r.method then
-          var sc = _scorePath(rt.segs);
-          if sc > bestSc then
-            best   = rt;
-            bestSc = sc;
-            r.params = ps;
-          end if;
-        else
-          allow.@add(rt.method);
-        end if;
-      end if;
-    end do;
-
     var res = HttpRes();
     res.sock   = sock;
     res.server = app.http;
     res.hdrs   = new [];
 
-    if best = nil then
-      if allow.@count() > 0 then
-        var av = '';
-        for m in allow do
-          if av <> '' then av &= ', '; end if;
-          av &= m;
-        end do;
-        res.status(405).header('Allow', av).text('method not allowed');
-      else
-        res.status(404).text('not found');
-      end if;
-      return;
-    end if;
-
-    r.route = best;
     try
-      _runChain(_joinList(app.mws, best.mws), 0, r, res, best.handler);
+      _runChain(app.mws, 0, r, res, _dispatchFinal);
     except
       if not res.sent then
         res.status(500).header('Content-Type', 'text/plain; charset=utf-8').send('Internal Error: ' & @);
