@@ -1,0 +1,36 @@
+bearer ok 200: True
+bearer sub: True
+bearer scheme: True
+bearer no token in auth: True
+bearer credentials cleared: True
+bearer missing 401: True
+bearer missing challenge: True
+bearer missing no error: True
+bearer wrong 401: True
+bearer invalid token error: True
+bearer malformed 401: True
+bearer invalid request error: True
+bearer bad padding 401: True
+bearer only padding 401: True
+bearer lower scheme 200: True
+bearer multiple spaces 200: True
+bearer rejects basic: True
+bearer optional anonymous: True
+bearer optional user: True
+bearer optional bad 401: True
+bearer optional malformed 401: True
+bearer parse-only empty: True
+bearer parse-only malformed: True
+bearer token68: True
+bearer bad token68 401: True
+bearer default true 200: True
+bearer default scheme: True
+bearer blocked 403: True
+bearer blocked header: True
+bearer blocked body: True
+bearer blocked no challenge: True
+bearer custom 401: True
+bearer custom challenge: True
+bearer custom body: True
+bearer strips verifier token: True
+ok
