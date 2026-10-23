@@ -529,6 +529,20 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (68 modules)
 - **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`
 - **Testing**: `test` (registration and assertions for `fun test`)
 
+Logging is configured once and then used through named loggers:
+
+```fun
+use 'logging.fun';
+
+logging.config([level: 'debug']);
+var logger = logging.getLogger('http');
+logger.info('request', [path: '/users']);
+```
+
+The default is stderr + info + text. `logging.config` can replace handlers and
+formatters; `logging.newLogger` creates an independent logger for tests or a
+dedicated sink.
+
 > **Platform-split convention**: the Windows implementation keeps the plain
 > module name, and the Unix backend is `<name>-unx.fun` (Linux + macOS); the
 > older `<name>-lnx.fun` name is kept as a thin wrapper on top of it. Logic
