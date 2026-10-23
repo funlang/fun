@@ -46,6 +46,8 @@
 //   * HttpServer.Use runs before route matching (all requests, including
 //     404/405); HttpGroup.Use runs after a route matches. Put request-wide
 //     middleware such as CORS on the server, before authentication.
+//   * res.beforeSend(fn) runs fn(res, body) just before headers are written;
+//     session/cookie middleware uses it to add or clear cookies.
 //   * the middleware continuation parameter is named `nx` because `next`
 //     (like `step`) is reserved by the language.
 //   * routing rules: literal segments beat `:name` parameters, which beat the
@@ -438,6 +440,7 @@ class HttpRes()
   var code   = 0;
   var hdrs   = nil;
   var sent   = false;
+  var preSend = nil;
 
   fun status(c)
     code = c;
@@ -472,9 +475,25 @@ class HttpRes()
     result = this;
   end fun;
 
+  // Run before the response headers are written; used by session/cookie
+  // middleware to add or clear cookies after the handler has run.
+  fun beforeSend(fx)
+    if preSend = nil then preSend = new []; end if;
+    preSend.@add(fx);
+    result = this;
+  end fun;
+
   fun send(s)
     if sent then
       raise 'http-server: response already sent';
+    end if;
+    if preSend <> nil then
+      var ps = preSend;
+      preSend = nil;
+      for i = 0 to ps.@count() - 1 do
+        var f = ps[i];
+        f(this, s);
+      end do;
     end if;
     sent = true;
     if code <= 0 then

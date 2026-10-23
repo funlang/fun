@@ -3,6 +3,7 @@ LOAD  http-bearer
 LOAD  http-client
 LOAD  http-cors
 LOAD  http-server
+LOAD  http-session
 LOAD  lib-ado-schema
 LOAD  lib-ado
 LOAD  lib-ajax
@@ -67,4 +68,4 @@ LOAD  lib-zlib
 LOAD  test
 LOAD  uuid
 
-loaded=62 failed=6
+loaded=63 failed=6
