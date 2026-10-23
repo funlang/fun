@@ -1,0 +1,26 @@
+session read empty: True
+session read no cookie: True
+session write cookie: True
+session cookie httponly: True
+session cookie samesite: True
+session cookie path: True
+session read user: True
+session read no resend: True
+session inc 1: True
+session inc no cookie: True
+session inc 2: True
+session isolated: True
+session regen cookie: True
+session old sid dead: True
+session new sid alive: True
+session logout clears: True
+session logout dead: True
+session stale clear: True
+session secure: True
+session strict: True
+session maxage: True
+session ttl expired: True
+session ttl stale clear: True
+session custom store: True
+session none requires secure: True
+ok

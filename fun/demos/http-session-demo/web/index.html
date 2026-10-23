@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fun session demo</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 760px; padding: 0 1rem; }
+    input { padding: .4rem; width: 14rem; }
+    button { margin: 0 .5rem .5rem 0; padding: .4rem .8rem; }
+    pre { background: #f4f4f4; padding: 1rem; overflow: auto; white-space: pre-wrap; }
+    code { background: #eee; padding: .1rem .3rem; }
+  </style>
+</head>
+<body>
+  <h1>Fun session demo</h1>
+  <p>Cookie <code>sid</code> carries only a random session id; data stays on the server.</p>
+  <p><input id="user" value="alice"></p>
+  <button id="login">POST /api/login</button>
+  <button id="me">GET /api/me</button>
+  <button id="count">GET /api/count</button>
+  <button id="logout">POST /api/logout</button>
+  <pre id="out">Click a button.</pre>
+
+  <script>
+    const out = document.getElementById('out');
+
+    async function call(label, path, opts) {
+      out.textContent = label + ' ...';
+      try {
+        const r = await fetch(path, opts || {});
+        const body = await r.text();
+        out.textContent = label + '\nstatus: ' + r.status + '\n\n' + body;
+      } catch (e) {
+        out.textContent = label + '\nfetch error: ' + e;
+      }
+    }
+
+    document.getElementById('login').onclick = () =>
+      call('POST /api/login', '/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: document.getElementById('user').value })
+      });
+
+    document.getElementById('me').onclick = () => call('GET /api/me', '/api/me');
+    document.getElementById('count').onclick = () => call('GET /api/count', '/api/count');
+    document.getElementById('logout').onclick = () =>
+      call('POST /api/logout', '/api/logout', { method: 'POST' });
+  </script>
+</body>
+</html>

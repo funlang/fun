@@ -39,7 +39,7 @@
 一句话定位：**Fun 是一门从 JSON 一路写到机器码的脚本语言。**
 
 - 用同一个运行时，覆盖从高层数据处理（JSON/FD）到底层系统编程（FFI、运行时 C、JIT、机器码）的全谱系；
-- 自带 66 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
+- 自带 67 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
 - 在信创与 AI Agent 场景中，作为连接国产 OS、数据库、芯片与业务逻辑的轻量级胶水。
 
 Fun 的设计出发点很简单：**数据与代码都应该是头等公民，而且一段脚本应该能在不离开语言的情况下一路触达机器底层。**
@@ -70,7 +70,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
 - **跨平台** —— Windows（32/64 位）、Linux、ARM 与 Windows CE。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
-- **自托管的标准库** —— 66 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
+- **自托管的标准库** —— 67 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
 ---
 
@@ -365,7 +365,7 @@ fun/
 │   ├── utils/         # 工具函数
 │   └── prj/fun/       # 工程与构建脚本（funcmd.dpr，Delphi/FPC）
 ├── fun/
-│   ├── lib/           # 标准库（纯 Fun 编写，66 个模块）
+│   ├── lib/           # 标准库（纯 Fun 编写，67 个模块）
 │   ├── demo/          # 语言语法演示
 │   ├── demos/         # 完整应用与基准测试
 │   └── key_*.ini      # 关键字别名包（CN / FR / PUA）
@@ -477,16 +477,16 @@ float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scala
 
 ## 标准库
 
-标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（66 个模块）：
+标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（67 个模块）：
 
-> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——66 个模块全部用 Fun 自身写成。
+> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——67 个模块全部用 Fun 自身写成。
 
 - **数据**：`lib-json`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`
 - **工具**：`uuid`
 - **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`
 - **文本**：`lib-string`、`lib-regex`、`lib-match`、`lib-unicode`
 - **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-time`、`lib-cmdline`、`lib-proc`
-- **网络**：`lib-winsock`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`
+- **网络**：`lib-winsock`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-session`
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
 - **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`
 - **UI**：`lib-ui`、`lib-ui-base`、`lib-dialog`、`lib-trayicon`
@@ -510,6 +510,7 @@ float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scala
 - [`fun/demos/test-demo`](fun/demos/test-demo) —— 只有库的包及测试：共享 helper、通过用例与失败断言示例。
 - [`fun/demos/http-cors-demo`](fun/demos/http-cors-demo) —— CORS 预检、credentials、暴露响应头与浏览器页面示例。
 - [`fun/demos/http-bearer-demo`](fun/demos/http-bearer-demo) —— Bearer token 认证、401 挑战与同源页面示例。
+- [`fun/demos/http-session-demo`](fun/demos/http-session-demo) —— cookie session 登录/登出、SID 轮换与服务端状态示例。
 
 ---
 
