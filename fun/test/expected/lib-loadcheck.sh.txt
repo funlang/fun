@@ -41,6 +41,7 @@ LOAD  lib-orm-rpc
 LOAD  lib-orm
 LOAD  lib-os
 LOAD  lib-param
+LOAD  lib-path
 FAIL  lib-proc-darwin        fun/lib/lib-proc-darwin.fun:37: getapi: cannot load library 
 LOAD  lib-proc
 LOAD  lib-regex
@@ -68,4 +69,4 @@ LOAD  lib-zlib
 LOAD  test
 LOAD  uuid
 
-loaded=63 failed=6
+loaded=64 failed=6
