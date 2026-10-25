@@ -59,13 +59,14 @@
 |---|---|---|---|---|
 | `s.move(numDest[, len])` | `isNum(e.value)` 行 546 → 548,`Move(q^,p^,...)` 行 553 | `numDest` 当**原始指针**,任意地址写 `len` 字节;若接收者本身是数值,`q := fun.ptr(exp.asInt)` 行 552 → **任意地址读**再写 | MEM | **拦** |
 | `f.move(f2)` | `else` 分支 → `CIO.Move` 行 555 | 文件改名 / `f2=null` 时**删除文件** | FSW | **拦** |
-| `s.movs(...)` | 见 §1.2 | 字符串缓冲内带边界移动 | MEM(弱) | 见 1.2 |
+| `s.movs(...)` | 见 §1.2 | 字符串目标内的带边界移动 | — | **不拦** |
 
 ### 1.2 `movs` — `_movs`(行 560)
 
-在字符串 `s` 与目标 `d` 之间做内存移动。**已有边界检查**(行 581,越界 `raise 'out of bounds'`)。
-- 类别:MEM,但目标 `d` 来自 `PData(ed.value).VInteger`(行 571)——即 `dest` 若是**数值**,就是任意地址读。
-- 判定:默认用法(`dest` 为字符串)基本安全;`dest` 为**数值**时按 MEM 拦。
+`movs` 是 `move` 的安全版本，设计上**只接受字符串目标**。
+**已有边界检查**(越界 `raise 'out of bounds'`)。
+- `dest` 不是字符串时直接返回，不写内存，也不把数值当指针解引用。
+- 判定:**不拦**。真正的任意地址写只有 `move` 的数值分支。
 
 ### 1.3 `toNum` — `_toNum`(行 641)
 
@@ -85,7 +86,7 @@
 - `toByte`:仅 `s[1+pos]` 读字符串缓冲，越界返回 #0。判定:**不拦**。
 
 > 这两项曾被旧清单按 MEM 拦，属于限制过度。真正的任意地址写只有
-> `move`/`movs` 的**数值目标**。
+> `move` 的**数值目标**；`movs` 只写字符串目标。
 
 ### 1.5 `eval` — `_eval`(行 344)
 
@@ -157,7 +158,7 @@
 |---|---|---|---|
 | `move` 数值分支 | `dest`/接收者为数值 | MEM | 拦 |
 | `move` 文件分支 | `dest` 为字符串 | FSW | 拦 |
-| `movs` | `dest` 为数值 | MEM | 拦 |
+| `movs` | `dest` 为数值 | — | 不拦（被忽略） |
 | `toNum` | `ptr∈{1,2,3}` | MEM(弱) | 不拦（仅缓冲内重解释） |
 | `toNum` | `ptr=0/-1` | — | 不拦 |
 | `fromByte` | 任意 | MEM(弱，限界内) | 不拦 |
@@ -190,7 +191,7 @@
 
 - 普通模式行为不变(回归全过,含 `test-jit-cb.fun`)。
 - 安全构建（`funcmd-safe`）下:
-  - `'abc'.move(123456)`、`'abc'.movs(0)`、`getapi` → 抛;
+  - `'abc'.move(123456)`、`getapi` → 抛;
   - `'ab'.fromByte(0, 65)`、`'abcd'.toNum(ptr:1)` → 不抛（限界内）;
   - `'123'.toNum()`、`'$name'.eval()`、`f.move(f2)`(如仍允许文件则可)按策略;
   - `getapi`、`lib-tcc/lib-jit/lib-asm` 路径 → 抛;
@@ -225,8 +226,8 @@ SAFE=custom SAFE_ALLOW=read,write,compile ./make-linux-x86_64.sh
 
 落点：
 
-- `src/lib/libase.pas`：`move` 数值分支、`movs(数值目标)`、
-  `compile(文件/inline)`、`load/find/hash/size/time`、`save/copy/move(文件)`。
+- `src/lib/libase.pas`：`move` 数值分支、`compile(文件/inline)`、
+  `load/find/hash/size/time`、`save/copy/move(文件)`。
 - `src/lib/lffi.pas` / `winapi.pas` / `winole.pas`：`getapi`、`@toCallback`、
   COM `NewObj` / `@toEvent`。
 - `src/lib/host.pas`：`getlib`。

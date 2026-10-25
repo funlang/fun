@@ -969,11 +969,12 @@ begin
   if not isStr(exp.value) or (s = '') then exit;
   ed := CExps.Find(exps, 'dest', 0);
   if ed = nil then exit;
-  {$IfDef FunSafe}
-  if isNum(ed.value) then SafeDeny('movs to a numeric address');
-  {$EndIf}
-  d  := fun.str(rawPtr(ed.value));
-  if not isStr(ed.value) or (d = '') then exit;
+  // movs is the safe counterpart of move: it only writes into a string
+  // destination. Check that before casting the value to a string pointer; a
+  // numeric dest must be ignored, not dereferenced.
+  if not isStr(ed.value) then exit;
+  d  := ed.asStr;
+  if d = '' then exit;
 
   ls  := Length(s);
   ld  := Length(d);

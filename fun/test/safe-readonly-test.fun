@@ -31,7 +31,6 @@ test('native code is still blocked', {
 
 test('raw addresses are still blocked', {
   assert.raises({ 'abc'.move(0); }, 'safe mode');
-  assert.raises({ 'abc'.movs(0); }, 'safe mode');
 });
 
 test('code loading from a file is still blocked', {

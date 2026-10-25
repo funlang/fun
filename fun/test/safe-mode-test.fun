@@ -44,8 +44,13 @@ test('move to a numeric address is blocked', {
   assert.raises({ 'abc'.move(0); }, 'safe mode');
 });
 
-test('movs to a numeric address is blocked', {
-  assert.raises({ 'abc'.movs(0); }, 'safe mode');
+test('movs is string-only and ignores a numeric destination', {
+  var s = 'abc';
+  s.movs(12345);
+  assert.equal(s, 'abc');
+  var d = '   ';
+  s.movs(d);
+  assert.equal(d, 'abc');
 });
 
 test('toNum bounded reinterpret reads are allowed', {
