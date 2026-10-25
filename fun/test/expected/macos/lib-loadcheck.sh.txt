@@ -66,6 +66,7 @@ LOAD  lib-winsock
 LOAD  lib-xml
 LOAD  lib-yaml
 LOAD  lib-zlib
+LOAD  logging
 LOAD  test
 LOAD  uuid
 

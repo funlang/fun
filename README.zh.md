@@ -508,6 +508,19 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 - **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`
 - **测试**：`test`（`fun test` 的注册与断言库）
 
+日志在入口配置一次，之后通过命名 logger 使用：
+
+```fun
+use 'logging.fun';
+
+logging.config([level: 'debug']);
+var logger = logging.getLogger('http');
+logger.info('request', [path: '/users']);
+```
+
+默认是 stderr + info + 文本格式；`logging.config` 可替换 handler/formatter，
+`logging.newLogger` 用于测试或需要独立 sink 的组件。
+
 > **平台拆分惯例**：Windows 实现保留原名，Unix 后端为 `<name>-unx.fun`（Linux + macOS），
 > 旧的 `<name>-lnx.fun` 名字保留为它之上的薄包装；两者共用的逻辑放在
 > `<name>-base.fun`（不计入上面的模块数）。只在 Linux 成立的后端（如读 `/proc` 的
