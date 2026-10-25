@@ -653,15 +653,26 @@ begin
     ;
   end
   else begin
-    {$IfDef FunSafe}
-    SafeDeny('file time');
-    {$EndIf}
     e := CExps.Find(exps, 'set', 1);
     if e <> nil then
       t := e.value^
     else
       t := 0
     ;
+    {$IfDef FunSafe}
+    if t <> 0 then
+    begin
+      {$IfNDef FunSafeAllowWrite}
+      SafeDeny('file time update');
+      {$EndIf}
+    end
+    else
+    begin
+      {$IfNDef FunSafeAllowRead}
+      SafeDeny('file time');
+      {$EndIf}
+    end;
+    {$EndIf}
 
     val^ := CIO.Time(exp.asStr, CExps.FindAsVal(exps, '', 0, 0), t)
   end;
@@ -670,7 +681,9 @@ end;
 procedure _size(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 begin
   {$IfDef FunSafe}
+  {$IfNDef FunSafeAllowRead}
   SafeDeny('file size');
+  {$EndIf}
   {$EndIf}
   val^ := CIO.Time(exp.asStr, 8);
   PData(val).VType := VarLongWord;
@@ -681,7 +694,9 @@ end;
 procedure _hash(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 begin
   {$IfDef FunSafe}
+  {$IfNDef FunSafeAllowRead}
   SafeDeny('file hash');
+  {$EndIf}
   {$EndIf}
   val^ := CIO.Load(exp.asStr, 0, CExps.FindAsVal(exps, '', 0, 0));
 end;
@@ -691,7 +706,9 @@ procedure _load(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 {$IfNDef Unicode}
 begin
   {$IfDef FunSafe}
+  {$IfNDef FunSafeAllowRead}
   SafeDeny('file read');
+  {$EndIf}
   {$EndIf}
   val^ := NullValue;
   val^ := CIO.Load(exp.asStr, CExps.FindAsVal(exps, 'cp', 0, 0));
@@ -701,7 +718,9 @@ var
   cp: fun.word;
 begin
   {$IfDef FunSafe}
+  {$IfNDef FunSafeAllowRead}
   SafeDeny('file read');
+  {$EndIf}
   {$EndIf}
   cp := 0;
   e  := CExps.Find(exps, 'cp', 0);
@@ -720,7 +739,9 @@ var
   e: CExp;
 begin
   {$IfDef FunSafe}
+  {$IfNDef FunSafeAllowWrite}
   SafeDeny('file write');
+  {$EndIf}
   {$EndIf}
   s := CExps.FindAsVal(exps, '', 0, '');
   CIO.Save(exp.asStr, s, CExps.FindAsVal(exps, 'cp', 1, 0), CExps.FindAsVal(exps, 'append', 2, false));
@@ -874,7 +895,9 @@ var
   fs: CNew;
 begin
   {$IfDef FunSafe}
+  {$IfNDef FunSafeAllowRead}
   SafeDeny('file search');
+  {$EndIf}
   {$EndIf}
   fs := CNew(core.CNew.new(nil).parse(CExps.Create()));
   setObj(val, fs, VarObjNew); del(fs);
@@ -888,7 +911,9 @@ var
   i: fun.int;
 begin
   {$IfDef FunSafe}
+  {$IfNDef FunSafeAllowWrite}
   SafeDeny('file copy');
+  {$EndIf}
   {$EndIf}
   s := exp.asStr;
   for i := 0 to CExps.Count(exps) -1 do
@@ -906,15 +931,14 @@ var
   p, q: fun.ptr;
   i: fun.int;
 begin
-  {$IfDef FunSafe}
-  // Both branches are unsafe: a numeric destination is arbitrary memory, a
-  // string destination renames or deletes a file.
-  SafeDeny('move');
-  {$EndIf}
   s := exp.asStr;
   e := CExps.Find(exps, 'dest', 0);
   if (e <> nil) and isNum(e.value) then
   begin
+    {$IfDef FunSafe}
+    // A numeric destination is an arbitrary write; no safe level allows it.
+    SafeDeny('move to a numeric address');
+    {$EndIf}
     p := asPtr(e.value);
     q := @s[1];
     i := CExps.FindAsVal(exps, 'len', 1, 0);
@@ -922,8 +946,15 @@ begin
     if isNum(PData(exp.value)^.VType) then q := asPtr(exp.value);
     Move(q^, p^, i * sizeof(char));
   end else
+  begin
+    {$IfDef FunSafe}
+    {$IfNDef FunSafeAllowWrite}
+    SafeDeny('file move');
+    {$EndIf}
+    {$EndIf}
     CIO.Move(s, CExps.FindAsVal(exps, '', 0, ''))
   ;
+  end;
 end;
 
 // s.movs(dest, len, pos, pod)
@@ -1091,9 +1122,6 @@ var
   s: fun.str;
   p: PByte;
 begin
-  {$IfDef FunSafe}
-  SafeDeny('fromByte raw write');
-  {$EndIf}
   i := CExps.FindAsVal(exps, 'pos',  0, 0);
   j := CExps.FindAsVal(exps, 'byte', 1, 0);
   s := exp.asStr;
@@ -1260,7 +1288,9 @@ begin
   ;
   b := CExps.FindAsVal(exps, 'inline', 0, false);
   {$IfDef FunSafe}
+  {$IfNDef FunSafeAllowCompile}
   if b or FileExists(fn) then SafeDeny('compile from a file or inline');
+  {$EndIf}
   {$EndIf}
   {if not b then} n := nil;
   if FileExists(fn) then

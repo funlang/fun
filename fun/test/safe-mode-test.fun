@@ -55,15 +55,10 @@ test('toNum bounded reinterpret reads are allowed', {
   assert.is_true(i <> 0);
 });
 
-test('fromByte raw writes are blocked', {
-  assert.raises({ 'ab'.fromByte(0, 65); }, 'safe mode');
-});
-
-test('fractional-index byte writes are blocked', {
-  assert.raises({
-    var s = 'abc';
-    s[0.5] = 'Z';
-  }, 'safe mode');
+test('bounded fromByte writes are allowed', {
+  var s = 'ab';
+  s.fromByte(0, 90);
+  assert.equal(s, 'Zb');
 });
 
 // --- FSR: file system reads ----------------------------------------------

@@ -46,6 +46,8 @@
 # Native Linux console build of funcmd.dpr (no extension, unlike the .exe)
 src/prj/fun/funcmd
 src/prj/fun/funcmd-safe
+src/prj/fun/units/
+src/prj/fun/units-safe/
 src/prj/fun/.ffi/
 
 # Convenience copy of the Linux build in the runtime folder (make-linux-x86_64.sh),

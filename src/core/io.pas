@@ -72,7 +72,7 @@ const
 
 implementation
 
-uses {$IfNDef UNIX}Windows,{$Else}DateUtils,{$EndIf}
+uses {$IfNDef UNIX}Windows,{$Else}DateUtils, BaseUnix,{$EndIf}
      {$IfDef MD5}{$IfDef UNIX}funhash,{$EndIf}{$EndIf}
      SysUtils;
 
@@ -632,7 +632,7 @@ var
   ft: TFileTime;
   {$Else}
   Age: LongInt;
-  h: fun.int;
+  st: stat;
   {$EndIf}
   ret: ^fun.int64;
 begin
@@ -700,12 +700,12 @@ begin
   end
   else // size
   begin
-    h := FileOpen(fn, fmOpenRead or fmShareDenyNone);
-    if h >= 0 then
+    // Metadata only: stat does not open the file and works without read
+    // permission. The old open/seek path also failed on unreadable files.
+    if fpstat(PChar(fn), st) = 0 then
     begin
       ret  := @result;
-      ret^ := FileSeek(h, 0, Seek_End);
-      FileClose(h);
+      ret^ := st.st_size;
     end;
   end;
   {$EndIf}

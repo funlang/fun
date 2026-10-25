@@ -1685,10 +1685,6 @@ begin
     if (i < 0) or (i >= Length(s)) then
       raise EBase.Create('string index out of range: ' + IntToStr(j));
     if isFloat(idx.value) and (idx.value^ > j) then begin
-    {$IfDef FunSafe}
-      // A fractional index writes a raw byte into the string buffer.
-      SafeDeny('string byte write via a fractional index');
-    {$EndIf}
     {$IfDef Unicode}
       p := s + i;
       // fun.int() would truncate the address on a 64-bit target

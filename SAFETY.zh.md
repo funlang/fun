@@ -1,6 +1,7 @@
 # Fun 内核安全标注清单(Safe Mode,按分支精析)
 
-> 目标:未来以 `fun.exe -safe ...` 启动时,凡触及**危险分支**的内核操作**直接抛 `EBase`**。
+> 目标:编译期安全构建(`SAFE=... ./make-linux-x86_64.sh`)中,凡触及**危险分支**
+> 的内核操作**直接抛 `EBase`**。默认构建不包含这些分支。
 > **原则:不打整个内置函数,只打具体危险的"分支/参数"。** 因为同一内置名的默认用法往往是安全的,整函数拦截会误伤合法代码。
 >
 > 文中 `行号` 以 `src/` 为准。
@@ -10,12 +11,14 @@
 > `.toByte/.fromByte/.toNum(ptr:)/.movs/.x/.toStr`、`CList.Count/GetItem` 都加了边界校验
 > （写越界 raise，读越界给安全默认值）。
 >
-> **2026-10-25 更新：编译期安全构建已落地。** `SAFE=1 ./make-linux-x86_64.sh`
-> 生成独立的 `funcmd-safe`（`-dFunSafe`），下面列出的 NAT/MEM/FSR/FSW/SRC
-> 拦截点在该二进制中生效；默认构建与回归基线完全不变。没有运行时 `-safe`
-> 开关，也没有等级或权限列表：需要安全能力时单独编译。测试见
-> `fun/test/safe-mode-test.fun` 与 `fun/test/run-safe-regression.sh`，CI 是
-> 独立的 `linux-safe` job，默认不跑完整回归。
+> **2026-10-25 更新：编译期安全构建已落地并分级。** `SAFE=strict|readonly|
+> readwrite|custom ./make-linux-x86_64.sh` 生成独立的 `funcmd-safe`
+> （`-dFunSafe` 加 `-dFunSafeAllowRead/Write/Compile`）。严格档拦
+> NAT/MEM/FSR/FSW/SRC；只读档放开 FSR；读写档再放开 FSW；`custom` 通过
+> `SAFE_ALLOW=read,write,compile` 选择。默认构建与回归基线完全不变。没有
+> 运行时 `-safe` 开关：需要安全能力时单独编译。测试见
+> `fun/test/safe-mode-test.fun` / `safe-readonly-test.fun` 与
+> `fun/test/run-safe-regression.sh`，CI 是独立的 `linux-safe` job。
 >
 > 作者同日定：
 > - **不做 COW**：字符串赋值/传参保持**引用语义**（`b := a; b[i] = x` 改到 `a` 是预期行为）。
@@ -33,7 +36,7 @@
 
 与其"全函数拦截",不如把危险操作按**能力类别**分类,`-safe` 默认拦哪类可单独配置:
 
-| 类 | 能力 | 危险程度 | `-safe` 默认 |
+| 类 | 能力 | 危险程度 | 严格档 |
 |---|---|---|---|
 | **NAT** | 本机代码执行(加载 DLL、调用导出函数、生成可执行内存、TCC/JIT/汇编) | 最高 | **拦** |
 | **MEM** | 任意内存读写(数值当指针) | 高 | **拦** |
@@ -74,10 +77,15 @@
 | `-1` | `PData(exp.value).VInteger` 行 657 读整型位模式 | MEM(弱) | 提示 |
 | `1/2/3` | 把**接收者自己的字符串缓冲**当 `int/single/double` 读，长度不足返回 0 | MEM(弱) | **不拦**（有长度校验，不能越界） |
 
-### 1.4 `fromByte` / `toByte` — `_fromByte`(行 698)、`_toByte`(行 683)
+### 1.4 `fromByte` / `toByte` — `_fromByte`、`_toByte`
 
-- `fromByte`:`p := fun.ptr(s); Inc(p,i); p^ := j` 行 707–709 —— 向字符串缓冲 `i` 偏移**写字节**;`i` 越界即缓冲溢出。类别:MEM,判定**拦**。
-- `toByte`:仅 `s[1+pos]` 读字符(行 692)。**读**,越界读返回 #0/越界访问,低危。判定**默认安全**(可加边界校验)。
+- `fromByte`:向**接收者自己的字符串缓冲** `i` 偏移写字节，已有
+  `(i < 0) or (i >= Length(s))` 检查。它不是任意地址写，和 `s[i] = c` 同级。
+  判定:**不拦**。
+- `toByte`:仅 `s[1+pos]` 读字符串缓冲，越界返回 #0。判定:**不拦**。
+
+> 这两项曾被旧清单按 MEM 拦，属于限制过度。真正的任意地址写只有
+> `move`/`movs` 的**数值目标**。
 
 ### 1.5 `eval` — `_eval`(行 344)
 
@@ -92,11 +100,17 @@
 - `inline:true` 时挂入当前作用域(行 795,可被随后执行 → 代码注入)。
 - 判定:拦"读文件"与"inline 注入"两个分支;纯 `compile(字符串)` 可不拦。
 
-### 1.7 文件系统家族 — `_load`(454)、`_save`(475)、`_copy`(523)、`_find`(496)、`_hash`(448)、`_size`(440)、`_time`(401)
+### 1.7 文件系统家族 — `_load`、`_save`、`_copy`、`_find`、`_hash`、`_size`、`_time`
 
-- 读类:`load/find/hash/size/time(文件)` → **FSR**。
-- 写类:`save`、`copy`、`move(文件)` → **FSW**。
-- 判定:按 FSR/FSW 策略拦。`find` 会遍历目录、泄露文件结构,读类中偏重。
+- 读类:`load/find/hash/size/time(读)` → **FSR**。
+- 写类:`save`、`copy`、`move(文件)`、`time(set:)` → **FSW**。
+- `hash` 当前实现是 `CIO.Load` 的别名，返回**文件内容**，不是摘要；旧注释
+  "0-MD5,1-SHA1" 已过时。按 FSR 内容读处理。
+- `size` 在 Unix 已改为 `stat`（不再 open/seek），Windows 用
+  `FindFirstFile`，两者都是纯 metadata 读取。
+- `time` 的 `set` 参数会调用 `SetFileTime`/`FileSetDate`，所以必须按写能力
+  单独判断；`set` 为 0 或省略时才是读。
+- 判定:按 FSR/FSW 策略拦。`find` 会遍历目录、泄露文件结构，读类中偏重。
 
 ### 1.8 `arg` / `set` / `random` — `_arg`(70)、`_set`(80)、`_random`(115)
 
@@ -126,10 +140,13 @@
 ## 3. 解释器内核路径(不走 `CLib.call`,需单独挂钩)
 
 `src/core/core.pas`:
-- `CIdx.done`(行 1471–1483):字符串索引赋值 `s[i]=x`,浮点下标分支执行 `PByte(p)^ := fun.byte(...)`(行 1479)/ `(s+i)^ := ...` —— **原始字节写**。类别 MEM,**拦**。
+- `CIdx.done`:字符串索引赋值 `s[i]=x`,浮点下标分支写字符串缓冲内的一个字节,
+  前面已有 `(i < 0) or (i >= Length(s))` 检查。类别 MEM(弱,限界内)。
 - `CIdx.find`(行 1522–1543):字符串索引**读**字节(`s[i+1]`、`div/mod 256`)。类别 MEM(弱)。
 
-这两处无内置名可查,`-safe` 需在 `done`/`find` 加检查。
+`CIdx.done` 的浮点下标分支仍在 `(i < 0) or (i >= Length(s))` 检查之后，最多
+写到字符串的终止字节，不构成任意地址写。它和 `fromByte` 一样属于**限界内的
+字符串字节写**，因此安全构建不拦。`CIdx.find` 是限界内读，不拦。
 
 ---
 
@@ -142,29 +159,29 @@
 | `movs` | `dest` 为数值 | MEM | 拦 |
 | `toNum` | `ptr∈{1,2,3}` | MEM(弱) | 不拦（仅缓冲内重解释） |
 | `toNum` | `ptr=0/-1` | — | 不拦 |
-| `fromByte` | 任意 | MEM | 拦 |
+| `fromByte` | 任意 | MEM(弱，限界内) | 不拦 |
 | `toByte` | 任意(读) | — | 不拦 |
 | `eval` | 任意 | ENV | **不拦** |
 | `compile` | 文件加载 / `inline` | SRC | 拦 |
-| `load/find/hash/size/time` | 任意 | FSR | 拦 |
-| `save/copy/move(文件)` | 任意 | FSW | 拦 |
+| `load/find/hash/size/time(读)` | 任意 | FSR | 拦（只读档放开） |
+| `save/copy/move(文件)/time(set)` | 任意 | FSW | 拦（读写档放开） |
 | `getapi` / `@toCallback` / COM `NewObj` | 任意 | NAT | 拦 |
-| `CIdx.done` 字节写 | 浮点下标赋值 | MEM | 拦 |
+| `use` 外部路径 | 不在脚本目录/cwd/lib/app/FUN_PATH 下 | SRC | 拦（`compile` 档放开） |
+| `CIdx.done` 字节写 | 浮点下标赋值 | MEM(弱，限界内) | 不拦 |
 
 ---
 
-## 5. 实现建议(最小改动)
+## 5. 实现方式
 
-1. `fun.pas` 加全局 `SafeRun: Boolean`;`fun.exe`(`funcmd.dpr`)解析 `-safe`。
-2. 因拦截点细化到**分支**,在 `CLib.call`(host.pas 行 209)处加一个**回调钩子**最灵活:
-   ```pascal
-   // CLib 增加: unsafeAttr: CHash  // id -> bitmask 类别
-   // 及一个 virtual: procedure SafeGuard(id; attr; exp; exps); 
-   // 默认空;CEnv2 在 SafeRun 时对 MEM/NAT/FSW 类别抛 EBase。
-   ```
-   内置在入口判断具体参数(如 `toNum` 的 `ptr`、`move` 的 `isNum(dest)`),**再决定是否抛**。这比"按 id 一刀切"精准。
-3. `core.pas` `CIdx.done`/`CIdx.find` 字节分支同样在 `SafeRun` 时抛 `ESafe`。
-4. 异常统一继承 `EBase` 的子类 `ESafe`,便于 `try/catch` 区分。
+实际实现放弃了运行时 `SafeRun` 开关，改为**编译期分支**：
+
+1. 危险分支包在 `{$IfDef FunSafe}` 里，默认构建直接不生成这些检查。
+2. 能力档位用编译期宏控制：`FunSafeAllowRead`、`FunSafeAllowWrite`、
+   `FunSafeAllowCompile`。构建脚本把 `SAFE=...` 映射到这些宏。
+3. 统一用 `SafeDeny()`（`src/core/base.pas`）抛 `EBase`，错误以
+   `safe mode: ...` 开头，脚本可以 `try/except` 捕获。
+4. 普通构建和 safe 构建使用不同的 FPC 单元输出目录（`units/` 与
+   `units-safe/`），避免互相复用定义不同的 `.ppu`。
 
 ---
 
@@ -172,7 +189,8 @@
 
 - 普通模式行为不变(回归全过,含 `test-jit-cb.fun`)。
 - 安全构建（`funcmd-safe`）下:
-  - `'abc'.move(123456)`、`'ab'.fromByte(5, 65)` → 抛;
+  - `'abc'.move(123456)`、`'abc'.movs(0)`、`getapi` → 抛;
+  - `'ab'.fromByte(0, 65)`、`'abcd'.toNum(ptr:1)` → 不抛（限界内）;
   - `'123'.toNum()`、`'$name'.eval()`、`f.move(f2)`(如仍允许文件则可)按策略;
   - `getapi`、`lib-tcc/lib-jit/lib-asm` 路径 → 抛;
   - 纯数据处理(JSON/FD、字符串、集合、正则)不受影响。
@@ -185,17 +203,35 @@
 
 ```sh
 cd src/prj/fun
-SAFE=1 ./make-linux-x86_64.sh        # 产出 funcmd-safe，不覆盖 funcmd
-fun/test/run-safe-regression.sh      # 只跑 safe 能力测试
+SAFE=strict ./make-linux-x86_64.sh   # 产出 funcmd-safe（默认严格档）
+fun/test/run-safe-regression.sh strict
+
+SAFE=readonly ./make-linux-x86_64.sh # 放开文件读
+fun/test/run-safe-regression.sh readonly
+
+SAFE=readwrite ./make-linux-x86_64.sh # 再放开文件写
+SAFE=custom SAFE_ALLOW=read,write,compile ./make-linux-x86_64.sh
 ```
+
+档位与宏：
+
+| `SAFE=` | 放开的宏 | FSR | FSW | SRC | NAT | MEM |
+|---|---|---|---|---|---|---|
+| `strict` / `1` | 无 | 拦 | 拦 | 拦 | 拦 | 拦 |
+| `readonly` | `FunSafeAllowRead` | 放 | 拦 | 拦 | 拦 | 拦 |
+| `readwrite` | `Read` + `Write` | 放 | 放 | 拦 | 拦 | 拦 |
+| `custom` | `SAFE_ALLOW` | 可选 | 可选 | 可选 | 拦 | 拦 |
 
 落点：
 
-- `src/lib/libase.pas`：`move`、`movs(数值目标)`、`fromByte`、
-  `compile(文件/inline)`、`load/find/hash/size/time(文件)`、`save/copy/move(文件)`。
+- `src/lib/libase.pas`：`move` 数值分支、`movs(数值目标)`、
+  `compile(文件/inline)`、`load/find/hash/size/time`、`save/copy/move(文件)`。
 - `src/lib/lffi.pas` / `winapi.pas` / `winole.pas`：`getapi`、`@toCallback`、
   COM `NewObj` / `@toEvent`。
-- `src/core/core.pas`：`CIdx.done` 的浮点下标字节写。
+- `src/lib/host.pas`：`getlib`。
+- `src/parse/parse.pas`：`use` 路径限制（脚本目录、cwd、解释器 lib/app、
+  `FUN_PATH`；`FunSafeAllowCompile` 时放开）。
+- `src/core/io.pas`：Unix `size` 改用 `stat`。
 
-`SAFE=1` 目前只接在 Linux 构建脚本上；拦截本身是平台无关的编译条件，后续
-需要时可在 macOS/Windows 构建脚本里加同一个 `-dFunSafe`。
+`SAFE` 目前只接在 Linux 构建脚本上；拦截本身是平台无关的编译条件，后续
+需要时可在 macOS/Windows 构建脚本里加同一组 `-dFunSafe*` 宏。

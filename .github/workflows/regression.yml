@@ -330,17 +330,26 @@ jobs:
       - name: Put fpc on PATH
         run: echo "$HOME/fpc-3.2.2/bin" >> "$GITHUB_PATH"
 
-      - name: Build funcmd-safe
+      - name: Build funcmd-safe (strict)
         run: |
           cd src/prj/fun
-          SAFE=1 ./make-linux-x86_64.sh 2>&1 | tee /tmp/build-safe.log
+          SAFE=strict ./make-linux-x86_64.sh 2>&1 | tee /tmp/build-safe.log
           # The NAT checks exercise getapi/@toCallback. They are only
           # meaningful when the FFI backend is compiled in, which the regular
           # Linux CI also requires.
           grep -q "FFI enabled" /tmp/build-safe.log
 
-      - name: Safe capability regression
-        run: fun/test/run-safe-regression.sh
+      - name: Safe capability regression (strict)
+        run: fun/test/run-safe-regression.sh strict
+
+      - name: Build funcmd-safe (readonly)
+        run: |
+          cd src/prj/fun
+          SAFE=readonly ./make-linux-x86_64.sh 2>&1 | tee /tmp/build-safe-readonly.log
+          grep -q "FFI enabled" /tmp/build-safe-readonly.log
+
+      - name: Safe capability regression (readonly)
+        run: fun/test/run-safe-regression.sh readonly
 
   # -------------------------------------------------------------- WINDOWS ---
   windows-x64:

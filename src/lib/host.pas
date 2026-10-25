@@ -94,6 +94,9 @@ procedure _getlib(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   name: fun.str;
 begin
+  {$IfDef FunSafe}
+  SafeDeny('getlib native UI');
+  {$EndIf}
   name := exp.asStr;
   {$IfDef FunUI}
   if name = 'ui' then

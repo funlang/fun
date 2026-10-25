@@ -495,15 +495,18 @@ win64/aarch64 target, so there is nothing to build with.
 For untrusted scripts, build the separate capability-restricted interpreter:
 
 ```sh
-cd src/prj/fun && SAFE=1 ./make-linux-x86_64.sh   # produces funcmd-safe
-fun/test/run-safe-regression.sh                   # focused capability tests
+cd src/prj/fun && SAFE=strict ./make-linux-x86_64.sh   # produces funcmd-safe
+fun/test/run-safe-regression.sh strict                  # focused capability tests
 ```
 
 `funcmd-safe` (`-dFunSafe`) removes native code (`getapi` / `@toCallback` /
-COM), raw memory access, file read/write/rename, and compile-from-file or
-`inline` code loading at compile time. The default `funcmd` and its full
-regression suite are unchanged; CI verifies the safe build in a separate
-`linux-safe` job.
+COM), arbitrary-address memory access, file access, and compile-from-file or
+`inline` code loading at compile time. Pick the level in the build script:
+`SAFE=strict` blocks all of them, `SAFE=readonly` allows file reads,
+`SAFE=readwrite` also allows writes, and `SAFE=custom
+SAFE_ALLOW=read,write,compile` selects categories explicitly. The default
+`funcmd` and its full regression suite are unchanged; CI verifies strict and
+readonly in a separate `linux-safe` job.
 
 ---
 

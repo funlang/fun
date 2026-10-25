@@ -476,13 +476,16 @@ float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scala
 需要运行不受信任的脚本时，可以单独编译安全构建：
 
 ```sh
-cd src/prj/fun && SAFE=1 ./make-linux-x86_64.sh   # 产出 funcmd-safe
-fun/test/run-safe-regression.sh                   # 只跑安全能力测试
+cd src/prj/fun && SAFE=strict ./make-linux-x86_64.sh   # 产出 funcmd-safe
+fun/test/run-safe-regression.sh strict                  # 只跑安全能力测试
 ```
 
 `funcmd-safe`（`-dFunSafe`）在编译期去掉本机代码（`getapi` / `@toCallback` /
-COM）、原始内存读写、文件读写/改名、以及从文件或 `inline` 加载代码这些路径。
-默认的 `funcmd` 与完整回归不受影响，CI 里的 `linux-safe` job 单独验证它。
+COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载代码这些路径。
+档位在构建脚本选择：`SAFE=strict` 全禁，`SAFE=readonly` 放开文件读，
+`SAFE=readwrite` 再放开文件写，`SAFE=custom SAFE_ALLOW=read,write,compile`
+按需组合。默认的 `funcmd` 与完整回归不受影响，CI 里的 `linux-safe` job
+分别验证 strict 与 readonly。
 
 ---
 

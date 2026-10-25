@@ -28,17 +28,24 @@
 # consumer runtime (-dFunPackUser): bundled apps run, but there is no
 # "fun pack" subcommand.
 #
-# -dFunSafe enables the capability-restricted safe build (no native code, raw
-# memory, file I/O, or compile-from-file). It is a separate binary,
-# funcmd-safe, so the default build and its regression baseline stay unchanged.
-# Build it with SAFE=1. See SAFETY.zh.md.
+# -dFunSafe enables the capability-restricted safe build. It is a separate
+# binary, funcmd-safe, so the default build and its regression baseline stay
+# unchanged. The level is selected with SAFE:
+#   SAFE=strict    no file access, no native code, no compile-from-file
+#   SAFE=readonly  also allow file reads (load/find/hash/size/time)
+#   SAFE=readwrite also allow file writes (save/copy/move/time(set))
+#   SAFE=custom    SAFE_ALLOW=read,write,compile
+# See SAFETY.zh.md.
 #
 # Usage:
 #   ./make-linux-x86_64.sh            # FPC resolved from PATH
 #   FPC=/path/to/fpc ./make-linux-x86_64.sh
 #   PCRE_SRC=/abs/path/to/pcre ./make-linux-x86_64.sh
 #   TCC_SRC=/abs/path/to/tcc ./make-linux-x86_64.sh
-#   SAFE=1 ./make-linux-x86_64.sh     # build funcmd-safe
+#   SAFE=1 ./make-linux-x86_64.sh     # same as SAFE=strict
+#   SAFE=readonly ./make-linux-x86_64.sh
+#   SAFE=readwrite ./make-linux-x86_64.sh
+#   SAFE=custom SAFE_ALLOW=read,compile ./make-linux-x86_64.sh
 #
 # Integer/double arithmetic, comparison, Boolean-result and integer div/mod
 # fast paths (src/core/calc.inc) are on by default; they avoid the much slower
@@ -215,13 +222,55 @@ if [ "${FUNPACK:-}" = "user" ]; then
 fi
 SAFE_FLAGS=""
 SAFE_OUT=""
-if [ -n "${SAFE:-}" ]; then
+SAFE_LEVEL=""
+SAFE_ALLOW_OPT="${SAFE_ALLOW:-}"
+SAFE_ALLOW=""
+case "${SAFE:-}" in
+    ""|0|no|off) ;;
+    1|strict)     SAFE_LEVEL=strict ;;
+    read|readonly) SAFE_LEVEL=readonly; SAFE_ALLOW="read" ;;
+    fs|rw|readwrite|read-write)
+                  SAFE_LEVEL=readwrite; SAFE_ALLOW="read,write" ;;
+    custom)       SAFE_LEVEL=custom; SAFE_ALLOW="$SAFE_ALLOW_OPT" ;;
+    *)            echo "Unknown SAFE='$SAFE' (use strict, readonly, readwrite or custom)." >&2
+                  exit 2 ;;
+esac
+if [ -n "$SAFE_LEVEL" ]; then
     SAFE_FLAGS="-dFunSafe"
     SAFE_OUT="-o$HERE/funcmd-safe"
-    echo "SAFE set - building the capability-restricted funcmd-safe."
+    SAFE_ALLOW="$(printf '%s' "$SAFE_ALLOW" | tr -d '[:space:]')"
+    OLDIFS="$IFS"
+    IFS=','
+    for cap in $SAFE_ALLOW; do
+        case "$cap" in
+            read)    SAFE_FLAGS="$SAFE_FLAGS -dFunSafeAllowRead" ;;
+            write)   SAFE_FLAGS="$SAFE_FLAGS -dFunSafeAllowWrite" ;;
+            compile) SAFE_FLAGS="$SAFE_FLAGS -dFunSafeAllowCompile" ;;
+            "")      ;;
+            *)       echo "Unknown SAFE_ALLOW capability '$cap' (use read, write, compile)." >&2
+                     exit 2 ;;
+        esac
+    done
+    IFS="$OLDIFS"
+    echo "SAFE=$SAFE_LEVEL${SAFE_ALLOW:+ (allow: $SAFE_ALLOW)} - building funcmd-safe."
 fi
+# Keep the two modes' .ppu/.o files apart. FPC otherwise writes units into the
+# current directory, and a later build of the other mode can silently reuse
+# them (normal code leaking into safe, or safe checks leaking into normal).
+if [ -n "$SAFE_LEVEL" ]; then
+    UNITS="$HERE/units-safe"
+else
+    UNITS="$HERE/units"
+fi
+mkdir -p "$UNITS"
+UNIT_FLAGS="-FU$UNITS"
+# FPC's -B does not rebuild units when only -d defines change, and the safe
+# levels differ only by defines. Clearing the mode's unit cache keeps a
+# SAFE=readonly build from reusing SAFE=strict units (and vice versa). A full
+# build is about a second.
+rm -f "$UNITS"/*.ppu "$UNITS"/*.o "$UNITS"/*.or 2>/dev/null || true
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $SAFE_FLAGS $SAFE_OUT $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $SAFE_FLAGS $SAFE_OUT $UNIT_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) -------------
 # Refresh fun/funcmd on every build, so a run from the repo root is just
@@ -230,7 +279,7 @@ fi
 # the copy needs libtcc.so beside it as well. Deliberately NOT the repo root:
 # keep the root clean and the binaries with the demo/ and lib/ they drive.
 ROOT="$(cd "$HERE/../../.." && pwd)"
-if [ -n "${SAFE:-}" ]; then
+if [ -n "$SAFE_LEVEL" ]; then
     BUILD_BIN="$HERE/funcmd-safe"
     TARGET_BIN="$ROOT/fun/funcmd-safe"
 else

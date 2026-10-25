@@ -6,12 +6,16 @@
 
 ## [未发布]
 
-- 新增编译期安全构建：`SAFE=1 ./make-linux-x86_64.sh` 生成独立的
-  `funcmd-safe`（`-dFunSafe`），在编译期去掉本机代码（`getapi`、
-  `@toCallback`、COM）、原始内存读写、文件读写/改名，以及从文件或
-  `inline` 加载代码的路径。默认 `funcmd` 与其完整回归不变；安全构建由
-  `fun/test/run-safe-regression.sh` 单独验证，CI 使用独立的 `linux-safe`
-  job。
+- 新增分级的编译期安全构建：`SAFE=strict|readonly|readwrite|custom
+  ./make-linux-x86_64.sh` 生成独立的 `funcmd-safe`（`-dFunSafe` 加
+  `-dFunSafeAllowRead/Write/Compile`）。严格档去掉本机代码（`getapi`、
+  `@toCallback`、COM）、任意地址读写、文件访问，以及从文件或 `inline`
+  加载代码；只读档放开文件读，读写档再放开文件写，`custom` 通过
+  `SAFE_ALLOW` 选择。默认 `funcmd` 与其完整回归不变；`linux-safe` CI job
+  分别验证 strict 和 readonly。
+
+- Unix 上文件 `size` 改用 `stat`，不再打开文件 seek 到末尾；不可读文件也能
+  取得大小。
 
 ## [9.4.6] - 2026-10-22
 

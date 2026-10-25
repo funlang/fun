@@ -559,6 +559,69 @@ begin
   Curr := flow.CTry(Curr).parse();
 end;
 
+{$IfDef FunSafe}
+// Is aPath inside aDir (after resolving relative components)? Both are
+// compared as expanded absolute paths; Windows is case-insensitive.
+function SafePathUnder(const aPath, aDir: fun.str): fun.bool;
+var
+  p, d: fun.str;
+begin
+  result := false;
+  if (aPath = '') or (aDir = '') then exit;
+  p := ExpandFileName(aPath);
+  d := ExpandFileName(aDir);
+  {$IfDef MSWINDOWS}
+  p := LowerCase(p);
+  d := LowerCase(d);
+  {$EndIf}
+  if Length(p) < Length(d) then exit;
+  if Copy(p, 1, Length(d)) <> d then exit;
+  if Length(p) = Length(d) then exit(true);
+  result := p[Length(d) + 1] in ['/', '\'];
+end;
+
+// Safe builds only import modules from the script directory, the current
+// directory, the interpreter's lib/app folders, or FUN_PATH. The import is
+// still parse-time code loading, so it is gated by FunSafeAllowCompile.
+function SafeUseAllowed(const fn: fun.str; root: CNode): fun.bool;
+var
+  base, fp, part, sep: fun.str;
+  i, n: fun.int;
+begin
+  result := false;
+  if root is CModu then
+    result := SafePathUnder(fn, ExtractFilePath(CModu(root).fileName));
+  if not result then
+    result := SafePathUnder(fn, GetCurrentDir);
+  if not result then
+  begin
+    base := ExtractFilePath(ParamStr(0));
+    result := SafePathUnder(fn, base + 'lib') or SafePathUnder(fn, base + 'app');
+  end;
+  {$IfDef FunPack}
+  if not result then
+  begin
+    fp := GetEnvironmentVariable('FUN_PATH');
+    {$IfDef UNIX}sep := ':';{$Else}sep := ';';{$EndIf}
+    i := 1;
+    n := Length(fp);
+    while (i <= n + 1) and not result do
+    begin
+      part := '';
+      while (i <= n) and (Copy(fp, i, 1) <> sep) do
+      begin
+        part := part + fp[i];
+        Inc(i);
+      end;
+      if part <> '' then
+        result := SafePathUnder(fn, part);
+      Inc(i);
+    end;
+  end;
+  {$EndIf}
+end;
+{$EndIf}
+
 function CParser.BuildUse(const a1, a0, estr: YYSType; const id: fun.str = ''): YYSType;
 var
   f: fun.str;
@@ -575,6 +638,11 @@ begin
   begin
     Delete(f, 1, 1);
     f := ParseFileName(f, Root);
+    {$IfDef FunSafe}
+    {$IfNDef FunSafeAllowCompile}
+    if not SafeUseAllowed(f, Root) then SafeDeny('use of ' + f);
+    {$EndIf}
+    {$EndIf}
     if FileExists(f) then
     begin
       temp.text := CIO.Load(f); // isUse - CreateStr
@@ -590,6 +658,11 @@ begin
     f := pf
   else
     f := ParseFileName(f, Root);
+  {$IfDef FunSafe}
+  {$IfNDef FunSafeAllowCompile}
+  if not SafeUseAllowed(f, Root) then SafeDeny('use of ' + f);
+  {$EndIf}
+  {$EndIf}
   m := CModu(Root).find(ExpandFileName(f));
   if m <> nil then
     Curr.use(m, id)
