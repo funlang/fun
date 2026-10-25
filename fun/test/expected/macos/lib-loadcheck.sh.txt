@@ -70,4 +70,4 @@ LOAD  logging
 LOAD  test
 LOAD  uuid
 
-loaded=64 failed=6
+loaded=65 failed=6
