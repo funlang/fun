@@ -18,6 +18,9 @@
 # fun/test/expected/<platform>/ snapshots; see fun/test/run-linux-regression.sh
 # and art/notes/macos-port.md.
 #
+# Manual run: Actions -> regression -> Run workflow. Tick "safe_only" to run
+# just the linux-safe job (strict + readonly); leave it off for the full suite.
+#
 # Status: all five jobs are a gate. The Windows build still has no regex (no
 # PCRE is compiled there yet), so run-windows-regression.bat probes for the
 # engine and skips the regex-dependent tests accordingly; the remaining
@@ -30,6 +33,11 @@ on:
     branches: [ main ]
   pull_request:
   workflow_dispatch:
+    inputs:
+      safe_only:
+        description: "Run only the safe build and its focused tests"
+        type: boolean
+        default: false
 
 # Homebrew installs FPC (arm64) and openssl@3. Its per-install auto-update and
 # cleanup dominate a bottle that is already in the download cache, so skip
@@ -41,13 +49,15 @@ env:
 
 # Cancel an in-progress run when the same ref is pushed again.
 concurrency:
-  group: regression-${{ github.ref }}
+  # A manual safe-only run must not cancel an in-progress full regression.
+  group: regression-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && inputs.safe_only && 'safe' || 'full' }}
   cancel-in-progress: true
 
 jobs:
   # ---------------------------------------------------------------- POSIX ---
   unix:
     name: ${{ matrix.name }}
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.safe_only }}
     strategy:
       fail-fast: false
       matrix:
@@ -354,6 +364,7 @@ jobs:
   # -------------------------------------------------------------- WINDOWS ---
   windows-x64:
     name: windows-x64
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.safe_only }}
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
