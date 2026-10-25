@@ -104,8 +104,9 @@
 
 - 读类:`load/find/hash/size/time(读)` → **FSR**。
 - 写类:`save`、`copy`、`move(文件)`、`time(set:)` → **FSW**。
-- `hash` 当前实现是 `CIO.Load` 的别名，返回**文件内容**，不是摘要；旧注释
-  "0-MD5,1-SHA1" 已过时。按 FSR 内容读处理。
+- `hash` 读取完整文件内容后返回摘要：`f.hash()` 是 MD5（32 位十六进制），
+  `f.hash(1)` 是 SHA1（40 位）。它仍会读文件内容，按 FSR 处理；摘要不能还原
+  内容，但可做内容匹配/存在性探测。
 - `size` 在 Unix 已改为 `stat`（不再 open/seek），Windows 用
   `FindFirstFile`，两者都是纯 metadata 读取。
 - `time` 的 `set` 参数会调用 `SetFileTime`/`FileSetDate`，所以必须按写能力

@@ -7,9 +7,10 @@ test('file reads are allowed', {
   assert.is_true('README.md'.size() > 0);
   assert.is_true('README.md'.time() > 0);
   assert.not_nil('README.md'.find());
-  // `hash` currently returns the file content (see SAFETY.zh.md), so it is a
-  // read capability, not a digest.
-  assert.is_true('README.md'.hash().length() > 0);
+  // `hash()` is MD5 (32 hex), `hash(1)` is SHA1 (40 hex). Both read the file
+  // content, so they are read capabilities.
+  assert.equal('README.md'.hash().length(), 32);
+  assert.equal('README.md'.hash(1).length(), 40);
 });
 
 test('file writes are still blocked', {
