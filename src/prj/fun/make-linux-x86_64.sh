@@ -99,7 +99,10 @@ FPC_BINDIR="$(dirname "$FPC_BIN")"
 export PATH="$FPC_BINDIR:$PATH"
 
 # --- Build bundled PCRE (8-bit) for Linux ------------------------
-PCRE_SRC="${PCRE_SRC:-$(cd "$HERE/../../3rd/pcre-8" 2>/dev/null && pwd)}"
+PCRE_SRC="${PCRE_SRC:-}"
+if [ -z "$PCRE_SRC" ] && [ -d "$HERE/../../3rd/pcre-8" ]; then
+    PCRE_SRC="$(cd "$HERE/../../3rd/pcre-8" && pwd)"
+fi
 PCRE_FLAGS=""
 if [ -n "$PCRE_SRC" ] && [ -f "$PCRE_SRC/pcre_compile.c" ]; then
     PCRE_LIB="$PCRE_SRC/linux-lib"
@@ -164,7 +167,10 @@ fi
 # vendored TCC source (same version as the shipped Windows DLL, 0.9.27), drop
 # it next to funcmd, and link funcmd with -rpath $ORIGIN so the bare soname
 # resolves there - the Linux analogue of Windows' "DLL next to the .exe".
-TCC_SRC="${TCC_SRC:-$(cd "$HERE/../../3rd/tcc" 2>/dev/null && pwd)}"
+TCC_SRC="${TCC_SRC:-}"
+if [ -z "$TCC_SRC" ] && [ -d "$HERE/../../3rd/tcc" ]; then
+    TCC_SRC="$(cd "$HERE/../../3rd/tcc" && pwd)"
+fi
 TCC_FLAGS=""
 if [ -n "$TCC_SRC" ] && [ -f "$TCC_SRC/libtcc.c" ] && command -v gcc >/dev/null 2>&1; then
     TCC_LIB="$HERE/libtcc.so"
