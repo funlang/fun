@@ -48,10 +48,11 @@ test('movs to a numeric address is blocked', {
   assert.raises({ 'abc'.movs(0); }, 'safe mode');
 });
 
-test('toNum raw pointer reads are blocked', {
-  assert.raises({ 'abcd'.toNum(ptr: 1); }, 'safe mode');
-  assert.raises({ 'abcd'.toNum(ptr: 2); }, 'safe mode');
-  assert.raises({ 'abcdefgh'.toNum(ptr: 3); }, 'safe mode');
+test('toNum bounded reinterpret reads are allowed', {
+  var i = 'abcd'.toNum(ptr: 1);
+  'abcd'.toNum(ptr: 2);
+  'abcdefgh'.toNum(ptr: 3);
+  assert.is_true(i <> 0);
 });
 
 test('fromByte raw writes are blocked', {

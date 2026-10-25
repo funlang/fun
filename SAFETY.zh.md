@@ -19,12 +19,13 @@
 >
 > 作者同日定：
 > - **不做 COW**：字符串赋值/传参保持**引用语义**（`b := a; b[i] = x` 改到 `a` 是预期行为）。
-> - **`s.move(numDest)` / `toNum(ptr:-1)`** 保留为"不安全内存操作"，等安全构建按 MEM 拦。
+> - **`s.move(numDest)` / `toNum(ptr:-1)`** 保留为"不安全内存操作"；安全构建拦
+>   `move`，`toNum(ptr:-1)` 只返回字符串地址，单独无法读写，暂不拦。
 > - **`movs` 管好**（已加边界）；**超大分配**（`@count(超大)`/`l[超大]`/`.x(超大)`）先放过。
 >
-> 本文档剩下的 MEM/NAT/FSW 拦截（`s.move(numDest)`、`toNum(ptr:1/2/3)`、
-> `getapi/@toCallback/COM`）已由 2026-10-25 的编译期安全构建实现。`toNum(ptr:-1)`
-> 仍按本文档的"提示而非拦截"保留。
+> 本文档剩下的 MEM/NAT/FSW 拦截（`s.move(numDest)`、`getapi/@toCallback/COM`）
+> 已由 2026-10-25 的编译期安全构建实现。`toNum(ptr:-1)` 与 `toNum(ptr:1/2/3)`
+> 保留：前者只把字符串地址当整数返回，后者只读字符串缓冲自身且已有长度校验。
 
 ---
 
@@ -71,7 +72,7 @@
 |---|---|---|---|
 | `0`(默认) | `CParser.StrToNum(exp.value^)` 行 652 字符串→数 | — | **安全** |
 | `-1` | `PData(exp.value).VInteger` 行 657 读整型位模式 | MEM(弱) | 提示 |
-| `1/2/3` | 把字符串缓冲强制当 `int/single/double` **指针解引用读** 行 660–671 | MEM | **拦** |
+| `1/2/3` | 把**接收者自己的字符串缓冲**当 `int/single/double` 读，长度不足返回 0 | MEM(弱) | **不拦**（有长度校验，不能越界） |
 
 ### 1.4 `fromByte` / `toByte` — `_fromByte`(行 698)、`_toByte`(行 683)
 
@@ -139,7 +140,7 @@
 | `move` 数值分支 | `dest`/接收者为数值 | MEM | 拦 |
 | `move` 文件分支 | `dest` 为字符串 | FSW | 拦 |
 | `movs` | `dest` 为数值 | MEM | 拦 |
-| `toNum` | `ptr∈{1,2,3}` | MEM | 拦 |
+| `toNum` | `ptr∈{1,2,3}` | MEM(弱) | 不拦（仅缓冲内重解释） |
 | `toNum` | `ptr=0/-1` | — | 不拦 |
 | `fromByte` | 任意 | MEM | 拦 |
 | `toByte` | 任意(读) | — | 不拦 |
@@ -171,7 +172,7 @@
 
 - 普通模式行为不变(回归全过,含 `test-jit-cb.fun`)。
 - 安全构建（`funcmd-safe`）下:
-  - `'abc'.move(123456)`、`x.toNum(ptr:1)`、`'ab'.fromByte(5, 65)` → 抛;
+  - `'abc'.move(123456)`、`'ab'.fromByte(5, 65)` → 抛;
   - `'123'.toNum()`、`'$name'.eval()`、`f.move(f2)`(如仍允许文件则可)按策略;
   - `getapi`、`lib-tcc/lib-jit/lib-asm` 路径 → 抛;
   - 纯数据处理(JSON/FD、字符串、集合、正则)不受影响。
@@ -190,9 +191,8 @@ fun/test/run-safe-regression.sh      # 只跑 safe 能力测试
 
 落点：
 
-- `src/lib/libase.pas`：`move`、`movs(数值目标)`、`toNum(ptr:1/2/3)`、
-  `fromByte`、`compile(文件/inline)`、`load/find/hash/size/time(文件)`、
-  `save/copy/move(文件)`。
+- `src/lib/libase.pas`：`move`、`movs(数值目标)`、`fromByte`、
+  `compile(文件/inline)`、`load/find/hash/size/time(文件)`、`save/copy/move(文件)`。
 - `src/lib/lffi.pas` / `winapi.pas` / `winole.pas`：`getapi`、`@toCallback`、
   COM `NewObj` / `@toEvent`。
 - `src/core/core.pas`：`CIdx.done` 的浮点下标字节写。

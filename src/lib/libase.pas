@@ -1036,10 +1036,6 @@ begin
     val^ := CParser.StrToNum(exp.value^)
   else
   begin
-    {$IfDef FunSafe}
-    if (p = 1) or (p = 2) or (p = 3) then
-      SafeDeny('toNum raw pointer read');
-    {$EndIf}
     s := exp.asStr();
     if p = -1 then
       val^ := fun.intptr(rawPtr(exp.value))
