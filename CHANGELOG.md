@@ -13,7 +13,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
   access, and compile-from-file or `inline` loading; readonly allows file
   reads, readwrite also allows writes, and `custom` selects categories with
   `SAFE_ALLOW`. The default `funcmd` and its full regression suite are
-  unchanged; a separate `linux-safe` CI job verifies strict and readonly.
+  unchanged; a separate `linux-safe` CI job verifies strict and readonly on
+  manual dispatch only.
 
 - On Unix, file `size` now uses `stat` instead of opening and seeking the
   file, so it also works for unreadable files.

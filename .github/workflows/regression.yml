@@ -19,7 +19,8 @@
 # and art/notes/macos-port.md.
 #
 # Manual run: Actions -> regression -> Run workflow. Tick "safe_only" to run
-# just the linux-safe job (strict + readonly); leave it off for the full suite.
+# just the linux-safe job (strict + readonly). Push and pull_request runs the
+# full suite without linux-safe; leave safe_only off for the same full suite.
 #
 # Status: all five jobs are a gate. The Windows build still has no regex (no
 # PCRE is compiled there yet), so run-windows-regression.bat probes for the
@@ -309,9 +310,11 @@ jobs:
   # The safe build is a separate binary (-dFunSafe, funcmd-safe) with native
   # code, raw memory, file I/O and compile-from-file disabled. It has its own
   # focused capability test instead of the full regression suite, so the
-  # default build's baseline is unaffected.
+  # default build's baseline is unaffected. Manual only: push/PR skip it, and
+  # a workflow_dispatch run needs safe_only=true.
   linux-safe:
     name: linux-safe
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.safe_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

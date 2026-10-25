@@ -12,7 +12,7 @@
   `@toCallback`、COM）、任意地址读写、文件访问，以及从文件或 `inline`
   加载代码；只读档放开文件读，读写档再放开文件写，`custom` 通过
   `SAFE_ALLOW` 选择。默认 `funcmd` 与其完整回归不变；`linux-safe` CI job
-  分别验证 strict 和 readonly。
+  分别验证 strict 和 readonly，且只在手动触发时运行。
 
 - Unix 上文件 `size` 改用 `stat`，不再打开文件 seek 到末尾；不可读文件也能
   取得大小。

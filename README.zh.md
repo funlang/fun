@@ -485,7 +485,8 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 档位在构建脚本选择：`SAFE=strict` 全禁，`SAFE=readonly` 放开文件读，
 `SAFE=readwrite` 再放开文件写，`SAFE=custom SAFE_ALLOW=read,write,compile`
 按需组合。默认的 `funcmd` 与完整回归不受影响，CI 里的 `linux-safe` job
-分别验证 strict 与 readonly。
+分别验证 strict 与 readonly，且只在手动触发（`safe_only`）时运行，
+普通 push/PR 不会跑 safe 部分。
 
 ---
 

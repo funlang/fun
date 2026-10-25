@@ -18,7 +18,8 @@
 > `SAFE_ALLOW=read,write,compile` 选择。默认构建与回归基线完全不变。没有
 > 运行时 `-safe` 开关：需要安全能力时单独编译。测试见
 > `fun/test/safe-mode-test.fun` / `safe-readonly-test.fun` 与
-> `fun/test/run-safe-regression.sh`，CI 是独立的 `linux-safe` job。
+> `fun/test/run-safe-regression.sh`，CI 是独立的 `linux-safe` job，只在
+> 手动触发（`safe_only`）时运行。
 >
 > 作者同日定：
 > - **不做 COW**：字符串赋值/传参保持**引用语义**（`b := a; b[i] = x` 改到 `a` 是预期行为）。

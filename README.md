@@ -505,8 +505,9 @@ COM), arbitrary-address memory access, file access, and compile-from-file or
 `SAFE=strict` blocks all of them, `SAFE=readonly` allows file reads,
 `SAFE=readwrite` also allows writes, and `SAFE=custom
 SAFE_ALLOW=read,write,compile` selects categories explicitly. The default
-`funcmd` and its full regression suite are unchanged; CI verifies strict and
-readonly in a separate `linux-safe` job.
+`funcmd` and its full regression suite are unchanged; a separate `linux-safe`
+CI job verifies strict and readonly, and it only runs on manual dispatch
+(`safe_only`), not on push/PR.
 
 ---
 
