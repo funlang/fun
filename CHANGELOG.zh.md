@@ -6,6 +6,8 @@
 
 ## [未发布]
 
+## [9.4.7] - 2026-10-25
+
 - 新增分级的编译期安全构建：`SAFE=strict|readonly|readwrite|custom
   ./make-linux-x86_64.sh` 生成独立的 `funcmd-safe`（`-dFunSafe` 加
   `-dFunSafeAllowRead/Write/Compile`）。严格档去掉本机代码（`getapi`、
@@ -13,6 +15,20 @@
   加载代码；只读档放开文件读，读写档再放开文件写，`custom` 通过
   `SAFE_ALLOW` 选择。默认 `funcmd` 与其完整回归不变；`linux-safe` CI job
   分别验证 strict 和 readonly，且只在手动触发时运行。
+
+- 新增 `HttpSession` cookie 服务端会话（RFC 6265）。cookie 里只放随机
+  SID，数据留在 store（默认内存，也可换成带 `get`/`set`/`destroy` 的后端）。
+  选项覆盖 `ttl`、`maxAge`、`secure`、`sameSite`、`domain`、`path` 和
+  `httpOnly`；登录后用 `SessionRegenerate` 轮换 SID，`req.session = nil`
+  即登出。附带 `http-session-demo` 示例与测试。
+
+- 新增 `lib-path` 标准库：跨平台的 `PathClean`、`PathJoin`、`PathDir`、
+  `PathBase`、`PathExt`、`PathIsAbs`、`PathToSlash` 和 `PathFromSlash`，
+  Unix 用 `/`，Windows 用 `\` 并识别盘符。
+
+- Unix libc 没有 `getentropy` 时（glibc < 2.25），`uuid` 改为读取
+  `/dev/urandom`，`UUID()` 因此在较老的 Linux 上也能用；仍然在没有 OS
+  随机源时抛错。
 
 - Unix 上文件 `size` 改用 `stat`，不再打开文件 seek 到末尾；不可读文件也能
   取得大小。

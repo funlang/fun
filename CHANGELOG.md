@@ -6,6 +6,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.4.7] - 2026-10-25
+
 - Add a leveled compile-time safe build: `SAFE=strict|readonly|readwrite|custom
   ./make-linux-x86_64.sh` produces the separate `funcmd-safe` binary
   (`-dFunSafe` plus `-dFunSafeAllowRead/Write/Compile`). Strict removes native
@@ -15,6 +17,22 @@ This project records notable changes in the style of [Keep a Changelog](https://
   `SAFE_ALLOW`. The default `funcmd` and its full regression suite are
   unchanged; a separate `linux-safe` CI job verifies strict and readonly on
   manual dispatch only.
+
+- Add `HttpSession`, cookie-backed server-side sessions (RFC 6265). The cookie
+  carries only a random SID; data stays in a store (in-memory by default, or a
+  `get`/`set`/`destroy` backend). Options cover `ttl`, `maxAge`, `secure`,
+  `sameSite`, `domain`, `path`, and `httpOnly`; `SessionRegenerate` rotates the
+  SID after login and `req.session = nil` logs out. Add the
+  `http-session-demo` example and tests.
+
+- Add the `lib-path` standard-library module with cross-platform
+  `PathClean`, `PathJoin`, `PathDir`, `PathBase`, `PathExt`, `PathIsAbs`,
+  `PathToSlash`, and `PathFromSlash`, using `/` on Unix and `\` plus drive
+  letters on Windows.
+
+- `uuid` falls back to reading `/dev/urandom` when the Unix libc has no
+  `getentropy` (glibc < 2.25), so `UUID()` also works on older Linux hosts;
+  it still raises when no OS source is available.
 
 - On Unix, file `size` now uses `stat` instead of opening and seeking the
   file, so it also works for unreadable files.
