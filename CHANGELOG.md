@@ -6,6 +6,14 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Add a compile-time safe build: `SAFE=1 ./make-linux-x86_64.sh` produces the
+  separate `funcmd-safe` binary (`-dFunSafe`), which removes native code
+  (`getapi`, `@toCallback`, COM), raw memory access, file read/write/rename,
+  and compile-from-file or `inline` code loading at compile time. The default
+  `funcmd` and its full regression suite are unchanged; the safe build is
+  verified by `fun/test/run-safe-regression.sh` in a separate `linux-safe` CI
+  job.
+
 ## [9.4.6] - 2026-10-22
 
 - Add `fun test`, a package test runner. It finds every `*_test.fun` below the

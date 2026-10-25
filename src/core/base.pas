@@ -37,6 +37,13 @@ var
 type
   EBase  = SysUtils.Exception;
 
+{$IfDef FunSafe}
+// Compile-time safe build (-dFunSafe): the interpreter withholds capabilities
+// that are fine for trusted scripts but unsafe for generated/untrusted code.
+// See SAFETY.zh.md for the category list.
+procedure SafeDeny(const what: fun.str);
+{$EndIf}
+
 type
   PArrayOfPtr = ^ArrayOfPtr;
    ArrayOfPtr = array[0..Maxint div 16 - 1] of fun.ptr;
@@ -202,6 +209,13 @@ implementation
 {$IfDef Unicode}{$WARN WIDECHAR_REDUCED OFF}{$EndIf}
 
 uses Variants;
+
+{$IfDef FunSafe}
+procedure SafeDeny(const what: fun.str);
+begin
+  raise EBase.Create('safe mode: ' + what + ' is not allowed');
+end;
+{$EndIf}
 
 {$IfDef FPC}
 // FPC's own VarToDateTime is not locale-independent: it goes through

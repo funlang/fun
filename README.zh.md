@@ -473,6 +473,17 @@ float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scala
 `windows-arm64` 已暂时禁用：所钉住的工具链 FPC 3.2.2 没有 win64/aarch64 目标，
 没有可用的构建方式。
 
+需要运行不受信任的脚本时，可以单独编译安全构建：
+
+```sh
+cd src/prj/fun && SAFE=1 ./make-linux-x86_64.sh   # 产出 funcmd-safe
+fun/test/run-safe-regression.sh                   # 只跑安全能力测试
+```
+
+`funcmd-safe`（`-dFunSafe`）在编译期去掉本机代码（`getapi` / `@toCallback` /
+COM）、原始内存读写、文件读写/改名、以及从文件或 `inline` 加载代码这些路径。
+默认的 `funcmd` 与完整回归不受影响，CI 里的 `linux-safe` job 单独验证它。
+
 ---
 
 ## 标准库

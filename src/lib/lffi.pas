@@ -127,6 +127,9 @@ var
   f: CFFIFun;
   e: CExp;
 begin
+  {$IfDef FunSafe}
+  SafeDeny('getapi native call');
+  {$EndIf}
   // exp is the shared object name (or '' when calling a raw address); the
   // optional named arg 'name' is the exported symbol to resolve.
   libname := exp.asStr;
@@ -360,6 +363,9 @@ var
   c: CFFICallback;
   e: CExp;
 begin
+  {$IfDef FunSafe}
+  SafeDeny('native callback');
+  {$EndIf}
   c := CFFICallback.Create.Parse(exp, exps, env);
   e := CExps.Find(exps, 'ptr', 2);
   if (e <> nil) and e.asBool then

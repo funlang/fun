@@ -94,6 +94,9 @@ begin
     exit;
   end;
 
+  {$IfDef FunSafe}
+  SafeDeny('COM object creation');
+  {$EndIf}
   val^ := _newOle(exp.asStr, CExps.FindAsVal(exps, 'get', 0, false));
 end;
 
@@ -102,6 +105,9 @@ end;
 //   DispIDs: 1 or 1,2,3
 procedure _toEvent(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 begin
+  {$IfDef FunSafe}
+  SafeDeny('COM event binding');
+  {$EndIf}
   val^ := CEvent.Create.Parse(exp, exps, env);
 end;
 

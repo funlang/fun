@@ -92,6 +92,9 @@ var
   wfun: CWinFun;
   e: CExp;
 begin
+  {$IfDef FunSafe}
+  SafeDeny('getapi native call');
+  {$EndIf}
   hlib := 0;
   name := exp.asStr;
   if name <> '' then
@@ -124,6 +127,9 @@ var
   c: CCallback;
   e: CExp;
 begin
+  {$IfDef FunSafe}
+  SafeDeny('native callback');
+  {$EndIf}
   c := CCallback.Create.Parse(exp, exps, env);
   e := CExps.Find(exps, 'ptr', 2);
   if (e <> nil) and e.asBool then

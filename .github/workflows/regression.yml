@@ -6,6 +6,7 @@
 #   linux-arm64  ubuntu-24.04-arm  native FPC + full suite (linux-aarch64 skips)
 #   macos-x64    macos-15-intel    FPC universal dmg + macOS suite
 #   macos-arm64  macos-latest      Homebrew FPC 3.2.2 bottle + macOS suite
+#   linux-safe   ubuntu-24.04      SAFE=1 build + focused capability test only
 #   windows-x64  windows-latest    FPC (ppcrossx64) + the Windows runner (portable subset)
 #
 # windows-arm64 is disabled: FPC 3.2.2 has no win64/aarch64 target, so there is
@@ -293,6 +294,53 @@ jobs:
         env:
           FUNREG_PLATFORM: ${{ matrix.platform }}
         run: fun/test/run-linux-regression.sh
+
+  # ----------------------------------------------------------------- SAFE ---
+  # The safe build is a separate binary (-dFunSafe, funcmd-safe) with native
+  # code, raw memory, file I/O and compile-from-file disabled. It has its own
+  # focused capability test instead of the full regression suite, so the
+  # default build's baseline is unaffected.
+  linux-safe:
+    name: linux-safe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Free Pascal 3.2.2
+        id: cache-fpc-safe
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/fpc-3.2.2
+            ~/.fpc.cfg
+          key: fpc-3.2.2-safe-x86_64-linux
+
+      - name: Install Free Pascal 3.2.2
+        if: steps.cache-fpc-safe.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          cd "$RUNNER_TEMP"
+          curl -fsSL --retry 3 -o fpc.tar \
+            "https://downloads.sourceforge.net/project/freepascal/Linux/3.2.2/fpc-3.2.2.x86_64-linux.tar"
+          mkdir -p fpc && tar -xf fpc.tar -C fpc
+          cd fpc/fpc-3.2.2.*-linux
+          printf '%s\n\n\n\n\n\n\n\n\n\n' "$HOME/fpc-3.2.2" | ./install.sh
+
+      - name: Put fpc on PATH
+        run: echo "$HOME/fpc-3.2.2/bin" >> "$GITHUB_PATH"
+
+      - name: Build funcmd-safe
+        run: |
+          cd src/prj/fun
+          SAFE=1 ./make-linux-x86_64.sh 2>&1 | tee /tmp/build-safe.log
+          # The NAT checks exercise getapi/@toCallback. They are only
+          # meaningful when the FFI backend is compiled in, which the regular
+          # Linux CI also requires.
+          grep -q "FFI enabled" /tmp/build-safe.log
+
+      - name: Safe capability regression
+        run: fun/test/run-safe-regression.sh
 
   # -------------------------------------------------------------- WINDOWS ---
   windows-x64:

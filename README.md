@@ -492,6 +492,18 @@ list when either is missing.
 `windows-arm64` is disabled: FPC 3.2.2, the pinned toolchain, has no
 win64/aarch64 target, so there is nothing to build with.
 
+For untrusted scripts, build the separate capability-restricted interpreter:
+
+```sh
+cd src/prj/fun && SAFE=1 ./make-linux-x86_64.sh   # produces funcmd-safe
+fun/test/run-safe-regression.sh                   # focused capability tests
+```
+
+`funcmd-safe` (`-dFunSafe`) removes native code (`getapi` / `@toCallback` /
+COM), raw memory access, file read/write/rename, and compile-from-file or
+`inline` code loading at compile time. The default `funcmd` and its full
+regression suite are unchanged; CI verifies the safe build in a separate
+`linux-safe` job.
 
 ---
 

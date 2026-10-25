@@ -10,13 +10,21 @@
 > `.toByte/.fromByte/.toNum(ptr:)/.movs/.x/.toStr`、`CList.Count/GetItem` 都加了边界校验
 > （写越界 raise，读越界给安全默认值）。
 >
+> **2026-10-25 更新：编译期安全构建已落地。** `SAFE=1 ./make-linux-x86_64.sh`
+> 生成独立的 `funcmd-safe`（`-dFunSafe`），下面列出的 NAT/MEM/FSR/FSW/SRC
+> 拦截点在该二进制中生效；默认构建与回归基线完全不变。没有运行时 `-safe`
+> 开关，也没有等级或权限列表：需要安全能力时单独编译。测试见
+> `fun/test/safe-mode-test.fun` 与 `fun/test/run-safe-regression.sh`，CI 是
+> 独立的 `linux-safe` job，默认不跑完整回归。
+>
 > 作者同日定：
 > - **不做 COW**：字符串赋值/传参保持**引用语义**（`b := a; b[i] = x` 改到 `a` 是预期行为）。
-> - **`s.move(numDest)` / `toNum(ptr:-1)`** 保留为"不安全内存操作"，等 `-safe` 按 MEM 拦。
+> - **`s.move(numDest)` / `toNum(ptr:-1)`** 保留为"不安全内存操作"，等安全构建按 MEM 拦。
 > - **`movs` 管好**（已加边界）；**超大分配**（`@count(超大)`/`l[超大]`/`.x(超大)`）先放过。
 >
-> 本文档剩下的 MEM/NAT/FSW 拦截（`-safe` 开关、`s.move(numDest)`、`toNum(ptr:-1)`、
-> `getapi/@toCallback/COM`）**尚未实现**，仍按本文档规划走。
+> 本文档剩下的 MEM/NAT/FSW 拦截（`s.move(numDest)`、`toNum(ptr:1/2/3)`、
+> `getapi/@toCallback/COM`）已由 2026-10-25 的编译期安全构建实现。`toNum(ptr:-1)`
+> 仍按本文档的"提示而非拦截"保留。
 
 ---
 
@@ -162,8 +170,32 @@
 ## 6. 验收
 
 - 普通模式行为不变(回归全过,含 `test-jit-cb.fun`)。
-- `-safe` 下:
+- 安全构建（`funcmd-safe`）下:
   - `'abc'.move(123456)`、`x.toNum(ptr:1)`、`'ab'.fromByte(5, 65)` → 抛;
   - `'123'.toNum()`、`'$name'.eval()`、`f.move(f2)`(如仍允许文件则可)按策略;
   - `getapi`、`lib-tcc/lib-jit/lib-asm` 路径 → 抛;
   - 纯数据处理(JSON/FD、字符串、集合、正则)不受影响。
+
+## 7. 实现方式(2026-10-25)
+
+没有运行时开关。`-dFunSafe` 把拦截写进编译产物，危险分支在 safe 二进制里
+只剩 `SafeDeny`（`src/core/base.pas`）。默认构建不包含这些分支，所以行为与
+性能都不变。
+
+```sh
+cd src/prj/fun
+SAFE=1 ./make-linux-x86_64.sh        # 产出 funcmd-safe，不覆盖 funcmd
+fun/test/run-safe-regression.sh      # 只跑 safe 能力测试
+```
+
+落点：
+
+- `src/lib/libase.pas`：`move`、`movs(数值目标)`、`toNum(ptr:1/2/3)`、
+  `fromByte`、`compile(文件/inline)`、`load/find/hash/size/time(文件)`、
+  `save/copy/move(文件)`。
+- `src/lib/lffi.pas` / `winapi.pas` / `winole.pas`：`getapi`、`@toCallback`、
+  COM `NewObj` / `@toEvent`。
+- `src/core/core.pas`：`CIdx.done` 的浮点下标字节写。
+
+`SAFE=1` 目前只接在 Linux 构建脚本上；拦截本身是平台无关的编译条件，后续
+需要时可在 macOS/Windows 构建脚本里加同一个 `-dFunSafe`。

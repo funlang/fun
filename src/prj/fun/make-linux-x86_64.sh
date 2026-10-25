@@ -28,11 +28,17 @@
 # consumer runtime (-dFunPackUser): bundled apps run, but there is no
 # "fun pack" subcommand.
 #
+# -dFunSafe enables the capability-restricted safe build (no native code, raw
+# memory, file I/O, or compile-from-file). It is a separate binary,
+# funcmd-safe, so the default build and its regression baseline stay unchanged.
+# Build it with SAFE=1. See SAFETY.zh.md.
+#
 # Usage:
 #   ./make-linux-x86_64.sh            # FPC resolved from PATH
 #   FPC=/path/to/fpc ./make-linux-x86_64.sh
 #   PCRE_SRC=/abs/path/to/pcre ./make-linux-x86_64.sh
 #   TCC_SRC=/abs/path/to/tcc ./make-linux-x86_64.sh
+#   SAFE=1 ./make-linux-x86_64.sh     # build funcmd-safe
 #
 # Integer/double arithmetic, comparison, Boolean-result and integer div/mod
 # fast paths (src/core/calc.inc) are on by default; they avoid the much slower
@@ -207,8 +213,15 @@ if [ "${FUNPACK:-}" = "user" ]; then
     PACK_FLAGS="-dFunPackUser"
     echo "FUNPACK=user - building only the bundled-app consumer."
 fi
+SAFE_FLAGS=""
+SAFE_OUT=""
+if [ -n "${SAFE:-}" ]; then
+    SAFE_FLAGS="-dFunSafe"
+    SAFE_OUT="-o$HERE/funcmd-safe"
+    echo "SAFE set - building the capability-restricted funcmd-safe."
+fi
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $SAFE_FLAGS $SAFE_OUT $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) -------------
 # Refresh fun/funcmd on every build, so a run from the repo root is just
@@ -217,10 +230,17 @@ fi
 # the copy needs libtcc.so beside it as well. Deliberately NOT the repo root:
 # keep the root clean and the binaries with the demo/ and lib/ they drive.
 ROOT="$(cd "$HERE/../../.." && pwd)"
-if [ -f "$HERE/funcmd" ] && [ -d "$ROOT/fun" ]; then
-    cp -f "$HERE/funcmd" "$ROOT/fun/funcmd"
+if [ -n "${SAFE:-}" ]; then
+    BUILD_BIN="$HERE/funcmd-safe"
+    TARGET_BIN="$ROOT/fun/funcmd-safe"
+else
+    BUILD_BIN="$HERE/funcmd"
+    TARGET_BIN="$ROOT/fun/funcmd"
+fi
+if [ -f "$BUILD_BIN" ] && [ -d "$ROOT/fun" ]; then
+    cp -f "$BUILD_BIN" "$TARGET_BIN"
     if [ -f "$HERE/libtcc.so" ]; then
         cp -f "$HERE/libtcc.so" "$ROOT/fun/libtcc.so"
     fi
-    echo "Copied funcmd to $ROOT/fun/funcmd"
+    echo "Copied $(basename "$BUILD_BIN") to $TARGET_BIN"
 fi

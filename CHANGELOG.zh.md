@@ -6,6 +6,13 @@
 
 ## [未发布]
 
+- 新增编译期安全构建：`SAFE=1 ./make-linux-x86_64.sh` 生成独立的
+  `funcmd-safe`（`-dFunSafe`），在编译期去掉本机代码（`getapi`、
+  `@toCallback`、COM）、原始内存读写、文件读写/改名，以及从文件或
+  `inline` 加载代码的路径。默认 `funcmd` 与其完整回归不变；安全构建由
+  `fun/test/run-safe-regression.sh` 单独验证，CI 使用独立的 `linux-safe`
+  job。
+
 ## [9.4.6] - 2026-10-22
 
 - 新增 `fun test` 包测试运行器。它查找项目根目录下所有 `*_test.fun`，每个
