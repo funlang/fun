@@ -46,6 +46,7 @@ raw-address-getapi.fun	test/raw-address-getapi.fun	snap
 lib-os-dispatch-prototype.fun	test/lib-os-dispatch-prototype.fun	snap
 libc-outbuf.fun	test/libc-outbuf.fun	snap
 lib-host-test.fun	test/lib-host-test.fun	snap
+lib-env-test.fun	test/lib-env-test.fun	snap
 lib-path-test.fun	test/lib-path-test.fun	snap
 lib-logging-test.fun	test/lib-logging-test.fun	snap
 lib-cmdline-linux.fun	test/lib-cmdline-linux.fun	snap
