@@ -1,3 +1,4 @@
+LOAD  env
 LOAD  http-auth
 LOAD  http-bearer
 LOAD  http-client
@@ -70,4 +71,4 @@ LOAD  logging
 LOAD  test
 LOAD  uuid
 
-loaded=65 failed=6
+loaded=66 failed=6

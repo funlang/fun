@@ -39,6 +39,7 @@ var _isLinux    = _hostOs = 'linux';
 var _isMac      = _hostOs = 'macos';
 var _isUnix     = _isLinux or _isMac;   // both POSIX, share the libc branch
 var _hostSep    = '/';
+var _hostChars  = _hostFacts.chars;
 
 fun IsWindows()
   result = _isWindows;
@@ -112,11 +113,21 @@ var _hostGetFullPath;   // Windows: kernel32.GetFullPathName
 var _hostGetCmdLine;    // Windows: kernel32.GetCommandLine
 var _hostGetCwd;        // Unix: LibC().getcwd
 var _hostGetenv;        // Unix: LibC().getenv
+var _hostSetenv;        // Unix: LibC().setenv
+var _hostUnsetenv;      // Unix: LibC().unsetenv
 var _hostStrlen;        // Unix: LibC().strlen
+var _hostGetEnvA;       // Windows: GetEnvironmentVariableA
+var _hostGetEnvW;       // Windows: GetEnvironmentVariableW
+var _hostSetEnvA;       // Windows: SetEnvironmentVariableA
+var _hostSetEnvW;       // Windows: SetEnvironmentVariableW
+var _hostGetLastError;  // Windows: GetLastError
+var _hostSetLastError;  // Windows: SetLastError
 
 if _isUnix then
   _hostGetCwd  = LibC().getapi('getcwd',  'pi:p');
   _hostGetenv  = LibC().getapi('getenv',  's:p');
+  _hostSetenv  = LibC().getapi('setenv',  'ssi:i');
+  _hostUnsetenv = LibC().getapi('unsetenv', 's:i');
   _hostStrlen  = LibC().getapi('strlen',  'p:i');
 else
   _hostSep = '\';
@@ -124,6 +135,12 @@ else
   _hostGetCurrPath = 'kernel32'.getapi('GetCurrentDirectory', 'ip:i');
   _hostGetTempPath = 'kernel32'.getapi('GetTempPath',         'ip:i');
   _hostGetFullPath = 'kernel32'.getapi('GetFullPathName',     'sipp:i');
+  _hostGetEnvA     = 'kernel32'.getapi('GetEnvironmentVariableA', 'spi:i');
+  _hostGetEnvW     = 'kernel32'.getapi('GetEnvironmentVariableW', 'spi:i');
+  _hostSetEnvA     = 'kernel32'.getapi('SetEnvironmentVariableA', 'ss:i');
+  _hostSetEnvW     = 'kernel32'.getapi('SetEnvironmentVariableW', 'ss:i');
+  _hostGetLastError = 'kernel32'.getapi('GetLastError', ':i');
+  _hostSetLastError = 'kernel32'.getapi('SetLastError', 'i:');
 end if;
 
 //--------------------------------------------------------------
@@ -237,5 +254,89 @@ fun HostFullPath(f)
     var r = '';
     var ln = _hostGetFullPath(f, _HOST_MAX_PATH, result, r);
     result = result.substr(len: ln);
+  end if;
+end fun;
+
+//--------------------------------------------------------------
+// environment
+//--------------------------------------------------------------
+fun _hostEnvNameOk(name)
+  if name = nil or name = '' then result = false; return; end if;
+  if name.subpos('=') >= 0 or name.subpos(0.toChar()) >= 0 then
+    result = false;
+    return;
+  end if;
+  result = true;
+end fun;
+
+fun HostEnvHas(name)
+  if not _hostEnvNameOk(name) then result = false; return; end if;
+  if _isUnix then
+    result = _hostGetenv(name) <> nil;
+  else
+    // GetEnvironmentVariable returns 0 for both "not found" and "empty".
+    // Reset LastError first, then ERROR_ENVVAR_NOT_FOUND (203) means absent.
+    _hostSetLastError(0);
+    var buf = ' '.x(2);
+    var n;
+    if _hostChars = 2 then
+      n = _hostGetEnvW(name, buf.toNum(-1), 2);
+    else
+      n = _hostGetEnvA(name, buf.toNum(-1), 2);
+    end if;
+    if n > 0 then result = true; return; end if;
+    result = _hostGetLastError() <> 203;
+  end if;
+end fun;
+
+fun HostEnvGet(name)
+  if not HostEnvHas(name) then result = nil; return; end if;
+  if _isUnix then
+    var p = _hostGetenv(name);
+    var n = _hostStrlen(p);
+    if n = 0 then result = ''; return; end if;
+    var buf = ' '.x(n);
+    p.move(buf.toNum(-1), n);
+    result = buf.substr(0, n);
+  else
+    var buf = ' '.x(32768);
+    var n;
+    if _hostChars = 2 then
+      n = _hostGetEnvW(name, buf.toNum(-1), 32768);
+    else
+      n = _hostGetEnvA(name, buf.toNum(-1), 32768);
+    end if;
+    result = buf.substr(0, n);
+  end if;
+end fun;
+
+fun HostEnvSet(name, value)
+  if not _hostEnvNameOk(name) then result = false; return; end if;
+  var v = '';
+  if value <> nil then v = '' & value; end if;
+  if _isUnix then
+    // FFI cannot pass an empty Fun string as a C string pointer.
+    var cv = v;
+    if cv = '' then cv = 0.toChar().x(1); end if;
+    result = _hostSetenv(name, cv, 1) = 0;
+  elsif _hostChars = 2 then
+    var wv = v;
+    if wv = '' then wv = 0.toChar().x(2); end if;
+    result = _hostSetEnvW(name, wv) <> 0;
+  else
+    var av = v;
+    if av = '' then av = 0.toChar().x(1); end if;
+    result = _hostSetEnvA(name, av) <> 0;
+  end if;
+end fun;
+
+fun HostEnvUnset(name)
+  if not _hostEnvNameOk(name) then result = false; return; end if;
+  if _isUnix then
+    result = _hostUnsetenv(name) = 0;
+  elsif _hostChars = 2 then
+    result = _hostSetEnvW(name, nil) <> 0;
+  else
+    result = _hostSetEnvA(name, nil) <> 0;
   end if;
 end fun;
