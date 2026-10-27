@@ -6,6 +6,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.4.8] - 2026-10-27
+
 - Add the `jsonschema` standard-library module for validating JSON/FD data
   against a JSON Schema subset. A schema may be FD (the default authoring
   format), JSON text or an already parsed value. v0 supports `type` (including
@@ -15,6 +17,19 @@ This project records notable changes in the style of [Keep a Changelog](https://
   JSON Pointer path; unknown keywords are ignored unless `opts.strict` is set.
   `$ref`, composition keywords, tuple `items` and `format` are not supported
   yet.
+
+- Add the `env` module for portable environment variables: `env.get(name,
+  default)`, `env.has`, `env.set` and `env.unset`, backed by new `HostEnv*`
+  primitives in `lib-host` (case-sensitive on POSIX, case-insensitive on
+  Windows).
+
+- Add the `fs` module for directories, recursive listing and walking, temporary
+  files and directories, symlink-safe removal and atomic writes. Whole-file
+  read/write/append stays on the built-ins. Includes the `fs-demo` example and
+  a host-neutral test.
+
+- Document the `logging` module, whose code shipped in 9.4.7 but was missing
+  from that release note.
 
 ## [9.4.7] - 2026-10-25
 

@@ -7,5 +7,5 @@
 //   'version' field of 'host'.arg(); both read this constant.
 // funRelease: curated language version string (README Version line),
 //   default '9.4' (or the explicit second argument).
-funVersion = 20261025;
-funRelease = '9.4.7';
+funVersion = 20261027;
+funRelease = '9.4.8';

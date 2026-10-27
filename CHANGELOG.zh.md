@@ -6,6 +6,8 @@
 
 ## [未发布]
 
+## [9.4.8] - 2026-10-27
+
 - 新增 `jsonschema` 标准库模块：按 JSON Schema 子集校验 JSON/FD 数据。schema
   可以用 FD（默认书写格式）、JSON 文本或已解析的值；v0 支持 `type`（含类型
   列表）、`properties` / `required` / `additionalProperties`、`items` /
@@ -13,6 +15,16 @@
   码点计数）、`pattern`（PCRE）、`enum` 与 `const`。错误带 JSON Pointer
   路径；未知关键字默认忽略，`opts.strict` 可改为报错。`$ref`、组合关键字、
   元组式 `items` 与 `format` 暂未支持。
+
+- 新增 `env` 模块：`env.get(name, default)`、`env.has`、`env.set`、
+  `env.unset`，底层是 `lib-host` 新增的 `HostEnv*` 原语（POSIX 区分大小写，
+  Windows 不区分）。
+
+- 新增 `fs` 模块：目录创建、递归 list/walk、临时文件与目录、符号链接安全
+  删除、原子写。整文件读写/追加仍用 built-in。附带 `fs-demo` 示例和
+  与宿主无关的测试。
+
+- 补记 `logging` 模块：代码已在 9.4.7 中发布，但当时的更新日志漏掉了。
 
 ## [9.4.7] - 2026-10-25
 
