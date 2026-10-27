@@ -1552,7 +1552,16 @@ begin
   begin
     pushed := CObj(o).push;
     try
-      Result := inherited call(env, exps)
+      result := p_val;
+      // Native collection methods (@count / @each / @has / @toJson / @clone)
+      // are dispatched through the libraries, but this branch used to go
+      // straight to the class scope, so they all returned nil on a class
+      // instance. Members still win: only the '@' namespace (reserved for
+      // interpreter methods, see _AT in CFun.parse) is offered to the libs,
+      // and a miss falls back to normal member lookup.
+      if (id = '') or (id[1] <> '@') or not env.call(exp, id, exps, result) then
+        Result := inherited call(env, exps)
+      ;
     finally
       if pushed then CObj(o).pop;
     end;
