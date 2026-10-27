@@ -39,7 +39,7 @@
 In one sentence: **Fun is a scripting language that goes all the way from JSON to machine code.**
 
 - One runtime spans the whole spectrum, from high-level data work (JSON/FD) down to low-level system programming (FFI, C at runtime, JIT, machine code);
-- 71 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
+- 74 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
 - in AI-agent and domestic-IT scenarios, it is the lightweight glue connecting OSes, databases, chips, and business logic.
 
 Fun is designed around a simple premise: **data and code should be equally first-class, and a script should be able to reach down to the machine without leaving the language.**
@@ -70,7 +70,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
 - **Cross-platform** — Windows (32/64-bit), Linux, ARM, and Windows CE.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
-- **Self-hosted standard library** — 71 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
+- **Self-hosted standard library** — 74 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
 ---
 
@@ -372,7 +372,7 @@ fun/
 │   ├── utils/         # Utility functions
 │   └── prj/fun/       # Projects & build scripts (funcmd.dpr, Delphi/FPC)
 ├── fun/
-│   ├── lib/           # Standard library (pure Fun, 71 modules)
+│   ├── lib/           # Standard library (pure Fun, 74 modules)
 │   ├── demo/          # Language syntax demos
 │   ├── demos/         # Full applications & benchmarks
 │   └── key_*.ini      # Keyword alias packs (CN / FR / PUA)
@@ -513,11 +513,11 @@ CI job verifies strict and readonly, and it only runs on manual dispatch
 
 ## Standard library
 
-The standard library in [`fun/lib`](fun/lib) is written in pure Fun (71 modules):
+The standard library in [`fun/lib`](fun/lib) is written in pure Fun (74 modules):
 
-> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 71 modules written in Fun itself.
+> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 74 modules written in Fun itself.
 
-- **Data**: `lib-json`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`
+- **Data**: `lib-json`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`
 - **Utility**: `uuid`
 - **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`
 - **Text**: `lib-string`, `lib-regex`, `lib-match`, `lib-unicode`
@@ -565,6 +565,25 @@ link itself, including broken links); `exists/isDir/isFile` follow them.
 Whole-file create/read/append stays on the built-ins — `save(data)`,
 `save(data, append: true)` and `load()`; `fs` focuses on directories,
 temporary entries and atomic replacement.
+
+Data can be validated against a JSON Schema. Schemas are written in FD by
+default, and JSON text or an already parsed value works too:
+
+```fun
+use 'jsonschema.fun';
+
+var schema = 'user.schema.fd'.load();
+var r = JsonSchema.check(data, schema);
+if not r.ok then
+  ?. r.first.path & ': ' & r.first.message;
+end if;
+```
+
+Errors carry a JSON Pointer path (`/user/name`, `/tags/0`). v0 covers `type`
+(including lists), `properties` / `required` / `additionalProperties`,
+`items` / `minItems` / `maxItems`, numeric bounds, `minLength` / `maxLength`
+(counted in Unicode code points), `pattern`, `enum` and `const`; `$ref`,
+composition keywords and tuple `items` are not supported yet.
 
 > **Platform-split convention**: the Windows implementation keeps the plain
 > module name, and the Unix backend is `<name>-unx.fun` (Linux + macOS); the

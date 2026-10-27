@@ -6,6 +6,7 @@ LOAD  http-client
 LOAD  http-cors
 LOAD  http-server
 LOAD  http-session
+LOAD  jsonschema
 LOAD  lib-ado-schema
 LOAD  lib-ado
 LOAD  lib-ajax
@@ -72,4 +73,4 @@ LOAD  logging
 LOAD  test
 LOAD  uuid
 
-loaded=67 failed=6
+loaded=68 failed=6

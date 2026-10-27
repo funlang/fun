@@ -39,7 +39,7 @@
 一句话定位：**Fun 是一门从 JSON 一路写到机器码的脚本语言。**
 
 - 用同一个运行时，覆盖从高层数据处理（JSON/FD）到底层系统编程（FFI、运行时 C、JIT、机器码）的全谱系；
-- 自带 71 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
+- 自带 74 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
 - 在信创与 AI Agent 场景中，作为连接国产 OS、数据库、芯片与业务逻辑的轻量级胶水。
 
 Fun 的设计出发点很简单：**数据与代码都应该是头等公民，而且一段脚本应该能在不离开语言的情况下一路触达机器底层。**
@@ -70,7 +70,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
 - **跨平台** —— Windows（32/64 位）、Linux、ARM 与 Windows CE。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
-- **自托管的标准库** —— 71 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
+- **自托管的标准库** —— 74 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
 ---
 
@@ -365,7 +365,7 @@ fun/
 │   ├── utils/         # 工具函数
 │   └── prj/fun/       # 工程与构建脚本（funcmd.dpr，Delphi/FPC）
 ├── fun/
-│   ├── lib/           # 标准库（纯 Fun 编写，71 个模块）
+│   ├── lib/           # 标准库（纯 Fun 编写，74 个模块）
 │   ├── demo/          # 语言语法演示
 │   ├── demos/         # 完整应用与基准测试
 │   └── key_*.ini      # 关键字别名包（CN / FR / PUA）
@@ -492,11 +492,11 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 
 ## 标准库
 
-标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（71 个模块）：
+标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（74 个模块）：
 
-> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——71 个模块全部用 Fun 自身写成。
+> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——74 个模块全部用 Fun 自身写成。
 
-- **数据**：`lib-json`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`
+- **数据**：`lib-json`、`jsonschema`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`
 - **工具**：`uuid`
 - **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`
 - **文本**：`lib-string`、`lib-regex`、`lib-match`、`lib-unicode`
@@ -541,6 +541,23 @@ fs.atomicWrite('build/out/config.json', data);
 `walk` 与 `removeAll` 不跟随符号链接（`removeAll` 只删除链接本身，含断链）；
 `exists/isDir/isFile` 跟随目标。整文件的创建/读取/追加仍用 built-in：
 `save(data)`、`save(data, append: true)`、`load()`；`fs` 专注目录、临时项和原子替换。
+
+数据可以按 JSON Schema 校验。schema 默认用 FD 写，也接受 JSON 文本或已解析的对象：
+
+```fun
+use 'jsonschema.fun';
+
+var schema = 'user.schema.fd'.load();
+var r = JsonSchema.check(data, schema);
+if not r.ok then
+  ?. r.first.path & ': ' & r.first.message;
+end if;
+```
+
+错误路径是 JSON Pointer（`/user/name`、`/tags/0`）。v0 支持 `type`（含类型列表）、
+`properties` / `required` / `additionalProperties`、`items` / `minItems` / `maxItems`、
+数值上下界、`minLength` / `maxLength`（按 Unicode 码点计数）、`pattern`、`enum`
+与 `const`；`$ref`、组合关键字和元组式 `items` 暂未支持。
 
 > **平台拆分惯例**：Windows 实现保留原名，Unix 后端为 `<name>-unx.fun`（Linux + macOS），
 > 旧的 `<name>-lnx.fun` 名字保留为它之上的薄包装；两者共用的逻辑放在

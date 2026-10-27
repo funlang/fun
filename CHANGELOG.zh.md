@@ -6,6 +6,14 @@
 
 ## [未发布]
 
+- 新增 `jsonschema` 标准库模块：按 JSON Schema 子集校验 JSON/FD 数据。schema
+  可以用 FD（默认书写格式）、JSON 文本或已解析的值；v0 支持 `type`（含类型
+  列表）、`properties` / `required` / `additionalProperties`、`items` /
+  `minItems` / `maxItems`、数值上下界、`minLength` / `maxLength`（按 Unicode
+  码点计数）、`pattern`（PCRE）、`enum` 与 `const`。错误带 JSON Pointer
+  路径；未知关键字默认忽略，`opts.strict` 可改为报错。`$ref`、组合关键字、
+  元组式 `items` 与 `format` 暂未支持。
+
 ## [9.4.7] - 2026-10-25
 
 - 新增分级的编译期安全构建：`SAFE=strict|readonly|readwrite|custom

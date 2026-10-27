@@ -50,6 +50,7 @@ lib-env-test.fun	test/lib-env-test.fun	snap
 lib-fs-test.fun	test/lib-fs-test.fun	snap
 lib-path-test.fun	test/lib-path-test.fun	snap
 lib-logging-test.fun	test/lib-logging-test.fun	snap
+lib-jsonschema-test.fun	test/lib-jsonschema-test.fun	snap
 lib-cmdline-linux.fun	test/lib-cmdline-linux.fun	snap
 lib-loadcheck.sh	test/lib-loadcheck.sh	shell
 run-benchmarks.sh	test/run-benchmarks.sh	shell

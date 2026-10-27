@@ -1,0 +1,42 @@
+# jsonschema: a user record, written in FD (the schema default format).
+# Quoted 'null'/'true'/'false' would be needed for those words as strings;
+# this schema only uses ordinary type names.
+type object
+required
+  - id
+  - tags
+properties
+  id
+    type integer
+    minimum 1
+    maximum 100
+  name
+    type string
+    minLength 2
+    maxLength 5
+    pattern ^[a-z]+$
+  score
+    type number
+    exclusiveMinimum 0
+    exclusiveMaximum 10
+  role
+    enum
+      - admin
+      - user
+  kind
+    const fixed
+  maybe
+    type
+      - string
+      - 'null'
+  meta
+    type object
+    additionalProperties
+      type string
+  tags
+    type array
+    items
+      type string
+    minItems 1
+    maxItems 2
+additionalProperties false

@@ -6,6 +6,16 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Add the `jsonschema` standard-library module for validating JSON/FD data
+  against a JSON Schema subset. A schema may be FD (the default authoring
+  format), JSON text or an already parsed value. v0 supports `type` (including
+  type lists), `properties` / `required` / `additionalProperties`, `items` /
+  `minItems` / `maxItems`, numeric bounds, `minLength` / `maxLength` (counted
+  in Unicode code points), `pattern` (PCRE), `enum` and `const`. Errors carry a
+  JSON Pointer path; unknown keywords are ignored unless `opts.strict` is set.
+  `$ref`, composition keywords, tuple `items` and `format` are not supported
+  yet.
+
 ## [9.4.7] - 2026-10-25
 
 - Add a leveled compile-time safe build: `SAFE=strict|readonly|readwrite|custom
