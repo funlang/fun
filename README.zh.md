@@ -39,7 +39,7 @@
 一句话定位：**Fun 是一门从 JSON 一路写到机器码的脚本语言。**
 
 - 用同一个运行时，覆盖从高层数据处理（JSON/FD）到底层系统编程（FFI、运行时 C、JIT、机器码）的全谱系；
-- 自带 70 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
+- 自带 71 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
 - 在信创与 AI Agent 场景中，作为连接国产 OS、数据库、芯片与业务逻辑的轻量级胶水。
 
 Fun 的设计出发点很简单：**数据与代码都应该是头等公民，而且一段脚本应该能在不离开语言的情况下一路触达机器底层。**
@@ -70,7 +70,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
 - **跨平台** —— Windows（32/64 位）、Linux、ARM 与 Windows CE。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
-- **自托管的标准库** —— 70 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
+- **自托管的标准库** —— 71 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
 ---
 
@@ -365,7 +365,7 @@ fun/
 │   ├── utils/         # 工具函数
 │   └── prj/fun/       # 工程与构建脚本（funcmd.dpr，Delphi/FPC）
 ├── fun/
-│   ├── lib/           # 标准库（纯 Fun 编写，70 个模块）
+│   ├── lib/           # 标准库（纯 Fun 编写，71 个模块）
 │   ├── demo/          # 语言语法演示
 │   ├── demos/         # 完整应用与基准测试
 │   └── key_*.ini      # 关键字别名包（CN / FR / PUA）
@@ -492,15 +492,15 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 
 ## 标准库
 
-标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（70 个模块）：
+标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（71 个模块）：
 
-> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——70 个模块全部用 Fun 自身写成。
+> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——71 个模块全部用 Fun 自身写成。
 
 - **数据**：`lib-json`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`
 - **工具**：`uuid`
 - **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`
 - **文本**：`lib-string`、`lib-regex`、`lib-match`、`lib-unicode`
-- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`logging`、`lib-time`、`lib-cmdline`、`lib-proc`
+- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`fs`、`logging`、`lib-time`、`lib-cmdline`、`lib-proc`
 - **网络**：`lib-winsock`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-session`
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
 - **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`
@@ -529,6 +529,19 @@ var home = env.get('HOME');
 var port = env.get('PORT', '8080');
 ```
 
+文件系统辅助覆盖目录、遍历和临时文件/目录：
+
+```fun
+use 'fs.fun';
+fs.mkdirAll('build/out');
+fs.walk('src', (p, isDir) { ... });
+fs.atomicWrite('build/out/config.json', data);
+```
+
+`walk` 与 `removeAll` 不跟随符号链接（`removeAll` 只删除链接本身，含断链）；
+`exists/isDir/isFile` 跟随目标。整文件的创建/读取/追加仍用 built-in：
+`save(data)`、`save(data, append: true)`、`load()`；`fs` 专注目录、临时项和原子替换。
+
 > **平台拆分惯例**：Windows 实现保留原名，Unix 后端为 `<name>-unx.fun`（Linux + macOS），
 > 旧的 `<name>-lnx.fun` 名字保留为它之上的薄包装；两者共用的逻辑放在
 > `<name>-base.fun`（不计入上面的模块数）。只在 Linux 成立的后端（如读 `/proc` 的
@@ -547,6 +560,7 @@ var port = env.get('PORT', '8080');
 - [`fun/demos/http-cors-demo`](fun/demos/http-cors-demo) —— CORS 预检、credentials、暴露响应头与浏览器页面示例。
 - [`fun/demos/http-bearer-demo`](fun/demos/http-bearer-demo) —— Bearer token 认证、401 挑战与同源页面示例。
 - [`fun/demos/http-session-demo`](fun/demos/http-session-demo) —— cookie session 登录/登出、SID 轮换与服务端状态示例。
+- [`fun/demos/fs-demo`](fun/demos/fs-demo) —— 递归建目录、list/walk、原子写与清理示例。
 
 ---
 
