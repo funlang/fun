@@ -540,7 +540,27 @@ fs.atomicWrite('build/out/config.json', data);
 
 `walk` 与 `removeAll` 不跟随符号链接（`removeAll` 只删除链接本身，含断链）；
 `exists/isDir/isFile` 跟随目标。整文件的创建/读取/追加仍用 built-in：
-`save(data)`、`save(data, append: true)`、`load()`；`fs` 专注目录、临时项和原子替换。
+`save(data)`、`save(data, append: true)`、`load()`。
+
+分段/二进制读写用 `fs.open`，返回按字节操作的文件对象：
+
+```fun
+var f = fs.open('data.bin', 'r+');
+f.seek(16, 0);
+var head = f.read(4);
+f.write(bytes);
+f.close();
+```
+
+模式为 `r`、`w`、`a`、`r+`、`w+`、`a+`（可带 `b` 后缀）；默认 `r`，
+`a`/`a+` 的写入追加到末尾。方法为 `read(n)`、`write(data)`、
+`seek(offset, whence)`、`tell()`、`eof()`、`flush()`、`close()`；
+`whence` 可省略（默认 0 起），也可为 1 当前/2 末尾。`read` 返回字节串（字符值 0..255），
+`write` 写每个字符的低字节。打开/I/O 失败抛异常，EOF 时 `read` 返回 `''`；
+使用完必须显式 `close()`。读写切换遵循 C stdio：读→写先 `seek`；写→读可
+`seek` 或 `flush`。64 位宿主上偏移为 64 位；大值需用算术构造
+（如 `0xFFFFFFFF + 1`）。Windows 上 `fs.open` 需要 64 位构建；64 位窄字符构建
+的路径使用当前 ANSI 代码页。
 
 > **平台拆分惯例**：Windows 实现保留原名，Unix 后端为 `<name>-unx.fun`（Linux + macOS），
 > 旧的 `<name>-lnx.fun` 名字保留为它之上的薄包装；两者共用的逻辑放在

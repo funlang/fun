@@ -563,8 +563,30 @@ fs.atomicWrite('build/out/config.json', data);
 `walk` and `removeAll` do not follow symbolic links (`removeAll` deletes the
 link itself, including broken links); `exists/isDir/isFile` follow them.
 Whole-file create/read/append stays on the built-ins — `save(data)`,
-`save(data, append: true)` and `load()`; `fs` focuses on directories,
-temporary entries and atomic replacement.
+`save(data, append: true)` and `load()`.
+
+For segmented or binary I/O, `fs.open` returns a byte-oriented file handle:
+
+```fun
+var f = fs.open('data.bin', 'r+');
+f.seek(16, 0);
+var head = f.read(4);
+f.write(bytes);
+f.close();
+```
+
+Modes are `r`, `w`, `a`, `r+`, `w+`, `a+` (an optional `b` is accepted);
+mode defaults to `r`, and `a`/`a+` append writes. Methods are `read(n)`,
+`write(data)`, `seek(offset, whence)`, `tell()`, `eof()`, `flush()` and
+`close()`; `whence` defaults to 0 (start) and may be 1 (current) or 2 (end).
+`read` returns a byte string
+(characters 0..255) and `write` writes each character's low byte. Open/I/O
+failures raise; `read` at EOF returns `''`. Call `close()` explicitly.
+Read/write switching follows C stdio: `seek` before writing after reading;
+`seek` or `flush` before reading after writing. Offsets are 64-bit on 64-bit
+hosts; large literals need arithmetic construction (e.g. `0xFFFFFFFF + 1`).
+On Windows `fs.open` requires a 64-bit build; 64-bit narrow-character builds
+use the active ANSI code page for paths.
 
 > **Platform-split convention**: the Windows implementation keeps the plain
 > module name, and the Unix backend is `<name>-unx.fun` (Linux + macOS); the

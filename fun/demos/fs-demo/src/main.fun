@@ -28,4 +28,11 @@ fs.walk(root, showWalk);
 ?. fs.atomicWrite(PathJoin([root, 'out', 'result.txt']), 'ok' & 10.toChar());
 ?. PathJoin([root, 'out', 'result.txt']).load();
 
+?. 'file:';
+var fp = fs.open(PathJoin([root, 'io.bin']), 'w+');
+fp.write('hello');
+fp.seek(0, 0);
+?. fp.read(5);
+fp.close();
+
 fs.removeAll(root);

@@ -1,7 +1,8 @@
 # fs-demo
 
 A small filesystem walkthrough: create nested directories, write files, list
-and walk them, then write a file atomically and clean up.
+and walk them, use a byte-oriented file handle, then write a file atomically
+and clean up.
 
 ```fun
 use 'fs.fun';
