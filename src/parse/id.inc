@@ -72,12 +72,18 @@ const
 const
   _Error = 256;
 
-var
-  Old_Id : fun.int;
-
 function ParseId({$IfNDef _C_}const {$EndIf}s: fun.str): fun.int;
 var
   L, H, k, i: integer;
+  // Reserved words are valid member names: obj.fun / obj?.fun.
+  function IsMemberPosition: boolean;
+  begin
+    // Member access.  The parser driver flags a shifted '.' by asking the
+    // generated action table whether the resulting state accepts an
+    // expression start (Num).  That distinguishes `obj.fun` / `obj?.fun`
+    // from the echo operator `?. exp` without a hand-written token list.
+    result := (yyPrevToken = Ord('.')) and yyDotIsMember;
+  end;
 begin
   {$IfDef _C_}
   s := ParseAlias(s);
@@ -93,24 +99,32 @@ begin
     if i < 0 then H := k - 1 else
     begin
       result := Ids[k].value;
-      if Old_Id = opBit then
+      if (result <> Id) and IsMemberPosition then
       begin
-        Old_Id := 0;
-        if result = opNot then
-          result := opBitNot
-        else if (result = opAnd) or (result = opOr) then
-          result := opBit
-        else
-          result := _Error;
-      end
-      else if result = opBit then
-      begin
-        Old_Id := opBit;
-        // todo: Position missed
+        return(Id);
         exit;
       end;
       break;
     end;
   end;
+
+  // `bit` is a two-token operator.  `yyPrevToken = _bit` is the pending
+  // prefix; its continuation must be the next identifier in this lex call.
+  if yyPrevToken = _bit then
+  begin
+    yyPrevToken := 0;
+    if result = opNot then
+      result := opBitNot
+    else if (result = opAnd) or (result = opOr) then
+      result := opBit
+    else if result <> Id then
+      result := _Error;
+  end
+  else if result = opBit then
+  begin
+    yyPrevToken := _bit;
+    exit;
+  end;
+
   return(result);
 end;

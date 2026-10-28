@@ -68,7 +68,11 @@ action:
 
   if not yydone then goto start;
 
+  // A pending `bit` prefix must be consumed in this call.  If it was not,
+  // drop it instead of leaking the state into the next token.
+  if yyPrevToken = _bit then yyPrevToken := 0;
   Result := yyretval;
+  yyPrevToken := Result;
 
 end;
 

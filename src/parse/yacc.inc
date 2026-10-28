@@ -16,6 +16,10 @@ type
     yyreject:   boolean;
     yydone:     boolean;
     yyretval:   integer;
+    // Last token returned by the lexer, and whether the last shifted '.'
+    // was member access (not the echo operator `?.`).
+    yyPrevToken: integer;
+    yyDotIsMember: boolean;
   private
     function yacc_parse(dontClear: fun.bool = false) : integer;
   public
@@ -89,6 +93,12 @@ begin
   end;
 end;
 
+function yycan(state, sym : Integer) : Boolean;
+var act : Integer;
+begin
+  result := yyact(state, sym, act);
+end;
+
 function yygoto(state, sym : Integer; var nstate : Integer) : Boolean;
 var k : Integer;
 begin
@@ -157,6 +167,8 @@ begin
 start:
 
   yystate := 0; yychar := -1; yyerrflag := 0; yysp := 0;
+  yyPrevToken := -1;
+  yyDotIsMember := false;
 
 parse:
 
@@ -244,6 +256,8 @@ errlab:
 
 shift:
 
+  if yychar = Ord('.') then
+    yyDotIsMember := not yycan(yyn, Num);
   yystate := yyn; yychar := -1; yyval := yylval;
   if yyerrflag>0 then dec(yyerrflag);
 
