@@ -12,7 +12,10 @@ var f = fs.open(p, 'w+');
 ?. f.tell() = 5;
 ?. f.seek(0, 0) = 0;
 ?. f.read(5) = 'hello';
+?. f.tell() = 5;
 ?. f.read(1) = '';
+?. f.eof();
+?. f.tell() = 5;
 ?. f.eof();
 ?. f.flush();
 ?. f.close();
@@ -74,6 +77,7 @@ f = fs.open(p, 'r');
 ?. f.seek(2, 0) = 2;
 ?. f.seek(1, 1) = 3;
 ?. f.read(1) = 'l';
+?. f.tell() = 4;
 f.close();
 
 var big = 0xFFFFFFFF + 1;
@@ -93,6 +97,7 @@ f.close();
 
 f = fs.open(p, 'a');
 ?. f.write('!') = 1;
+?. f.tell() = 6;
 f.close();
 f = fs.open(p, 'r');
 ?. f.read(10) = 'hello!';

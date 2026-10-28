@@ -15,12 +15,15 @@ var _fsFFlush = LibC().getapi('fflush', 'p:i');
 var _fsFClose = LibC().getapi('fclose', 'p:i');
 var _fsFSeek;
 var _fsFTell;
+var _fsFileno;
+var _fsLSeek64;
 
 if IsWindows() then
   _fsFOpen = LibC().getapi('fopen', 'ss:p');
   if _fsChars = 2 then _fsFOpenW = LibC().getapi('_wfopen', 'ss:p'); end if;
   _fsFSeek = LibC().getapi('_fseeki64', 'pli:i');
-  _fsFTell = LibC().getapi('_ftelli64', 'p:l');
+  _fsFileno = LibC().getapi('_fileno', 'p:i');
+  _fsLSeek64 = LibC().getapi('_lseeki64', 'ili:l');
 else
   _fsFOpen  = LibC().getapi('fopen', 'ss:p');
   _fsFSeek  = LibC().getapi('fseeko', 'pli:i');
@@ -52,6 +55,13 @@ fun _fsFMode(m)
   end if;
 end fun;
 
+// msvcrt has no _ftelli64; fseek(0, CUR) drops the buffer, so the fd offset
+// is the logical stream position. It clears EOF, which callers track instead.
+fun _fsWinPos(h)
+  if _fsFSeek(h, 0, 1) <> 0 then result = -1; return; end if;
+  result = _fsLSeek64(_fsFileno(h), 0, 1);
+end fun;
+
 fun _fsFileOpen(p, mode)
   if p = nil or p = '' then raise 'fs.open: invalid path'; end if;
   if IsWindows() and _fsBits <> 64 then raise 'fs.open: not supported on 32-bit Windows'; end if;
@@ -70,6 +80,7 @@ class _FsFile(p, mode)
   var canRead = m = 'r' or m = 'r+' or m = 'w+' or m = 'a+';
   var canWrite = m = 'w' or m = 'a' or m = 'r+' or m = 'w+' or m = 'a+';
   var h = _fsFileOpen(p, m);
+  var atEof = false;
 
   fun _check()
     if h = nil then raise 'fs: file is closed'; end if;
@@ -86,6 +97,7 @@ class _FsFile(p, mode)
     if n = 0 then result = ''; return; end if;
     var raw = 0.toChar().x(n);
     var got = _fsFRead(raw.toNum(-1), 1, n, h);
+    if IsWindows() then atEof = _fsFEof(h) <> 0; end if;
     if _fsFError(h) <> 0 then raise 'fs: read failed'; end if;
     if got = 0 then
       result = '';
@@ -126,19 +138,24 @@ class _FsFile(p, mode)
     whence = whence or 0;
     if whence < 0 or whence > 2 then raise 'fs: invalid whence ' & whence; end if;
     if _fsFSeek(h, offset or 0, whence) <> 0 then raise 'fs: seek failed'; end if;
-    result = _fsFTell(h);
+    if IsWindows() then
+      atEof = false;
+      result = _fsLSeek64(_fsFileno(h), 0, 1);
+    else
+      result = _fsFTell(h);
+    end if;
     if result < 0 then raise 'fs: tell failed'; end if;
   end fun;
 
   fun tell()
     this._check();
-    result = _fsFTell(h);
+    if IsWindows() then result = _fsWinPos(h); else result = _fsFTell(h); end if;
     if result < 0 then raise 'fs: tell failed'; end if;
   end fun;
 
   fun eof()
     this._check();
-    result = _fsFEof(h) <> 0;
+    if IsWindows() then result = atEof; else result = _fsFEof(h) <> 0; end if;
   end fun;
 
   fun flush()
