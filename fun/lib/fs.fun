@@ -1,9 +1,10 @@
 // Copyright (c) 2010-2026 Zhang Weidong <zwd@funlang.org>
 // SPDX-License-Identifier: MIT
 //
-// fs: portable filesystem helpers for directories, temporary entries and
-// atomic writes. File read/write/copy/move stay on the existing built-ins.
-// walk/removeAll do not follow symbolic links.
+// fs: portable filesystem helpers for directories, temporary entries,
+// atomic writes and byte-oriented file handles. Whole-file read/write and
+// copy/move stay on the existing built-ins. walk/removeAll do not follow
+// symbolic links.
 //
 //     use 'fs.fun';
 //
@@ -13,10 +14,13 @@
 //     fs.removeAll('build');
 //     var t = fs.tempFile('job-');
 //     fs.atomicWrite('config.json', data);
+//     var f = fs.open('data.bin', 'r+');
+//     f.seek(16, 0); var head = f.read(4); f.close();
 use 'lib-path.fun';
 use 'lib-host.fun';
 use 'uuid.fun';
 use 'fs/backend.fun';
+use 'fs/file.fun';
 
 fun _fsCollect(paths, names, seen)
   for i = 0 to paths.@count() - 1 do
@@ -143,6 +147,10 @@ class _FsApi()
   fun removeAll(p)
     if p = nil or p = '' then result = true; return; end if;
     result = _fsRemoveAll(PathClean(p));
+  end fun;
+
+  fun open(p, mode)
+    result = _FsFile(p, mode);
   end fun;
 
   fun tempFile(prefix)
