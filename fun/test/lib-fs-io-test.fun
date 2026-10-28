@@ -116,6 +116,14 @@ end try;
 f.close();
 ?. p.size() = 2;
 
+var pz = PathJoin([root, 'zero.txt']);
+f = fs.open(pz, 'w');
+?. f.write('0') = 1;
+?. f.write('00') = 2;
+?. f.write('0' & 10.toChar()) = 2;
+f.close();
+?. pz.load() = '0000' & 10.toChar();
+
 var pf = PathJoin([root, 'flush.txt']);
 f = fs.open(pf, 'w');
 ?. f.write('flush') = 5;

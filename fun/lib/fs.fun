@@ -184,7 +184,9 @@ class _FsApi()
     parts.@add('.fun-' & UUID() & '.tmp');
     var tmp = PathJoin(parts);
     try
-      tmp.save(data or '', cp: 10056);
+      var body = data;
+      if body.type() = 0 then body = ''; end if;
+      tmp.save(body, cp: 10056);
     except
       if _fsExists(tmp) then _fsUnlink(tmp); end if;
       result = false;

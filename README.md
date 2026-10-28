@@ -39,7 +39,7 @@
 In one sentence: **Fun is a scripting language that goes all the way from JSON to machine code.**
 
 - One runtime spans the whole spectrum, from high-level data work (JSON/FD) down to low-level system programming (FFI, C at runtime, JIT, machine code);
-- 72 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
+- 73 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
 - in AI-agent and domestic-IT scenarios, it is the lightweight glue connecting OSes, databases, chips, and business logic.
 
 Fun is designed around a simple premise: **data and code should be equally first-class, and a script should be able to reach down to the machine without leaving the language.**
@@ -70,7 +70,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
 - **Cross-platform** — Windows (32/64-bit), Linux, ARM, and Windows CE.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
-- **Self-hosted standard library** — 72 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
+- **Self-hosted standard library** — 73 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
 ---
 
@@ -372,7 +372,7 @@ fun/
 │   ├── utils/         # Utility functions
 │   └── prj/fun/       # Projects & build scripts (funcmd.dpr, Delphi/FPC)
 ├── fun/
-│   ├── lib/           # Standard library (pure Fun, 72 modules)
+│   ├── lib/           # Standard library (pure Fun, 73 modules)
 │   ├── demo/          # Language syntax demos
 │   ├── demos/         # Full applications & benchmarks
 │   └── key_*.ini      # Keyword alias packs (CN / FR / PUA)
@@ -513,11 +513,11 @@ CI job verifies strict and readonly, and it only runs on manual dispatch
 
 ## Standard library
 
-The standard library in [`fun/lib`](fun/lib) is written in pure Fun (72 modules):
+The standard library in [`fun/lib`](fun/lib) is written in pure Fun (73 modules):
 
-> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 72 modules written in Fun itself.
+> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 73 modules written in Fun itself.
 
-- **Data**: `lib-json`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`
+- **Data**: `lib-json`, `csv`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`
 - **Utility**: `uuid`
 - **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`
 - **Text**: `lib-string`, `lib-regex`, `lib-match`, `lib-unicode`
@@ -587,6 +587,32 @@ Read/write switching follows C stdio: `seek` before writing after reading;
 hosts; large literals need arithmetic construction (e.g. `0xFFFFFFFF + 1`).
 On Windows `fs.open` requires a 64-bit build; 64-bit narrow-character builds
 use the active ANSI code page for paths.
+
+CSV files stream row by row. The reader and writer wrap a file handle and do
+not close it:
+
+```fun
+use 'csv.fun';
+var f = fs.open('users.csv', 'r');
+var r = csv.reader(f);
+var row = r.read();          // nil at EOF
+while row <> nil do
+  ...
+  row = r.read();
+end do;
+f.close();
+
+var g = fs.open('out.csv', 'w');
+var w = csv.writer(g);
+w.write(['name', 'age']);
+g.close();
+```
+
+Fields are strings and columns are strict. A blank line is a one-empty-field
+record by default, so it fails the column check in a multi-column file; pass
+`[skipEmptyLines: true]` to ignore completely empty lines. The writer quotes
+fields when needed and uses `\n`; pass `[crlf: true]` for CRLF. The reader
+accepts any object with `read(n)`, the writer any object with `write(s)`.
 
 Data can be validated against a JSON Schema. Schemas are written in FD by
 default, and JSON text or an already parsed value works too:
