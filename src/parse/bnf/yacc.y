@@ -97,6 +97,8 @@ Run         : _if    Exp _then          { builder.BuildIf($1, $3, $2); }
             | _class Id            FunA { builder.BuildClass($1, $3, $2, $3); }
             | _class Id _EQ VarExp FunA { builder.BuildClass($1, $5, $2, $5, $4.node); }
             
+            | _end Bloc                 { builder.BuildEnd($1, $2, $2); }
+            
             | Cmd ";"                   { }
             |     ";"                   { }
             |     "}"                   { if builder.BuildEnd($1).val = -1 then yy_done; }
@@ -116,9 +118,7 @@ Bloc        : _if                       { }
             | _class                    { }
             ;
 
-Cmd         : _end Bloc                 { builder.BuildEnd($1, $2, $2); }
-            
-            | _exit                     { builder.BuildExit($1); }
+Cmd         : _exit                     { builder.BuildExit($1); }
             | _exit _when Exp           { builder.BuildExit($1, $3, $3); }
             | _next                     { builder.BuildNext($1); }
             | _next _when Exp           { builder.BuildNext($1, $3, $3); }
@@ -140,7 +140,7 @@ Cmd         : _end Bloc                 { builder.BuildEnd($1, $2, $2); }
             
             | FunCall                   { builder.BuildCall($1); }
             | "?"     Exp               { builder.BuildEcho($1, $2, $2); }
-            | "?" "." Exp               { builder.BuildEcho($1, $3, $3, {$IfDef Unix}#10{$Else}#13#10{$EndIf}); }
+            | "?" "." Exp               { builder.BuildEcho($1, $3, $3, EOL); }
             | "?" "," Exp               { builder.BuildEcho($1, $3, $3, ' '); }
             | "?" ":" Exp               { builder.BuildEcho($1, $3, $3, #9); }
             ;
