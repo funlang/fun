@@ -187,7 +187,10 @@ next:
     if yylret = 1 then
     begin
       yylret := 0;
-      if yylsp = 1 then goto next;
+      // Never re-feed the internal error token: shifting it as `error`
+      // aborts again before the lexer can advance, which loops forever.
+      // Lex the next token instead.
+      if (yylsp = 1) or (yylval.val = _error) then goto next;
       yychar := yylval.val;
     end
     else
