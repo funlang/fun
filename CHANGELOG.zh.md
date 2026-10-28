@@ -6,6 +6,24 @@
 
 ## [未发布]
 
+## [9.4.9] - 2026-10-28
+
+- 新增 `csv` 标准库模块：基于任意带 `read`/`write` 的句柄（例如
+  `fs.open`）的流式逐行 reader 与 writer。选项包括 `delimiter`、`quote`、
+  `skipEmptyLines`，writer 还支持 `crlf`。列数严格校验，空行默认算作一条
+  记录（可用 `skipEmptyLines` 跳过）。标准库现为 73 个模块。
+
+- 词法分析器现在会记录移入的 `.` 是否为成员访问，所有保留字都能作为
+  成员名使用（`obj.fun`、`obj?.end`），`bit` 前缀也不会再泄漏到后续
+  标识符。移除 `FunNoSoftKeyword` 编译开关，该行为始终生效。
+
+- 修复 `bit` 后跟 `and`/`or`/`not` 之外的保留字时解析器死循环的问题：
+  不再重喂内部错误 token，非法输入只报一次语法错误并退出。
+
+- `end if`、`end case`、`end loop`、`end do`、`end try`、`end fun`、
+  `end class` 之后的分号可以省略。这只是块边界的局部放宽：`end` 之前的
+  语句仍必须写 `;`，而 `end` 后多写一个 `;` 也仍然接受。
+
 ## [9.4.8] - 2026-10-27
 
 - 新增 `jsonschema` 标准库模块：按 JSON Schema 子集校验 JSON/FD 数据。schema
