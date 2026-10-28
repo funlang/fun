@@ -6,6 +6,28 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.4.9] - 2026-10-28
+
+- Add the `csv` standard-library module: a streaming row-by-row reader and
+  writer over any handle with `read`/`write` (such as `fs.open`). Options
+  cover `delimiter`, `quote`, `skipEmptyLines` and, for the writer, `crlf`.
+  Field counts are strict and blank lines are records unless skipped. The
+  standard library is now 73 modules.
+
+- The lexer now tracks whether a shifted `.` is member access, so every
+  reserved word is accepted as a member name (`obj.fun`, `obj?.end`), and the
+  `bit` prefix no longer leaks into later identifiers. The
+  `FunNoSoftKeyword` build switch is gone; the behavior is unconditional.
+
+- Fix an infinite parse loop when `bit` is followed by a reserved word other
+  than `and`/`or`/`not`: the internal error token is no longer re-fed, so
+  invalid input reports one syntax error and exits.
+
+- `end if`, `end case`, `end loop`, `end do`, `end try`, `end fun` and
+  `end class` no longer require a trailing `;`. This is a block-boundary
+  exemption only: the `;` before `end` is still required, and an extra
+  trailing `;` is still accepted.
+
 ## [9.4.8] - 2026-10-27
 
 - Add the `jsonschema` standard-library module for validating JSON/FD data
