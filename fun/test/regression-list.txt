@@ -49,6 +49,7 @@ lib-host-test.fun	test/lib-host-test.fun	snap
 lib-env-test.fun	test/lib-env-test.fun	snap
 lib-fs-test.fun	test/lib-fs-test.fun	snap
 lib-fs-io-test.fun	test/lib-fs-io-test.fun	snap
+lib-csv-test.fun	test/lib-csv-test.fun	snap
 lib-path-test.fun	test/lib-path-test.fun	snap
 lib-logging-test.fun	test/lib-logging-test.fun	snap
 lib-jsonschema-test.fun	test/lib-jsonschema-test.fun	snap
