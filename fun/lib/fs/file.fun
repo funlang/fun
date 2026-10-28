@@ -116,7 +116,8 @@ class _FsFile(p, mode)
     if not canWrite then raise 'fs: file is not open for writing'; end if;
     var dt = data.type();
     if dt <> 0 and dt <> 8 then raise 'fs: write data must be a string'; end if;
-    var s = '' & (data or '');
+    var s = data;
+    if s = nil then s = ''; end if;
     var len = s.length();
     if len = 0 then result = 0; return; end if;
     var wrote;
