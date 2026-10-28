@@ -63,19 +63,19 @@
          builder.BuildClass(yyv[yysp-4], yyv[yysp-0], yyv[yysp-3], yyv[yysp-0], yyv[yysp-1].node); 
        end;
        procedure A22; begin
-         
+         builder.BuildEnd(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A23; begin
          
        end;
        procedure A24; begin
-         if builder.BuildEnd(yyv[yysp-0]).val = -1 then yy_done; 
+         
        end;
        procedure A25; begin
          if builder.BuildEnd(yyv[yysp-0]).val = -1 then yy_done; 
        end;
        procedure A26; begin
-         
+         if builder.BuildEnd(yyv[yysp-0]).val = -1 then yy_done; 
        end;
        procedure A27; begin
          
@@ -102,7 +102,7 @@
          
        end;
        procedure A35; begin
-         builder.BuildEnd(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         
        end;
        procedure A36; begin
          builder.BuildExit(yyv[yysp-0]); 
@@ -156,7 +156,7 @@
          builder.BuildEcho(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A53; begin
-         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], {$IfDef Unix}#10{$Else}#13#10{$EndIf}); 
+         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], EOL); 
        end;
        procedure A54; begin
          builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], ' '); 

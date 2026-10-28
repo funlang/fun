@@ -2,6 +2,9 @@
 {$I 'ycon.inc'}
 {$I 'ytab.inc'}
 
+const
+  EOL = {$IfDef Unix}#10{$Else}#13#10{$EndIf};
+
 type
   TParser = class
   private
