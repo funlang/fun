@@ -1238,7 +1238,15 @@ begin
     // leaving an FPU overflow exception that some call paths cannot trap. A
     // controlled EConvertError keeps strict JSON's 'number out of range' and
     // FD's string fallback deterministic.
+    {$IfDef FPC}
     fs := DefaultFormatSettings;
+    {$Else}
+      {$If CompilerVersion >= 20} // Delphi 2009+
+      fs := DefaultFormatSettings;
+      {$Else}                     // Delphi 2006/2007
+      GetLocaleFormatSettings(0, fs);
+      {$IfEnd}
+    {$EndIf}
     fs.DecimalSeparator := '.';
     if TryStrToFloat(s, d, fs) and not IsInfinite(d) and not IsNan(d) then
       result := d
