@@ -71,10 +71,11 @@ ok(fd('n null').n = nil, 'fd null');
 ok(fd('n yes').n = 'yes', 'fd yes is string');
 ok(fd('n no').n = 'no', 'fd no is string');
 
-// safe integer boundary, equal in Fun / Pascal / JS
-ok(fd('n 9007199254740991').n = 9007199254740991, 'fd safe int is number');
-ok(fd('n 9007199254740992').n = '9007199254740992', 'fd 2^53 is string');
-ok(fd('n 9223372036854775807').n = '9223372036854775807', 'fd int64 max is string');
+// values follow the host number type; only literals that do not fit stay text
+ok(fd('n 9007199254740991').n = 9007199254740991, 'fd 2^53-1 is number');
+ok(fd('n 9007199254740992').n = 9007199254740992, 'fd 2^53 is number');
+ok(fd('n 9223372036854775807').n = 9223372036854775807, 'fd int64 max is number');
+ok(fd('n 9223372036854775808').n = '9223372036854775808', 'fd beyond int64 is string');
 ok(fd('n 1e309').n = '1e309', 'fd float overflow is string');
 
 // --- FD escapes: only \"... enables them, like Fun esc() ------------------

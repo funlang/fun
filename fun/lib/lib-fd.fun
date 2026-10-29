@@ -33,20 +33,10 @@ var root;
 var stak;
 var cbcb = CBNF(rules, dup: 0); //?. cb.regex.replace(/\x20/g, '');
 fun fdNum(s)
-  # Same number policy as the Pascal and JS readers: integers outside the
-  # cross-language safe range, and floats that overflow a double, stay strings.
-  var isInt = not (s =~ /[.eE]/);
+  # FD numbers use the RFC 8259 grammar. The value follows the host type;
+  # literals that do not fit Int64 or a double stay as their source text.
   try
-    var n = s.toNum();
-    if isInt then
-      if n <= 9007199254740991 and n >= -9007199254740991 then
-        result = n;
-      else
-        result = s;
-      end if;
-    else
-      result = n;
-    end if;
+    result = s.toNum();
   except
     result = s;
   end try;

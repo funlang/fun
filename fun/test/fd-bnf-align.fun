@@ -31,7 +31,8 @@ var q = sl + '"';
 
 var doc = 'a 85' + nl + 'b -3.14' + nl + 'c .5' + nl + 'd 0x10' + nl +
           'e 9007199254740992' + nl + 'f yes' + nl + 'g ' + q + 'x' + sl + 'x41"' + nl +
-          'h 03' + nl + 'i 01' + nl + 'j 0.5' + nl + 'k 1e+3';
+          'h 03' + nl + 'i 01' + nl + 'j 0.5' + nl + 'k 1e+3' + nl +
+          'l 9223372036854775807' + nl + 'm 9223372036854775808';
 same(doc, 'BNF agrees on numbers/escapes');
 
 var kvd = '#!kvd:=' + nl + 'a=85' + nl + 'b=hello world' + nl;
