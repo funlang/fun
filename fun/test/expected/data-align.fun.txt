@@ -32,9 +32,10 @@ PASS fd false is bool
 PASS fd null
 PASS fd yes is string
 PASS fd no is string
-PASS fd safe int is number
-PASS fd 2^53 is string
-PASS fd int64 max is string
+PASS fd 2^53-1 is number
+PASS fd 2^53 is number
+PASS fd int64 max is number
+PASS fd beyond int64 is string
 PASS fd float overflow is string
 PASS fd backslash-n
 PASS fd backslash-x41

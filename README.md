@@ -318,8 +318,11 @@ reader):
 
 - Numbers use the RFC 8259 grammar, the same as `getJson(json: 2)`:
   `-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?`. Leading zeros (`03`),
-  hex, `.5`, `1.`, `+1` and `1e` are strings; integers beyond JavaScript's
-  safe range (`±9007199254740991`) stay strings so no reader loses precision.
+  hex, `.5`, `1.`, `+1` and `1e` are strings. Values follow the host number
+  type: Fun/Pascal use Int64, JS uses IEEE-754 doubles, so integers beyond
+  2^53 lose exactness in JS, and literals beyond the host type stay strings
+  (beyond Int64 in Fun, beyond a double in JS). Quote large IDs as strings
+  when they must round-trip exactly.
 - Only `true`, `false` and `null` are literals. `yes`/`no` are strings here;
   Fun's source-level string truthiness accepts them, but the data formats do
   not.

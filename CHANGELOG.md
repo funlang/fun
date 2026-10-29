@@ -19,10 +19,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
 - Align the three FD readers (`libfd.inc`, `fd.js`/`fd2.js`, `lib-fd.fun`) and
   the writer: FD numbers now use the same RFC 8259 grammar as `json: 2`, so
   `03`/`01` are strings (previously numbers) and `.5`, `1.`, `+1`, `0x10`,
-  `1e` are also strings. Integers outside JavaScript's safe range stay
-  strings, `\xHH` is decoded, `#!kvd:`-style directives are honoured,
-  empty documents parse as `[]`, and duplicate named keys are last-wins.
-  `lib-fd.fun` also no longer crashes on an absent indentation match.
+  `1e` are also strings. Values follow the host number type (Int64 in
+  Fun/Pascal, IEEE-754 double in JS), so JS loses exactness beyond 2^53;
+  quote large IDs if they must round-trip. `\xHH` is decoded,
+  `#!kvd:`-style directives are honoured, empty documents parse as `[]`,
+  and duplicate named keys are last-wins. `lib-fd.fun` also no longer
+  crashes on an absent indentation match.
 
 - The JSON writer now encodes C0 control characters as `\u00XX`
   (previously they were replaced with `.`), matching `JSON.stringify`.

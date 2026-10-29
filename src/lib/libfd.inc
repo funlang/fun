@@ -181,13 +181,12 @@ var
   end;
 
   // FD numbers use the same RFC 8259 grammar as strict JSON (IsJsonNumber in
-  // base.pas). Integers are exact in every implementation only up to
-  // JavaScript's safe-integer limit; larger integer literals are kept as their
-  // source text (a string) so Fun, Pascal and JS agree and no precision is
-  // lost. Floats that overflow the host double fall back to the source too.
+  // base.pas). The value follows the host number type: Int64 here. Literals
+  // that do not fit the host type (integers beyond Int64, floats beyond a
+  // double) stay as their source text instead of raising, so FD remains a
+  // lenient data format. JS uses IEEE-754 doubles and is the caller's concern
+  // if exact integers beyond 2^53 matter.
   function FdNumber(const t: fun.str): CValue;
-  const
-    MaxSafeInt = 9007199254740991;
   var
     i64: fun.int64;
     d: fun.real;
@@ -199,7 +198,7 @@ var
     begin
       // 'val' is ParseFD's value variable and shadows the RTL Val() here.
       System.Val(t, i64, code);
-      if (code = 0) and (i64 >= -MaxSafeInt) and (i64 <= MaxSafeInt) then
+      if code = 0 then
       begin
         if (i64 >= -2147483648) and (i64 <= 2147483647) then
           Result := fun.int(i64)
