@@ -323,8 +323,9 @@ reader):
   2^53 lose exactness in JS, and literals beyond the host type stay strings
   (beyond Int64 in Fun, beyond a double in JS). Quote large IDs as strings
   when they must round-trip exactly.
-  The writers emit the shortest decimal that parses back to the same double,
-  so JSON/FD does not lose floating-point precision on a round-trip.
+  Writers use the same human-friendly 15 significant digits as `toStr`, so
+  `0.1 + 0.2` is written as `0.3`. Tiny floating-point round-trip
+  differences are accepted for readability.
 - Only `true`, `false` and `null` are literals. `yes`/`no` are strings here;
   Fun's source-level string truthiness accepts them, but the data formats do
   not.

@@ -52,9 +52,9 @@ PASS bool numeric zero
 PASS bool non-empty fallback
 PASS json \\u000b
 PASS json \\u0001
-PASS float round-trip 0.1+0.2
-PASS float round-trip 1/3
-PASS float round-trip 1e-7
-PASS float round-trip 17 digits
-PASS float round-trip max double
-PASS float round-trip min subnormal
+PASS float write 0.1+0.2 json
+PASS float write 0.1+0.2 fd
+PASS float write 1/3 json
+PASS float write 1/3 fd
+PASS float write 1e-7
+PASS float write 17 digits

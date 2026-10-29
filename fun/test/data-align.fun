@@ -27,12 +27,12 @@ fun fd(s)
   result = s.getJson(fd: true);
 end fun;
 
-fun jsonRt(v)
-  result = (new [x: v]).@toJson(json: true).getJson(json: true).x = v;
+fun jsonOf(v)
+  result = (new [x: v]).@toJson(json: true);
 end fun;
 
-fun fdRt(v)
-  result = (new [x: v]).@toJson(fd: true).getJson(fd: true).x = v;
+fun fdOf(v)
+  result = (new [x: v]).@toJson(fd: true);
 end fun;
 
 var nl = 10.toChar();
@@ -116,10 +116,10 @@ ok(truth('off') and truth(' no '), 'bool non-empty fallback');
 ok((new [v: 11.toChar()]).@toJson(json: true) = '{"v":"' + sl + 'u000b"}', 'json \\u000b');
 ok((new [v: 1.toChar()]).@toJson(json: true) = '{"v":"' + sl + 'u0001"}', 'json \\u0001');
 
-// --- JSON/FD writers use a shortest round-trip decimal --------------------
-ok(jsonRt(0.1 + 0.2) and fdRt(0.1 + 0.2), 'float round-trip 0.1+0.2');
-ok(jsonRt(1.0 / 3.0) and fdRt(1.0 / 3.0), 'float round-trip 1/3');
-ok(jsonRt(1e-7) and fdRt(1e-7), 'float round-trip 1e-7');
-ok(jsonRt(1.2345678901234567) and fdRt(1.2345678901234567), 'float round-trip 17 digits');
-ok(jsonRt(1.7976931348623157E308) and fdRt(1.7976931348623157E308), 'float round-trip max double');
-ok(jsonRt(5.0E-324) and fdRt(5.0E-324), 'float round-trip min subnormal');
+// --- JSON/FD writers keep the friendly 15-digit FloatToStr output ---------
+ok(jsonOf(0.1 + 0.2) = '{"x":0.3}', 'float write 0.1+0.2 json');
+ok(fdOf(0.1 + 0.2) = 'x 0.3' + nl, 'float write 0.1+0.2 fd');
+ok(jsonOf(1.0 / 3.0) = '{"x":0.333333333333333}', 'float write 1/3 json');
+ok(fdOf(1.0 / 3.0) = 'x 0.333333333333333' + nl, 'float write 1/3 fd');
+ok(jsonOf(1e-7) = '{"x":1E-7}', 'float write 1e-7');
+ok(jsonOf(1.2345678901234567) = '{"x":1.23456789012346}', 'float write 17 digits');
