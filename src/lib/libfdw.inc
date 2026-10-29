@@ -193,7 +193,7 @@ var
       Result := 'null';
       Exit;
     end;
-    raw := NumToStr(e.value);
+    raw := e.asStr;
     with val^ do
     begin
       if VType = varBoolean then
