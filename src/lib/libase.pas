@@ -57,7 +57,7 @@ implementation
 
 {$IfDef Unicode}{$WARN WIDECHAR_REDUCED OFF}{$EndIf}
 
-uses SysUtils, Variants, Math,
+uses SysUtils, Variants,
      {$IfNDef UNIX}Windows,{$Else}
        {$IfDef Linux}Linux,{$EndIf}
        unixtype, baseunix, termio,
@@ -1624,9 +1624,6 @@ var
             else
               raise;
           end;
-          if strict and (vv.VType = varDouble) and
-             (IsInfinite(vv.VDouble) or IsNan(vv.VDouble)) then
-            StrictFail('number out of range ''' + kv + '''', oi);
           st := 1;
           Continue;
         end;
