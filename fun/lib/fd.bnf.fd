@@ -11,7 +11,7 @@ Val      (?: Qstring | Number | Const )? Ws? $ | `` Length | Unqstr? Ws? $
 Unqkey   \S++
 Unqstr   [^\r\n]++
 Const    true | false | null | \{\} | \[\]
-Number   -?\d++(?:\.\d++)?(?:[Ee][+-]?\d++)?
+Number   -?(?:0|[1-9]\d*+)(?:\.\d++)?(?:[Ee][+-]?\d++)?
 
 Qstring  \\? (?: '(?:[^']++|'')*+' | "(?:[^"]++|"")*+" | `(?:[^`]++|``)*+` )
 

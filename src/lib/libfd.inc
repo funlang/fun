@@ -180,41 +180,11 @@ var
     Result := ParseRawToken(kvd + LineBreak, isQuoted);
   end;
 
-  // FD number grammar (fd.bnf.fd):
-  //   -?[0-9]+ ( '.' [0-9]+ )? ( [eE] [+-]? [0-9]+ )?
-  // Leading zeros are allowed by FD (unlike strict JSON). Hex, '+', '.5',
-  // '1.' and '1e' are plain strings, which keeps the reader identical to the
-  // BNF and JavaScript parsers.
-  function IsFdNumber(const t: fun.str): fun.bool;
-  var
-    p, n: fun.int;
-  begin
-    Result := False;
-    n := Length(t);
-    p := 1;
-    if (p <= n) and (t[p] = '-') then Inc(p);
-    if (p > n) or not (t[p] in ['0'..'9']) then Exit;
-    while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
-    if (p <= n) and (t[p] = '.') then
-    begin
-      Inc(p);
-      if (p > n) or not (t[p] in ['0'..'9']) then Exit;
-      while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
-    end;
-    if (p <= n) and (t[p] in ['e', 'E']) then
-    begin
-      Inc(p);
-      if (p <= n) and (t[p] in ['+', '-']) then Inc(p);
-      if (p > n) or not (t[p] in ['0'..'9']) then Exit;
-      while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
-    end;
-    Result := p > n;
-  end;
-
-  // Integers are exact in every FD implementation only up to JavaScript's
-  // safe-integer limit; larger integer literals are kept as their source text
-  // (a string) so Fun, Pascal and JS agree and no precision is lost. Floats
-  // that overflow the host double fall back to the source text too.
+  // FD numbers use the same RFC 8259 grammar as strict JSON (IsJsonNumber in
+  // base.pas). Integers are exact in every implementation only up to
+  // JavaScript's safe-integer limit; larger integer literals are kept as their
+  // source text (a string) so Fun, Pascal and JS agree and no precision is
+  // lost. Floats that overflow the host double fall back to the source too.
   function FdNumber(const t: fun.str): CValue;
   const
     MaxSafeInt = 9007199254740991;
@@ -278,7 +248,7 @@ var
         CValue(Result) := NullValue
       else if token = '' then
         CValue(Result) := ''
-      else if IsFdNumber(token) then
+      else if IsJsonNumber(token) then
         CValue(Result) := FdNumber(token)
       else
         CValue(Result) := token;

@@ -316,9 +316,10 @@ Its defining trait is that **FD is self-describing**: the parser in `lib-fd.fun`
 FD value rules (shared by the interpreter, `fd.js`/`fd2.js`, and the BNF
 reader):
 
-- Numbers are `-?digits(.digits)?([eE][+-]?digits)?`. Hex, `.5`, `1.`, `+1`
-  and `1e` are strings; integers beyond JavaScript's safe range
-  (`±9007199254740991`) stay strings so no reader loses precision.
+- Numbers use the RFC 8259 grammar, the same as `getJson(json: 2)`:
+  `-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?`. Leading zeros (`03`),
+  hex, `.5`, `1.`, `+1` and `1e` are strings; integers beyond JavaScript's
+  safe range (`±9007199254740991`) stay strings so no reader loses precision.
 - Only `true`, `false` and `null` are literals. `yes`/`no` are strings here;
   Fun's source-level string truthiness accepts them, but the data formats do
   not.

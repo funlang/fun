@@ -16,8 +16,11 @@ PASS strict rejects 1.2.3
 PASS strict rejects int64 overflow
 PASS lenient .5
 PASS lenient 03
-PASS fd 03 is number
-PASS fd 03 type int
+PASS fd 03 is string
+PASS fd 03 type str
+PASS fd 01 is string
+PASS fd 0.5 is number
+PASS fd 1e+3 is number
 PASS fd 1. is string
 PASS fd .5 is string
 PASS fd 0x10 is string

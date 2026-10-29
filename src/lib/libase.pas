@@ -1452,44 +1452,6 @@ var
       StrictFail('unbalanced close', curPos);
   end;
 
-  // RFC 8259 number: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
-  // The lenient scanner deliberately accepts a wider set ('.5', '03', '1.',
-  // '1e+', hex), so strict mode has to validate the token it scanned rather
-  // than relying on StrToNum to reject it.
-  function IsJsonNumber(const t: fun.str): fun.bool;
-  var
-    p, n: fun.int;
-  begin
-    Result := False;
-    n := Length(t);
-    p := 1;
-    if (p <= n) and (t[p] = '-') then Inc(p);
-    if p > n then Exit;
-    if t[p] = '0' then
-      Inc(p)
-    else if t[p] in ['1'..'9'] then
-    begin
-      Inc(p);
-      while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
-    end
-    else
-      Exit;
-    if (p <= n) and (t[p] = '.') then
-    begin
-      Inc(p);
-      if (p > n) or not (t[p] in ['0'..'9']) then Exit;
-      while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
-    end;
-    if (p <= n) and (t[p] in ['e', 'E']) then
-    begin
-      Inc(p);
-      if (p <= n) and (t[p] in ['+', '-']) then Inc(p);
-      if (p > n) or not (t[p] in ['0'..'9']) then Exit;
-      while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
-    end;
-    Result := p > n;
-  end;
-
   procedure ParseJSON;
   var
     i, ii, oi, bs, p: fun.int;
