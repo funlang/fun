@@ -1205,11 +1205,12 @@ end;
 class function CParser.StrToNum(const s: fun.str): CValue;
 var
   i, ii: fun.int;
+  {$IfDef FPC}
   i64: fun.int64;
   d: fun.real;
   code: fun.int;
+  {$EndIf}
   u: fun.uint32;
-  fs: TFormatSettings;
 begin
   ii := Length(s);
   if (ii > 2) and (s[1] = '0') and (s[2] in ['X', 'x', 'B', 'b']) then
@@ -1233,22 +1234,15 @@ begin
     end;
   end
   else if (Pos('.', s) >= 1) or (Pos('e', s) > 1) or (Pos('E', s) > 1) then
+  {$IfDef FPC}
   begin
-    // TryStrToFloat returns False for overflow and malformed input instead of
-    // leaving an FPU overflow exception that some call paths cannot trap. A
-    // controlled EConvertError keeps strict JSON's 'number out of range' and
-    // FD's string fallback deterministic.
-    {$IfDef FPC}
-    fs := DefaultFormatSettings;
-    {$Else}
-      {$If CompilerVersion >= 20} // Delphi 2009+
-      fs := DefaultFormatSettings;
-      {$Else}                     // Delphi 2006/2007
-      GetLocaleFormatSettings(0, fs);
-      {$IfEnd}
-    {$EndIf}
-    fs.DecimalSeparator := '.';
-    if TryStrToFloat(s, d, fs) and not IsInfinite(d) and not IsNan(d) then
+    // FPC's StrToFloat/Val accept an out-of-range exponent as an 80-bit
+    // Extended. The Extended->Variant assignment then stores a poisoned
+    // varDouble that only raises when the value is read later, outside the
+    // caller's try. Parse straight into Double so the overflow is reported
+    // here as a controlled EConvertError. The finite check also catches
+    // 1e9999, which FPC's TryStrToFloat reports as a successful +Inf.
+    if TryStrToFloat(s, d) and not IsInfinite(d) and not IsNan(d) then
       result := d
     else
       raise EConvertError.CreateFmt('"%s" is an invalid float', [s]);
@@ -1273,6 +1267,17 @@ begin
       result := StrToInt64(s)
     ;
   end;
+  {$Else}
+    result := StrToFloat(s)
+  else
+  begin
+    if TryStrToInt(s, i) then
+      result := i
+    else
+      result := StrToInt64(s)
+    ;
+  end;
+  {$EndIf}
 end;
 
 
