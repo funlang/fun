@@ -17,12 +17,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
   `json: true` keeps its historical superset.
 
 - Align the three FD readers (`libfd.inc`, `fd.js`/`fd2.js`, `lib-fd.fun`) and
-  the writer: numbers follow the `fd.bnf.fd` grammar (`.5`, `1.`, `+1`,
-  `0x10`, `1e` are strings), integers outside JavaScript's safe range stay
+  the writer: FD numbers now use the same RFC 8259 grammar as `json: 2`, so
+  `03`/`01` are strings (previously numbers) and `.5`, `1.`, `+1`, `0x10`,
+  `1e` are also strings. Integers outside JavaScript's safe range stay
   strings, `\xHH` is decoded, `#!kvd:`-style directives are honoured,
-  empty documents parse as `[]`, and duplicate named keys are
-  last-wins. `lib-fd.fun` also no longer crashes on an absent indentation
-  match.
+  empty documents parse as `[]`, and duplicate named keys are last-wins.
+  `lib-fd.fun` also no longer crashes on an absent indentation match.
 
 - The JSON writer now encodes C0 control characters as `\u00XX`
   (previously they were replaced with `.`), matching `JSON.stringify`.

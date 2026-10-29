@@ -175,6 +175,9 @@ function isStr(vt: TVarType): fun.bool; overload;
 function isStr(val: PValue): fun.bool; overload;
 function isNum(vt: TVarType; all: fun.bool = false): fun.bool; overload;
 function isNum(val: PValue; all: fun.bool = false): fun.bool; overload;
+// Shared RFC 8259 number syntax: used by strict JSON, FD and the FD writer.
+// Fun source literals are a superset and stay on CParser.StrToNum.
+function IsJsonNumber(const s: fun.str): fun.bool;
 function isFloat(vt: TVarType): fun.bool; overload;
 function isFloat(val: PValue): fun.bool; overload;
 function isOle(val: PValue): fun.bool;
@@ -1067,6 +1070,44 @@ begin
       end;
     end;
   end;
+end;
+
+// RFC 8259: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
+// One grammar for strict JSON, FD and the FD writer. Leading zeros, '.5',
+// '1.', '+1', '1e' and hex are not numbers here; FD keeps such tokens as
+// strings, while Fun source literals are handled separately by StrToNum.
+function IsJsonNumber(const s: fun.str): fun.bool;
+var
+  p, n: fun.int;
+begin
+  Result := False;
+  n := Length(s);
+  p := 1;
+  if (p <= n) and (s[p] = '-') then Inc(p);
+  if p > n then Exit;
+  if s[p] = '0' then
+    Inc(p)
+  else if s[p] in ['1'..'9'] then
+  begin
+    Inc(p);
+    while (p <= n) and (s[p] in ['0'..'9']) do Inc(p);
+  end
+  else
+    Exit;
+  if (p <= n) and (s[p] = '.') then
+  begin
+    Inc(p);
+    if (p > n) or not (s[p] in ['0'..'9']) then Exit;
+    while (p <= n) and (s[p] in ['0'..'9']) do Inc(p);
+  end;
+  if (p <= n) and (s[p] in ['e', 'E']) then
+  begin
+    Inc(p);
+    if (p <= n) and (s[p] in ['+', '-']) then Inc(p);
+    if (p > n) or not (s[p] in ['0'..'9']) then Exit;
+    while (p <= n) and (s[p] in ['0'..'9']) do Inc(p);
+  end;
+  Result := p > n;
 end;
 
 function isFloat(vt: TVarType): fun.bool;

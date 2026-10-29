@@ -53,9 +53,12 @@ ok(not jsonOk('9223372036854775808'), 'strict rejects int64 overflow');
 ok('.5'.getJson(json: true).@toJson() = '[0.5]', 'lenient .5');
 ok('03'.getJson(json: true).@toJson() = '[3]', 'lenient 03');
 
-// --- FD numbers follow fd.bnf.fd ------------------------------------------
-ok(fd('n 03').n = 3, 'fd 03 is number');
-ok(fd('n 03').n.type() = 3, 'fd 03 type int');
+// --- FD numbers follow RFC 8259, same as json:2 ---------------------------
+ok(fd('n 03').n = '03', 'fd 03 is string');
+ok(fd('n 03').n.type() = 8, 'fd 03 type str');
+ok(fd('n 01').n = '01', 'fd 01 is string');
+ok(fd('n 0.5').n = 0.5, 'fd 0.5 is number');
+ok(fd('n 1e+3').n = 1000, 'fd 1e+3 is number');
 ok(fd('n 1.').n = '1.', 'fd 1. is string');
 ok(fd('n .5').n = '.5', 'fd .5 is string');
 ok(fd('n 0x10').n = '0x10', 'fd 0x10 is string');
