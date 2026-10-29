@@ -79,6 +79,7 @@ lang-semantics.fun	test/lang-semantics.fun	snap
 bool-num-cmp.fun	test/bool-num-cmp.fun	snap
 json-unicode.fun	test/json-unicode.fun	snap
 data-align.fun	test/data-align.fun	snap
+fd-bnf-align.fun	test/fd-bnf-align.fun	snap
 ffi-scalar.fun	test/ffi/ffi-scalar.fun	smoke
 ffi-int64.fun	test/ffi/ffi-int64.fun	snap
 ffi-float.fun	test/ffi/ffi-float.fun	snap

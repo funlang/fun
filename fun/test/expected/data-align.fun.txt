@@ -39,7 +39,6 @@ PASS fd unknown escape
 PASS fd backslash-v stays literal
 PASS fd kvd number
 PASS fd kvd string
-PASS BNF agrees on kvd
 PASS fd duplicate key last wins
 PASS json duplicate key last wins
 PASS fd duplicate emits once
@@ -50,4 +49,3 @@ PASS bool numeric forms
 PASS bool non-empty fallback
 PASS json \\u000b
 PASS json \\u0001
-PASS BNF agrees with builtin
