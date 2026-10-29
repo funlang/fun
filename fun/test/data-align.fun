@@ -57,6 +57,7 @@ ok(not jsonOk('1e+'), 'strict rejects 1e+');
 ok(not jsonOk('--1'), 'strict rejects --1');
 ok(not jsonOk('1.2.3'), 'strict rejects 1.2.3');
 ok(not jsonOk('9223372036854775808'), 'strict rejects int64 overflow');
+ok(not jsonOk('1e309'), 'strict rejects float overflow');
 // lenient keeps the historical superset
 ok('.5'.getJson(json: true).@toJson() = '[0.5]', 'lenient .5');
 ok('03'.getJson(json: true).@toJson() = '[3]', 'lenient 03');

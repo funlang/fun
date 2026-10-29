@@ -180,48 +180,6 @@ var
     Result := ParseRawToken(kvd + LineBreak, isQuoted);
   end;
 
-  // FD numbers use the same RFC 8259 grammar as strict JSON (IsJsonNumber in
-  // base.pas). The value follows the host number type: Int64 here. Literals
-  // that do not fit the host type (integers beyond Int64, floats beyond a
-  // double) stay as their source text instead of raising, so FD remains a
-  // lenient data format. JS uses IEEE-754 doubles and is the caller's concern
-  // if exact integers beyond 2^53 matter.
-  function FdNumber(const t: fun.str): CValue;
-  var
-    i64: fun.int64;
-    d: fun.real;
-    code: fun.int;
-  begin
-    // 'pos' is ParseFD's cursor variable and shadows the RTL Pos() here.
-    if (System.Pos('.', t) = 0) and (System.Pos('e', t) = 0) and
-       (System.Pos('E', t) = 0) then
-    begin
-      // 'val' is ParseFD's value variable and shadows the RTL Val() here.
-      System.Val(t, i64, code);
-      if code = 0 then
-      begin
-        if (i64 >= -2147483648) and (i64 <= 2147483647) then
-          Result := fun.int(i64)
-        else
-          Result := i64;
-      end
-      else
-        Result := t;
-    end
-    else
-    begin
-      try
-        d := StrToFloat(t);
-        if IsInfinite(d) or IsNan(d) then
-          Result := t
-        else
-          Result := d;
-      except
-        Result := t;
-      end;
-    end;
-  end;
-
   function ParseValue: CData;
   var
     token: fun.str;
@@ -248,7 +206,19 @@ var
       else if token = '' then
         CValue(Result) := ''
       else if IsJsonNumber(token) then
-        CValue(Result) := FdNumber(token)
+      begin
+        // Same conversion as strict JSON (CParser.StrToNum). FD is lenient:
+        // a value that does not fit the host type, or becomes Inf/NaN, stays
+        // as its source text instead of raising.
+        try
+          CValue(Result) := CParser.StrToNum(token);
+          if (Result.VType = varDouble) and
+             (IsInfinite(Result.VDouble) or IsNan(Result.VDouble)) then
+            CValue(Result) := token;
+        except
+          CValue(Result) := token;
+        end;
+      end
       else
         CValue(Result) := token;
     end;
