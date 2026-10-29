@@ -24,13 +24,6 @@ This project records notable changes in the style of [Keep a Changelog](https://
   last-wins. `lib-fd.fun` also no longer crashes on an absent indentation
   match.
 
-- Keep Fun's `true`/`yes`/`false`/`no` string truthiness inside `funBool`
-  instead of mutating SysUtils' process-wide `TrueBoolStrs`/`FalseBoolStrs`
-  table. Numeric-looking strings are now deterministic (`'0.0'` and `'0e0'`
-  are false, `'1e3'` is true) instead of depending on the FPU state left by
-  earlier conversions. The CLI flag parser keeps the same yes/no behaviour
-  locally.
-
 - The JSON writer now encodes C0 control characters as `\u00XX`
   (previously they were replaced with `.`), matching `JSON.stringify`.
 

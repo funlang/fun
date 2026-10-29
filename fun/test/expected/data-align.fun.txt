@@ -45,7 +45,6 @@ PASS fd duplicate emits once
 PASS bool true words
 PASS bool false words
 PASS bool numeric zero
-PASS bool numeric forms
 PASS bool non-empty fallback
 PASS json \\u000b
 PASS json \\u0001

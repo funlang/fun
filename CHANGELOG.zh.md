@@ -20,12 +20,6 @@
   `\xHH`，JS 读取器支持 `#!kvd:` 指令，空文档解析为 `[]`，重复命名键
   后者覆盖前者。`lib-fd.fun` 也不再因缺少缩进匹配而崩溃。
 
-- Fun 的 `true`/`yes`/`false`/`no` 字符串真值判断收回到 `funBool` 内部，
-  不再修改 SysUtils 进程级的 `TrueBoolStrs`/`FalseBoolStrs`。数字形态的
-  字符串现在结果稳定（`'0.0'`、`'0e0'` 为假，`'1e3'` 为真），不再受此前
-  浮点转换留下的 FPU 状态影响。命令行参数解析在本地保留相同的 yes/no
-  行为。
-
 - JSON writer 现在把 C0 控制字符写成 `\u00XX`（此前会替换成 `.`），
   与 `JSON.stringify` 一致。
 
