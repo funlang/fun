@@ -5,16 +5,52 @@ use 'lib-bnf.fun';
 use ':fd.bnf.fd' as rules;
 rules = rules.getJson(fd: true); //?. rules.@toJson(fd: true);
 
+fun kvdChar(s)
+  var m = s.match(/^[\t\x20]*#!kvd:(.)/m);
+  if m = nil then result = ''; else result = m.@(1); end if;
+end fun;
+
 fun parse(s)
+  var ch = kvdChar(s);
+  var cb = cbcb;
+  var tab = 9.toChar();
+  if ch <> '' and ch <> ' ' and ch <> tab then
+    var r = rules.@clone();
+    var e = ch;
+    var sl = 92.toChar();
+    if ch = sl or ch = ']' or ch = '^' or ch = '-' then e = sl & ch; end if;
+    r['Unqkey'] = '[^' & sl & 's' & e & ']++';
+    r['Ws'] = '[' & sl & 't' & sl & 'x20' & e & ']++';
+    cb = CBNF(r, dup: 0);
+  end if;
   root = new [];
   stak = Stack();
   stak.push([ind: -1, node: root]);
-  result = cbcb.parse(s, actions);
+  result = cb.parse(s, actions);
 end fun;
 
 var root;
 var stak;
 var cbcb = CBNF(rules, dup: 0); //?. cb.regex.replace(/\x20/g, '');
+fun fdNum(s)
+  # Same number policy as the Pascal and JS readers: integers outside the
+  # cross-language safe range, and floats that overflow a double, stay strings.
+  var isInt = not (s =~ /[.eE]/);
+  try
+    var n = s.toNum();
+    if isInt then
+      if n <= 9007199254740991 and n >= -9007199254740991 then
+        result = n;
+      else
+        result = s;
+      end if;
+    else
+      result = n;
+    end if;
+  except
+    result = s;
+  end try;
+end fun;
 var actions = [
       Comment: (o,r) {
         var rt = getRet(r);
@@ -23,6 +59,7 @@ var actions = [
       Key: (o,r) {
         var rt = getRet(r);
         rt.key = o.val or o.t;
+        rt.ind = rt.ind or 0;
         while stak.peek().ind >= rt.ind do
          stak.pop();
         end do;
@@ -76,7 +113,7 @@ var actions = [
         p.@ = nil;
       },
       Number: (o,p) {
-        p.val = o.t.toNum();
+        p.val = fdNum(o.t);
         p.@ = nil;
       },
       Const: (o,p) {

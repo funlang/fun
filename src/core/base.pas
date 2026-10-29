@@ -984,13 +984,54 @@ end;
 
 //==============================================================
 function funBool(val: PValue): fun.bool;
+var
+  s, t: fun.str;
+  d: fun.real;
+
+  // Only feed decimal-looking strings to the RTL. 'nan'/'inf' make the FPU
+  // raise EInvalidOp in some builds, while the old Variant cast treated them
+  // as ordinary non-empty strings.
+  function LooksNumeric: fun.bool;
+  var
+    i: fun.int;
+  begin
+    Result := False;
+    for i := 1 to Length(s) do
+      if not (s[i] in ['0'..'9', '+', '-', '.', 'e', 'E', ' ', #9]) then Exit;
+    Result := True;
+  end;
 begin
   if isStr(val) then
-    try
-      result := fun.bool(val^);
-    except
-      result := not isNull(val);
-    end
+  begin
+    // Keep Fun's documented string truthiness (true/yes/1 and false/no/0/'')
+    // here instead of mutating SysUtils' process-wide TrueBoolStrs table.
+    // Numeric-looking strings use the same rule the old Variant cast used:
+    // a parsed zero is false, any other number is true. Every other non-empty
+    // string is true, which is the language's long-standing fallback.
+    s := fun.str(val^);
+    if s = '' then
+      result := False
+    else
+      try
+        if LooksNumeric and TryStrToFloat(s, d) then
+          result := d <> 0
+        else
+        begin
+          t := LowerCase(s);
+          if (t = 'true') or (t = 'yes') then
+            result := True
+          else if (t = 'false') or (t = 'no') then
+            result := False
+          else
+            result := True;
+        end;
+      except
+        // Strings such as 'nan' make the RTL raise EInvalidOp instead of
+        // returning False. The old Variant cast caught that and fell back to
+        // "non-empty is true"; keep doing so.
+        result := True;
+      end;
+  end
   else result := fun.bool(val^);
 end;
 
@@ -1346,13 +1387,5 @@ end;
 
 initialization
   NullValue := Unassigned;
-
-  SetLength(TrueBoolStrs, 2);
-  TrueBoolStrs[0] := 'True';
-  TrueBoolStrs[1] := 'Yes';
-  SetLength(FalseBoolStrs, 3);
-  FalseBoolStrs[0] := 'False';
-  FalseBoolStrs[1] := 'No';
-  FalseBoolStrs[2] := '';
 
 end.

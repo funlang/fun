@@ -289,9 +289,34 @@ begin
   end;
 end;
 
+// Deliberately local: the interpreter no longer mutates SysUtils'
+// TrueBoolStrs/FalseBoolStrs, so the CLI keeps its historical yes/no and 0/1
+// parsing without changing that global state for every unit in the process.
+function ParseBoolDef(const s: fun.str; def: fun.bool): fun.bool;
+var
+  t: fun.str;
+  d: fun.real;
+begin
+  t := LowerCase(s);
+  if (t = 'true') or (t = 'yes') or (t = '1') then
+    result := True
+  else if (t = 'false') or (t = 'no') or (t = '0') or (s = '') then
+    result := False
+  else
+    try
+      if TryStrToFloat(s, d) then
+        result := d <> 0
+      else
+        result := def;
+    except
+      // 'nan'/'inf' can raise instead of returning False on some FPUs.
+      result := def;
+    end;
+end;
+
 function FindParamAsBool(const id: fun.str; idx: fun.int): fun.bool;
 begin
-  result := StrToBoolDef(FindParam(id, idx), false);
+  result := ParseBoolDef(FindParam(id, idx), false);
 end;
 
 //==============================================================

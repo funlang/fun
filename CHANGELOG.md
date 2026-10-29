@@ -6,6 +6,34 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Fix integer parsing above 2^31: `StrToNum` used a 32-bit `TryStrToInt`
+  first, and FPC reports success while wrapping the value
+  (`9007199254740991` became `-1`). Numeric literals and JSON/FD numbers now
+  keep their value and become `Int64` when they do not fit 32 bits.
+
+- `getJson(json: 2)` now validates numbers against RFC 8259 instead of only
+  requiring one digit: `.5`, `03`, `1.`, `1e`, `1e+`, `--1`, `1.2.3` and
+  out-of-range integers are rejected with a `strict:` message. Lenient
+  `json: true` keeps its historical superset.
+
+- Align the three FD readers (`libfd.inc`, `fd.js`/`fd2.js`, `lib-fd.fun`) and
+  the writer: numbers follow the `fd.bnf.fd` grammar (`.5`, `1.`, `+1`,
+  `0x10`, `1e` are strings), integers outside JavaScript's safe range stay
+  strings, `\xHH` is decoded, `#!kvd:`-style directives are honoured,
+  empty documents parse as `[]`, and duplicate named keys are
+  last-wins. `lib-fd.fun` also no longer crashes on an absent indentation
+  match.
+
+- Keep Fun's `true`/`yes`/`false`/`no` string truthiness inside `funBool`
+  instead of mutating SysUtils' process-wide `TrueBoolStrs`/`FalseBoolStrs`
+  table. Numeric-looking strings are now deterministic (`'0.0'` and `'0e0'`
+  are false, `'1e3'` is true) instead of depending on the FPU state left by
+  earlier conversions. The CLI flag parser keeps the same yes/no behaviour
+  locally.
+
+- The JSON writer now encodes C0 control characters as `\u00XX`
+  (previously they were replaced with `.`), matching `JSON.stringify`.
+
 ## [9.4.9] - 2026-10-28
 
 - Add the `csv` standard-library module: a streaming row-by-row reader and

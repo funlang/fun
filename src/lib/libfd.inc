@@ -180,6 +180,79 @@ var
     Result := ParseRawToken(kvd + LineBreak, isQuoted);
   end;
 
+  // FD number grammar (fd.bnf.fd):
+  //   -?[0-9]+ ( '.' [0-9]+ )? ( [eE] [+-]? [0-9]+ )?
+  // Leading zeros are allowed by FD (unlike strict JSON). Hex, '+', '.5',
+  // '1.' and '1e' are plain strings, which keeps the reader identical to the
+  // BNF and JavaScript parsers.
+  function IsFdNumber(const t: fun.str): fun.bool;
+  var
+    p, n: fun.int;
+  begin
+    Result := False;
+    n := Length(t);
+    p := 1;
+    if (p <= n) and (t[p] = '-') then Inc(p);
+    if (p > n) or not (t[p] in ['0'..'9']) then Exit;
+    while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
+    if (p <= n) and (t[p] = '.') then
+    begin
+      Inc(p);
+      if (p > n) or not (t[p] in ['0'..'9']) then Exit;
+      while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
+    end;
+    if (p <= n) and (t[p] in ['e', 'E']) then
+    begin
+      Inc(p);
+      if (p <= n) and (t[p] in ['+', '-']) then Inc(p);
+      if (p > n) or not (t[p] in ['0'..'9']) then Exit;
+      while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
+    end;
+    Result := p > n;
+  end;
+
+  // Integers are exact in every FD implementation only up to JavaScript's
+  // safe-integer limit; larger integer literals are kept as their source text
+  // (a string) so Fun, Pascal and JS agree and no precision is lost. Floats
+  // that overflow the host double fall back to the source text too.
+  function FdNumber(const t: fun.str): CValue;
+  const
+    MaxSafeInt = 9007199254740991;
+  var
+    i64: fun.int64;
+    d: fun.real;
+    code: fun.int;
+  begin
+    // 'pos' is ParseFD's cursor variable and shadows the RTL Pos() here.
+    if (System.Pos('.', t) = 0) and (System.Pos('e', t) = 0) and
+       (System.Pos('E', t) = 0) then
+    begin
+      // 'val' is ParseFD's value variable and shadows the RTL Val() here.
+      System.Val(t, i64, code);
+      if (code = 0) and (i64 >= -MaxSafeInt) and (i64 <= MaxSafeInt) then
+      begin
+        if (i64 >= -2147483648) and (i64 <= 2147483647) then
+          Result := fun.int(i64)
+        else
+          Result := i64;
+      end
+      else
+        Result := t;
+    end
+    else
+    begin
+      try
+        d := StrToFloat(t);
+        if (d > 1.7976931348623157E308) or (d < -1.7976931348623157E308) then
+          Result := t
+        else
+          Result := d;
+      except
+        Result := t;
+      end;
+    end;
+  end;
+
   function ParseValue: CData;
   var
     token: fun.str;
@@ -205,12 +278,8 @@ var
         CValue(Result) := NullValue
       else if token = '' then
         CValue(Result) := ''
-      else if (token[1] >= '0') and (token[1] <= '9') or (token[1] = '-') then
-      try
-        CValue(Result) := CParser.StrToNum(token);
-      except
-        CValue(Result) := token;
-      end
+      else if IsFdNumber(token) then
+        CValue(Result) := FdNumber(token)
       else
         CValue(Result) := token;
     end;
