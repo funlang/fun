@@ -1206,8 +1206,10 @@ class function CParser.StrToNum(const s: fun.str): CValue;
 var
   i, ii: fun.int;
   i64: fun.int64;
+  d: fun.real;
   code: fun.int;
   u: fun.uint32;
+  fs: TFormatSettings;
 begin
   ii := Length(s);
   if (ii > 2) and (s[1] = '0') and (s[2] in ['X', 'x', 'B', 'b']) then
@@ -1231,7 +1233,18 @@ begin
     end;
   end
   else if (Pos('.', s) >= 1) or (Pos('e', s) > 1) or (Pos('E', s) > 1) then
-    result := StrToFloat(s)
+  begin
+    // TryStrToFloat returns False for overflow and malformed input instead of
+    // leaving an FPU overflow exception that some call paths cannot trap. A
+    // controlled EConvertError keeps strict JSON's 'number out of range' and
+    // FD's string fallback deterministic.
+    fs := DefaultFormatSettings;
+    fs.DecimalSeparator := '.';
+    if TryStrToFloat(s, d, fs) and not IsInfinite(d) and not IsNan(d) then
+      result := d
+    else
+      raise EConvertError.CreateFmt('"%s" is an invalid float', [s]);
+  end
   else
   begin
     // Do not use TryStrToInt here: with a 32-bit target FPC reports success

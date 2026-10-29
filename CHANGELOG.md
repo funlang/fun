@@ -13,8 +13,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 - `getJson(json: 2)` now validates numbers against RFC 8259 instead of only
   requiring one digit: `.5`, `03`, `1.`, `1e`, `1e+`, `--1`, `1.2.3` and
-  out-of-range integers are rejected with a `strict:` message. Lenient
-  `json: true` keeps its historical superset.
+  out-of-range integers or floats are rejected with a `strict:` message.
+  Lenient `json: true` keeps its historical superset.
 
 - Align the three FD readers (`libfd.inc`, `fd.js`/`fd2.js`, `lib-fd.fun`) and
   the writer: FD numbers now use the same RFC 8259 grammar as `json: 2`, so
@@ -25,6 +25,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
   `#!kvd:`-style directives are honoured, empty documents parse as `[]`,
   and duplicate named keys are last-wins. `lib-fd.fun` also no longer
   crashes on an absent indentation match.
+
+- FD now reuses `CParser.StrToNum` for number conversion instead of a
+  separate `FdNumber`. The grammar (`IsJsonNumber`) and conversion are shared
+  with strict JSON; FD only adds its lenient fallback, keeping values that do
+  not fit Int64, or overflow a double, as source text.
 
 - The JSON writer now encodes C0 control characters as `\u00XX`
   (previously they were replaced with `.`), matching `JSON.stringify`.

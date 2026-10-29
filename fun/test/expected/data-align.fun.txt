@@ -14,6 +14,7 @@ PASS strict rejects 1e+
 PASS strict rejects --1
 PASS strict rejects 1.2.3
 PASS strict rejects int64 overflow
+PASS strict rejects float overflow
 PASS lenient .5
 PASS lenient 03
 PASS fd 03 is string
