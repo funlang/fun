@@ -35,7 +35,7 @@ implementation
 
 {$IfDef Unicode}{$WARN WIDECHAR_REDUCED OFF}{$EndIf}
 
-uses SysUtils;
+uses SysUtils, Math;
 
 procedure _count(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
@@ -304,6 +304,45 @@ begin
 end;
 
 function _asJson(hash: CHash; cs: CSet; lev: fun.int; format: fun.int = 0; json: fun.bool = False; isGbk: fun.bool = false; fd: fun.bool = false; kvd: fun.int = 32): fun.str; overload; forward;
+
+// Shortest decimal that parses back to the same double. FloatToStr's default
+// 15 digits silently loses precision (0.1+0.2 was written as 0.3); trying
+// 15/16/17 and stopping at the first exact round-trip keeps JSON/FD lossless.
+// NaN/Inf have no JSON/FD spelling, so they become null like JSON.stringify.
+function NumToStr(val: PValue): fun.str;
+var
+  d: Double;
+  fs: TFormatSettings;
+  i: fun.int;
+  s: fun.str;
+  back: Double;
+begin
+  if PData(val)^.VType <> varDouble then
+  begin
+    Result := fun.str(val^);
+    Exit;
+  end;
+  d := PData(val)^.VDouble;
+  if IsNan(d) or IsInfinite(d) then
+  begin
+    Result := 'null';
+    Exit;
+  end;
+  fs := DefaultFormatSettings;
+  fs.DecimalSeparator := '.';
+  fs.ThousandSeparator := #0;
+  for i := 15 to 17 do
+  begin
+    s := FloatToStrF(d, ffGeneral, i, 0, fs);
+    if TryStrToFloat(s, back, fs) and (back = d) then
+    begin
+      Result := s;
+      Exit;
+    end;
+  end;
+  Result := FloatToStrF(d, ffGeneral, 17, 0, fs);
+end;
+
 function _asJson(hash: CHash; e: CExp; lev: fun.int; format: fun.int = 0; json: fun.bool = False; isGbk: fun.bool = false): fun.str; overload;
 begin
   if e.asObj is CSet then
@@ -315,7 +354,7 @@ begin
     if PData(e.value).VType <= varNull then
       result := 'null'//'""'
     else
-      result := e.asStr // todo, 8209 - byte array
+      result := NumToStr(e.value) // todo, 8209 - byte array
     ;
     with PData(e.value)^ do
     begin

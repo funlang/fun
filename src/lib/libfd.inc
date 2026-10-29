@@ -212,7 +212,7 @@ var
     begin
       try
         d := StrToFloat(t);
-        if (d > 1.7976931348623157E308) or (d < -1.7976931348623157E308) then
+        if IsInfinite(d) or IsNan(d) then
           Result := t
         else
           Result := d;
