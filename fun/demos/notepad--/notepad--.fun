@@ -201,11 +201,7 @@ class MainForm = Form()
     if (n.tagName == 'P' || n.tagName == 'LI' || n.tagName == 'SPAN' || n.tagName == 'I') {
       n.innerHTML = n.innerHTML.replace(/<[^>]+>/g, '').replace(/ |&nbsp;/g, '·').replace(child||re, function($0,k0,$1,$2,$3,$4){
         if (k0) return '<i class="k0">'+(replace && replace.Is ? replace.Str : k0)+'</i>';
-        if ($1) {
-          if ($1.charAt(0) == '.') return '<i class="k2">.</i>'+$1.substring(1);
-          if ($1.substring(0, 2) == '?.') return '<i class="k2">?.</i>'+$1.substring(2);
-          return '<i class="k1">'+$1+'</i>';
-        }
+        if ($1) return '<i class="k1">'+$1+'</i>';
         if ($2) return '<i class="k2">'+$2+'</i>';
         if ($3) return '<i class="k3">'+$3+'</i>';
         if ($4) return '<i class="k4">'+$4+'</i>';
