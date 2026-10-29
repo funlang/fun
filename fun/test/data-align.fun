@@ -1,9 +1,10 @@
-// Cross-format alignment: Fun numbers, JSON strict grammar, FD readers/writer,
-// boolean coercion and duplicate keys.
+// Cross-format alignment: Fun numbers, JSON strict grammar, the built-in FD
+// reader/writer, boolean coercion and duplicate keys.
+//
+// The BNF reader (`lib-fd.fun`) needs the regex engine, so its differential
+// lives in fd-bnf-align.fun and is skipped on builds without regex.
 //
 // Run: fun/funcmd fun/test/data-align.fun
-
-use '../lib/lib-fd.fun' as fdlib;
 
 fun ok(cond, name)
   if cond then
@@ -84,7 +85,6 @@ ok(fd('n ' + q + 'a' + sl + 'vb"').n = 'a' + sl + 'vb', 'fd backslash-v stays li
 var kvd = '#!kvd:=' + nl + 'a=85' + nl + 'b=hello world' + nl;
 ok(kvd.getJson(fd: true).a = 85, 'fd kvd number');
 ok(kvd.getJson(fd: true).b = 'hello world', 'fd kvd string');
-ok(fdlib.parse(kvd).@toJson() = kvd.getJson(fd: true).@toJson(), 'BNF agrees on kvd');
 
 // --- duplicate named keys: last wins --------------------------------------
 ok(fd('a 1' + nl + 'a 2').a = 2, 'fd duplicate key last wins');
@@ -104,8 +104,3 @@ ok(truth('off') and truth(' no '), 'bool non-empty fallback');
 // --- JSON writer escapes C0 controls --------------------------------------
 ok((new [v: 11.toChar()]).@toJson(json: true) = '{"v":"' + sl + 'u000b"}', 'json \\u000b');
 ok((new [v: 1.toChar()]).@toJson(json: true) = '{"v":"' + sl + 'u0001"}', 'json \\u0001');
-
-// --- the BNF reader agrees with the builtin FD reader ---------------------
-var doc = 'a 85' + nl + 'b -3.14' + nl + 'c .5' + nl + 'd 0x10' + nl +
-          'e 9007199254740992' + nl + 'f yes' + nl + 'g ' + q + 'x' + sl + 'x41"';
-ok(fdlib.parse(doc).@toJson() = doc.getJson(fd: true).@toJson(), 'BNF agrees with builtin');

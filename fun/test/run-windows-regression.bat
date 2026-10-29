@@ -69,7 +69,7 @@ rem Tests gated only by the regex engine's absence: probed below, skipped while
 rem REGEXOK=0. The CI win64 build links PCRE dynamically (pcre3.dll next to
 rem funcmd.exe, -dPCRE_WinDLL), so the probe normally finds it; a toolchain
 rem without PCRE just skips these instead of failing.
-set "REGEXTESTS= all.fun regex-adv.fun lib-match-test.fun lib-regex-test.fun lib-func-check.fun lib-bnf-dedup.fun lib-regex-replace.fun portability-probe.fun lib-jsonschema-test.fun "
+set "REGEXTESTS= all.fun regex-adv.fun lib-match-test.fun lib-regex-test.fun lib-func-check.fun lib-bnf-dedup.fun lib-regex-replace.fun portability-probe.fun lib-jsonschema-test.fun fd-bnf-align.fun "
 
 set "MODE=compare"
 set "PORTABLE=0"
