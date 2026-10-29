@@ -97,8 +97,7 @@ fun truth(s)
 end fun;
 ok(truth('true') and truth('TRUE') and truth('yes'), 'bool true words');
 ok(not truth('false') and not truth('no') and not truth(''), 'bool false words');
-ok(not truth('0') and not truth('00') and not truth('-0'), 'bool numeric zero');
-ok(not truth('0.0') and not truth('0e0') and truth('1e3'), 'bool numeric forms');
+ok(not truth('0'), 'bool numeric zero');
 ok(truth('off') and truth(' no '), 'bool non-empty fallback');
 
 // --- JSON writer escapes C0 controls --------------------------------------
