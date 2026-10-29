@@ -73,6 +73,7 @@ LOAD  lib-yaml
 LOAD  lib-zlib
 LOAD  logging
 LOAD  test
+LOAD  toml
 LOAD  uuid
 
-loaded=70 failed=6
+loaded=71 failed=6
