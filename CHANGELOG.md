@@ -6,6 +6,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.5.0] - 2026-10-29
+
 - Fix integer parsing above 2^31: `StrToNum` used a 32-bit `TryStrToInt`
   first, and FPC reports success while wrapping the value
   (`9007199254740991` became `-1`). Numeric literals and JSON/FD numbers now
