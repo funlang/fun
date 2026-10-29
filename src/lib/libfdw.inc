@@ -39,11 +39,34 @@ var
     Result := NewStringReplace(S, OldPattern, NewPattern, [rfReplaceAll]);
   end;
 
+  // Must match the reader's number grammar exactly, otherwise a string that
+  // looks numeric is written unquoted and read back as a number (or the
+  // reverse). FD numbers are -?[0-9]+('.'[0-9]+)?([eE][+-]?[0-9]+)?;
+  // hex, '.5', '1.', '+1' and '1e' are plain strings.
   function IsNumericString(const s: fun.str): fun.bool;
   var
-    d: Extended;
+    p, n: fun.int;
   begin
-    Result := TryStrToFloat(s, d) or (Length(s) > 2) and (s[1] = '0') and (s[2] in ['x','X','b','B']);
+    Result := False;
+    n := Length(s);
+    p := 1;
+    if (p <= n) and (s[p] = '-') then Inc(p);
+    if (p > n) or not (s[p] in ['0'..'9']) then Exit;
+    while (p <= n) and (s[p] in ['0'..'9']) do Inc(p);
+    if (p <= n) and (s[p] = '.') then
+    begin
+      Inc(p);
+      if (p > n) or not (s[p] in ['0'..'9']) then Exit;
+      while (p <= n) and (s[p] in ['0'..'9']) do Inc(p);
+    end;
+    if (p <= n) and (s[p] in ['e', 'E']) then
+    begin
+      Inc(p);
+      if (p <= n) and (s[p] in ['+', '-']) then Inc(p);
+      if (p > n) or not (s[p] in ['0'..'9']) then Exit;
+      while (p <= n) and (s[p] in ['0'..'9']) do Inc(p);
+    end;
+    Result := p > n;
   end;
 
   function IsPlainValue(const s: fun.str): fun.bool;
@@ -51,7 +74,7 @@ var
     Result := False;
     if s = '' then Exit;
     if (Pos(#10, s) > 0) or (Pos(#13, s) > 0) then Exit;
-    if (Length(s) > 0) and ((s[1] = ' ') or (s[Length(s)] = ' ')) then Exit;
+    if (s[1] in [' ', #9]) or (s[Length(s)] in [' ', #9]) then Exit;
     if IsNumericString(s) then Exit;
     if (s = 'true') or (s = 'false') or (s = 'null') then Exit;
     if (s = '[]') or (s = '{}') then Exit;

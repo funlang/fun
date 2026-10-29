@@ -1205,6 +1205,8 @@ end;
 class function CParser.StrToNum(const s: fun.str): CValue;
 var
   i, ii: fun.int;
+  i64: fun.int64;
+  code: fun.int;
   u: fun.uint32;
 begin
   ii := Length(s);
@@ -1232,9 +1234,21 @@ begin
     result := StrToFloat(s)
   else
   begin
-    if TryStrToInt(s, i) then
-      result := i
+    // Do not use TryStrToInt here: with a 32-bit target FPC reports success
+    // for values that overflow Integer and silently wraps them
+    // (TryStrToInt('9007199254740991', i) => True, i = -1). Parse into an
+    // Int64 first, then narrow to the 32-bit variant only when it fits, so
+    // large integer literals and data numbers keep their value and type.
+    Val(s, i64, code);
+    if code = 0 then
+    begin
+      if (i64 >= -2147483648) and (i64 <= 2147483647) then
+        result := fun.int(i64)
+      else
+        result := i64;
+    end
     else
+      // Keep the RTL error text for the invalid-integer report.
       result := StrToInt64(s)
     ;
   end;

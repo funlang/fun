@@ -1,0 +1,53 @@
+PASS literal > int32
+PASS literal 2^53-1
+PASS negative literal 2^53-1
+PASS strict 0
+PASS strict -0
+PASS strict 0.5
+PASS strict 1e+5
+PASS strict -1.25E-3
+PASS strict rejects .5
+PASS strict rejects 03
+PASS strict rejects 1.
+PASS strict rejects 1e
+PASS strict rejects 1e+
+PASS strict rejects --1
+PASS strict rejects 1.2.3
+PASS strict rejects int64 overflow
+PASS lenient .5
+PASS lenient 03
+PASS fd 03 is number
+PASS fd 03 type int
+PASS fd 1. is string
+PASS fd .5 is string
+PASS fd 0x10 is string
+PASS fd +1 is string
+PASS fd 1e is string
+PASS fd 1.2.3 is string
+PASS fd true is bool
+PASS fd false is bool
+PASS fd null
+PASS fd yes is string
+PASS fd no is string
+PASS fd safe int is number
+PASS fd 2^53 is string
+PASS fd int64 max is string
+PASS fd float overflow is string
+PASS fd backslash-n
+PASS fd backslash-x41
+PASS fd unknown escape
+PASS fd backslash-v stays literal
+PASS fd kvd number
+PASS fd kvd string
+PASS BNF agrees on kvd
+PASS fd duplicate key last wins
+PASS json duplicate key last wins
+PASS fd duplicate emits once
+PASS bool true words
+PASS bool false words
+PASS bool numeric zero
+PASS bool numeric forms
+PASS bool non-empty fallback
+PASS json \\u000b
+PASS json \\u0001
+PASS BNF agrees with builtin

@@ -171,6 +171,7 @@ end;
 function unesc(const s: fun.str; isGbk: fun.bool = false): fun.str;
 const
   abtnvfr = 'abtnvfr';
+  Hex = '0123456789abcdef';
 var
   ret: fun.str;
   i, k, l, n: fun.int;
@@ -197,7 +198,8 @@ begin
   k := 1;
   l := Length(s);
   n := 0;
-  SetLength(ret, l * 2);
+  // Worst case is a control character, which expands to six bytes (\u00XX).
+  SetLength(ret, l * 6);
 {$IfNDef Unicode}
   inGbk := false;
 {$EndIf}
@@ -231,7 +233,16 @@ begin
     else if Ord(c) < 32 then
     begin
       InsertAndInc(true);
-      ret[i+n] := '.'; // todo: ignore the control chars
+      // JSON has no raw C0 controls: encode as \u00XX (lowercase, like
+      // JSON.stringify). This replaces the old '.' placeholder, which lost
+      // data and disagreed with every JSON writer.
+      ret[i+n]     := '\';
+      ret[i+n + 1] := 'u';
+      ret[i+n + 2] := '0';
+      ret[i+n + 3] := '0';
+      ret[i+n + 4] := Hex[(Ord(c) shr 4) + 1];
+      ret[i+n + 5] := Hex[(Ord(c) and $F) + 1];
+      Inc(n, 5);
     end;
   end;
   InsertAndInc(true);

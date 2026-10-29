@@ -1393,10 +1393,19 @@ var
     e: CExp;
   begin
     if (Level = 0) and (Length(Stack) = 0) then Push('');
-    e := CExp.new(nil);
-    e.name := name;
+    // A repeated named key replaces the earlier value (last wins), matching
+    // JSON.parse, the FD JavaScript readers and the BNF reader. Unnamed items
+    // (arrays) always append.
+    e := nil;
+    if name <> '' then
+      e := Peek[name];
+    if e = nil then
+    begin
+      e := CExp.new(nil);
+      e.name := name;
+      Peek.Add(e);
+    end;
     e.assign(PValue(vv));
-    Peek.Add(e);
   end;
 
   procedure Push(const name: fun.str; isObj: fun.bool = false);
@@ -1441,6 +1450,44 @@ var
     if Level > 1 then Dec(Level)
     else if Level = 0 then
       StrictFail('unbalanced close', curPos);
+  end;
+
+  // RFC 8259 number: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
+  // The lenient scanner deliberately accepts a wider set ('.5', '03', '1.',
+  // '1e+', hex), so strict mode has to validate the token it scanned rather
+  // than relying on StrToNum to reject it.
+  function IsJsonNumber(const t: fun.str): fun.bool;
+  var
+    p, n: fun.int;
+  begin
+    Result := False;
+    n := Length(t);
+    p := 1;
+    if (p <= n) and (t[p] = '-') then Inc(p);
+    if p > n then Exit;
+    if t[p] = '0' then
+      Inc(p)
+    else if t[p] in ['1'..'9'] then
+    begin
+      Inc(p);
+      while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
+    end
+    else
+      Exit;
+    if (p <= n) and (t[p] = '.') then
+    begin
+      Inc(p);
+      if (p > n) or not (t[p] in ['0'..'9']) then Exit;
+      while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
+    end;
+    if (p <= n) and (t[p] in ['e', 'E']) then
+    begin
+      Inc(p);
+      if (p <= n) and (t[p] in ['+', '-']) then Inc(p);
+      if (p > n) or not (t[p] in ['0'..'9']) then Exit;
+      while (p <= n) and (t[p] in ['0'..'9']) do Inc(p);
+    end;
+    Result := p > n;
   end;
 
   procedure ParseJSON;
@@ -1602,16 +1649,19 @@ var
           kv := Copy(s, oi, i - oi);
           if s[i] in ['$', '_', 'A'..'Z', 'a'..'z'] then
             StrictFail('invalid number ''' + kv + '''', oi);
-          // strict: a number token with no digit at all ('.', '-', '--') is
-          // malformed. Digit-bearing forms stay lenient on purpose (.5, 03, 1.).
-          if strict then
-          begin
-            p := 1;
-            while (p <= Length(kv)) and not (kv[p] in ['0'..'9']) do Inc(p);
-            if p > Length(kv) then
-              StrictFail('invalid number ''' + kv + '''', oi);
+          // strict follows RFC 8259: no leading '+', no leading zero, a digit
+          // is required on both sides of '.', and an exponent needs digits.
+          // Lenient keeps its historical superset (.5, 03, 1., 1e+ ...).
+          if strict and not IsJsonNumber(kv) then
+            StrictFail('invalid number ''' + kv + '''', oi);
+          try
+            CValue(vv) := CParser.StrToNum(kv);
+          except
+            if strict then
+              StrictFail('number out of range ''' + kv + '''', oi)
+            else
+              raise;
           end;
-          CValue(vv) := CParser.StrToNum(kv);
           st := 1;
           Continue;
         end;

@@ -313,6 +313,22 @@ person
 
 Its defining trait is that **FD is self-describing**: the parser in `lib-fd.fun` is generated from a BNF grammar written in FD itself (`fd.bnf.fd`). The grammar file `src/parse/bnf/fun.ebnf` documents the language grammar in the same spirit.
 
+FD value rules (shared by the interpreter, `fd.js`/`fd2.js`, and the BNF
+reader):
+
+- Numbers are `-?digits(.digits)?([eE][+-]?digits)?`. Hex, `.5`, `1.`, `+1`
+  and `1e` are strings; integers beyond JavaScript's safe range
+  (`±9007199254740991`) stay strings so no reader loses precision.
+- Only `true`, `false` and `null` are literals. `yes`/`no` are strings here;
+  Fun's source-level string truthiness accepts them, but the data formats do
+  not.
+- Strings are raw by default. Prefixing the opening quote with a backslash
+  enables escapes (`\"a\nb"`, `\xHH`); an unknown escape is preserved
+  literally.
+- `#!kvd:<char>` selects a custom key/value delimiter for the rest of the
+  document (for example `#!kvd:=` and `key=value`).
+- Duplicate named keys are last-wins, matching `JSON.parse`.
+
 ---
 
 ## Foreign function interface
