@@ -35,7 +35,7 @@ implementation
 
 {$IfDef Unicode}{$WARN WIDECHAR_REDUCED OFF}{$EndIf}
 
-uses SysUtils, Math;
+uses SysUtils;
 
 procedure _count(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
@@ -304,27 +304,6 @@ begin
 end;
 
 function _asJson(hash: CHash; cs: CSet; lev: fun.int; format: fun.int = 0; json: fun.bool = False; isGbk: fun.bool = false; fd: fun.bool = false; kvd: fun.int = 32): fun.str; overload; forward;
-
-// Human-friendly 15-digit FloatToStr, matching toStr. Tiny float round-trip
-// differences are accepted for readability (0.1+0.2 writes as 0.3, not
-// 0.30000000000000004). NaN/Inf have no JSON/FD spelling, so they become null
-// like JSON.stringify.
-function NumToStr(val: PValue): fun.str;
-var
-  d: Double;
-begin
-  if PData(val)^.VType = varDouble then
-  begin
-    d := PData(val)^.VDouble;
-    if IsNan(d) or IsInfinite(d) then
-    begin
-      Result := 'null';
-      Exit;
-    end;
-  end;
-  Result := fun.str(val^);
-end;
-
 function _asJson(hash: CHash; e: CExp; lev: fun.int; format: fun.int = 0; json: fun.bool = False; isGbk: fun.bool = false): fun.str; overload;
 begin
   if e.asObj is CSet then
@@ -336,7 +315,7 @@ begin
     if PData(e.value).VType <= varNull then
       result := 'null'//'""'
     else
-      result := NumToStr(e.value) // todo, 8209 - byte array
+      result := e.asStr // todo, 8209 - byte array
     ;
     with PData(e.value)^ do
     begin
