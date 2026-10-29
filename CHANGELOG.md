@@ -29,6 +29,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
 - The JSON writer now encodes C0 control characters as `\u00XX`
   (previously they were replaced with `.`), matching `JSON.stringify`.
 
+- JSON/FD writers now emit the shortest decimal that parses back to the same
+  double (15, 16 or 17 significant digits) instead of `FloatToStr`'s 15-digit
+  default. `0.1 + 0.2` is written as `0.30000000000000004`, not `0.3`, so a
+  JSON/FD round-trip no longer loses floating-point precision.
+
 ## [9.4.9] - 2026-10-28
 
 - Add the `csv` standard-library module: a streaming row-by-row reader and

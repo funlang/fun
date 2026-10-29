@@ -57,7 +57,7 @@ implementation
 
 {$IfDef Unicode}{$WARN WIDECHAR_REDUCED OFF}{$EndIf}
 
-uses SysUtils, Variants,
+uses SysUtils, Variants, Math,
      {$IfNDef UNIX}Windows,{$Else}
        {$IfDef Linux}Linux,{$EndIf}
        unixtype, baseunix, termio,

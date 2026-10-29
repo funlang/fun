@@ -314,6 +314,7 @@ FD 取值规则（解释器、`fd.js`/`fd2.js` 与 BNF 读取器一致）：
   Fun/Pascal 用 Int64，JS 用 IEEE-754 double，所以 JS 里超过 2^53 的
   整数会丢精度；超出宿主类型的字面量降级成字符串（Fun 超出 Int64，
   JS 超出 double）。需要精确往返的大 ID 请写成字符串。
+  writer 输出能解析回同一个 double 的最短十进制，JSON/FD 往返不丢浮点精度。
 - 只有 `true`、`false`、`null` 是字面量。`yes`/`no` 在这里是字符串；
   Fun 源码层的字符串真值判断接受它们，但数据格式不接受。
 - 字符串默认不转义；在起始引号前加反斜杠才启用转义
