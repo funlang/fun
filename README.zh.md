@@ -39,7 +39,7 @@
 一句话定位：**Fun 是一门从 JSON 一路写到机器码的脚本语言。**
 
 - 用同一个运行时，覆盖从高层数据处理（JSON/FD）到底层系统编程（FFI、运行时 C、JIT、机器码）的全谱系；
-- 自带 73 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
+- 自带 74 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
 - 在信创与 AI Agent 场景中，作为连接国产 OS、数据库、芯片与业务逻辑的轻量级胶水。
 
 Fun 的设计出发点很简单：**数据与代码都应该是头等公民，而且一段脚本应该能在不离开语言的情况下一路触达机器底层。**
@@ -70,7 +70,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
 - **跨平台** —— Windows（32/64 位）、Linux、ARM 与 Windows CE。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
-- **自托管的标准库** —— 73 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
+- **自托管的标准库** —— 74 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
 ---
 
@@ -365,7 +365,7 @@ fun/
 │   ├── utils/         # 工具函数
 │   └── prj/fun/       # 工程与构建脚本（funcmd.dpr，Delphi/FPC）
 ├── fun/
-│   ├── lib/           # 标准库（纯 Fun 编写，73 个模块）
+│   ├── lib/           # 标准库（纯 Fun 编写，74 个模块）
 │   ├── demo/          # 语言语法演示
 │   ├── demos/         # 完整应用与基准测试
 │   └── key_*.ini      # 关键字别名包（CN / FR / PUA）
@@ -492,15 +492,15 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 
 ## 标准库
 
-标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（73 个模块）：
+标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（74 个模块）：
 
-> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——73 个模块全部用 Fun 自身写成。
+> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——74 个模块全部用 Fun 自身写成。
 
 - **数据**：`lib-json`、`csv`、`jsonschema`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`
 - **工具**：`uuid`
 - **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`
 - **文本**：`lib-string`、`lib-regex`、`lib-match`、`lib-unicode`
-- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`fs`、`logging`、`lib-time`、`lib-cmdline`、`lib-proc`
+- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`fs`、`io`、`logging`、`lib-time`、`lib-cmdline`、`lib-proc`
 - **网络**：`lib-winsock`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-session`
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
 - **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`
@@ -561,6 +561,24 @@ f.close();
 `seek` 或 `flush`。64 位宿主上偏移为 64 位；大值需用算术构造
 （如 `0xFFFFFFFF + 1`）。Windows 上 `fs.open` 需要 64 位构建；64 位窄字符构建
 的路径使用当前 ANSI 代码页。
+
+通用流辅助接受任何 reader/writer，不关闭句柄，并把 `''` 视为 EOF：
+
+```fun
+use 'io.fun';
+var b = io.buffer('hello');
+var text = io.readAll(b);        // 仅适合小数据
+var out = io.buffer();
+var f = fs.open('copy.bin', 'r');
+var n = io.copy(out, f);         // 按 8192 字符分块
+f.close();
+io.writeString(out, 'done');
+```
+
+`io.buffer` 是内存 reader/writer（`read/write/text/length/reset`）；
+`io.readAll` 是便捷入口，`io.copy` 才是流式复制。格式库和辅助函数接受
+`io.buffer` 作为流，`fs.open` 句柄也可直接使用；格式 reader/writer 不关闭、
+不 flush 底层 IO。
 
 CSV 文件按行流式读写；reader/writer 只包装文件句柄，不负责关闭：
 
