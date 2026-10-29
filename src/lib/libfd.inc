@@ -208,13 +208,10 @@ var
       else if IsJsonNumber(token) then
       begin
         // Same conversion as strict JSON (CParser.StrToNum). FD is lenient:
-        // a value that does not fit the host type, or becomes Inf/NaN, stays
-        // as its source text instead of raising.
+        // a value that does not fit the host type stays as its source text
+        // instead of raising. StrToNum itself rejects Inf/NaN.
         try
           CValue(Result) := CParser.StrToNum(token);
-          if (Result.VType = varDouble) and
-             (IsInfinite(Result.VDouble) or IsNan(Result.VDouble)) then
-            CValue(Result) := token;
         except
           CValue(Result) := token;
         end;
