@@ -1,1 +1,1 @@
-(\?\.(?:[$_@A-Za-z][$_@A-Za-z0-9]*)|\.(?:[$_@A-Za-z][$_@A-Za-z0-9]*)|\b(?:if|then|elsif|else|end|case|is|when|do|loop|exit|next|while|for|to|step|in|try|except|finally|raise|fun|return|class|atom|new|var|use|as|null|nil|div|mod|not|and|or|xor|bit|true|false|result|this|base)\b|@|\$)
+(\b(?:if|then|elsif|else|end|case|is|when|do|loop|exit|next|while|for|to|step|in|try|except|finally|raise|fun|return|class|atom|new|var|use|as|null|nil|div|mod|not|and|or|xor|bit|true|false|result|this|base)\b|@|\$)
