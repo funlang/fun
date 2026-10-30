@@ -8,6 +8,10 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [9.5.1] - 2026-10-30
 
+- Add the `cli` module: a small command framework with root commands,
+  subcommands, typed flags (aliases, defaults), generated help and hooks.
+  Ships with `cli-demo` and CLI tests; the standard library is now 76 modules.
+
 - Fix string index writes into binary buffers: the write bounds check used
   `Length(PChar)` (strlen), so a string holding `#0` bytes, such as the
   `0.toChar().x(n)` buffer built by lib-ui2 `_buildBlock`, looked empty and
