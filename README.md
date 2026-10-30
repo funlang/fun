@@ -39,7 +39,7 @@
 In one sentence: **Fun is a scripting language that goes all the way from JSON to machine code.**
 
 - One runtime spans the whole spectrum, from high-level data work (JSON/FD) down to low-level system programming (FFI, C at runtime, JIT, machine code);
-- 75 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
+- 76 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
 - in AI-agent and domestic-IT scenarios, it is the lightweight glue connecting OSes, databases, chips, and business logic.
 
 Fun is designed around a simple premise: **data and code should be equally first-class, and a script should be able to reach down to the machine without leaving the language.**
@@ -70,7 +70,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
 - **Cross-platform** — Windows (32/64-bit), Linux, ARM, and Windows CE.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
-- **Self-hosted standard library** — 75 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
+- **Self-hosted standard library** — 76 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
 ---
 
@@ -395,7 +395,7 @@ fun/
 │   ├── utils/         # Utility functions
 │   └── prj/fun/       # Projects & build scripts (funcmd.dpr, Delphi/FPC)
 ├── fun/
-│   ├── lib/           # Standard library (pure Fun, 75 modules)
+│   ├── lib/           # Standard library (pure Fun, 76 modules)
 │   ├── demo/          # Language syntax demos
 │   ├── demos/         # Full applications & benchmarks
 │   └── key_*.ini      # Keyword alias packs (CN / FR / PUA)
@@ -536,15 +536,15 @@ CI job verifies strict and readonly, and it only runs on manual dispatch
 
 ## Standard library
 
-The standard library in [`fun/lib`](fun/lib) is written in pure Fun (75 modules):
+The standard library in [`fun/lib`](fun/lib) is written in pure Fun (76 modules):
 
-> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 75 modules written in Fun itself.
+> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 76 modules written in Fun itself.
 
 - **Data**: `lib-json`, `csv`, `toml`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`
 - **Utility**: `uuid`
 - **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`
 - **Text**: `lib-string`, `lib-regex`, `lib-match`, `lib-unicode`
-- **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `env`, `fs`, `io`, `logging`, `lib-time`, `lib-cmdline`, `lib-proc`
+- **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `env`, `cli`, `fs`, `io`, `logging`, `lib-time`, `lib-cmdline`, `lib-proc`
 - **Network**: `lib-winsock`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`, `http-session`
 - **Databases**: `lib-orm`, `lib-orm-pro`, `lib-orm-gen`, `lib-orm-rpc`, `lib-orm-cte`, `lib-ado`, `lib-ado-schema`
 - **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`
@@ -572,6 +572,141 @@ Environment variables are available without platform-specific FFI:
 use 'env.fun';
 var home = env.get('HOME');
 var port = env.get('PORT', '8080');
+```
+
+### Command-line programs
+
+`cli` is a small command framework. A root command owns global flags and
+subcommands, and every subcommand is the same `cli.command` object. Help,
+version, aliases, env fallback, required flags, hooks and exit codes are built
+in.
+
+```fun
+use 'cli.fun';
+
+fun hello(ctx)
+  var times = ctx.int('times');
+  for i = 1 to times do
+    ?. 'hello ' & ctx.string('name');
+  end do;
+end fun;
+
+fun serve(ctx)
+  ?. 'serving on port ' & ctx.int('port');
+end fun;
+
+var root = cli.command('demo', [
+  usage: 'demo command-line tool',
+  version: '1.0.0'
+]);
+root.flag(cli.string('name', [aliases: ['n'], value: 'world', usage: 'who to greet']));
+root.flag(cli.int('times', [aliases: ['t'], value: 1, usage: 'repeat count']));
+root.action(hello);
+root.command(cli.command('serve', [
+  usage: 'start the server',
+  flags: [cli.int('port', [aliases: ['p'], value: 8080, usage: 'listen port'])],
+  action: serve
+]));
+
+var code = root.run();          // nil: process arguments
+if code <> 0 then cli.quit(code); end if;
+```
+
+```text
+$ demo --name bob -t 2
+hello bob
+hello bob
+$ demo serve -p 9000
+serving on port 9000
+$ demo --help
+$ demo --version
+```
+
+`cli.command(name, opts)` accepts `usage` (a one-line summary in the parent's
+command list, also shown in its own help when `description` is empty),
+`usageText` (replace the generated usage line), `argsUsage`, `version`,
+`description`, `aliases`, `flags`, `commands`, `action`, `before`, `after`,
+`hidden`, `out` and `err`.
+
+Flags come from `cli.string`, `cli.bool`, `cli.int`, `cli.float` and
+`cli.strings`; options are `aliases`, `value` (default), `usage`, `env`
+(a name or list of names), `required`, `hidden` and `placeholder`. `strings`
+may be repeated. Its default list is used only when the flag is absent; the
+first explicit value replaces the default. Help shows default values and env
+names. A `required` flag must appear on the command line or come from env; a
+default does not satisfy it, while an empty `--flag=` still counts as supplied
+(validate non-empty values in the action). Flag and command names are
+case-sensitive, so `-V` and `-v` are different flags. Hidden flags and commands
+still parse but are omitted from help. Duplicate flag/command names and
+aliases raise at construction.
+
+Short and long forms may be mixed: `--name=value`, `--name value`, `-n value`,
+`-n=value`, combined bools such as `-ab` when both are bool flags, and `--` to
+stop option parsing. Boolean values accept `true/false`, `1/0`, `yes/no` and
+`on/off`; bool flags do not consume the next token, so use `--flag=false`.
+Integers are decimal; floats accept decimals and exponents. A non-bool option
+takes the next token as its value; when that value starts with
+`-`, use the attached form `--name=-x`/`-n=-x` (negative int/float values such
+as `--times -1` are still accepted). Global flags belong before the subcommand;
+tokens after it are parsed by the subcommand. When a command has subcommands,
+its first positional token is treated as a command name, so use `--` before
+positional arguments of the root action.
+
+The action receives a context: `ctx.string/bool/int/float/strings(name)`,
+`ctx.has(name)` (true only when set on the command line or by env),
+`ctx.args()`, `ctx.arg(n)`, `ctx.narg()`, `ctx.command()`, and the configured
+writers `ctx.out()`/`ctx.err()`. Typed accessors validate the declared flag:
+unknown names or a wrong type raise instead of silently returning a zero value.
+Parent flags inherited by a child stay accessible. Use canonical flag names,
+not aliases, with these accessors. Env values are converted by flag type;
+`strings` values are split on commas. The first present name from `env` wins.
+
+Help and version are automatic: `--help`/`-h`, `help [command...]`, and, on a
+command with `version` set, `-v`/`--version`. The `help` command exists at the
+root and on commands with subcommands; a leaf command can still use `help` as a
+positional value. `help`/`h` are reserved flag names, and `version`/`v` are
+reserved on a command that has a version; registration raises if a flag tries
+to use them. Subcommand help lists its own options; global options are listed by
+the parent/root help.
+
+Hooks run without process-level setup: `before(ctx)` may return nil/true/0 to
+continue, false to stop with code 1, or a nonzero integer to stop with that
+code. A parent `before` runs before the child action, and a parent `after` runs
+after the child action, including when the action raises. Help, version and
+parse errors do not run parent hooks. `after(ctx)` runs after its action returns
+or raises, once `before` has succeeded; its return value is ignored.
+
+`run(args)` never exits the process; it returns an exit code. Pass a list for
+exact control, or call `run()` to read process arguments (a leading
+`.fun`/`.foo`/`.fxx` script path is dropped; an empty process argument ends the
+scan). Use `cli.quit(code)` after the command has finished when the process
+should exit. Mixing `?.` with redirected `out`/`err` can reorder output: `?.`
+always writes to the process console, while `ctx.out()`/`ctx.err()` use the
+selected writers.
+
+Exit codes: parse errors, unknown flags/commands, bad values and missing
+required flags return 2; a false hook or an exception returns 1; an integer
+returned by an action becomes the exit code. Actions must return nil, a boolean
+or an integer; other return types raise and return 1. `before` accepts nil, a
+boolean or an integer.
+
+Help goes to stdout and errors go to stderr by default. The default console
+writer uses the process handles directly; pass `out`/`err` for captured,
+redirected or non-ASCII output. Any object with `write(s)` works; actions reach
+them through `ctx.out()` and `ctx.err()`, and a child's own writers override the
+root's. Writers are not closed or flushed by the framework. Tests use
+`io.buffer`:
+
+```fun
+use 'io.fun';
+var out = io.buffer();
+var app = cli.command('demo', [out: out, err: out]);
+app.flag(cli.string('name', [value: 'world']));
+app.flag(cli.int('times', [value: 1]));
+app.action(hello);
+
+?. app.run(['--help']) = 0;
+?. out.text().subpos('usage: demo') >= 0;
 ```
 
 Filesystem helpers cover directories, walking and temporary entries:
@@ -714,6 +849,7 @@ composition keywords and tuple `items` are not supported yet.
 - [`fun/demos/http-bearer-demo`](fun/demos/http-bearer-demo) — Bearer token auth, 401 challenges, and a same-origin page.
 - [`fun/demos/http-session-demo`](fun/demos/http-session-demo) — cookie session login/logout, SID rotation, and server-side state.
 - [`fun/demos/fs-demo`](fun/demos/fs-demo) — nested directories, listing, walking, atomic write, and cleanup.
+- [`fun/demos/cli-demo`](fun/demos/cli-demo) — commands, flags, aliases, env, hooks, help/version, and testable output.
 
 ---
 

@@ -1,3 +1,4 @@
+LOAD  cli
 LOAD  csv
 LOAD  env
 LOAD  fs
@@ -76,4 +77,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=71 failed=6
+loaded=72 failed=6
