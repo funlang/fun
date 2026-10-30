@@ -6,11 +6,16 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.5.1] - 2026-10-30
+
 - Fix string index writes into binary buffers: the write bounds check used
   `Length(PChar)` (strlen), so a string holding `#0` bytes, such as the
   `0.toChar().x(n)` buffer built by lib-ui2 `_buildBlock`, looked empty and
   `block[0.1] = ...` raised `string index out of range: 0`. Bounds now use the
   Variant string length, so embedded NUL bytes no longer hide the real size.
+
+- Document the `io` and `toml` modules, whose code shipped in 9.5.0 but was
+  missing from that release note.
 
 ## [9.5.0] - 2026-10-29
 
