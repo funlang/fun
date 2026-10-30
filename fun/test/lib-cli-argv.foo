@@ -1,0 +1,14 @@
+// cli: run() drops the supported .foo/.fxx entry script path. Booleans only.
+use 'fun/lib/cli.fun';
+
+var got = new [];
+fun act(ctx)
+  got.@add(ctx.narg());
+  got.@add(ctx.arg(0));
+end fun;
+
+var root = cli.command('argv');
+root.action(act);
+?. root.run() = 0;
+?. got[0] = 0;
+?. got[1] = nil;
