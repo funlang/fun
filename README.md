@@ -765,6 +765,32 @@ io.writeString(out, 'done');
 `io.buffer` where a format or helper expects a stream; `fs.open` handles work
 directly. Format readers/writers never close or flush the underlying IO.
 
+Process stdio uses the same contract:
+
+```fun
+use 'io.fun';
+var input = io.stdin();
+var output = io.stdout();
+var errors = io.stderr();
+
+var chunk = input.read(4096);     // may be short; '' means EOF
+output.write('received ' & chunk.length() & 10.toChar());
+errors.write('warning' & 10.toChar());
+```
+
+`io.stdin` is a Reader and `io.stdout`/`io.stderr` are Writers. They do not
+close, flush or translate line endings, and they do not create pipes; `io.pipe`
+and CLI stdin are separate later layers. Process stdio treats strings as byte
+strings: on UTF-16 Windows builds each character is written as one byte, so
+ASCII and binary data round-trip unchanged; non-ASCII text must be encoded by
+the caller first. Windows console code pages and UTF-16 are not translated.
+Process stdio uses `getapi`, so an FFI-enabled build is required: `io.buffer`
+still works in safe or FFI-less builds, but reading or writing process stdio
+raises an error there. A closed pipe can terminate the process through SIGPIPE
+on Unix, as usual. Do not mix `io.stdin()` with the built-in `line`/`char`/`all`
+input helpers on the same stdin, and do not mix `io.stdout()` with `?.` when
+output order matters: they use independent buffering/FFI paths.
+
 TOML documents use the same reader/writer contract:
 
 ```fun

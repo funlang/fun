@@ -118,6 +118,7 @@ rem getapi needs -dWinFFI plus ffi.dll next to funcmd.exe, so probe for a
 rem working getapi as well, and SKIP the four portable cases instead of
 rem failing when a build has neither.
 set "FFITESTS= ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun "
+set "STDIOTESTS= lib-io-stdio-out.fun lib-io-stdio-err.fun "
 set "GETAPIOK=0"
 if not exist "fun\test\ffi\libffitest.dll" goto ffi_probed
 set "PROBEFILE=fun\test\.getapi-probe.fun"
@@ -147,6 +148,10 @@ set "name=%~1"
 set "script=%~2"
 set "tmode=%~3"
 if /i "%tmode%"=="shell" goto skip_shell
+if "%GETAPIOK%"=="0" (
+  echo !STDIOTESTS! | findstr /i /c:" %name% " >nul
+  if not errorlevel 1 goto skip_ffi
+)
 if "%PORTABLE%"=="1" (
   echo !HOSTDEP! | findstr /i /c:" %name% " >nul
   if not errorlevel 1 goto skip_host
@@ -199,6 +204,11 @@ exit /b 0
 
 :skip_host
 echo %name%   SKIP (host-dependent)
+set /a SKIP+=1
+exit /b 0
+
+:skip_ffi
+echo %name%   SKIP (no getapi)
 set /a SKIP+=1
 exit /b 0
 

@@ -1,0 +1,16 @@
+rc=0
+stdout:
+  out:abc
+  rest:def
+stderr:
+  err:abc
+eof_rc=0
+eof_stdout:
+  out:
+  rest:
+eof_stderr:
+  err:
+copy_rc=0
+binary=PASS
+readall_rc=0
+readall=PASS
