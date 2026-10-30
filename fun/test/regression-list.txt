@@ -111,3 +111,5 @@ lib-fun-uuid-test.fun	test/lib-fun-uuid-test.fun	snap
 soft-keyword.fun	test/soft-keyword.fun	smoke
 lib-io-test.fun	test/lib-io-test.fun	snap
 lib-toml-test.fun	test/lib-toml-test.fun	snap
+lib-cli-test.fun	test/lib-cli-test.fun	snap
+lib-cli-argv.foo	test/lib-cli-argv.foo	snap

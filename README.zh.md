@@ -39,7 +39,7 @@
 一句话定位：**Fun 是一门从 JSON 一路写到机器码的脚本语言。**
 
 - 用同一个运行时，覆盖从高层数据处理（JSON/FD）到底层系统编程（FFI、运行时 C、JIT、机器码）的全谱系；
-- 自带 75 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
+- 自带 76 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
 - 在信创与 AI Agent 场景中，作为连接国产 OS、数据库、芯片与业务逻辑的轻量级胶水。
 
 Fun 的设计出发点很简单：**数据与代码都应该是头等公民，而且一段脚本应该能在不离开语言的情况下一路触达机器底层。**
@@ -70,7 +70,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
 - **跨平台** —— Windows（32/64 位）、Linux、ARM 与 Windows CE。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
-- **自托管的标准库** —— 75 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
+- **自托管的标准库** —— 76 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
 ---
 
@@ -365,7 +365,7 @@ fun/
 │   ├── utils/         # 工具函数
 │   └── prj/fun/       # 工程与构建脚本（funcmd.dpr，Delphi/FPC）
 ├── fun/
-│   ├── lib/           # 标准库（纯 Fun 编写，75 个模块）
+│   ├── lib/           # 标准库（纯 Fun 编写，76 个模块）
 │   ├── demo/          # 语言语法演示
 │   ├── demos/         # 完整应用与基准测试
 │   └── key_*.ini      # 关键字别名包（CN / FR / PUA）
@@ -492,15 +492,15 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 
 ## 标准库
 
-标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（75 个模块）：
+标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（76 个模块）：
 
-> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——75 个模块全部用 Fun 自身写成。
+> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——76 个模块全部用 Fun 自身写成。
 
 - **数据**：`lib-json`、`csv`、`toml`、`jsonschema`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`
 - **工具**：`uuid`
 - **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`
 - **文本**：`lib-string`、`lib-regex`、`lib-match`、`lib-unicode`
-- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`fs`、`io`、`logging`、`lib-time`、`lib-cmdline`、`lib-proc`
+- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`cli`、`fs`、`io`、`logging`、`lib-time`、`lib-cmdline`、`lib-proc`
 - **网络**：`lib-winsock`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-session`
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
 - **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`
@@ -527,6 +527,121 @@ logger.info('request', [path: '/users']);
 use 'env.fun';
 var home = env.get('HOME');
 var port = env.get('PORT', '8080');
+```
+
+### 命令行程序
+
+`cli` 是一个小型命令框架。根命令持有全局 flag 与子命令，子命令同样用
+`cli.command` 创建；help、version、别名、env 回退、required、钩子和退出码都已内置。
+
+```fun
+use 'cli.fun';
+
+fun hello(ctx)
+  var times = ctx.int('times');
+  for i = 1 to times do
+    ?. 'hello ' & ctx.string('name');
+  end do;
+end fun;
+
+fun serve(ctx)
+  ?. 'serving on port ' & ctx.int('port');
+end fun;
+
+var root = cli.command('demo', [
+  usage: 'demo command-line tool',
+  version: '1.0.0'
+]);
+root.flag(cli.string('name', [aliases: ['n'], value: 'world', usage: 'who to greet']));
+root.flag(cli.int('times', [aliases: ['t'], value: 1, usage: 'repeat count']));
+root.action(hello);
+root.command(cli.command('serve', [
+  usage: 'start the server',
+  flags: [cli.int('port', [aliases: ['p'], value: 8080, usage: 'listen port'])],
+  action: serve
+]));
+
+var code = root.run();          // nil：读取进程参数
+if code <> 0 then cli.quit(code); end if;
+```
+
+```text
+$ demo --name bob -t 2
+hello bob
+hello bob
+$ demo serve -p 9000
+serving on port 9000
+$ demo --help
+$ demo --version
+```
+
+`cli.command(name, opts)` 支持 `usage`（父命令列表中的一句话说明；自身没有
+`description` 时也显示在自身 help 中）、`usageText`（替换自动生成的 usage 行）、
+`argsUsage`、`version`、`description`、`aliases`、`flags`、`commands`、`action`、
+`before`、`after`、`hidden`、`out`、`err`。
+
+flag 由 `cli.string`、`cli.bool`、`cli.int`、`cli.float`、`cli.strings` 创建；
+选项有 `aliases`、`value`（默认值）、`usage`、`env`（单个名字或名字列表）、
+`required`、`hidden`、`placeholder`。`strings` 可以重复出现；默认列表只在
+flag 未出现时使用，第一次显式赋值会替换默认值。help 会显示默认值和 env 名称。
+`required` 只接受命令行或 env，默认值不算满足；空的 `--flag=` 也算已提供（非空
+校验请放在 action 里）。flag 与命令名区分大小写，`-V` 和 `-v` 是两个不同的 flag。
+`hidden` 的 flag/命令仍可解析，但不显示在 help 中。重复的 flag/命令名或别名在
+构造时直接报错。
+
+长短选项可混用：`--name=value`、`--name value`、`-n value`、`-n=value`、
+`-ab` 这类两个 bool 的组合，以及用 `--` 终止选项解析。bool 接受
+`true/false`、`1/0`、`yes/no`、`on/off`；bool flag 不吞下一个 token，请用
+`--flag=false`。int 为十进制整数；float 支持小数和指数。非 bool 选项的下一个
+token 作为值；如果值以 `-` 开头，请用紧贴形式
+`--name=-x`/`-n=-x`（`--times -1` 这类负 int/float 仍可直接写）。全局 flag 要放在
+子命令前，子命令后的 token 由子命令解析。命令有子命令时，第一个位置参数会被当作
+命令名；根 action 需要位置参数时请用 `--`。
+
+action 收到 context：`ctx.string/bool/int/float/strings(name)`、`ctx.has(name)`
+（只有命令行或 env 显式设置才为 true）、`ctx.args()`、`ctx.arg(n)`、`ctx.narg()`、
+`ctx.command()`，以及配置好的 writer `ctx.out()`/`ctx.err()`。带类型的访问器会
+校验声明的 flag：未知名字或类型不匹配会报错，而不是静默返回零值；子命令仍可
+访问父命令继承下来的 flag。访问器使用 flag 的规范名而不是别名。env 值按 flag
+类型转换，`strings` 按逗号分隔；`env` 列表中先存在的名字生效。
+
+help/version 自动提供：`--help`/`-h`、`help [command...]`；命令设置 `version` 后
+还有 `-v`/`--version`。根命令和有子命令的命令提供 `help` 命令，叶子命令仍可把
+`help` 当普通位置参数。`help`/`h` 是保留 flag 名；有版本的命令上 `version`/`v`
+也是保留名，注册冲突 flag 会直接报错。子命令 help 只列自己的选项；全局选项在
+父/根命令的 help 中。
+
+钩子无需进程级初始化：`before(ctx)` 返回 nil/true/0 继续，返回 false 以退出码 1
+停止，返回非零整数则以该码停止。父命令的 `before` 在子命令 action 前执行，
+`after` 在子命令 action 后执行（action 抛异常也执行）；help/version/解析错误不会
+触发父命令钩子。`after(ctx)` 在自己的 action 返回或抛异常后执行，前提是 `before`
+已成功；`after` 的返回值会被忽略。
+
+`run(args)` 不退出进程，只返回退出码；要精确控制参数时传列表，调用 `run()`
+则读取进程参数（会丢掉开头的 `.fun`/`.foo`/`.fxx` 脚本路径；进程参数中遇到空
+参数就停止扫描）。命令结束后需要退出时调用 `cli.quit(code)`。混用 `?.` 和重定向的
+`out`/`err` 可能导致顺序错乱：`?.` 始终写进程控制台，`ctx.out()`/`ctx.err()`
+才使用指定 writer。
+
+退出码：解析错误、未知 flag/命令、非法值和缺失 required 返回 2；hook 返回 false
+或抛出异常返回 1；action 返回的整数作为退出码。action 只能返回 nil、bool 或 int，
+其他类型会报错并返回 1；`before` 同样只接受 nil、bool 或 int。
+
+help 默认写 stdout，错误默认写 stderr。默认 console writer 直接写进程句柄；需要
+捕获、重定向或非 ASCII 输出时请传 `out`/`err`。任意带 `write(s)` 的对象都可以；
+action 通过 `ctx.out()`/`ctx.err()` 访问它们；子命令自己的 writer 优先，否则继承
+根命令。框架不关闭也不 flush writer。测试通常用 `io.buffer`：
+
+```fun
+use 'io.fun';
+var out = io.buffer();
+var app = cli.command('demo', [out: out, err: out]);
+app.flag(cli.string('name', [value: 'world']));
+app.flag(cli.int('times', [value: 1]));
+app.action(hello);
+
+?. app.run(['--help']) = 0;
+?. out.text().subpos('usage: demo') >= 0;
 ```
 
 文件系统辅助覆盖目录、遍历和临时文件/目录：
@@ -656,6 +771,7 @@ end if;
 - [`fun/demos/http-bearer-demo`](fun/demos/http-bearer-demo) —— Bearer token 认证、401 挑战与同源页面示例。
 - [`fun/demos/http-session-demo`](fun/demos/http-session-demo) —— cookie session 登录/登出、SID 轮换与服务端状态示例。
 - [`fun/demos/fs-demo`](fun/demos/fs-demo) —— 递归建目录、list/walk、原子写与清理示例。
+- [`fun/demos/cli-demo`](fun/demos/cli-demo) —— 命令、flag、别名、env、钩子、help/version 与可测试输出示例。
 
 ---
 
