@@ -6,6 +6,8 @@ float idx oob is nil: True
 write oob raises: True
 write far neg raises: True
 write in range: True
+write NUL buffer: True
+write mid NUL: True
 toByte oob is 0: True
 toByte neg is 0: True
 toByte in range: True

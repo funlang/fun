@@ -38,6 +38,14 @@ try t2[-10] = 'X'; except threw = true; end try;
 var t3 = 'abc';
 t3[0] = 'X';
 ?. 'write in range: ' & (t3 = 'Xbc');
+// binary buffers: #0 bytes must not hide the real length (lib-ui2 _buildBlock)
+var bin = 0.toChar().x(4);
+bin[0.1] = 65;
+bin[3.1] = 66;
+?. 'write NUL buffer: ' & (bin.length() = 4 and bin[0.1] = 65 and bin[3.1] = 66);
+var mid = 'x' & 0.toChar() & 'y';
+mid[1] = 'A';
+?. 'write mid NUL: ' & (mid.length() = 3 and mid[1] = 'A');
 
 //--------------------------------------------------------------
 // 3. byte access
