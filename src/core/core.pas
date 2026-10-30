@@ -1683,15 +1683,15 @@ var
   s: PChar;
   p: fun.ptr;
   cv: fun.str;
-  i, j: fun.int;
+  i, j, n: fun.int;
 begin
   if flag = 9 then begin
-    s := PData(exp.value).VPointer;
+    s := PData(exp.value).VPointer; n := Length(exp.asStr); // Variant length; strlen(s) stops at the first #0
     j := idx.asInt;
-    i := calcIndex(j, Length(s));
+    i := calcIndex(j, n);
     // Documented range is 0..N-1 / -N..-1 (see fun/lib/lib-string.fun).
     // A raw write outside it corrupts the string header or the heap.
-    if (i < 0) or (i >= Length(s)) then
+    if (i < 0) or (i >= n) then
       raise EBase.Create('string index out of range: ' + IntToStr(j));
     if isFloat(idx.value) and (idx.value^ > j) then begin
     {$IfDef Unicode}
@@ -1770,10 +1770,10 @@ begin
     begin
       if estr = nil then estr := CExp.new(nil);
       evar := estr;
-      s := exp.asStr;
+      s := exp.asStr; n := Length(s);
       j := idx.asInt;
-      i := calcIndex(j, Length(s));
-      if (i < 0) or (i >= Length(s)) then
+      i := calcIndex(j, n);
+      if (i < 0) or (i >= n) then
       begin
         // Documented range is 0..N-1 / -N..-1 (see fun/lib/lib-string.fun):
         // reads out of range yield nil (like a list), writes raise.
