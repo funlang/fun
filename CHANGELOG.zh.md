@@ -17,6 +17,10 @@
   `useLevel` 守卫。`-lnx` 兼容包装因此对 `use` 和 `use ... as` 都透明；
   新增 `alias-re-export.fun` 回归。
 
+- 明确并锁定 `compile(inline: true)` 的词法内联语义：返回模块的 parent 是调用方，
+  `m.name` 可以读写调用方变量；非 inline `compile()` 保持隔离。新增
+  `compile-inline-scope.fun` 回归。
+
 ## [9.5.1] - 2026-10-30
 
 - 新增 `cli` 模块：小型命令框架，支持根命令、子命令、带别名和默认值的

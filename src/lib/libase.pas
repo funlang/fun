@@ -1276,6 +1276,11 @@ end;
 
 //==============================================================
 // s.compile(inline = false)
+// inline: true is lexical insertion: the parsed module's parent is the caller
+// node, so both unqualified lookup and qualified access through the returned
+// module (m.name) read and write the caller's variables. Do not store or
+// return an inline module for later use. inline: false is an isolated module
+// (parent = nil).
 procedure _compile(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   s, fn: fun.str;

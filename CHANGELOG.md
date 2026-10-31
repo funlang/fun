@@ -20,6 +20,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
   `useLevel` guard handles cycles. This makes the `-lnx` compatibility wrappers
   transparent for both `use` and `use ... as`; `alias-re-export.fun` covers it.
 
+- Document and pin `compile(inline: true)` as lexical insertion: the returned
+  module's parent is the caller, so `m.name` reads and writes the caller's
+  variables. `compile()` without inline stays isolated. Covered by
+  `compile-inline-scope.fun`.
+
 ## [9.5.1] - 2026-10-30
 
 - Add the `cli` module: a small command framework with root commands,

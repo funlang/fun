@@ -10,7 +10,7 @@
 ## 0. 当前基线
 
 - **版本**：9.5.1，`src/core/version.inc` 的 `funRelease = '9.5.1'`。
-- **回归**：Linux `121/121`（`sh fun/test/run-linux-regression.sh`）。
+- **回归**：Linux `122/122`（`sh fun/test/run-linux-regression.sh`）。
 - **可加载性**：`72/78`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
 - **标准库**：76 个模块（`fun/lib` 有 78 个基础 `.fun`，内部 `lib-base`/`lib-type` 不计）。
@@ -81,6 +81,7 @@
 | X-04 | H-07 递归求值栈 | WONTFIX | 16M 栈当前够用，不够再加 |
 | X-05 | writer 15 位浮点输出 | WONTFIX | 可读性优先，接受细小往返差异 |
 | X-06 | 重复键 last-wins、孤立 surrogate 不额外拒绝 | WONTFIX | 与 RFC 8259 / JSON.parse 行为一致 |
+| X-07 | `compile(inline: true)` 是词法内联 | WONTFIX | 返回模块的 parent 是调用方，`m.x` 可读写调用方状态；需要隔离时用非 inline `compile()` 或传入状态容器。不要长期持有或返回 inline 模块。 |
 
 ## 6. 发版检查
 
@@ -98,3 +99,5 @@
   导致一直走纯 Fun；1 MB 从约 9.6 秒降到约 4 毫秒。
 - 2026-10-31：`use ... as Alias` 现在会沿转发模块的 `use` 链暴露一级名字，
   `-lnx` 薄包装对限定访问也透明；新增 `alias-re-export.fun` 回归。
+- 2026-10-31：确认 `compile(inline: true)` 是词法内联，`m.x` 可读写调用方状态；
+  新增 `compile-inline-scope.fun` 回归，非 inline `compile()` 保持隔离。
