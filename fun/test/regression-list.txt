@@ -118,3 +118,4 @@ lib-cli-argv.foo	test/lib-cli-argv.foo	snap
 lib-io-stdio-test.sh	test/lib-io-stdio-test.sh	shell
 lib-io-stdio-out.fun	test/lib-io-stdio-out.fun	snap
 lib-io-stdio-err.fun	test/lib-io-stdio-err.fun	snap
+alias-re-export.fun	test/alias-re-export.fun	snap

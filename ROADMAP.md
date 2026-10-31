@@ -10,7 +10,7 @@
 ## 0. 当前基线
 
 - **版本**：9.5.1，`src/core/version.inc` 的 `funRelease = '9.5.1'`。
-- **回归**：Linux `120/120`（`sh fun/test/run-linux-regression.sh`）。
+- **回归**：Linux `121/121`（`sh fun/test/run-linux-regression.sh`）。
 - **可加载性**：`72/78`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
 - **标准库**：76 个模块（`fun/lib` 有 78 个基础 `.fun`，内部 `lib-base`/`lib-type` 不计）。
@@ -96,3 +96,5 @@
 - 2026-10-31：创建主控文档；把当前技术债、待办、接受项和发版检查集中到这里。
 - 2026-10-31：修复 `SHA256()` 的 Unix 快路径，别名指向错误的 `-lnx` 包装，
   导致一直走纯 Fun；1 MB 从约 9.6 秒降到约 4 毫秒。
+- 2026-10-31：`use ... as Alias` 现在会沿转发模块的 `use` 链暴露一级名字，
+  `-lnx` 薄包装对限定访问也透明；新增 `alias-re-export.fun` 回归。

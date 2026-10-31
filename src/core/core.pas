@@ -147,6 +147,7 @@ type
     procedure add(cn: CNode); override;
     procedure run(env: CEnv); override;
     function UID(const n: fun.str): CVar; override;
+    function findExport(const n: fun.str): CVar;
     procedure use(n : CRuns; const id: fun.str = ''); override;
     property ID[const name: fun.str]: CVar read GetID write SetID;
     property ND[i: fun.int]: CRun read GetND; default;
@@ -770,6 +771,32 @@ begin
     end;
   end;
   if result = nil then result := inherited UID(n);
+end;
+
+function CRuns.findExport(const n: fun.str): CVar;
+// Dotted alias lookup. A forwarding module (`use 'real.fun';`) should expose
+// the names it imports, not just its own definitions. `UID` also walks the
+// lexical parent chain; this walks only `used`, so `Alias.name` cannot see the
+// caller's globals by accident.
+const
+  MaxDepth = 64;
+  function findIn(r: CRuns; const name: fun.str; depth: fun.int): CVar;
+  var
+    i: fun.int;
+    c: CVar;
+  begin
+    result := nil;
+    c := r.ID[name];
+    if c <> nil then exit(c);
+    if depth >= MaxDepth then exit;
+    for i := r.used.count - 1 downto 0 do
+    begin
+      c := findIn(CRuns(r.used[i]), name, depth + 1);
+      if c <> nil then exit(c);
+    end;
+  end;
+begin
+  result := findIn(self, n, 0);
 end;
 
 procedure CRuns.use(n : CRuns; const id: fun.str = '');
@@ -1622,8 +1649,8 @@ begin
         evar := CVar.new(CFun(o).all, id);
       end;
     end
-    else if o is CRuns then // use
-      evar := CRuns(o).ID[id]
+    else if o is CRuns then // use, including forwarding modules
+      evar := CRuns(o).findExport(id)
     ;
   end
   else if isOle(exp.value) then

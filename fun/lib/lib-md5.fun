@@ -19,9 +19,10 @@ fun SHA256 (msg)
       // alias must be copied to Cr in the same branch (assigning after the
       // inner `end if` raises "libCr not found" and the except below would
       // silently fall back to the slow, non-wrapping pure implementation).
-      // Import the real Unix backend, not the `-lnx` wrapper: an alias of the
-      // wrapper does not re-export `Crypt`, so `Cr.Crypt(...)` raised and every
-      // Linux/macOS call silently used the pure-Fun fallback.
+      // Import the real Unix backend directly. The `-lnx` wrapper is a
+      // compatibility name; using `-unx` here avoids one forwarding hop. (An
+      // alias of the wrapper also works now that aliases re-export their
+      // module's `use` chain.)
       if 'host'.arg().getJson(fd: true).os = 'linux' or
          'host'.arg().getJson(fd: true).os = 'macos' then
         use 'lib-crypt-unx.fun' as libCr;

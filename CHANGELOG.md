@@ -13,6 +13,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
   from about 9.6 s to about 4 ms; the pure-Fun fallback is unchanged for
   builds without a crypto library.
 
+- Make `use '...' as Alias` expose names imported by a forwarding module.
+  Qualified lookup now checks the module's own definitions first, then its
+  `use` chain in reverse order, with a depth guard; it does not walk the
+  caller's lexical parent. This makes the `-lnx` compatibility wrappers
+  transparent for both `use` and `use ... as`; `alias-re-export.fun` covers it.
+
 ## [9.5.1] - 2026-10-30
 
 - Add the `cli` module: a small command framework with root commands,

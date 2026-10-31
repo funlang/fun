@@ -63,7 +63,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Dynamic, data-centric value model** — numbers, strings, time, regex, and first-class collections: list (array), set, and tree, built on a variant-based runtime.
 - **First-class functions** — anonymous functions, function references, currying, default and variadic parameters, and `->` pipelines.
 - **Object system** — `class`, `this` / `base`, methods, and property get/set dispatch (methods, getters and setters are dispatched uniformly through the `.` operator).
-- **Modules** — `use 'file.fun'` (optionally `as alias`) pulls in other scripts; the runtime tracks module state and dependencies.
+- **Modules** — `use 'file.fun'` (optionally `as alias`) pulls in other scripts; an alias also exposes names imported by forwarding modules, and the runtime tracks module state and dependencies.
 - **Regex as a value type** — bundled PCRE engine with inline regex literals (`/.../`) and match operators (`=~`, `!~`).
 - **Built-in data formats** — JSON and **FD**, a JSON-compatible, Markdown-like format friendly to humans and to AI (see [below](#the-fd-data-format)).
 - **Runtime C & machine code** — bundled Tiny C Compiler, JIT, and inline assembly (see [the capability ladder](#the-capability-ladder)).
