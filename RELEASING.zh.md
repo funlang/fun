@@ -8,8 +8,11 @@
 
 - 确认 `main` 上的回归工作流全部通过。
 - 把 `CHANGELOG.md` 和 `CHANGELOG.zh.md` 里 `Unreleased` 的条目移到新版本号下，写上日期。
+- 更新 `ROADMAP.md`：基线版本、回归/可加载数字，以及已完成条目的状态。把完成项移出
+  NOW/NEXT，并翻转技术债台账里对应的行。
 - 重新生成版本号：`fun src/prj/fun/gen-version.fun [YYYYMMDD] ["release"]`。
-- 将这三个文件提交为 `release: Fun X.Y.Z`。
+- 运行 `sh src/prj/fun/check-roadmap.sh`，有报错先修再打 tag。
+- 将两个 changelog、版本戳和 `ROADMAP.md` 提交为 `release: Fun X.Y.Z`。
 
 ## 2. 打带摘要的注解 tag，不要打空 tag
 

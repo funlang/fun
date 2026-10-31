@@ -8,6 +8,7 @@
 - 官网：<https://funlang.org>
 - 作者：张卫东 &lt;zwd@funlang.org>
 - 授权：MIT（另有商业授权条款，见下文「许可证」）
+- 状态与路线图：[ROADMAP.md](ROADMAP.md)
 
 > **版本 9.5**：这不是玩具或原型——一门经历了超过 15 年（2010 至今）持续演化与生产级验证的成熟语言，其前身可追溯至 Nuva（2006）与 TemplateScript（2005）。
 

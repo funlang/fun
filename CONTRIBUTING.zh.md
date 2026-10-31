@@ -13,6 +13,13 @@
   - `Docs: update build matrix`
 - 尽量让每个提交只包含一个逻辑变更，便于回溯。
 
+## 状态与路线图
+
+- `ROADMAP.md` 是当前状态、优先级和“接受/不做”的**唯一**来源；`CHANGELOG.md` 记录已发布历史。
+- 修掉或新增一个条目时，在同一个提交里翻转或添加 `ROADMAP.md` 里对应的行。
+- `art/notes/` 只保留设计、证据和历史，不再维护第二份状态清单。
+- `sh src/prj/fun/check-roadmap.sh` 会在 `docs` CI 工作流里运行。
+
 ## 编码与换行
 
 - 语言核心为 Pascal（Delphi / Free Pascal），源码文件使用 **CRLF** 换行（Windows 工具链）。

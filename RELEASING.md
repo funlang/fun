@@ -8,8 +8,11 @@ Maintainer checklist for cutting a release.
 
 - Make sure the regression workflow is green on `main`.
 - Move the `Unreleased` entries in `CHANGELOG.md` and `CHANGELOG.zh.md` under the new version with today's date.
+- Update `ROADMAP.md`: baseline version, regression/loadcheck numbers, and the status of
+  completed items. Move finished work out of NOW/NEXT and flip the matching debt rows.
 - Regenerate the version stamp: `fun src/prj/fun/gen-version.fun [YYYYMMDD] ["release"]`.
-- Commit the three files as `release: Fun X.Y.Z`.
+- Run `sh src/prj/fun/check-roadmap.sh` and fix any mismatch before tagging.
+- Commit the changelogs, version stamp, and `ROADMAP.md` as `release: Fun X.Y.Z`.
 
 ## 2. Tag with a summary, never a bare tag
 

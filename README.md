@@ -8,6 +8,7 @@
 - Website: <https://funlang.org>
 - Author: Zhang Weidong &lt;zwd@funlang.org>
 - License: MIT, plus commercial terms (see [License](#license))
+- Status and roadmap: [ROADMAP.md](ROADMAP.md)
 
 > **Version 9.5**: this is not a toy or a prototype — a mature language refined and production-validated for over 15 years (2010–present), with a lineage that reaches back through Nuva (2006) and TemplateScript (2005).
 

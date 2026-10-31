@@ -13,6 +13,15 @@ Thanks for your interest in contributing to **Fun**! Please follow the conventio
   - `Docs: update build matrix`
 - Keep each commit to one logical change so it is easy to bisect.
 
+## Status and roadmap
+
+- `ROADMAP.md` is the **only** source of current status, priorities and accepted
+  limitations. `CHANGELOG.md` is the released history.
+- If a change fixes or opens an item, flip or add its row in `ROADMAP.md` in the
+  same commit.
+- Notes under `art/notes/` keep design, evidence and history, not a second status list.
+- `sh src/prj/fun/check-roadmap.sh` runs in the `docs` CI workflow.
+
 ## Encoding & line endings
 
 - The language core is Pascal (Delphi / Free Pascal); source files use **CRLF** line endings (Windows toolchain).

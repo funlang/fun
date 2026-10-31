@@ -1,0 +1,22 @@
+name: docs
+
+# Lightweight gate for the master status document. It does not build Fun.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  roadmap:
+    name: roadmap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check ROADMAP.md
+        run: sh src/prj/fun/check-roadmap.sh
