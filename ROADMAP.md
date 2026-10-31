@@ -5,11 +5,11 @@
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
 > 最近更新：2026-10-31
-> 基线：Fun 9.5.1（tag `v9.5.1`）
+> 基线：Fun 9.5.2（tag `v9.5.2`）
 
 ## 0. 当前基线
 
-- **版本**：9.5.1，`src/core/version.inc` 的 `funRelease = '9.5.1'`。
+- **版本**：9.5.2，`src/core/version.inc` 的 `funRelease = '9.5.2'`。
 - **回归**：Linux `122/122`（`sh fun/test/run-linux-regression.sh`）。
 - **可加载性**：`72/78`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
@@ -101,3 +101,5 @@
   `-lnx` 薄包装对限定访问也透明；新增 `alias-re-export.fun` 回归。
 - 2026-10-31：确认 `compile(inline: true)` 是词法内联，`m.x` 可读写调用方状态；
   新增 `compile-inline-scope.fun` 回归，非 inline `compile()` 保持隔离。
+- 2026-10-31：发布 9.5.2；包含 io stdio 适配器、SHA256 快路径、use 别名
+  re-export、inline 语义锁定和 ROADMAP/检查脚本。

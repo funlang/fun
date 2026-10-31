@@ -6,10 +6,17 @@
 
 ## [未发布]
 
+## [9.5.2] - 2026-10-31
+
+- 新增 `io.stdin`、`io.stdout`、`io.stderr` 进程 stdio 字节流适配器。它们遵循
+  与 `io.buffer`、`fs.open` 相同的 reader/writer 契约，因此 `io.readAll`、
+  `io.copy`、`io.writeString` 可直接使用。进程 stdio 需要启用 FFI 的构建；
+  管道与 CLI stdin 层仍留待后续。附带 stdin/stdout/stderr shell 测试。
+
 - 修复 Linux/macOS 上的 `SHA256()`：它把 `lib-crypt-lnx.fun` 当作模块别名导入，
   但 `-lnx` 只是转发包装，别名里没有 `Crypt`，于是每次调用都静默退回纯 Fun 实现。
   改为直接导入 `lib-crypt-unx.fun`。在有 libcrypto 的机器上，1 MB 哈希从约
-  9.6 秒降到约 4 毫秒；没有加密库时仍走原来的纯 Fun 回退。
+  9.6 秒降到约 3 毫秒；没有加密库时仍走原来的纯 Fun 回退。
 
 - `use '...' as Alias` 现在会暴露转发模块导入的一级名字。限定访问先查模块自己的
   定义，再按逆序查它的 `use` 链，直接复用 `UID`。模块是独立根节点
@@ -20,6 +27,9 @@
 - 明确并锁定 `compile(inline: true)` 的词法内联语义：返回模块的 parent 是调用方，
   `m.name` 可以读写调用方变量；非 inline `compile()` 保持隔离。新增
   `compile-inline-scope.fun` 回归。
+
+- 新增 `ROADMAP.md` 作为唯一状态源，配套 `src/prj/fun/check-roadmap.sh` 和
+  `docs` CI；发版清单与贡献指南已指向它。
 
 ## [9.5.1] - 2026-10-30
 

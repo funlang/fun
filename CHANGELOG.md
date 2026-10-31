@@ -6,11 +6,19 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.5.2] - 2026-10-31
+
+- Add `io.stdin`, `io.stdout` and `io.stderr` byte-stream adapters for process
+  stdio. They follow the same reader/writer contract as `io.buffer` and
+  `fs.open`, so `io.readAll`, `io.copy` and `io.writeString` work with them.
+  Process stdio requires an FFI-enabled build; pipe creation and the CLI stdin
+  layer remain future work. Includes stdin/stdout/stderr shell tests.
+
 - Fix `SHA256()` on Linux/macOS: it imported `lib-crypt-lnx.fun` as a module
   alias, but the `-lnx` file is only a re-export wrapper, so `Cr.Crypt(...)`
   raised and every call silently used the pure-Fun fallback. Import
   `lib-crypt-unx.fun` directly. On a host with libcrypto, hashing 1 MB drops
-  from about 9.6 s to about 4 ms; the pure-Fun fallback is unchanged for
+  from about 9.6 s to about 3 ms; the pure-Fun fallback is unchanged for
   builds without a crypto library.
 
 - Make `use '...' as Alias` expose names imported by a forwarding module.
@@ -24,6 +32,10 @@ This project records notable changes in the style of [Keep a Changelog](https://
   module's parent is the caller, so `m.name` reads and writes the caller's
   variables. `compile()` without inline stays isolated. Covered by
   `compile-inline-scope.fun`.
+
+- Add `ROADMAP.md` as the single status source, with `src/prj/fun/check-roadmap.sh`
+  and a `docs` CI workflow. The release checklist and contributor guide now
+  point at it.
 
 ## [9.5.1] - 2026-10-30
 
