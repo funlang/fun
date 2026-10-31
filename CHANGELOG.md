@@ -6,6 +6,13 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Fix `SHA256()` on Linux/macOS: it imported `lib-crypt-lnx.fun` as a module
+  alias, but the `-lnx` file is only a re-export wrapper, so `Cr.Crypt(...)`
+  raised and every call silently used the pure-Fun fallback. Import
+  `lib-crypt-unx.fun` directly. On a host with libcrypto, hashing 1 MB drops
+  from about 9.6 s to about 4 ms; the pure-Fun fallback is unchanged for
+  builds without a crypto library.
+
 ## [9.5.1] - 2026-10-30
 
 - Add the `cli` module: a small command framework with root commands,

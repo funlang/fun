@@ -13,7 +13,7 @@ use 'fun/lib/lib-md5.fun';
 ?. Hex2Base64('414243');            // base64 of "ABC"
 ?. fromBase64(Str2Base64('Fun 语言'));
 
-//--- SHA-256 known vectors (pure-Fun fallback path: lib-crypt is absent here) ---
+//--- SHA-256 known vectors (libcrypto fast path, or the pure-Fun fallback) ---
 ?. SHA256('abc');
 ?. SHA256('');
 ?. SHA256('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq');
