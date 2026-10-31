@@ -14,9 +14,10 @@ This project records notable changes in the style of [Keep a Changelog](https://
   builds without a crypto library.
 
 - Make `use '...' as Alias` expose names imported by a forwarding module.
-  Qualified lookup now checks the module's own definitions first, then its
-  `use` chain in reverse order, with a depth guard; it does not walk the
-  caller's lexical parent. This makes the `-lnx` compatibility wrappers
+  Qualified lookup now reuses the module's `UID` chain: its own definitions
+  first, then its `use` chain in reverse order. Modules are independent roots
+  (`parent = nil`), so this does not leak caller globals; `CModu.UID`'s
+  `useLevel` guard handles cycles. This makes the `-lnx` compatibility wrappers
   transparent for both `use` and `use ... as`; `alias-re-export.fun` covers it.
 
 ## [9.5.1] - 2026-10-30
