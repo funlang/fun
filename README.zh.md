@@ -713,6 +713,29 @@ io.writeString(out, 'done');
 `io.buffer` 作为流，`fs.open` 句柄也可直接使用；格式 reader/writer 不关闭、
 不 flush 底层 IO。
 
+进程标准流沿用同一契约：
+
+```fun
+use 'io.fun';
+var input = io.stdin();
+var output = io.stdout();
+var errors = io.stderr();
+
+var chunk = input.read(4096);     // 可能短读；'' 表示 EOF
+output.write('received ' & chunk.length() & 10.toChar());
+errors.write('warning' & 10.toChar());
+```
+
+`io.stdin` 是 Reader，`io.stdout`/`io.stderr` 是 Writer；三者都不关闭、不 flush、
+不转换换行，也不创建管道。`io.pipe`、CLI stdin 和 shell 管道是后续独立层。
+进程 stdio 按字节处理字符串：UTF-16 Windows 构建中每个字符写成一个字节，
+因此 ASCII 和二进制数据可原样往返；非 ASCII 文本需调用方先编码。Windows
+console 的代码页/UTF-16 不做转换。进程 stdio 依赖 `getapi`，需要启用 FFI 的
+构建；安全构建或无 FFI 构建中 `io.buffer` 仍可用，但读写进程 stdio 会报错。
+Unix 上管道关闭时进程可能按惯例收到 SIGPIPE 并退出。不要在同一个 stdin 上
+混用 `io.stdin()` 与内置 `line`/`char`/`all` 输入；输出顺序重要时也不要混用
+`io.stdout()` 和 `?.`，它们使用独立的缓冲/FFI 路径。
+
 TOML 文档沿用同一套 reader/writer 契约：
 
 ```fun

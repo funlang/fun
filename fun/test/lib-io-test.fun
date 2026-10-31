@@ -37,6 +37,64 @@ class _FailWriter()
   end fun;
 end class;
 
+// process stdio API and validation (no terminal read/write here)
+var stdinR = io.stdin();
+?. stdinR.read(0) = '';
+var stdBad = false;
+try
+  stdinR.read(-1);
+except
+  stdBad = true;
+end try;
+?. stdBad;
+stdBad = false;
+try
+  stdinR.read('x');
+except
+  stdBad = true;
+end try;
+?. stdBad;
+stdBad = false;
+try
+  stdinR.read(nil);
+except
+  stdBad = true;
+end try;
+?. stdBad;
+stdBad = false;
+try
+  stdinR.read(1.5);
+except
+  stdBad = true;
+end try;
+?. stdBad;
+stdBad = false;
+try
+  stdinR.read(0x80000000);
+except
+  stdBad = true;
+end try;
+?. stdBad;
+var stdoutW = io.stdout();
+?. stdoutW.write('') = 0;
+?. stdoutW.write(nil) = 0;
+?. io.stderr().write('') = 0;
+?. io.stderr().write(nil) = 0;
+stdBad = false;
+try
+  stdoutW.write(0);
+except
+  stdBad = true;
+end try;
+?. stdBad;
+stdBad = false;
+try
+  stdoutW.write(false);
+except
+  stdBad = true;
+end try;
+?. stdBad;
+
 // buffer construction and reading
 var b = io.buffer();
 ?. b.text() = '';
