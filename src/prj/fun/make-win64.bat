@@ -10,4 +10,10 @@ rem spurious here too: -dWinCE
 rem made 'host'.arg() report the OS as 'wince' on a Win64 build.
 rem -Fu..\..\lib: funcmd.dpr lists host with an explicit `in` path, but units
 rem that host pulls in itself (lffi, under -dWinFFI) need the lib dir here.
-%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx -dRegexx -Fu..\..\lib
+rem Regex: -dRegexx here was a typo that enabled nothing. win64 does support
+rem regex when pcre3.dll sits next to funcmd.exe (CI builds it; see the PCRE
+rem step in .github/workflows/regression.yml). -dPCRE_WinDLL imports the DLL,
+rem so no bcc32 objects or MinGW CRT are needed. Without the DLL, skip it.
+set "REGEX="
+if exist pcre3.dll set "REGEX=-dRegex -dPCRE_WinDLL"
+%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %REGEX% -Fu..\..\lib

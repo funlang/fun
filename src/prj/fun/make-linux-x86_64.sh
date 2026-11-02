@@ -7,9 +7,10 @@
 #
 # It also builds the bundled PCRE 8 engine (8-bit) from the vendored C source
 # under src/3rd/pcre-8 (fetch PCRE 8.x from https://www.pcre.org/) and enables
-# regex (-dRegex, one word - the "-dRegexx" used by the .bat scripts is a
-# no-op typo). If the PCRE C source is not present, the build falls back to
-# regex-disabled.
+# regex (-dRegex). The win64 .bat build adds -dRegex -dPCRE_WinDLL when
+# pcre3.dll is next to funcmd.exe; the cross-target .bat scripts leave regex
+# off because they have no PCRE objects for the target. If the PCRE C source is
+# not present, this build falls back to regex-disabled.
 #
 # It also builds the bundled Tiny C Compiler as libtcc.so from the vendored
 # source under src/3rd/tcc (same version as the shipped Windows libtcc.dll,
