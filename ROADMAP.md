@@ -4,13 +4,13 @@
 > 本文只维护当前基线、优先级、技术债和发版门槛。
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
-> 最近更新：2026-10-31
+> 最近更新：2026-11-02
 > 基线：Fun 9.5.2（tag `v9.5.2`）
 
 ## 0. 当前基线
 
 - **版本**：9.5.2，`src/core/version.inc` 的 `funRelease = '9.5.2'`。
-- **回归**：Linux `122/122`（`sh fun/test/run-linux-regression.sh`）。
+- **回归**：Linux `123/123`（`sh fun/test/run-linux-regression.sh`）。
 - **可加载性**：`72/78`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
 - **标准库**：76 个模块（`fun/lib` 有 78 个基础 `.fun`，内部 `lib-base`/`lib-type` 不计）。
@@ -65,11 +65,11 @@
 | P-08 | macOS | P2 | OPEN | arm64 真机验证、`libtcc.dylib`、签名/公证未做 | `art/notes/macos-port.md` |
 | P-09 | 架构 | P3 | OPEN | LoongArch 工具链与编码器未做 | `art/notes/arch-machine-code-plan.md` |
 | P-10 | 架构 | P3 | OPEN | Linux aarch64 交叉产物仍缺 `-dRegex` 与 `-dLinuxFFI` | `README.zh.md` |
-| Q-01 | 质量 | P2 | OPEN | `lib-ado-schema.Filter` 丢外键 | `art/notes/linux-capabilities.md` |
-| Q-02 | 质量 | P2 | OPEN | `lib-fd`/`lib-bnf` 仍有已知功能项（重名组已修） | `art/notes/port-decisions.md` |
-| Q-03 | 质量 | P3 | OPEN | Windows `make-*.bat` 仍写 `-dRegexx` 拼写，实际不启用 regex | `src/prj/fun/make-win64.bat` |
-| Q-04 | 质量 | P3 | OPEN | `str.sha256()` 没有 Linux 内置 Pascal 实现，纯回退正确但慢 | `art/notes/port-decisions.md` |
-| Q-05 | 质量 | P2 | OPEN | safe 模式只接在 Linux 构建脚本，macOS/Windows 未接同一组宏 | `SAFETY.zh.md` |
+| Q-01 | 质量 | P2 | DONE | `lib-ado-schema.Filter` 丢外键 | `art/notes/linux-capabilities.md` |
+| Q-02 | 质量 | P2 | DONE | `lib-fd`/`lib-bnf` 仍有已知功能项（重名组已修） | `art/notes/port-decisions.md` |
+| Q-03 | 质量 | P3 | DONE | Windows `make-*.bat` 仍写 `-dRegexx` 拼写，实际不启用 regex | `src/prj/fun/make-win64.bat` |
+| Q-04 | 质量 | P3 | DEFERRED | `str.sha256()` 没有 Linux 内置 Pascal 实现，纯回退正确但慢；正常路径不会回退，见 X-08 | `art/notes/port-decisions.md` |
+| Q-05 | 质量 | P2 | DONE | safe 模式只接在 Linux 构建脚本，macOS/Windows 未接同一组宏 | `SAFETY.zh.md` |
 
 ## 5. 接受 / 不做
 
@@ -82,6 +82,7 @@
 | X-05 | writer 15 位浮点输出 | WONTFIX | 可读性优先，接受细小往返差异 |
 | X-06 | 重复键 last-wins、孤立 surrogate 不额外拒绝 | WONTFIX | 与 RFC 8259 / JSON.parse 行为一致 |
 | X-07 | `compile(inline: true)` 是词法内联 | WONTFIX | 返回模块的 parent 是调用方，`m.x` 可读写调用方状态；需要隔离时用非 inline `compile()` 或传入状态容器。不要长期持有或返回 inline 模块。 |
+| X-08 | `str.sha256()` 的 Pascal 内置实现 | DEFERRED | 正常构建走 libcrypto（Linux）/CryptoAPI（Windows）/CommonCrypto（macOS），不会回退；只有缺 libcrypto 或 safe 构建（getapi 被拦）才走纯 Fun。纯实现已用多块向量验证正确，只是约 12 ms/KB；需要时再仿 `funhash.pas` 补内置。 |
 
 ## 6. 发版检查
 
@@ -103,3 +104,4 @@
   新增 `compile-inline-scope.fun` 回归，非 inline `compile()` 保持隔离。
 - 2026-10-31：发布 9.5.2；包含 io stdio 适配器、SHA256 快路径、use 别名
   re-export、inline 语义锁定和 ROADMAP/检查脚本。
+- 2026-11-02：Q-01/Q-02/Q-03/Q-05 关闭；Q-04 降级为 DEFERRED（X-08）。

@@ -11,8 +11,9 @@
 > `.toByte/.fromByte/.toNum(ptr:)/.movs/.x/.toStr`、`CList.Count/GetItem` 都加了边界校验
 > （写越界 raise，读越界给安全默认值）。
 >
-> **2026-10-25 更新：编译期安全构建已落地并分级。** `SAFE=strict|readonly|
-> readwrite|custom ./make-linux-x86_64.sh` 生成独立的 `funcmd-safe`
+> **2026-10-25 更新：编译期安全构建已落地并分级；2026-11-02 起同一组宏也接在
+> macOS / Linux aarch64 / win64 构建脚本上（见第 7 节）。**
+> `SAFE=strict|readonly|readwrite|custom ./make-linux-x86_64.sh` 生成独立的 `funcmd-safe`
 > （`-dFunSafe` 加 `-dFunSafeAllowRead/Write/Compile`）。严格档拦
 > NAT/MEM/FSR/FSW/SRC；只读档放开 FSR；读写档再放开 FSW；`custom` 通过
 > `SAFE_ALLOW=read,write,compile` 选择。默认构建与回归基线完全不变。没有
@@ -236,5 +237,20 @@ SAFE=custom SAFE_ALLOW=read,write,compile ./make-linux-x86_64.sh
   `FUN_PATH`；`FunSafeAllowCompile` 时放开）。
 - `src/core/io.pas`：Unix `size` 改用 `stat`。
 
-`SAFE` 目前只接在 Linux 构建脚本上；拦截本身是平台无关的编译条件，后续
-需要时可在 macOS/Windows 构建脚本里加同一组 `-dFunSafe*` 宏。
+`SAFE` 现在接在同一组平台构建脚本上（`src/prj/fun/safe-flags.sh` 统一解析
+`SAFE`/`SAFE_ALLOW`，各脚本只决定输出名和单元目录）：
+
+| 脚本 | 普通产物 | safe 产物 |
+|---|---|---|
+| `make-linux-x86_64.sh` | `funcmd` | `funcmd-safe` |
+| `make-macos.sh`（原生 Mac） | `funcmd` | `funcmd-safe` |
+| `make-darwin.sh`（Linux 交叉编译 Mac） | `funcmd-darwin-<cpu>` | `funcmd-darwin-<cpu>-safe` |
+| `make-linux-aarch64.sh` | `funcmd-linux-aarch64` | `funcmd-linux-aarch64-safe` |
+| `make-win64.bat` | `funcmd.exe` | `funcmd-safe.exe`（`set SAFE=...`） |
+
+普通构建与 safe 构建使用不同的 FPC 单元目录（`units/` 与 `units-safe/`，
+交叉构建本来就是独立临时目录），不会互相复用 `.ppu`。拦截逻辑本身仍是
+平台无关的编译条件。
+
+`fun/test/run-safe-regression.sh` 目前只在 Linux 上跑（需要 `funcmd-safe`）；
+macOS/Windows 上可以用 `FUNCMD=<path-to-safe-binary>` 跑同一组测试。

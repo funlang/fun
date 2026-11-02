@@ -26,6 +26,11 @@ set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
 
+# SAFE=... builds the capability-restricted funcmd-safe (same macros as the
+# Linux/aarch64/darwin/win64 scripts; see safe-flags.sh).
+. "$HERE/safe-flags.sh"
+fun_safe_parse || exit 2
+
 # --- Resolve the Free Pascal driver --------------------------------------
 if [ -n "${FPC:-}" ]; then
     FPC_BIN="$FPC"
@@ -120,12 +125,31 @@ if [ "${FUNPACK:-}" = "user" ]; then
     PACK_FLAGS="-dFunPackUser"
     echo "FUNPACK=user - building only the bundled-app consumer."
 fi
+# Keep the two modes' .ppu/.o files apart, exactly like make-linux-x86_64.sh:
+# FPC otherwise reuses units compiled with the other define set.
+if [ -n "$FUN_SAFE_LEVEL" ]; then
+    SAFE_OUT="-o$HERE/funcmd-safe"
+    UNITS="$HERE/units-safe"
+else
+    SAFE_OUT=""
+    UNITS="$HERE/units"
+fi
+mkdir -p "$UNITS"
+UNIT_FLAGS="-FU$UNITS"
+rm -f "$UNITS"/*.ppu "$UNITS"/*.o "$UNITS"/*.or 2>/dev/null || true
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -dMD5 $PACK_FLAGS $PCRE_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -dMD5 $PACK_FLAGS $FUN_SAFE_FLAGS $SAFE_OUT $UNIT_FLAGS $PCRE_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) ---------------------
 ROOT="$(cd "$HERE/../../.." && pwd)"
-if [ -f "$HERE/funcmd" ] && [ -d "$ROOT/fun" ]; then
-    cp -f "$HERE/funcmd" "$ROOT/fun/funcmd"
-    echo "Copied funcmd to $ROOT/fun/funcmd"
+if [ -n "$FUN_SAFE_LEVEL" ]; then
+    BUILD_BIN="$HERE/funcmd-safe"
+    TARGET_BIN="$ROOT/fun/funcmd-safe"
+else
+    BUILD_BIN="$HERE/funcmd"
+    TARGET_BIN="$ROOT/fun/funcmd"
+fi
+if [ -f "$BUILD_BIN" ] && [ -d "$ROOT/fun" ]; then
+    cp -f "$BUILD_BIN" "$TARGET_BIN"
+    echo "Copied $(basename "$BUILD_BIN") to $TARGET_BIN"
 fi

@@ -227,39 +227,15 @@ if [ "${FUNPACK:-}" = "user" ]; then
     PACK_FLAGS="-dFunPackUser"
     echo "FUNPACK=user - building only the bundled-app consumer."
 fi
-SAFE_FLAGS=""
+# SAFE=... is shared with the macOS/aarch64 scripts (see safe-flags.sh).
+. "$HERE/safe-flags.sh"
+fun_safe_parse || exit 2
+SAFE_FLAGS="$FUN_SAFE_FLAGS"
+SAFE_LEVEL="$FUN_SAFE_LEVEL"
+SAFE_ALLOW="$FUN_SAFE_ALLOW"
 SAFE_OUT=""
-SAFE_LEVEL=""
-SAFE_ALLOW_OPT="${SAFE_ALLOW:-}"
-SAFE_ALLOW=""
-case "${SAFE:-}" in
-    ""|0|no|off) ;;
-    1|strict)     SAFE_LEVEL=strict ;;
-    read|readonly) SAFE_LEVEL=readonly; SAFE_ALLOW="read" ;;
-    fs|rw|readwrite|read-write)
-                  SAFE_LEVEL=readwrite; SAFE_ALLOW="read,write" ;;
-    custom)       SAFE_LEVEL=custom; SAFE_ALLOW="$SAFE_ALLOW_OPT" ;;
-    *)            echo "Unknown SAFE='$SAFE' (use strict, readonly, readwrite or custom)." >&2
-                  exit 2 ;;
-esac
 if [ -n "$SAFE_LEVEL" ]; then
-    SAFE_FLAGS="-dFunSafe"
     SAFE_OUT="-o$HERE/funcmd-safe"
-    SAFE_ALLOW="$(printf '%s' "$SAFE_ALLOW" | tr -d '[:space:]')"
-    OLDIFS="$IFS"
-    IFS=','
-    for cap in $SAFE_ALLOW; do
-        case "$cap" in
-            read)    SAFE_FLAGS="$SAFE_FLAGS -dFunSafeAllowRead" ;;
-            write)   SAFE_FLAGS="$SAFE_FLAGS -dFunSafeAllowWrite" ;;
-            compile) SAFE_FLAGS="$SAFE_FLAGS -dFunSafeAllowCompile" ;;
-            "")      ;;
-            *)       echo "Unknown SAFE_ALLOW capability '$cap' (use read, write, compile)." >&2
-                     exit 2 ;;
-        esac
-    done
-    IFS="$OLDIFS"
-    echo "SAFE=$SAFE_LEVEL${SAFE_ALLOW:+ (allow: $SAFE_ALLOW)} - building funcmd-safe."
 fi
 # Keep the two modes' .ppu/.o files apart. FPC otherwise writes units into the
 # current directory, and a later build of the other mode can silently reuse

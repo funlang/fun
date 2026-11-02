@@ -40,6 +40,11 @@ CPU="${CPU:-aarch64}"
 ROOT="${DARWIN_FPC_ROOT:-$HOME/.fun/darwin-cross}"
 ZIG="${ZIG:-$ROOT/zig/zig}"
 
+# SAFE=... builds a capability-restricted variant (same macros as the other
+# build scripts; the fresh temp unit dir keeps the modes apart).
+. "$HERE/safe-flags.sh"
+fun_safe_parse || exit 2
+
 # --- Resolve the FPC darwin cross compiler and its unit trees ---------------
 ppc_name() {
   case "$1" in
@@ -93,6 +98,7 @@ build_cpu() {
   else
     FEATURES="-dFunPack"
   fi
+  FEATURES="$FEATURES $FUN_SAFE_FLAGS"
   FU_EXTRA=""
   FL_EXTRA=""
   if [ -f "$UNITS_HASH/md5.ppu" ] && [ -f "$UNITS_HASH/sha1.ppu" ]; then
@@ -133,7 +139,7 @@ build_cpu() {
       -Fu"$UNITS" $FU_EXTRA $FL_EXTRA -FD"$TOOLS" \
       -FU"$BUILD" -FE"$BUILD" $FEATURES "$@"
 
-  OUT="${FUN_DARWIN_OUT:-$HERE/../../../fun/funcmd-darwin-$cpu}"
+  OUT="${FUN_DARWIN_OUT:-$HERE/../../../fun/funcmd-darwin-$cpu${FUN_SAFE_LEVEL:+-safe}}"
   cp -f "$BUILD/funcmd" "$OUT"
   echo "Copied funcmd to $OUT"
   rm -rf "$BUILD"

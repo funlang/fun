@@ -16,4 +16,72 @@ rem step in .github/workflows/regression.yml). -dPCRE_WinDLL imports the DLL,
 rem so no bcc32 objects or MinGW CRT are needed. Without the DLL, skip it.
 set "REGEX="
 if exist pcre3.dll set "REGEX=-dRegex -dPCRE_WinDLL"
-%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %REGEX% -Fu..\..\lib
+
+rem SAFE=strict|readonly|readwrite|custom builds funcmd-safe.exe with the same
+rem compile-time macros as the POSIX scripts (SAFE_ALLOW=read,write,compile for
+rem custom). The unit cache is separate (units-safe) so the two modes cannot
+rem reuse each other's .ppu files. Use 'set SAFE=...' before calling this file;
+rem 'set SAFE=' or 'set SAFE=0' builds the normal interpreter.
+set "SAFE_FLAGS="
+set "SAFE_OUT="
+set "SAFE_UNITS="
+if not defined SAFE goto :build
+if /i "%SAFE%"=="0" goto :build
+if /i "%SAFE%"=="no" goto :build
+if /i "%SAFE%"=="off" goto :build
+if /i "%SAFE%"=="1" goto :safe_strict
+if /i "%SAFE%"=="strict" goto :safe_strict
+if /i "%SAFE%"=="read" goto :safe_read
+if /i "%SAFE%"=="readonly" goto :safe_read
+if /i "%SAFE%"=="fs" goto :safe_readwrite
+if /i "%SAFE%"=="rw" goto :safe_readwrite
+if /i "%SAFE%"=="readwrite" goto :safe_readwrite
+if /i "%SAFE%"=="read-write" goto :safe_readwrite
+if /i "%SAFE%"=="custom" goto :safe_custom
+echo Unknown SAFE='%SAFE%' (use strict, readonly, readwrite or custom). 1>&2
+exit /b 2
+
+:safe_strict
+set "SAFE_LEVEL=strict"
+set "SAFE_ALLOW="
+goto :safe_common
+
+:safe_read
+set "SAFE_LEVEL=readonly"
+set "SAFE_ALLOW=read"
+goto :safe_common
+
+:safe_readwrite
+set "SAFE_LEVEL=readwrite"
+set "SAFE_ALLOW=read,write"
+goto :safe_common
+
+:safe_custom
+set "SAFE_LEVEL=custom"
+set "SAFE_ALLOW=%SAFE_ALLOW%"
+goto :safe_common
+
+:safe_common
+set "SAFE_FLAGS=-dFunSafe"
+set "SAFE_OUT=-ofuncmd-safe.exe"
+set "SAFE_UNITS=-FUunits-safe"
+if not exist units-safe mkdir units-safe
+del /q units-safe\*.ppu units-safe\*.o units-safe\*.or 2>nul
+set "ALLOW=%SAFE_ALLOW:,= %"
+for %%c in (%ALLOW%) do call :safe_add %%c
+if errorlevel 1 exit /b 2
+echo SAFE=%SAFE_LEVEL% - building funcmd-safe.exe.
+goto :build
+
+:safe_add
+if /i "%1"=="read"    set "SAFE_FLAGS=%SAFE_FLAGS% -dFunSafeAllowRead"
+if /i "%1"=="write"   set "SAFE_FLAGS=%SAFE_FLAGS% -dFunSafeAllowWrite"
+if /i "%1"=="compile" set "SAFE_FLAGS=%SAFE_FLAGS% -dFunSafeAllowCompile"
+if /i not "%1"=="read" if /i not "%1"=="write" if /i not "%1"=="compile" (
+  echo Unknown SAFE_ALLOW capability '%1' (use read, write, compile). 1>&2
+  exit /b 2
+)
+exit /b 0
+
+:build
+%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %REGEX% %SAFE_FLAGS% %SAFE_OUT% %SAFE_UNITS% -Fu..\..\lib

@@ -29,6 +29,11 @@ cd "$HERE"
 
 ROOT="${A64_FPC_ROOT:-$HOME/.fun/linux-aarch64}"
 ZIG="${ZIG:-${DARWIN_FPC_ROOT:-$HOME/.fun/darwin-cross}/zig/zig}"
+
+# SAFE=... builds a capability-restricted variant (the fresh temp unit dir keeps
+# the modes apart; same macros as make-linux-x86_64.sh).
+. "$HERE/safe-flags.sh"
+fun_safe_parse || exit 2
 PPCROSS="${PPCROSS:-${DARWIN_FPC_ROOT:-$HOME/.fun/darwin-cross}/bin/ppcrossa64}"
 UNITS="${A64_UNITS:-$ROOT/units/aarch64-linux}"
 UNITS_OBJPAS="${A64_UNITS_OBJPAS:-$ROOT/units-objpas/aarch64-linux}"
@@ -61,6 +66,7 @@ if [ "${FUNPACK:-}" = "user" ]; then
 else
   FEATURES="-dFunPack"
 fi
+FEATURES="$FEATURES $FUN_SAFE_FLAGS"
 if [ -f "$UNITS_HASH/md5.ppu" ] && [ -f "$UNITS_HASH/sha1.ppu" ]; then
   FEATURES="$FEATURES -dMD5"
   FU_EXTRA="$FU_EXTRA -Fu$UNITS_HASH"
@@ -81,7 +87,7 @@ echo "Building funcmd for linux/aarch64 with $PPCROSS"
     -Fu"$UNITS" $FU_EXTRA -FD"$TOOLS" \
     -FU"$BUILD" -FE"$BUILD" $FEATURES "$@"
 
-OUT="${FUN_A64_OUT:-$HERE/../../../fun/funcmd-linux-aarch64}"
+OUT="${FUN_A64_OUT:-$HERE/../../../fun/funcmd-linux-aarch64${FUN_SAFE_LEVEL:+-safe}}"
 cp -f "$BUILD/funcmd" "$OUT"
 echo "Copied funcmd to $OUT"
 rm -rf "$BUILD"
