@@ -111,16 +111,14 @@ findstr /x /c:"regex-on" "%TEMP%\funreg-regex.out" >nul 2>&1
 if not errorlevel 1 set "REGEXOK=1"
 del "%PROBEFILE%" >nul 2>&1
 
-rem --- FFI cases: getapi and the helper library both have to be there -------
+rem --- native cases: getapi and (for FFI tests) the helper library ----------
 rem ffi-*.fun load fun/test/ffi/libffitest.(so|dylib|dll) (built on demand, see
 rem fun/test/ffi/build.sh / the CI) and call it through getapi(). On Windows
-rem getapi needs -dWinFFI plus ffi.dll next to funcmd.exe, so probe for a
-rem working getapi as well, and SKIP the four portable cases instead of
-rem failing when a build has neither.
+rem getapi needs -dWinFFI plus ffi.dll next to funcmd.exe. Probe getapi
+rem unconditionally: the stdio/pipe snaps need only getapi, not libffitest.dll.
 set "FFITESTS= ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun "
-set "STDIOTESTS= lib-io-stdio-out.fun lib-io-stdio-err.fun "
+set "NATIVEIOTESTS= lib-io-stdio-out.fun lib-io-stdio-err.fun lib-io-pipe-test.fun "
 set "GETAPIOK=0"
-if not exist "fun\test\ffi\libffitest.dll" goto ffi_probed
 set "PROBEFILE=fun\test\.getapi-probe.fun"
 >"%PROBEFILE%" echo var g = 'kernel32'.getapi('GetTickCount', ':i');
 >>"%PROBEFILE%" echo var t = g();
@@ -129,8 +127,9 @@ set "PROBEFILE=fun\test\.getapi-probe.fun"
 findstr /x /c:"getapi-on" "%TEMP%\funreg-getapi.out" >nul 2>&1
 if not errorlevel 1 set "GETAPIOK=1"
 del "%PROBEFILE%" >nul 2>&1
-:ffi_probed
-if "%GETAPIOK%"=="0" set "HOSTDEP=%HOSTDEP%%FFITESTS%"
+set "FFITESTSOK=%GETAPIOK%"
+if not exist "fun\test\ffi\libffitest.dll" set "FFITESTSOK=0"
+if "%FFITESTSOK%"=="0" set "HOSTDEP=%HOSTDEP%%FFITESTS%"
 
 if not exist "%EXPECTED%" mkdir "%EXPECTED%" >nul 2>&1
 set "FAIL=0"
@@ -149,7 +148,7 @@ set "script=%~2"
 set "tmode=%~3"
 if /i "%tmode%"=="shell" goto skip_shell
 if "%GETAPIOK%"=="0" (
-  echo !STDIOTESTS! | findstr /i /c:" %name% " >nul
+  echo !NATIVEIOTESTS! | findstr /i /c:" %name% " >nul
   if not errorlevel 1 goto skip_ffi
 )
 if "%PORTABLE%"=="1" (
