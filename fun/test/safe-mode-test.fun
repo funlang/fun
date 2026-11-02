@@ -3,6 +3,7 @@
 // Run it with funcmd-safe, not the normal interpreter:
 //   fun/test/run-safe-regression.sh
 use 'fun/lib/test.fun';
+use 'fun/lib/io.fun';
 
 fun identity(x)
   result = x;
@@ -89,6 +90,12 @@ test('compile from a file is blocked', {
 
 test('inline compile is blocked', {
   assert.raises({ '?. 1;'.compile(inline: true); }, 'safe mode');
+});
+
+test('io.pipe requires native code', {
+  var b = io.buffer('abc');
+  assert.equal(b.read(3), 'abc');
+  assert.raises({ io.pipe(); }, 'io.pipe: an FFI-enabled build is required');
 });
 
 runTests();

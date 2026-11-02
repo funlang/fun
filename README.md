@@ -781,8 +781,9 @@ errors.write('warning' & 10.toChar());
 
 `io.stdin` is a Reader and `io.stdout`/`io.stderr` are Writers. They do not
 close, flush or translate line endings, and they do not create pipes; `io.pipe`
-and CLI stdin are separate later layers. Process stdio treats strings as byte
-strings: on UTF-16 Windows builds each character is written as one byte, so
+creates pipes separately, and CLI stdin remains a later layer. Process stdio
+treats strings as byte strings: on UTF-16 Windows builds each character is
+written as one byte, so
 ASCII and binary data round-trip unchanged; non-ASCII text must be encoded by
 the caller first. Windows console code pages and UTF-16 are not translated.
 Process stdio uses `getapi`, so an FFI-enabled build is required: `io.buffer`
@@ -791,6 +792,33 @@ raises an error there. A closed pipe can terminate the process through SIGPIPE
 on Unix, as usual. Do not mix `io.stdin()` with the built-in `line`/`char`/`all`
 input helpers on the same stdin, and do not mix `io.stdout()` with `?.` when
 output order matters: they use independent buffering/FFI paths.
+
+Process pipes use the same reader/writer contract:
+
+```fun
+use 'io.fun';
+var p = io.pipe();
+p.writer.write('hello');
+p.writer.close();                  // reader sees EOF after buffered data
+var text = io.readAll(p.reader);   // 'hello'
+p.close();
+```
+
+`io.pipe()` creates a blocking OS pipe; `p.reader` and `p.writer` are Reader and
+Writer plus an explicit `close()`, and `p.close()` closes both ends. Closing the
+writer lets the reader drain buffered data and then return `''`; closing the
+reader makes later reads raise; a later write may terminate the process with
+SIGPIPE on Unix (not a catchable error).
+`p.close()` closes both ends and discards unread data.
+Pipes own their handles and must be closed explicitly; `io.readAll`/`io.copy`
+never close them. Pipe buffers are finite: writing more than the OS buffer
+before reading deadlocks a single-threaded script. v1 is for small payloads
+only; there is no supported thread/process hand-off yet, and larger transfers
+need the future subprocess stdio layer. Reads (including `readAll` and `copy`)
+block while the pipe is empty and the writer is open; there is no timeout or
+cancel. Close the writer to make an empty read finish with EOF. The pair is not
+thread-safe: do not read, write or close it concurrently. `io.pipe` needs an
+FFI-enabled build and uses the same byte rules as process stdio.
 
 TOML documents use the same reader/writer contract:
 

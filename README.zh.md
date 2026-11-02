@@ -728,7 +728,7 @@ errors.write('warning' & 10.toChar());
 ```
 
 `io.stdin` 是 Reader，`io.stdout`/`io.stderr` 是 Writer；三者都不关闭、不 flush、
-不转换换行，也不创建管道。`io.pipe`、CLI stdin 和 shell 管道是后续独立层。
+不转换换行，也不创建管道；`io.pipe` 单独创建管道，CLI stdin 仍是后续独立层。
 进程 stdio 按字节处理字符串：UTF-16 Windows 构建中每个字符写成一个字节，
 因此 ASCII 和二进制数据可原样往返；非 ASCII 文本需调用方先编码。Windows
 console 的代码页/UTF-16 不做转换。进程 stdio 依赖 `getapi`，需要启用 FFI 的
@@ -736,6 +736,27 @@ console 的代码页/UTF-16 不做转换。进程 stdio 依赖 `getapi`，需要
 Unix 上管道关闭时进程可能按惯例收到 SIGPIPE 并退出。不要在同一个 stdin 上
 混用 `io.stdin()` 与内置 `line`/`char`/`all` 输入；输出顺序重要时也不要混用
 `io.stdout()` 和 `?.`，它们使用独立的缓冲/FFI 路径。
+
+进程管道沿用同一套 reader/writer 契约：
+
+```fun
+use 'io.fun';
+var p = io.pipe();
+p.writer.write('hello');
+p.writer.close();                  // reader 读完缓冲后看到 EOF
+var text = io.readAll(p.reader);   // 'hello'
+p.close();
+```
+
+`io.pipe()` 创建阻塞式 OS 管道；`p.reader`/`p.writer` 是 Reader/Writer，另有显式
+`close()`，`p.close()` 关闭两端并丢弃未读数据。关闭 writer 后 reader 先读完缓冲数据
+再返回 `''`；关闭 reader 后再读会报错，之后的写可能直接触发 SIGPIPE 终止进程
+（不可捕获）。管道拥有自己的句柄，必须显式关闭；`io.readAll`/`io.copy` 不会替
+调用方关闭。管道缓冲有限：单线程脚本先写入超过系统缓冲容量再读会死锁；v1 只适合
+小数据，当前没有受支持的线程/进程句柄交接，大数据需要后续子进程 stdio 层。
+管道为空且 writer 未关闭时，read（含 readAll/copy）会阻塞；没有超时/取消；
+关闭 writer 才能让空读以 EOF 结束。`p.reader`/`p.writer` 不是线程安全的：
+不要并发 read/write/close。`io.pipe` 需要启用 FFI 的构建，字节语义与进程 stdio 相同。
 
 TOML 文档沿用同一套 reader/writer 契约：
 

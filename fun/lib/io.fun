@@ -5,8 +5,9 @@
 // allowed and '' means EOF. A writer has write(s) and must write all of s.
 // Helpers never own, close or flush the underlying handle. io.buffer is the
 // in-memory implementation; fs.open handles work directly; io.stdin,
-// io.stdout and io.stderr adapt process stdio as byte streams. Process stdio
-// needs an FFI-enabled build; io.buffer stays usable without FFI.
+// io.stdout and io.stderr adapt process stdio as byte streams; io.pipe creates
+// blocking OS pipe pairs. Native stdio/pipes need an FFI-enabled build;
+// io.buffer stays usable without FFI.
 //
 //     use 'io.fun';
 //
@@ -18,11 +19,15 @@
 var _IO_CHUNK = 8192;
 
 var _ioState = new [
+  hostKnown: false,
   bound: false,
+  baseBound: false,
+  pipeBound: false,
   isWindows: false,
   isMac: false,
   isLinux: false,
   isUnicode: false,
+  ptrBytes: 4,
   read: nil,
   write: nil,
   stdHandle: nil,
@@ -31,51 +36,94 @@ var _ioState = new [
   getLastError: nil,
   errno: nil,
   strerror: nil,
-  memcpy: nil
+  memcpy: nil,
+  pipe: nil,
+  closeFd: nil,
+  createPipe: nil,
+  closeHandle: nil
 ];
 
-fun _ioBind()
-  if _ioState.bound then result = true; return; end if;
+fun _ioHost()
+  if _ioState.hostKnown then result = true; return; end if;
   var host = 'host'.arg().getJson(fd: true);
   _ioState.isWindows = host.os = 'windows';
   _ioState.isMac = host.os = 'macos';
   _ioState.isLinux = host.os = 'linux';
   _ioState.isUnicode = 0x1234.toChar().toByte() > 0xff;
+  _ioState.ptrBytes = host.bits div 8;
   if not _ioState.isWindows and not _ioState.isMac and not _ioState.isLinux then
     raise 'io: unsupported host ' & host.os;
   end if;
+  _ioState.hostKnown = true;
+  result = true;
+end fun;
+
+fun _ioBindBase()
+  if _ioState.baseBound then result = true; return; end if;
+  if _ioState.isWindows then
+    // 'i' carries raw pointers on WinAPI 32-bit and win64 lffi; 'v' is NULL.
+    _ioState.readFile = 'kernel32'.getapi('ReadFile', 'iiiiv:i');
+    _ioState.writeFile = 'kernel32'.getapi('WriteFile', 'iiiiv:i');
+    _ioState.getLastError = 'kernel32'.getapi('GetLastError', ':i');
+  elsif _ioState.isMac then
+    _ioState.read = 'libSystem.B.dylib'.getapi('read', 'ipi:i');
+    _ioState.write = 'libSystem.B.dylib'.getapi('write', 'ipi:i');
+    _ioState.memcpy = 'libSystem.B.dylib'.getapi('memcpy', 'ppn:p');
+    _ioState.errno = 'libSystem.B.dylib'.getapi('__error', ':p');
+    try
+      _ioState.strerror = 'libSystem.B.dylib'.getapi('strerror', 'i:s');
+    except
+      _ioState.strerror = nil;
+    end try;
+  else
+    _ioState.read = 'libc.so.6'.getapi('read', 'ipi:i');
+    _ioState.write = 'libc.so.6'.getapi('write', 'ipi:i');
+    _ioState.memcpy = 'libc.so.6'.getapi('memcpy', 'ppn:p');
+    _ioState.errno = 'libc.so.6'.getapi('__errno_location', ':p');
+    try
+      _ioState.strerror = 'libc.so.6'.getapi('strerror', 'i:s');
+    except
+      _ioState.strerror = nil;
+    end try;
+  end if;
+  _ioState.baseBound = true;
+  result = true;
+end fun;
+
+fun _ioBind()
+  if _ioState.bound then result = true; return; end if;
+  _ioHost();
   try
+    _ioBindBase();
     if _ioState.isWindows then
       _ioState.stdHandle = 'kernel32'.getapi('GetStdHandle', 'i:p');
-      // 'i' carries raw pointers on WinAPI 32-bit and win64 lffi; 'v' is NULL.
-      _ioState.readFile = 'kernel32'.getapi('ReadFile', 'iiiiv:i');
-      _ioState.writeFile = 'kernel32'.getapi('WriteFile', 'iiiiv:i');
-      _ioState.getLastError = 'kernel32'.getapi('GetLastError', ':i');
-    elsif _ioState.isMac then
-      _ioState.read = 'libSystem.B.dylib'.getapi('read', 'ipi:i');
-      _ioState.write = 'libSystem.B.dylib'.getapi('write', 'ipi:i');
-      _ioState.memcpy = 'libSystem.B.dylib'.getapi('memcpy', 'ppn:p');
-      _ioState.errno = 'libSystem.B.dylib'.getapi('__error', ':p');
-      try
-        _ioState.strerror = 'libSystem.B.dylib'.getapi('strerror', 'i:s');
-      except
-        _ioState.strerror = nil;
-      end try;
-    else
-      _ioState.read = 'libc.so.6'.getapi('read', 'ipi:i');
-      _ioState.write = 'libc.so.6'.getapi('write', 'ipi:i');
-      _ioState.memcpy = 'libc.so.6'.getapi('memcpy', 'ppn:p');
-      _ioState.errno = 'libc.so.6'.getapi('__errno_location', ':p');
-      try
-        _ioState.strerror = 'libc.so.6'.getapi('strerror', 'i:s');
-      except
-        _ioState.strerror = nil;
-      end try;
     end if;
     _ioState.bound = true;
     result = true;
   except
     raise 'io: process stdio unavailable; an FFI-enabled build is required (' & @ & ')';
+  end try;
+end fun;
+
+fun _ioBindPipe()
+  if _ioState.pipeBound then result = true; return; end if;
+  _ioHost();
+  try
+    _ioBindBase();
+    if _ioState.isWindows then
+      _ioState.createPipe = 'kernel32'.getapi('CreatePipe', 'iivi:i');
+      _ioState.closeHandle = 'kernel32'.getapi('CloseHandle', 'i:i');
+    elsif _ioState.isMac then
+      _ioState.pipe = 'libSystem.B.dylib'.getapi('pipe', 'p:i');
+      _ioState.closeFd = 'libSystem.B.dylib'.getapi('close', 'i:i');
+    else
+      _ioState.pipe = 'libc.so.6'.getapi('pipe', 'p:i');
+      _ioState.closeFd = 'libc.so.6'.getapi('close', 'i:i');
+    end if;
+    _ioState.pipeBound = true;
+    result = true;
+  except
+    raise 'io.pipe: an FFI-enabled build is required (' & @ & ')';
   end try;
 end fun;
 
@@ -123,14 +171,32 @@ fun _ioByteData(s)
   result = b;
 end fun;
 
-fun _ioDword(s)
+fun _ioDwordAt(s, at)
   if _ioState.isUnicode then
-    result = (_ioByteAt(s, 3) << 24) + (_ioByteAt(s, 2) << 16) +
-             (_ioByteAt(s, 1) << 8) + _ioByteAt(s, 0);
+    result = (_ioByteAt(s, at + 3) << 24) + (_ioByteAt(s, at + 2) << 16) +
+             (_ioByteAt(s, at + 1) << 8) + _ioByteAt(s, at);
   else
-    result = (s.toByte(3) << 24) + (s.toByte(2) << 16) +
-             (s.toByte(1) << 8) + s.toByte(0);
+    result = (s.toByte(at + 3) << 24) + (s.toByte(at + 2) << 16) +
+             (s.toByte(at + 1) << 8) + s.toByte(at);
   end if;
+end fun;
+
+fun _ioDword(s)
+  result = _ioDwordAt(s, 0);
+end fun;
+
+// pointer-width little-endian value at byte offset at
+fun _ioPtrAt(s, at, n)
+  result = 0;
+  var m = 1;
+  for i = 0 to n - 1 do
+    if _ioState.isUnicode then
+      result += _ioByteAt(s, at + i) * m;
+    else
+      result += s.toByte(at + i) * m;
+    end if;
+    if i < n - 1 then m *= 256; end if;
+  end do;
 end fun;
 
 fun _ioErrnoValue()
@@ -183,11 +249,9 @@ fun _ioReadUnix(fd, n)
   end loop;
 end fun;
 
-fun _ioReadWin(fd, n)
-  var stdHandle = _ioState.stdHandle;
+fun _ioReadWinHandle(h, what, n)
   var readFile = _ioState.readFile;
   var lastError = _ioState.getLastError;
-  var h = _ioHandle(stdHandle(-10), 'stdin');
   var buf = 0.toChar().x(n);
   var glen = 4;
   if _ioState.isUnicode then glen = 2; end if;
@@ -196,9 +260,19 @@ fun _ioReadWin(fd, n)
   if ok = 0 then
     var err = lastError();
     if err = 109 or err = 38 then result = ''; return; end if;
-    raise 'io: stdin read failed (' & err & ')';
+    if what = 'stdin' then
+      raise 'io: stdin read failed (' & err & ')';
+    else
+      raise 'io: read failed (' & err & ')';
+    end if;
   end if;
   result = _ioBytesToString(buf, _ioDword(got));
+end fun;
+
+fun _ioReadWin(fd, n)
+  var stdHandle = _ioState.stdHandle;
+  var h = _ioHandle(stdHandle(-10), 'stdin');
+  result = _ioReadWinHandle(h, 'stdin', n);
 end fun;
 
 fun _ioReadFd(fd, n)
@@ -232,17 +306,9 @@ fun _ioWriteUnix(fd, s)
   result = l;
 end fun;
 
-fun _ioWriteWin(fd, s)
-  var stdHandle = _ioState.stdHandle;
+fun _ioWriteWinHandle(h, s)
   var writeFile = _ioState.writeFile;
   var lastError = _ioState.getLastError;
-  var id = -12;
-  var what = 'stderr';
-  if fd = 1 then
-    id = -11;
-    what = 'stdout';
-  end if;
-  var h = _ioHandle(stdHandle(id), what);
   var off = 0;
   var l = s.length();
   var glen = 4;
@@ -263,10 +329,39 @@ fun _ioWriteWin(fd, s)
   result = l;
 end fun;
 
+fun _ioWriteWin(fd, s)
+  var id = -12;
+  var what = 'stderr';
+  if fd = 1 then
+    id = -11;
+    what = 'stdout';
+  end if;
+  var stdHandle = _ioState.stdHandle;
+  var h = _ioHandle(stdHandle(id), what);
+  result = _ioWriteWinHandle(h, s);
+end fun;
+
 fun _ioWriteFd(fd, s)
   if fd <> 1 and fd <> 2 then raise 'io: invalid output fd'; end if;
   _ioBind();
   if _ioState.isWindows then result = _ioWriteWin(fd, s); else result = _ioWriteUnix(fd, s); end if;
+end fun;
+
+fun _ioCloseAny(h)
+  if _ioState.isWindows then
+    var closeHandle = _ioState.closeHandle;
+    var lastError = _ioState.getLastError;
+    if closeHandle(h) = 0 then
+      raise 'io.pipe: close failed (' & lastError() & ')';
+    end if;
+  else
+    var closeFd = _ioState.closeFd;
+    if closeFd(h) <> 0 then
+      var e = _ioErrnoValue();
+      raise 'io.pipe: close failed (' & _ioErrnoText(e) & ')';
+    end if;
+  end if;
+  result = true;
 end fun;
 
 class _IoBuffer(s)
@@ -337,6 +432,66 @@ class _IoWriter(fd)
   end fun;
 end class;
 
+class _IoPipeReader(h)
+  var h = h;
+  var closed = false;
+
+  fun read(n)
+    if this.closed then raise 'io: pipe reader is closed'; end if;
+    var sz = _ioReadSize(n);
+    if sz = 0 then result = ''; return; end if;
+    if _ioState.isWindows then
+      result = _ioReadWinHandle(this.h, 'pipe', sz);
+    else
+      result = _ioReadUnix(this.h, sz);
+    end if;
+  end fun;
+
+  fun close()
+    if this.closed then result = true; return; end if;
+    this.closed = true;
+    _ioCloseAny(this.h);
+    result = true;
+  end fun;
+end class;
+
+class _IoPipeWriter(h)
+  var h = h;
+  var closed = false;
+
+  fun write(s)
+    if this.closed then raise 'io: pipe writer is closed'; end if;
+    var data = _ioWriteData(s);
+    if data = '' then result = 0; return; end if;
+    if _ioState.isWindows then
+      _ioWriteWinHandle(this.h, data);
+    else
+      _ioWriteUnix(this.h, data);
+    end if;
+    result = data.length();
+  end fun;
+
+  fun close()
+    if this.closed then result = true; return; end if;
+    this.closed = true;
+    _ioCloseAny(this.h);
+    result = true;
+  end fun;
+end class;
+
+class _IoPipe(reader, writer)
+  var reader = reader;
+  var writer = writer;
+
+  fun close()
+    var msg = '';
+    try this.writer.close(); except msg = '' & @; end try;
+    try this.reader.close(); except if msg = '' then msg = '' & @; end if; end try;
+    if msg <> '' then raise msg; end if;
+    result = true;
+  end fun;
+end class;
+
 class _IoApi()
   fun buffer(text)
     result = _IoBuffer(text);
@@ -352,6 +507,30 @@ class _IoApi()
 
   fun stderr()
     result = _IoWriter(2);
+  end fun;
+
+  fun pipe()
+    _ioBindPipe();
+    if _ioState.isWindows then
+      var hr = 0.toChar().x(8);
+      var hw = 0.toChar().x(8);
+      var createPipe = _ioState.createPipe;
+      if createPipe(hr.toNum(-1), hw.toNum(-1), nil, 0) = 0 then
+        var lastError = _ioState.getLastError;
+        raise 'io.pipe: create failed (' & lastError() & ')';
+      end if;
+      result = _IoPipe(_IoPipeReader(_ioPtrAt(hr, 0, _ioState.ptrBytes)),
+                       _IoPipeWriter(_ioPtrAt(hw, 0, _ioState.ptrBytes)));
+    else
+      var fds = 0.toChar().x(8);
+      var pipeFn = _ioState.pipe;
+      if pipeFn(fds.toNum(-1)) <> 0 then
+        var e = _ioErrnoValue();
+        raise 'io.pipe: create failed (' & _ioErrnoText(e) & ')';
+      end if;
+      result = _IoPipe(_IoPipeReader(_ioPtrAt(fds, 0, 4)),
+                       _IoPipeWriter(_ioPtrAt(fds, 4, 4)));
+    end if;
   end fun;
 
   fun readAll(r)
