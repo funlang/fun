@@ -447,7 +447,7 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 
 - **Build machine requirements**: Linux x86_64, host FPC 3.2.x, `make`, `curl` or `wget`, `tar`, and ~2 GB free disk. Zig is fetched by the bootstrap (pinned to 0.13; 0.14 panics on older glibc). No macOS host, Apple SDK, or `osxcross` is required — Zig ships a libSystem stub.
 - `bootstrap-linux-aarch64.sh` reuses the `ppcrossa64` and Zig from the darwin toolchain: an FPC compiler binary is CPU-specific but can target any OS it has units for.
-- Optional features degrade as usual: no PCRE -> no regex, no libffi unit/stub -> no `getapi` (the win64 CI supplies both, `pcre3.dll` and `ffi.dll`). The Linux aarch64 artifact is the core interpreter (its `-dRegex` and `-dLinuxFFI` need a libc / libffi that are not cross-built yet).
+- Optional features degrade as usual: no PCRE -> no regex, no libffi unit/stub -> no `getapi` (the win64 CI supplies both, `pcre3.dll` and `ffi.dll`). The cross-built Linux aarch64 artifact is the core interpreter (its `-dRegex` and `-dLinuxFFI` need a libc / libffi that are not cross-built yet); a native Linux arm64 build, as in CI, has both.
 - Porting details: [`art/notes/macos-port.md`](art/notes/macos-port.md).
 
 ### Third-party dependencies (not carried in the repo)

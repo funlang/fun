@@ -434,7 +434,7 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 
 - **构建机要求**：Linux x86_64、宿主 FPC 3.2.x、`make`、`curl` 或 `wget`、`tar`，约 2 GB 空闲磁盘。Zig 由 bootstrap 下载（钉在 0.13；0.14 在较旧的 glibc 上会 panic）。**不需要** macOS 真机、Apple SDK 或 `osxcross`——Zig 自带 libSystem stub。
 - `bootstrap-linux-aarch64.sh` 复用 darwin 工具链的 `ppcrossa64` 与 Zig：FPC 编译器二进制与 CPU 绑定，但只要目标 OS 的单元齐备，就能编译该 OS。
-- 可选特性照例降级：缺 PCRE → 无正则；缺 libffi 单元/stub → 无 `getapi`（win64 的 CI 两者都会备好：`pcre3.dll` 与 `ffi.dll`）。Linux aarch64 产物是核心解释器（其 `-dRegex` 与 `-dLinuxFFI` 需要 libc / libffi，尚未交叉构建）。
+- 可选特性照例降级：缺 PCRE → 无正则；缺 libffi 单元/stub → 无 `getapi`（win64 的 CI 两者都会备好：`pcre3.dll` 与 `ffi.dll`）。Linux aarch64 交叉产物是核心解释器（其 `-dRegex` 与 `-dLinuxFFI` 需要 libc / libffi，尚未交叉构建）；而原生 Linux arm64 构建（CI 即如此）两者都有。
 - 移植细节见 [`art/notes/macos-port.md`](art/notes/macos-port.md)。
 
 ### 第三方依赖（仓库未携带）

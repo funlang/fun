@@ -22,9 +22,10 @@
 # just the linux-safe job (strict + readonly). Push and pull_request runs the
 # full suite without linux-safe; leave safe_only off for the same full suite.
 #
-# Status: all five jobs are a gate. The Windows build still has no regex (no
-# PCRE is compiled there yet), so run-windows-regression.bat probes for the
-# engine and skips the regex-dependent tests accordingly; the remaining
+# Status: all five jobs are a gate. The win64 build gets regex from the
+# pcre3.dll that the job compiles with MinGW-w64 gcc (best effort), and
+# run-windows-regression.bat still probes for the engine so a regex-less build
+# skips the regex-dependent tests instead of failing. The remaining
 # host-dependent entries are listed there too. See the README "Regression tests
 # and CI" section.
 name: regression
