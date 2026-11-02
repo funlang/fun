@@ -40,7 +40,7 @@
 一句话定位：**Fun 是一门从 JSON 一路写到机器码的脚本语言。**
 
 - 用同一个运行时，覆盖从高层数据处理（JSON/FD）到底层系统编程（FFI、运行时 C、JIT、机器码）的全谱系；
-- 自带 76 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
+- 自带 77 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
 - 在信创与 AI Agent 场景中，作为连接国产 OS、数据库、芯片与业务逻辑的轻量级胶水。
 
 Fun 的设计出发点很简单：**数据与代码都应该是头等公民，而且一段脚本应该能在不离开语言的情况下一路触达机器底层。**
@@ -71,7 +71,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
 - **跨平台** —— Windows（32/64 位）、Linux、ARM 与 Windows CE。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
-- **自托管的标准库** —— 76 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
+- **自托管的标准库** —— 77 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
 ---
 
@@ -384,7 +384,7 @@ fun/
 │   ├── utils/         # 工具函数
 │   └── prj/fun/       # 工程与构建脚本（funcmd.dpr，Delphi/FPC）
 ├── fun/
-│   ├── lib/           # 标准库（纯 Fun 编写，76 个模块）
+│   ├── lib/           # 标准库（纯 Fun 编写，77 个模块）
 │   ├── demo/          # 语言语法演示
 │   ├── demos/         # 完整应用与基准测试
 │   └── key_*.ini      # 关键字别名包（CN / FR / PUA）
@@ -511,15 +511,15 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 
 ## 标准库
 
-标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（76 个模块）：
+标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（77 个模块）：
 
-> 总代码量约 6,000 行逻辑代码（不含注释），平均每个模块约 100 行——76 个模块全部用 Fun 自身写成。
+> 总代码量约 6,000 行逻辑代码（不含注释）——77 个模块全部用 Fun 自身写成。
 
 - **数据**：`lib-json`、`csv`、`toml`、`jsonschema`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`
 - **工具**：`uuid`
 - **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`
 - **文本**：`lib-string`、`lib-regex`、`lib-match`、`lib-unicode`
-- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`cli`、`fs`、`io`、`logging`、`lib-time`、`lib-cmdline`、`lib-proc`
+- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`cli`、`fs`、`io`、`process`、`logging`、`lib-time`、`lib-cmdline`、`lib-proc`
 - **网络**：`lib-winsock`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-session`
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
 - **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`
@@ -753,10 +753,41 @@ p.close();
 再返回 `''`；关闭 reader 后再读会报错，之后的写可能直接触发 SIGPIPE 终止进程
 （不可捕获）。管道拥有自己的句柄，必须显式关闭；`io.readAll`/`io.copy` 不会替
 调用方关闭。管道缓冲有限：单线程脚本先写入超过系统缓冲容量再读会死锁；v1 只适合
-小数据，当前没有受支持的线程/进程句柄交接，大数据需要后续子进程 stdio 层。
+小数据，当前没有受支持的线程/进程句柄交接，大数据需要后续的流式/进程交接层。
 管道为空且 writer 未关闭时，read（含 readAll/copy）会阻塞；没有超时/取消；
 关闭 writer 才能让空读以 EOF 结束。`p.reader`/`p.writer` 不是线程安全的：
 不要并发 read/write/close。`io.pipe` 需要启用 FFI 的构建，字节语义与进程 stdio 相同。
+
+用 `process.run` 启动子进程：
+
+```fun
+use 'process.fun';
+
+var r = process.run('git', ['status', '--short'], [timeout: 5000]);
+if r.ok then
+  ?. r.stdout;
+else
+  ?. r.stderr;
+  ?. r.exitCode;
+end if;
+```
+
+`process.run(name[, args[, opts]])` 直接执行命令，不经过 shell；尾随参数可省略，
+没有参数时也可传 `nil` 或空列表。选项为 `stdin`（字符串，默认 `''`）、
+`cwd`（空表示继承当前目录）、`timeout`（毫秒；`nil`/`0` 表示不超时）。
+返回对象包含 `ok`、`exitCode`、`signal`、`timedOut`、`stdout`、`stderr`。
+非 0 退出码是正常结果；无法启动才 raise。Unix 上被信号终止时
+`exitCode` 为负信号值（例如 `-15`），同时给出信号编号；Windows 返回进程退出码，
+`signal` 为 `nil`。stdout/stderr 分开捕获为原始字节，不做编码或换行转换。
+
+调用会阻塞到子进程退出或超时。超时后终止直接子进程并等待，结果中
+`timedOut = true`、`ok = false`。实现使用单线程 stdio 泵，避免 stdout/stderr
+互相堵死；不创建语言级线程，不杀整个进程树，也暂不支持输出上限、流式或交互式
+stdio。需要 shell 语法时显式调用 `sh -c` / `cmd /c`。`process.run` 需要启用 FFI
+的构建。Windows v1 的 stdin 用临时文件承载（Unix 用管道），且 `CreateProcessA`
+的 ANSI 路径不能可靠处理非 ASCII 命令行/路径；32 位 Unicode/Delphi 仍需人工验证。
+如果直接子进程退出后孙进程仍持有 stdout/stderr，v1 可能在短暂宽限期后停止读取，
+迟到输出可能丢失。
 
 TOML 文档沿用同一套 reader/writer 契约：
 

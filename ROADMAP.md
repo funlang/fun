@@ -10,10 +10,10 @@
 ## 0. 当前基线
 
 - **版本**：9.5.3，`src/core/version.inc` 的 `funRelease = '9.5.3'`。
-- **回归**：Linux `123/123`（`sh fun/test/run-linux-regression.sh`）。
-- **可加载性**：`72/78`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
+- **回归**：Linux `124/124`（`sh fun/test/run-linux-regression.sh`）。
+- **可加载性**：`73/79`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
-- **标准库**：76 个模块（`fun/lib` 有 78 个基础 `.fun`，内部 `lib-base`/`lib-type` 不计）。
+- **标准库**：77 个模块（`fun/lib` 有 79 个基础 `.fun`，内部 `lib-base`/`lib-type` 不计）。
 - **平台**：Linux x86_64 / arm64、macOS x64 / arm64、Windows x64（FPC）；
   Delphi/Win32 继续人工验证。
 - **CI**：GitHub Actions 的 `regression` 工作流覆盖 6 个构建作业（4 个 POSIX 平台 +

@@ -135,7 +135,9 @@
 | `CCallback.GetProc` | `winapi.pas` 行 285 | `VirtualAlloc(..., PAGE_EXECUTE_READWRITE)` 分配可执行内存并写机器码 |
 | `NewObj`(COM) | `winole.pas` | 创建 / 调用任意 COM 对象 |
 
-**放大层**(自我宿主库,底层依赖上面原语,连锁抛异常即预期):`lib-tcc.fun`、`lib-jit.fun`、`lib-asm-pro.fun`、`lib-asm.fun`、`lib-winapi.fun`、`lib-winsock.fun`、`lib-registry.fun`、`lib-zlib.fun`。
+**放大层**(自我宿主库,底层依赖上面原语,连锁抛异常即预期):`lib-tcc.fun`、`lib-jit.fun`、`lib-asm-pro.fun`、`lib-asm.fun`、`lib-winapi.fun`、`lib-winsock.fun`、`lib-registry.fun`、`lib-zlib.fun`、`process.fun`。
+
+`process.run` 通过 `getapi` 执行外部命令，属于 NAT 放大面；严格档由 `getapi` 拦截，报 `process.run: native process execution is disabled in safe mode`。
 
 > 注意:NAT 类确实"整个内置都危险"(getapi 没有安全用法),但它的个数少、边界清晰,与"打击面大"是两回事——被误伤的通常是 MEM 类的共享内置名,见 §1。
 
@@ -170,6 +172,7 @@
 | `load/find/hash/size/time(读)` | 任意 | FSR | 拦（只读档放开） |
 | `save/copy/move(文件)/time(set)` | 任意 | FSW | 拦（读写档放开） |
 | `getapi` / `@toCallback` / COM `NewObj` | 任意 | NAT | 拦 |
+| `process.run` | 任意外部命令 | NAT（依赖 `getapi`） | 拦 |
 | `use` 外部路径 | 不在脚本目录/cwd/lib/app/FUN_PATH 下 | SRC | 拦（`compile` 档放开） |
 | `CIdx.done` 字节写 | 浮点下标赋值 | MEM(弱，限界内) | 不拦 |
 
