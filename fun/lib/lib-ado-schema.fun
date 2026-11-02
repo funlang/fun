@@ -2,54 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 use 'lib-ado.fun';
+use 'lib-ado-base.fun';
 use 'lib-set.fun' as set;
 use 'lib-stream.fun';
-
-var adSchemaTables           = 20; // 表
-var adSchemaColumns          = 4;  // 字段
-var adSchemaPrimaryKeys      = 28; // 主键
-var adSchemaForeignKeys      = 27; // 外键
-
-var adEmpty = 0x0;
-var adTinyInt = 0x10;
-var adSmallInt = 0x2;
-var adInteger = 0x3;
-var adBigInt = 0x14;
-var adUnsignedTinyInt = 0x11;
-var adUnsignedSmallInt = 0x12;
-var adUnsignedInt = 0x13;
-var adUnsignedBigInt = 0x15;
-var adSingle = 0x4;
-var adDouble = 0x5;
-var adCurrency = 0x6;
-var adDecimal = 0xE;
-var adNumeric = 0x83;
-var adBoolean = 0xB;
-var adError = 0xA;
-var adUserDefined = 0x84;
-var adVariant = 0xC;
-var adIDispatch = 0x9;
-var adIUnknown = 0xD;
-var adGUID = 0x48;
-var adDate = 0x7;
-var adDBDate = 0x85;
-var adDBTime = 0x86;
-var adDBTimeStamp = 0x87;
-var adBSTR = 0x8;
-var adChar = 0x81;
-var adVarChar = 0xC8;
-var adLongVarChar = 0xC9;
-var adWChar = 0x82;
-var adVarWChar = 0xCA;
-var adLongVarWChar = 0xCB;
-var adBinary = 0x80;
-var adVarBinary = 0xCC;
-var adLongVarBinary = 0xCD;
-var adChapter = 0x88;
-var adFileTime = 0x40;
-var adDBFileTime = 0x89;
-var adPropVariant = 0x8A;
-var adVarNumeric = 0x8B;
 
 class Schema(cnString, args)
   fun Get()
@@ -67,17 +22,18 @@ class Schema(cnString, args)
   end fun;
 
   fun Filter(s, t)
+    var tt = new []; // surviving table names
     var ts = new [];
     s.Tables = set.filter(s.Tables, e -> e.TABLE_TYPE = 'TABLE');  //?. t.show('tables');
-    s.Tables.@each((t){ts[t.TABLE_NAME] = t.TABLE_NAME});          //?. t.show('table each');
-    s.Fields = set.filter(s.Fields, e -> ts[e.TABLE_NAME] <> nil); //?. t.show('fields');
+    s.Tables.@each((t){tt[t.TABLE_NAME] = 1});                     //?. t.show('table each');
+    s.Fields = set.filter(s.Fields, e -> tt[e.TABLE_NAME] <> nil);//?. t.show('fields');
     ts = new [];
     s.PKeys.@each((f){ts[f.TABLE_NAME&'.'&f.COLUMN_NAME]=1});      //?. t.show('pkey each');
     s.Fields.@each((f){
       f.IsPKey = ts[f.TABLE_NAME&'.'&f.COLUMN_NAME] and 1 or 0;
     });                                                            //?. t.show('isPKey');
     s.PKeys  = nil;
-    s.FKeys  = set.filter(s.FKeys,  e->e.PK_TABLE_NAME in ts and e.FK_TABLE_NAME in ts);
+    s.FKeys  = set.filter(s.FKeys,  e->tt[e.PK_TABLE_NAME] and tt[e.FK_TABLE_NAME]);
   end fun;
 
   fun Format(s)

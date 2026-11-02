@@ -2,19 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use 'lib-set.fun';
-
-var adModeRead = 1;
-var adModeShareDenyNone = 16;
-#*
-var adSchemaCatalogs         = 1;  // database
-var adSchemaSchemata         = 17; // schema
-var adSchemaTables           = 20; // table
-var adSchemaColumns          = 4;  // columns
-var adSchemaPrimaryKeys      = 28; // primary keys
-var adSchemaForeignKeys      = 27; // foreign keys
-var adSchemaProviderTypes    = 22; // provider types
-#
-var adSchemaDBInfoLiterals   = 31; // special symbols
+use 'lib-ado-base.fun';
 
 class ADO(cnString, args)
   var db = 'ADODB.Connection'.newobj();

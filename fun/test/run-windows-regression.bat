@@ -248,7 +248,7 @@ set "OK=0"
 set "BAD=0"
 for %%F in (fun\lib\*.fun) do (
   set "n=%%~nF"
-  if "!n!"=="!n:-lnx=!" if /i not "!n!"=="lib-unicode-base" (
+  if "!n!"=="!n:-lnx=!" if /i not "!n!"=="lib-unicode-base" if /i not "!n!"=="lib-ado-base" (
     >"fun\test\.loadcheck-one.fun" echo use 'fun/lib/!n!.fun';
     >>"fun\test\.loadcheck-one.fun" echo ?. 'loaded';
     "%FUNCMD%" "fun\test\.loadcheck-one.fun" > "%TEMP%\funreg-load.out" 2>&1

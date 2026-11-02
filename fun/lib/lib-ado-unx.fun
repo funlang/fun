@@ -35,6 +35,7 @@
 // would otherwise hand C a temporary copy (see art/notes/library-port-plan.md).
 
 use 'lib-host.fun';
+use 'lib-ado-base.fun';
 
 var _lib = DyLib('libsqlite3.so.0', 'libsqlite3.dylib');
 var _PTR = 'host'.arg().getJson(fd: true).bits div 8; // pointer width
@@ -58,13 +59,6 @@ var SQLITE_FLOAT   = 2;
 var SQLITE_TEXT    = 3;
 var SQLITE_BLOB    = 4;
 var SQLITE_NULL    = 5;
-
-// ADO OpenSchema constants (module level, like lib-ado's adSchemaDBInfoLiterals)
-var adSchemaTables         = 20;
-var adSchemaColumns        = 4;
-var adSchemaPrimaryKeys    = 28;
-var adSchemaForeignKeys    = 27;
-var adSchemaDBInfoLiterals = 31;
 
 var _open      = _lib.getapi('sqlite3_open_v2',        'spip:i');
 var _close     = _lib.getapi('sqlite3_close',          'p:i');
@@ -447,6 +441,7 @@ class ADO(cnString, args)
       // subscript (member-dot syntax f.from would not parse). This SQLite
       // predates the table-valued pragma functions, so no SQL-side aliasing.
       for f in Execute('PRAGMA foreign_key_list("' & t & '")', false) do
+        next when f['table'] = nil; // empty PRAGMA result ([[rows:0]])
         result.@add(new [
           FK_TABLE_SCHEMA: 'main',
           FK_TABLE_NAME:   t,

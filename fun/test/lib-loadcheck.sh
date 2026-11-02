@@ -23,10 +23,11 @@ ok=0; bad=0
 for f in fun/lib/*.fun; do
   n=$(basename "$f" .fun)
   # skip backend units: <name>-unx / <name>-lnx are the Unix implementation and
-  # its Linux alias, and lib-unicode-base / lib-winsock-base are the shared
-  # bases of a Windows/Unix split -- neither is a standalone stdlib module.
+  # its Linux alias, and lib-unicode-base / lib-winsock-base / lib-ado-base
+  # are the shared bases of a Windows/Unix split -- none is a standalone
+  # stdlib module.
   # (lib-base *is* a module.)
-  case "$n" in *-lnx|*-unx|lib-unicode-base|lib-winsock-base) continue;; esac
+  case "$n" in *-lnx|*-unx|lib-unicode-base|lib-winsock-base|lib-ado-base) continue;; esac
   t="$f"
   if [ -f "fun/lib/${n}-unx.fun" ]; then t="fun/lib/${n}-unx.fun"; fi
   if [ -f "fun/lib/${n}-lnx.fun" ]; then t="fun/lib/${n}-lnx.fun"; fi
