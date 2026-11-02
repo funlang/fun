@@ -8,6 +8,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [9.5.3] - 2026-11-02
 
+- Add `io.pipe()` and OS pipe pairs (PR #44): `p.reader`/`p.writer` follow the
+  same Reader/Writer contract as process stdio, with explicit `close()`;
+  `p.close()` closes both ends. Blocking pipes need an FFI-enabled build and are
+  intended for small payloads in a single thread.
+
 - Fix `lib-ado-schema.Filter` dropping every foreign key. The final FKey filter
   reused the primary-key map after its values had been replaced with `1`, and
   Fun's `in` tests values rather than keys, so no table name ever matched. Keep
