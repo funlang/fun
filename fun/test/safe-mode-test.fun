@@ -4,6 +4,7 @@
 //   fun/test/run-safe-regression.sh
 use 'fun/lib/test.fun';
 use 'fun/lib/io.fun';
+use 'fun/lib/process.fun';
 
 fun identity(x)
   result = x;
@@ -96,6 +97,10 @@ test('io.pipe requires native code', {
   var b = io.buffer('abc');
   assert.equal(b.read(3), 'abc');
   assert.raises({ io.pipe(); }, 'io.pipe: an FFI-enabled build is required');
+});
+
+test('process.run requires native code', {
+  assert.raises({ process.run('echo', []); }, 'process.run: native process execution is disabled in safe mode');
 });
 
 runTests();

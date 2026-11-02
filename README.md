@@ -40,7 +40,7 @@
 In one sentence: **Fun is a scripting language that goes all the way from JSON to machine code.**
 
 - One runtime spans the whole spectrum, from high-level data work (JSON/FD) down to low-level system programming (FFI, C at runtime, JIT, machine code);
-- 76 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
+- 77 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
 - in AI-agent and domestic-IT scenarios, it is the lightweight glue connecting OSes, databases, chips, and business logic.
 
 Fun is designed around a simple premise: **data and code should be equally first-class, and a script should be able to reach down to the machine without leaving the language.**
@@ -71,7 +71,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
 - **Cross-platform** — Windows (32/64-bit), Linux, ARM, and Windows CE.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
-- **Self-hosted standard library** — 76 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
+- **Self-hosted standard library** — 77 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
 ---
 
@@ -396,7 +396,7 @@ fun/
 │   ├── utils/         # Utility functions
 │   └── prj/fun/       # Projects & build scripts (funcmd.dpr, Delphi/FPC)
 ├── fun/
-│   ├── lib/           # Standard library (pure Fun, 76 modules)
+│   ├── lib/           # Standard library (pure Fun, 77 modules)
 │   ├── demo/          # Language syntax demos
 │   ├── demos/         # Full applications & benchmarks
 │   └── key_*.ini      # Keyword alias packs (CN / FR / PUA)
@@ -537,15 +537,15 @@ CI job verifies strict and readonly, and it only runs on manual dispatch
 
 ## Standard library
 
-The standard library in [`fun/lib`](fun/lib) is written in pure Fun (76 modules):
+The standard library in [`fun/lib`](fun/lib) is written in pure Fun (77 modules):
 
-> In total roughly 6,000 lines of logical code (excluding comments), about 100 lines per module — all 76 modules written in Fun itself.
+> In total roughly 6,000 lines of logical code (excluding comments) — all 77 modules written in Fun itself.
 
 - **Data**: `lib-json`, `csv`, `toml`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`
 - **Utility**: `uuid`
 - **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`
 - **Text**: `lib-string`, `lib-regex`, `lib-match`, `lib-unicode`
-- **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `env`, `cli`, `fs`, `io`, `logging`, `lib-time`, `lib-cmdline`, `lib-proc`
+- **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `env`, `cli`, `fs`, `io`, `process`, `logging`, `lib-time`, `lib-cmdline`, `lib-proc`
 - **Network**: `lib-winsock`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`, `http-session`
 - **Databases**: `lib-orm`, `lib-orm-pro`, `lib-orm-gen`, `lib-orm-rpc`, `lib-orm-cte`, `lib-ado`, `lib-ado-schema`
 - **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`
@@ -814,11 +814,50 @@ Pipes own their handles and must be closed explicitly; `io.readAll`/`io.copy`
 never close them. Pipe buffers are finite: writing more than the OS buffer
 before reading deadlocks a single-threaded script. v1 is for small payloads
 only; there is no supported thread/process hand-off yet, and larger transfers
-need the future subprocess stdio layer. Reads (including `readAll` and `copy`)
+need a future streaming/process-handoff layer. Reads (including `readAll` and `copy`)
 block while the pipe is empty and the writer is open; there is no timeout or
 cancel. Close the writer to make an empty read finish with EOF. The pair is not
 thread-safe: do not read, write or close it concurrently. `io.pipe` needs an
 FFI-enabled build and uses the same byte rules as process stdio.
+
+Run a child process with `process.run`:
+
+```fun
+use 'process.fun';
+
+var r = process.run('git', ['status', '--short'], [timeout: 5000]);
+if r.ok then
+  ?. r.stdout;
+else
+  ?. r.stderr;
+  ?. r.exitCode;
+end if;
+```
+
+`process.run(name[, args[, opts]])` executes the command directly, without a
+shell. Trailing arguments are optional; pass `nil` or an empty list for no
+arguments. Options are `stdin` (a string; default `''`), `cwd` (empty
+inherits the current directory), and `timeout` in milliseconds (`nil`/`0`
+means no timeout).
+The returned object has `ok`, `exitCode`, `signal`, `timedOut`, `stdout`, and
+`stderr`. A non-zero exit is a normal result; a command that cannot start raises.
+On Unix a signal exit reports a negative `exitCode` (for example `-15`) and the
+signal number; Windows reports the process exit code and `signal` is `nil`.
+stdout and stderr are captured separately as raw bytes; input/output are not
+encoded or line-ending translated.
+
+The call blocks until the child exits or the timeout expires. On timeout the
+direct child is terminated and waited for, and the result has `timedOut = true`
+and `ok = false`. The implementation uses a single-threaded stdio pump, so
+stdout and stderr cannot deadlock each other; it does not create language
+threads, does not kill the whole process tree, and does not cap output or
+provide streaming/interactive stdio yet. Use `sh -c` / `cmd /c` explicitly when
+shell syntax is required. `process.run` needs an FFI-enabled build. On Windows
+v1 stdin is backed by a temporary file (Unix uses a pipe), and the ANSI
+`CreateProcessA` path does not reliably handle non-ASCII command lines or paths;
+the 32-bit Unicode/Delphi path remains manual. If a descendant keeps
+stdout/stderr open after the direct child exits, v1 may stop reading after a
+short grace period, so late descendant output can be lost.
 
 TOML documents use the same reader/writer contract:
 
