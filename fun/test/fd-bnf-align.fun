@@ -38,6 +38,12 @@ same(doc, 'BNF agrees on numbers/escapes');
 var kvd = '#!kvd:=' + nl + 'a=85' + nl + 'b=hello world' + nl;
 same(kvd, 'BNF agrees on kvd');
 
+var nested = 'a' + nl + '  b' + nl + '    c 1';
+same(nested, 'BNF agrees on nesting');
+
+var kvdNested = '#!kvd:=' + nl + 'a=' + nl + '  b=1' + nl + 'c=2';
+same(kvdNested, 'BNF agrees on kvd empty value + nesting');
+
 var ds = ['=', ';', ':', '|', ']'];
 ds.@each((d){
   var x = '#!kvd:' + d + nl + 'a' + d + '85' + nl + 'b' + d + 'x y' + nl;

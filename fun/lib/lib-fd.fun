@@ -67,7 +67,10 @@ var actions = [
         r.done = root;
       },
       Val: (o,r,p) {
-        if p?.n? <> 'Unqkey' then
+        // p 'Ws' means the value is empty (a bare key or only the kvd
+        // separator/trailing spaces). Keep the key open so indented
+        // children attach to it instead of to the parent.
+        if p?.n? <> 'Unqkey' and p?.n? <> 'Ws' then
           var rt = getRet(r);
           rt.val = o.val;
           stak.pop();

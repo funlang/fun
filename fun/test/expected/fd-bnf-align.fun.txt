@@ -1,5 +1,7 @@
 PASS BNF agrees on numbers/escapes
 PASS BNF agrees on kvd
+PASS BNF agrees on nesting
+PASS BNF agrees on kvd empty value + nesting
 PASS BNF agrees on kvd =
 PASS BNF agrees on kvd ;
 PASS BNF agrees on kvd :
