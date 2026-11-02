@@ -6,6 +6,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Add `process.run()` and `process.fun` (PR #45): run a child process without a
+  shell, with optional arguments, stdin, cwd and timeout; capture stdout/stderr
+  as raw bytes and report `exitCode`, `signal` and `timedOut`. This is the
+  one-shot companion to `io.pipe`; streaming and interactive child stdio remain
+  a follow-up.
+
 ## [9.5.3] - 2026-11-02
 
 - Add `io.pipe()` and OS pipe pairs (PR #44): `p.reader`/`p.writer` follow the

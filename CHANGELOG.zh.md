@@ -6,6 +6,11 @@
 
 ## [未发布]
 
+- 新增 `process.run()` 与 `process.fun`（PR #45）：不经 shell 启动子进程，可传
+  参数、stdin、cwd 和超时；以原始字节捕获 stdout/stderr，并返回 `exitCode`、
+  `signal`、`timedOut`。这是 `io.pipe` 的一次性配套；流式/交互式子进程 stdio
+  留作后续。
+
 ## [9.5.3] - 2026-11-02
 
 - 新增 `io.pipe()` 与操作系统管道对（PR #44）：`p.reader`/`p.writer` 遵循与

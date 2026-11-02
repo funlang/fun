@@ -30,7 +30,6 @@
 | ID | 事项 | 状态 | 优先级 | 验收 | 关联 |
 |---|---|---|---|---|---|
 | D-01 | JSON Schema v0.x | OPEN | P1 | `checkJson`/`checkFd`、`$ref/$defs`、`allOf`/`anyOf`/`oneOf`/`not`、`uniqueItems`、元组 `items`、`patternProperties`、`propertyNames`、`format` | `art/notes/jsonschema-plan.md` |
-| S-01 | `io.pipe` + 子进程 stdio | OPEN | P1 | pipe、spawn/wait、退出码、超时、输出捕获 | `README.zh.md` 的 io 一节 |
 | S-02 | 沙箱运行器 | OPEN | P1 | 用 `-safe` 子进程 + 超时/内存/输出上限跑 AI 生成脚本 | `art/notes/todo.md` |
 
 ## 3. 以后 (LATER)
@@ -43,6 +42,7 @@
 | S-06 | 用 fun-ui 重写 funide | OPEN | P3 | 新 IDE 替代旧 funide | `art/notes/todo.md` |
 | S-07 | funcally AI agent | OPEN | P3 | 基于沙箱、CLI、HTTP 的 agent | `art/notes/todo.md` |
 | S-08 | fun-ui 跨平台 | OPEN | P2 | Windows/Linux 收尾 | `art/notes/todo.md` |
+| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | `io.pipe` 交接给子进程、边跑边读写、输出上限、进程树终止、Windows Unicode 命令行 | `README.zh.md` 的 io 一节 |
 
 ## 4. 技术债台账
 
@@ -105,3 +105,5 @@
 - 2026-10-31：发布 9.5.2；包含 io stdio 适配器、SHA256 快路径、use 别名
   re-export、inline 语义锁定和 ROADMAP/检查脚本。
 - 2026-11-02：Q-01/Q-02/Q-03/Q-05 关闭；Q-04 降级为 DEFERRED（X-08）。
+- 2026-11-02：S-01 关闭（#44 `io.pipe` + #45 `process.run`）；流式/交互式子进程
+  stdio 拆为 S-09。
