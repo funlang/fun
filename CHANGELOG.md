@@ -6,6 +6,35 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.5.3] - 2026-11-02
+
+- Fix `lib-ado-schema.Filter` dropping every foreign key. The final FKey filter
+  reused the primary-key map after its values had been replaced with `1`, and
+  Fun's `in` tests values rather than keys, so no table name ever matched. Keep
+  the surviving table names in a separate set and look the child/parent names up
+  as keys. `ToSchema()` no longer needs its raw-FKeys workaround. An empty
+  `PRAGMA foreign_key_list` result (SQLite 3.7 reports zero columns) no longer
+  produces a bogus FK row.
+
+- Move the ADO OpenSchema/DataType constants into `lib-ado-base.fun`, shared by
+  `lib-ado.fun`, `lib-ado-unx.fun` and both schema files instead of being copied
+  per platform.
+
+- `lib-fd`: keep a key open when its value is empty. With `#!kvd:<char>`, a row
+  like `a=` followed by indented children now builds `a` as their parent instead
+  of attaching them to the grandparent. The lib-fd/getJson(fd:true)
+  differential test gains nesting and kvd-empty-value cases.
+
+- Windows build: `-dRegexx` was a placeholder, not a real define, so regex was
+  never enabled. `make-win64.bat` now adds `-dRegex -dPCRE_WinDLL` when
+  `pcre3.dll` sits next to `funcmd.exe`; the cross-target scripts drop the dead
+  flag and document why they stay regex-free.
+
+- Safe builds now cover more than Linux x86_64. `SAFE=...` is parsed once in
+  `src/prj/fun/safe-flags.sh` and used by the Linux aarch64, native macOS,
+  darwin cross and win64 scripts, producing a per-platform `*-safe` binary with
+  a separate FPC unit directory.
+
 ## [9.5.2] - 2026-10-31
 
 - Add `io.stdin`, `io.stdout` and `io.stderr` byte-stream adapters for process

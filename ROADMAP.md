@@ -5,11 +5,11 @@
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
 > 最近更新：2026-11-02
-> 基线：Fun 9.5.2（tag `v9.5.2`）
+> 基线：Fun 9.5.3（tag `v9.5.3`）
 
 ## 0. 当前基线
 
-- **版本**：9.5.2，`src/core/version.inc` 的 `funRelease = '9.5.2'`。
+- **版本**：9.5.3，`src/core/version.inc` 的 `funRelease = '9.5.3'`。
 - **回归**：Linux `123/123`（`sh fun/test/run-linux-regression.sh`）。
 - **可加载性**：`72/78`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。

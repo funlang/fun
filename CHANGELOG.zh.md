@@ -6,6 +6,29 @@
 
 ## [未发布]
 
+## [9.5.3] - 2026-11-02
+
+- 修复 `lib-ado-schema.Filter` 把所有外键丢掉的问题。最后一步 FKey 过滤复用了
+  主键映射，但值已经被替换成 `1`，而 Fun 的 `in` 判断的是值不是键，所以任何表名
+  都匹配不上。现在单独保留存活表名集合，并以子/父表名为键查询；`ToSchema()`
+  不再需要“备份原始 FKeys”的绕过。空 `PRAGMA foreign_key_list` 结果（SQLite 3.7
+  返回 0 列）也不会再生成一条表名为空的外键。
+
+- 把 ADO 的 OpenSchema/DataType 常量集中到 `lib-ado-base.fun`，由
+  `lib-ado.fun`、`lib-ado-unx.fun` 和两个 schema 文件共享，不再按平台各拷一份。
+
+- `lib-fd`：值为空时保持键处于打开状态。带 `#!kvd:<字符>` 时，`a=` 后跟缩进
+  子键现在会把子键挂到 `a` 下，而不是挂到祖父层。lib-fd 与
+  `getJson(fd:true)` 的差分测试增加了嵌套和 kvd 空值用例。
+
+- Windows 构建：`-dRegexx` 只是占位符、不是真正的宏，所以 regex 从未启用。
+  `make-win64.bat` 现在在 `pcre3.dll` 与 `funcmd.exe` 同目录时自动加上
+  `-dRegex -dPCRE_WinDLL`；交叉目标脚本删掉这个无效开关并注明原因。
+
+- safe 构建不再只支持 Linux x86_64。`SAFE=...` 统一由
+  `src/prj/fun/safe-flags.sh` 解析，Linux aarch64、原生 macOS、darwin 交叉和
+  win64 脚本共用，各自产出 `*-safe` 二进制并使用独立的 FPC 单元目录。
+
 ## [9.5.2] - 2026-10-31
 
 - 新增 `io.stdin`、`io.stdout`、`io.stderr` 进程 stdio 字节流适配器。它们遵循
