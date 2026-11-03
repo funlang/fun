@@ -6,6 +6,15 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Fix bare `var` arguments being sent to COM as named arguments. `var x` reused
+  the referenced variable's node, whose `.name` made `winole` pass it to
+  `IDispatch` as a named argument (`DISP_E_UNKNOWNNAME`), so
+  `db.Execute(sql, var i)` failed. Bare `var` arguments are now a dedicated
+  `CRef` node with no argument name: they stay positional and by-reference,
+  while explicitly named `param: var x` arguments still bind by name. This also
+  fixes builtins that look arguments up by name, e.g.
+  `'abcdef'.substr(var k)`.
+
 - Add `process.run()` and `process.fun` (PR #45): run a child process without a
   shell, with optional arguments, stdin, cwd and timeout; capture stdout/stderr
   as raw bytes and report `exitCode`, `signal` and `timedOut`. This is the

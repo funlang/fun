@@ -185,7 +185,10 @@ var
   
         // Named params
         // Now supported !!!
-        if e.name <> '' then cd.NamedArgCount := ii - i;
+        // Only a trailing, contiguous run of named args can be passed to
+        // IDispatch; e.g. `f(x: 1, var y)` must not count `y` as named.
+        if (e.name <> '') and (cd.NamedArgCount = ii - i - 1) then
+          cd.NamedArgCount := ii - i;
       end;
       o   := asObj(v);
   

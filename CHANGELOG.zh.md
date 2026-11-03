@@ -6,6 +6,13 @@
 
 ## [未发布]
 
+- 修复裸 `var` 实参被当作 COM 命名实参发送的问题。`var x` 直接复用了被引用变量
+  的节点，其 `.name` 让 `winole` 把它按命名实参交给 `IDispatch`
+  （`DISP_E_UNKNOWNNAME`），导致 `db.Execute(sql, var i)` 失败。裸 `var` 实参
+  现在使用独立的 `CRef` 节点且不带实参名：仍按位置、按引用传递，而显式写法的
+  `param: var x` 依旧按名字绑定。同时修复按名字查找实参的内建函数，例如
+  `'abcdef'.substr(var k)`。
+
 - 新增 `process.run()` 与 `process.fun`（PR #45）：不经 shell 启动子进程，可传
   参数、stdin、cwd 和超时；以原始字节捕获 stdout/stderr，并返回 `exitCode`、
   `signal`、`timedOut`。这是 `io.pipe` 的一次性配套；流式/交互式子进程 stdio

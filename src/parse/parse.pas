@@ -822,9 +822,16 @@ begin
 end;
 
 function CParser.CreateRef(const a1, a0, id: YYSType): YYSType;
+var
+  v: CVar;
 begin
   DoLog(a1, a0, result);
-  result.node := Curr.UID(id.text);
+  v := Curr.UID(id.text);
+  if v <> nil then
+    result.node := CRef.new(Curr, v)
+  else
+    result.node := nil
+  ;
   base.add(result.node);
   if result.node = nil then
   begin

@@ -249,6 +249,17 @@ type
     class function findOwner(parent: CNode): CFun;
     class function new(pn: CRuns; const id: fun.str = ''; allowClass: fun.bool = false): CVar; overload;
   end;
+
+  // A bare `var x` argument. It is positional and by-reference; keeping it as
+  // a separate node with an empty .name prevents the referenced variable's
+  // name from being mistaken for a named argument.
+  CRef = class(CVar)
+  protected
+    src: CVar;
+  public
+    constructor new(pn: CNode; asrc: CVar);
+    function value: PValue; override;
+  end;
   
   CVarRE = class(CVar)
   protected
@@ -1221,7 +1232,7 @@ begin
     if (p <> nil) and ( (p.name='') or SameText(p.name,e.name) or (p is CVar) ) then
     begin
       if p is CVar then
-        e.p_val := p.p_val
+        e.p_val := p.value
       else
       begin
         v := p.value^; // get param value before to fix bug of recursion
@@ -1381,6 +1392,20 @@ begin
   end;
   if (id <> '') and (pn <> nil) then pn.ID[id] := result;
   result.name  := id;
+end;
+
+//==============================================================
+constructor CRef.new(pn: CNode; asrc: CVar);
+begin
+  inherited new(pn, false);
+  src := asrc;
+end;
+
+function CRef.value: PValue;
+begin
+  // Resolve through the target at call time: CVarRE.p_val can be redirected
+  // to a recursion stack slot after this node is built.
+  result := src.value;
 end;
 
 //==============================================================
