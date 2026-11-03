@@ -21,6 +21,7 @@
 
 use 'lib-host.fun';
 use 'env.fun';
+use 'io.fun';
 
 var _CLI_NL = 10.toChar();
 if IsWindows() then _CLI_NL = 13.toChar() & 10.toChar(); end if;
@@ -386,7 +387,7 @@ class _CliFlag(name, kind, opts)
   end fun;
 end class;
 
-class _CliContext(values, given, argv, name, kinds, o, e)
+class _CliContext(values, given, argv, name, kinds, o, e, inp)
   var vals = values;
   var set = given;
   var list = argv;
@@ -394,6 +395,7 @@ class _CliContext(values, given, argv, name, kinds, o, e)
   var kinds = kinds;
   var o = o;
   var e = e;
+  var i = inp;
 
   fun _kind(name)
     if not this.kinds.@has(name) then raise "unknown flag '" & name & "'"; end if;
@@ -445,6 +447,11 @@ class _CliContext(values, given, argv, name, kinds, o, e)
     result = this.e;
   end fun;
 
+  fun stdin()
+    if this.i = nil then this.i = io.stdin(); end if;
+    result = this.i;
+  end fun;
+
   fun args()
     result = this.list;
   end fun;
@@ -478,6 +485,7 @@ class _CliCommand(name, opts)
   var hidden = false;
   var out = nil;
   var err = nil;
+  var input = nil;
 
   if name = nil or name = '' then raise 'cli: command name required'; end if;
   if _cliNameBad(name) then raise 'cli: invalid command name ' & name; end if;
@@ -494,6 +502,7 @@ class _CliCommand(name, opts)
   hidden = _cliBoolOpt(opts, 'hidden', false);
   out = _cliOpt(opts, 'out');
   err = _cliOpt(opts, 'err');
+  input = _cliOpt(opts, 'input');
   act = _cliOpt(opts, 'action');
   beforeFn = _cliOpt(opts, 'before');
   afterFn = _cliOpt(opts, 'after');
@@ -818,7 +827,7 @@ class _CliCommand(name, opts)
     result = 0;
   end fun;
 
-  fun _runInner(tokens, inherited, given, root, o, e, parents)
+  fun _runInner(tokens, inherited, given, root, o, e, inp, parents)
     var vals = new [];
     inherited.@each((v, k){ vals[k] = _cliCopyValue(v); });
     var gv = new [];
@@ -948,7 +957,9 @@ class _CliCommand(name, opts)
           if co = nil then co = o; end if;
           var ce = c.err;
           if ce = nil then ce = e; end if;
-          result = c._run(rest, vals, gv, root, co, ce, ps);
+          var ci = c.input;
+          if ci = nil then ci = inp; end if;
+          result = c._run(rest, vals, gv, root, co, ce, ci, ps);
           return;
         end if;
         pos.@add(a);
@@ -987,9 +998,11 @@ class _CliCommand(name, opts)
       if po = nil then po = o; end if;
       var pe = parents[pi].err;
       if pe = nil then pe = e; end if;
-      pctxs.@add(_CliContext(vals, gv, new [], parents[pi].name, kinds, po, pe));
+      var pin = parents[pi].input;
+      if pin = nil then pin = inp; end if;
+      pctxs.@add(_CliContext(vals, gv, new [], parents[pi].name, kinds, po, pe, pin));
     end do;
-    var ctx = _CliContext(vals, gv, pos, this.name, kinds, o, e);
+    var ctx = _CliContext(vals, gv, pos, this.name, kinds, o, e, inp);
 
     var pbc = this._runParentsBefore(parents, vals, gv, e, pctxs);
     if pbc <> 0 then result = pbc; return; end if;
@@ -1020,9 +1033,9 @@ class _CliCommand(name, opts)
     result = code;
   end fun;
 
-  fun _run(tokens, inherited, given, root, o, e, parents)
+  fun _run(tokens, inherited, given, root, o, e, inp, parents)
     try
-      result = this._runInner(tokens, inherited, given, root, o, e, parents);
+      result = this._runInner(tokens, inherited, given, root, o, e, inp, parents);
     except
       this._usageError('' & @, e);
       result = 2;
@@ -1036,7 +1049,7 @@ class _CliCommand(name, opts)
     var e = this.err;
     if o = nil then o = _CliConsole(1); end if;
     if e = nil then e = _CliConsole(2); end if;
-    result = this._run(toks, new [], new [], this, o, e, new []);
+    result = this._run(toks, new [], new [], this, o, e, this.input, new []);
   end fun;
 end class;
 

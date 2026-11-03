@@ -597,7 +597,7 @@ $ demo --version
 `cli.command(name, opts)` 支持 `usage`（父命令列表中的一句话说明；自身没有
 `description` 时也显示在自身 help 中）、`usageText`（替换自动生成的 usage 行）、
 `argsUsage`、`version`、`description`、`aliases`、`flags`、`commands`、`action`、
-`before`、`after`、`hidden`、`out`、`err`。
+`before`、`after`、`hidden`、`out`、`err`、`input`。
 
 flag 由 `cli.string`、`cli.bool`、`cli.int`、`cli.float`、`cli.strings` 创建；
 选项有 `aliases`、`value`（默认值）、`usage`、`env`（单个名字或名字列表）、
@@ -619,8 +619,8 @@ token 作为值；如果值以 `-` 开头，请用紧贴形式
 
 action 收到 context：`ctx.string/bool/int/float/strings(name)`、`ctx.has(name)`
 （只有命令行或 env 显式设置才为 true）、`ctx.args()`、`ctx.arg(n)`、`ctx.narg()`、
-`ctx.command()`，以及配置好的 writer `ctx.out()`/`ctx.err()`。带类型的访问器会
-校验声明的 flag：未知名字或类型不匹配会报错，而不是静默返回零值；子命令仍可
+`ctx.command()`，以及配置好的流 `ctx.out()`/`ctx.err()`/`ctx.stdin()`。带类型的
+访问器会校验声明的 flag：未知名字或类型不匹配会报错，而不是静默返回零值；子命令仍可
 访问父命令继承下来的 flag。访问器使用 flag 的规范名而不是别名。env 值按 flag
 类型转换，`strings` 按逗号分隔；`env` 列表中先存在的名字生效。
 
@@ -649,7 +649,13 @@ help/version 自动提供：`--help`/`-h`、`help [command...]`；命令设置 `
 help 默认写 stdout，错误默认写 stderr。默认 console writer 直接写进程句柄；需要
 捕获、重定向或非 ASCII 输出时请传 `out`/`err`。任意带 `write(s)` 的对象都可以；
 action 通过 `ctx.out()`/`ctx.err()` 访问它们；子命令自己的 writer 优先，否则继承
-根命令。框架不关闭也不 flush writer。测试通常用 `io.buffer`：
+根命令。框架不关闭也不 flush writer。
+
+可选的 `input` 是任意带 `read(n)` 的对象，reader 契约与 `io.fun` 相同；默认惰性
+使用 `io.stdin()`，因此读取 `ctx.stdin()` 的命令天然支持管道输入。子命令自己的
+`input` 优先，否则继承根命令；父 hook 与子 action 共享同一个输入流，hook 的读取
+会先消费输入。框架不主动读取、缓冲或关闭 reader，help/version 也不会消费输入。
+测试用 `io.buffer` 同时注入输出和输入：
 
 ```fun
 use 'io.fun';
@@ -661,6 +667,20 @@ app.action(hello);
 
 ?. app.run(['--help']) = 0;
 ?. out.text().subpos('usage: demo') >= 0;
+```
+
+输入也是同样的方式：
+
+```fun
+var source = io.buffer('hello');
+var copied = io.buffer();
+fun copy(ctx)
+  ctx.out().write(io.readAll(ctx.stdin()));
+end fun;
+var cat = cli.command('cat', [input: source, out: copied]);
+cat.action(copy);
+?. cat.run([]) = 0;
+?. copied.text() = 'hello';
 ```
 
 文件系统辅助覆盖目录、遍历和临时文件/目录：

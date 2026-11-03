@@ -1,0 +1,2 @@
+stdin_rc=0
+stdin=PASS

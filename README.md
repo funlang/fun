@@ -627,7 +627,7 @@ $ demo --version
 command list, also shown in its own help when `description` is empty),
 `usageText` (replace the generated usage line), `argsUsage`, `version`,
 `description`, `aliases`, `flags`, `commands`, `action`, `before`, `after`,
-`hidden`, `out` and `err`.
+`hidden`, `out`, `err` and `input`.
 
 Flags come from `cli.string`, `cli.bool`, `cli.int`, `cli.float` and
 `cli.strings`; options are `aliases`, `value` (default), `usage`, `env`
@@ -656,8 +656,9 @@ positional arguments of the root action.
 The action receives a context: `ctx.string/bool/int/float/strings(name)`,
 `ctx.has(name)` (true only when set on the command line or by env),
 `ctx.args()`, `ctx.arg(n)`, `ctx.narg()`, `ctx.command()`, and the configured
-writers `ctx.out()`/`ctx.err()`. Typed accessors validate the declared flag:
-unknown names or a wrong type raise instead of silently returning a zero value.
+streams `ctx.out()`, `ctx.err()` and `ctx.stdin()`. Typed accessors validate the
+declared flag: unknown names or a wrong type raise instead of silently returning
+a zero value.
 Parent flags inherited by a child stay accessible. Use canonical flag names,
 not aliases, with these accessors. Env values are converted by flag type;
 `strings` values are split on commas. The first present name from `env` wins.
@@ -695,8 +696,16 @@ Help goes to stdout and errors go to stderr by default. The default console
 writer uses the process handles directly; pass `out`/`err` for captured,
 redirected or non-ASCII output. Any object with `write(s)` works; actions reach
 them through `ctx.out()` and `ctx.err()`, and a child's own writers override the
-root's. Writers are not closed or flushed by the framework. Tests use
-`io.buffer`:
+root's. Writers are not closed or flushed by the framework.
+
+The optional `input` is any object with `read(n)`, using the same reader contract
+as `io.fun`. It defaults lazily to `io.stdin()`, so a command that reads
+`ctx.stdin()` accepts piped input without extra setup. A child's own `input`
+overrides the root's; otherwise it inherits. When a child inherits, a parent hook
+and the child action share the same input stream, so a hook that reads consumes
+input before the action. The framework never reads, buffers or closes the
+reader, and help/version do not consume it. Tests use `io.buffer` for both
+output and input:
 
 ```fun
 use 'io.fun';
@@ -708,6 +717,20 @@ app.action(hello);
 
 ?. app.run(['--help']) = 0;
 ?. out.text().subpos('usage: demo') >= 0;
+```
+
+Input works the same way:
+
+```fun
+var source = io.buffer('hello');
+var copied = io.buffer();
+fun copy(ctx)
+  ctx.out().write(io.readAll(ctx.stdin()));
+end fun;
+var cat = cli.command('cat', [input: source, out: copied]);
+cat.action(copy);
+?. cat.run([]) = 0;
+?. copied.text() = 'hello';
 ```
 
 Filesystem helpers cover directories, walking and temporary entries:
