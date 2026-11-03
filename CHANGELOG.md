@@ -4,7 +4,15 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 **English** (this file) · [简体中文](CHANGELOG.zh.md)
 
-## [Unreleased]
+## [9.5.4] - 2026-11-03
+
+- Add brace-delimited blocks for `if` and conditional loops:
+  `if exp { ... }`, `while exp { ... }` and `for ... { ... }`. The closing
+  `}` follows the same block rules as an anonymous closure, so these forms do
+  not need `end if` / `end loop` / `end do`.
+
+- `cli` commands accept an optional `input` stream, and `ctx.stdin()` lazily
+  wraps `io.stdin()` (PR #46).
 
 - Fix bare `var` arguments being sent to COM as named arguments. `var x` reused
   the referenced variable's node, whose `.name` made `winole` pass it to

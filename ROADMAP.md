@@ -4,13 +4,13 @@
 > 本文只维护当前基线、优先级、技术债和发版门槛。
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
-> 最近更新：2026-11-02
-> 基线：Fun 9.5.3（tag `v9.5.3`）
+> 最近更新：2026-11-03
+> 基线：Fun 9.5.4（tag `v9.5.4`）
 
 ## 0. 当前基线
 
-- **版本**：9.5.3，`src/core/version.inc` 的 `funRelease = '9.5.3'`。
-- **回归**：Linux `124/124`（`sh fun/test/run-linux-regression.sh`）。
+- **版本**：9.5.4，`src/core/version.inc` 的 `funRelease = '9.5.4'`。
+- **回归**：Linux `126/126`（`sh fun/test/run-linux-regression.sh`）。
 - **可加载性**：`73/79`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
 - **标准库**：77 个模块（`fun/lib` 有 79 个基础 `.fun`，内部 `lib-base`/`lib-type` 不计）。
@@ -107,3 +107,5 @@
 - 2026-11-02：Q-01/Q-02/Q-03/Q-05 关闭；Q-04 降级为 DEFERRED（X-08）。
 - 2026-11-02：S-01 关闭（#44 `io.pipe` + #45 `process.run`）；流式/交互式子进程
   stdio 拆为 S-09。
+- 2026-11-03：发布 9.5.4；`if`/条件循环新增 `{}` 块写法，`cli` 支持可选 stdin，
+  修复裸 `var` 实参的命名绑定问题。

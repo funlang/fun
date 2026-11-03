@@ -4,7 +4,14 @@
 
 **English**: [CHANGELOG.md](CHANGELOG.md) · **简体中文**（本文件）
 
-## [未发布]
+## [9.5.4] - 2026-11-03
+
+- `if` 和条件循环新增 `{}` 块写法：`if 表达式 { ... }`、
+  `while 表达式 { ... }`、`for ... { ... }`。闭合的 `}` 与匿名闭包走同一套
+  块规则，因此这些写法不再需要 `end if` / `end loop` / `end do`。
+
+- `cli` 命令支持可选的 `input` 流，`ctx.stdin()` 会按需包装
+  `io.stdin()`（PR #46）。
 
 - 修复裸 `var` 实参被当作 COM 命名实参发送的问题。`var x` 直接复用了被引用变量
   的节点，其 `.name` 让 `winole` 把它按命名实参交给 `IDispatch`
