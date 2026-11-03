@@ -131,6 +131,19 @@ fun ctxOutAction(ctx)
   ctx.err().write('ctx-err');
 end fun;
 
+fun stdinAllAction(ctx)
+  got.@add(io.readAll(ctx.stdin()));
+end fun;
+
+var stdinTrace = '';
+fun stdinParentHook(ctx)
+  stdinTrace &= ctx.stdin().read(1);
+end fun;
+
+fun stdinChildAction(ctx)
+  stdinTrace &= io.readAll(ctx.stdin());
+end fun;
+
 fun writerBefore(ctx)
   ctx.out().write('P');
 end fun;
@@ -588,6 +601,47 @@ writerParent.command(cli.command('child', [
 ?. writerParent.run(['child']) = 0;
 ?. writerRoot.text() = 'PA';
 ?. writerChild.text() = 'C';
+
+// contexts expose the selected input reader
+var stdinCmd = cli.command('stdin-in', [
+  input: io.buffer('hello'),
+  out: out,
+  err: err,
+  action: stdinAllAction
+]);
+got = new [];
+?. stdinCmd.run([]) = 0;
+?. got[0] = 'hello';
+
+// a child inherits the parent's input
+var stdinRoot = cli.command('stdin-inherit', [input: io.buffer('inherit'), out: out, err: err]);
+stdinRoot.command(cli.command('child', [action: stdinAllAction]));
+got = new [];
+?. stdinRoot.run(['child']) = 0;
+?. got[0] = 'inherit';
+
+// a child's own input overrides the parent's
+var stdinOverride = cli.command('stdin-override', [input: io.buffer('root'), out: out, err: err]);
+stdinOverride.command(cli.command('child', [input: io.buffer('child'), action: stdinAllAction]));
+got = new [];
+?. stdinOverride.run(['child']) = 0;
+?. got[0] = 'child';
+
+// parent hooks and child actions use their own context readers
+stdinTrace = '';
+var stdinHooks = cli.command('stdin-hooks', [input: io.buffer('R'), out: out, err: err]);
+stdinHooks.before(stdinParentHook);
+stdinHooks.command(cli.command('child', [input: io.buffer('C'), action: stdinChildAction]));
+?. stdinHooks.run(['child']) = 0;
+?. stdinTrace = 'RC';
+
+// an inheriting child continues from the parent hook's reader
+stdinTrace = '';
+var stdinShared = cli.command('stdin-shared', [input: io.buffer('XY'), out: out, err: err]);
+stdinShared.before(stdinParentHook);
+stdinShared.command(cli.command('child', [action: stdinChildAction]));
+?. stdinShared.run(['child']) = 0;
+?. stdinTrace = 'XY';
 
 // after hooks run when an action raises
 var afterErr = cli.command('after-err', [out: out, err: err]);
