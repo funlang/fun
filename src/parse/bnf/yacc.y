@@ -74,6 +74,7 @@ Goal        : Run                       { yyaccept; }
 
 /*--statement*/
 Run         : _if    Exp _then          { builder.BuildIf($1, $3, $2); }
+            | _if    Exp "{"            { builder.BuildIf($1, $3, $2); }
             | _elsif Exp _then          { builder.BuildIf($1, $3, $2, true); }
             | _else                     { builder.BuildElse($1); }
             
@@ -107,6 +108,7 @@ Run         : _if    Exp _then          { builder.BuildIf($1, $3, $2); }
 
 Loop        : _loop                     { }
             | _do                       { }
+            | "{"                       { }
             ;
 
 Bloc        : _if                       { }

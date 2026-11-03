@@ -9,76 +9,76 @@
          builder.BuildIf(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
 4 : begin
-         builder.BuildIf(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], true); 
+         builder.BuildIf(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
 5 : begin
-         builder.BuildElse(yyv[yysp-0]); 
+         builder.BuildIf(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], true); 
        end;
 6 : begin
-         builder.BuildCase(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+         builder.BuildElse(yyv[yysp-0]); 
        end;
 7 : begin
-         builder.BuildWhen(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+         builder.BuildCase(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
 8 : begin
-         builder.BuildLoop(yyv[yysp-0]); 
+         builder.BuildWhen(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
 9 : begin
-         builder.BuildLoop(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+         builder.BuildLoop(yyv[yysp-0]); 
        end;
 10 : begin
-         builder.BuildForIn(yyv[yysp-4], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
+         builder.BuildLoop(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
 11 : begin
-         builder.BuildForIn(yyv[yysp-6], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1], yyv[yysp-5].text); 
+         builder.BuildForIn(yyv[yysp-4], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
        end;
 12 : begin
-         builder.BuildForIn(yyv[yysp-6], yyv[yysp-0], yyv[yysp-5], yyv[yysp-1], '', yyv[yysp-3].text); 
+         builder.BuildForIn(yyv[yysp-6], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1], yyv[yysp-5].text); 
        end;
 13 : begin
-         builder.BuildForIn(yyv[yysp-8], yyv[yysp-0], yyv[yysp-5], yyv[yysp-1], yyv[yysp-7].text, yyv[yysp-3].text); 
+         builder.BuildForIn(yyv[yysp-6], yyv[yysp-0], yyv[yysp-5], yyv[yysp-1], '', yyv[yysp-3].text); 
        end;
 14 : begin
-         builder.BuildFor(yyv[yysp-6], yyv[yysp-0], yyv[yysp-5], yyv[yysp-3], yyv[yysp-1]); 
+         builder.BuildForIn(yyv[yysp-8], yyv[yysp-0], yyv[yysp-5], yyv[yysp-1], yyv[yysp-7].text, yyv[yysp-3].text); 
        end;
 15 : begin
-         builder.BuildFor(yyv[yysp-8], yyv[yysp-0], yyv[yysp-7], yyv[yysp-5], yyv[yysp-3], yyv[yysp-1].node); 
+         builder.BuildFor(yyv[yysp-6], yyv[yysp-0], yyv[yysp-5], yyv[yysp-3], yyv[yysp-1]); 
        end;
 16 : begin
-         builder.BuildTry(yyv[yysp-0]); 
+         builder.BuildFor(yyv[yysp-8], yyv[yysp-0], yyv[yysp-7], yyv[yysp-5], yyv[yysp-3], yyv[yysp-1].node); 
        end;
 17 : begin
-         builder.BuildExcept(yyv[yysp-0]); 
+         builder.BuildTry(yyv[yysp-0]); 
        end;
 18 : begin
-         builder.BuildFinally(yyv[yysp-0]); 
+         builder.BuildExcept(yyv[yysp-0]); 
        end;
 19 : begin
-         builder.BuildFun(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
+         builder.BuildFinally(yyv[yysp-0]); 
        end;
 20 : begin
-         builder.BuildClass(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
+         builder.BuildFun(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
        end;
 21 : begin
-         builder.BuildClass(yyv[yysp-4], yyv[yysp-0], yyv[yysp-3], yyv[yysp-0], yyv[yysp-1].node); 
+         builder.BuildClass(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
        end;
 22 : begin
-         builder.BuildEnd(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildClass(yyv[yysp-4], yyv[yysp-0], yyv[yysp-3], yyv[yysp-0], yyv[yysp-1].node); 
        end;
 23 : begin
-         
+         builder.BuildEnd(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
 24 : begin
          
        end;
 25 : begin
-         if builder.BuildEnd(yyv[yysp-0]).val = -1 then yy_done; 
+         
        end;
 26 : begin
          if builder.BuildEnd(yyv[yysp-0]).val = -1 then yy_done; 
        end;
 27 : begin
-         
+         if builder.BuildEnd(yyv[yysp-0]).val = -1 then yy_done; 
        end;
 28 : begin
          
@@ -105,79 +105,79 @@
          
        end;
 36 : begin
-         builder.BuildExit(yyv[yysp-0]); 
+         
        end;
 37 : begin
-         builder.BuildExit(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0]); 
+         
        end;
 38 : begin
-         builder.BuildNext(yyv[yysp-0]); 
+         builder.BuildExit(yyv[yysp-0]); 
        end;
 39 : begin
-         builder.BuildNext(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildExit(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0]); 
        end;
 40 : begin
-         builder.BuildReturn(yyv[yysp-0]); 
+         builder.BuildNext(yyv[yysp-0]); 
        end;
 41 : begin
-         builder.BuildReturn(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildNext(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0]); 
        end;
 42 : begin
-         builder.BuildRaise(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildReturn(yyv[yysp-0]); 
        end;
 43 : begin
-         builder.BuildUse(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildReturn(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
 44 : begin
-         builder.BuildUse(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0].text); 
+         builder.BuildRaise(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
 45 : begin
-         builder.BuildVar(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildUse(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
 46 : begin
-         builder.BuildVar(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0].node); 
+         builder.BuildUse(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0].text); 
        end;
 47 : begin
-         builder.BuildVar(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], builder.BuildFunDef(yyv[yysp-3], yyv[yysp-0], yyv[yysp-1].node, true, yyv[yysp-2].text).node, true); 
+         builder.BuildVar(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
 48 : begin
-         builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); 
+         builder.BuildVar(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0].node); 
        end;
 49 : begin
-         builder.BuildSet(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
+         builder.BuildVar(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], builder.BuildFunDef(yyv[yysp-3], yyv[yysp-0], yyv[yysp-1].node, true, yyv[yysp-2].text).node, true); 
        end;
 50 : begin
-         builder.BuildSet(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0], yyv[yysp-1].text); 
+         builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); 
        end;
 51 : begin
-         builder.BuildCall(yyv[yysp-0]); 
+         builder.BuildSet(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
        end;
 52 : begin
-         builder.BuildEcho(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildSet(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0], yyv[yysp-1].text); 
        end;
 53 : begin
-         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], EOL); 
+         builder.BuildCall(yyv[yysp-0]); 
        end;
 54 : begin
-         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], ' '); 
+         builder.BuildEcho(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
 55 : begin
-         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], #9); 
+         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], EOL); 
        end;
 56 : begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], ' '); 
        end;
 57 : begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], #9); 
        end;
 58 : begin
-         yyval := builder.CreateExp(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
 59 : begin
          yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
 60 : begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         yyval := builder.CreateExp(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
        end;
 61 : begin
          yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
@@ -189,67 +189,67 @@
          yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
 64 : begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0], true); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
 65 : begin
-         yyval := builder.CreateExp(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0], true); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
 66 : begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0], true); 
        end;
 67 : begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         yyval := builder.CreateExp(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0], true); 
        end;
 68 : begin
-         yyval := builder.BuildFunDef(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1].node); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
 69 : begin
-         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1].node); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
 70 : begin
-         yyval := builder.BuildFunDef(yyv[yysp-0], yyv[yysp-0], nil); 
+         yyval := builder.BuildFunDef(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1].node); 
        end;
 71 : begin
-         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1].node, true); yylast := yyval; 
+         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1].node); 
        end;
 72 : begin
-         builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); yyval := yylast; 
+         yyval := builder.BuildFunDef(yyv[yysp-0], yyv[yysp-0], nil); 
        end;
 73 : begin
-         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], builder.CreateNames(yyv[yysp-1]).node, true); yylast := yyval; 
+         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1].node, true); yylast := yyval; 
        end;
 74 : begin
          builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); yyval := yylast; 
        end;
 75 : begin
-         yyval := builder.BuildFunDef(yyv[yysp-0], yyv[yysp-0], nil, true); yylast := yyval; 
+         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], builder.CreateNames(yyv[yysp-1]).node, true); yylast := yyval; 
        end;
 76 : begin
          builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); yyval := yylast; 
        end;
 77 : begin
-         yyval := builder.CreateFunFun(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         yyval := builder.BuildFunDef(yyv[yysp-0], yyv[yysp-0], nil, true); yylast := yyval; 
        end;
 78 : begin
-         yyval := builder.CreateSetNew(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); yyval := yylast; 
        end;
 79 : begin
-         yyval := builder.CreateRef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         yyval := builder.CreateFunFun(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
 80 : begin
-         yyval := builder.CreateDotAny(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         yyval := builder.CreateSetNew(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
 81 : begin
-         yyval := builder.CreateFunExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], builder.CreateValues(yyv[yysp-2])); 
+         yyval := builder.CreateRef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
 82 : begin
-         yyval := builder.CreateFunExp(yyv[yysp-2], yyv[yysp-0], builder.CreateFunFun(yyv[yysp-0], yyv[yysp-0], yyv[yysp-0]), builder.CreateValues(yyv[yysp-2])); 
+         yyval := builder.CreateDotAny(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
 83 : begin
-         
+         yyval := builder.CreateFunExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], builder.CreateValues(yyv[yysp-2])); 
        end;
 84 : begin
-         
+         yyval := builder.CreateFunExp(yyv[yysp-2], yyv[yysp-0], builder.CreateFunFun(yyv[yysp-0], yyv[yysp-0], yyv[yysp-0]), builder.CreateValues(yyv[yysp-2])); 
        end;
 85 : begin
          
@@ -261,99 +261,105 @@
          
        end;
 88 : begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+         
        end;
 89 : begin
          
        end;
 90 : begin
-         
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
 91 : begin
-         yyval := builder.CreateId(yyv[yysp-0]); 
+         
        end;
 92 : begin
-         yyval := builder.CreateId(yyv[yysp-1], true); 
+         
        end;
 93 : begin
-         yyval := builder.CreateVarExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
+         yyval := builder.CreateId(yyv[yysp-0]); 
        end;
 94 : begin
-         yyval := builder.CreateVarExp(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1], false, true); 
+         yyval := builder.CreateId(yyv[yysp-1], true); 
        end;
 95 : begin
-         yyval := builder.CreateVarExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0], true); 
+         yyval := builder.CreateVarExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
        end;
 96 : begin
-         yyval := builder.CreateNum(yyv[yysp-0]); 
+         yyval := builder.CreateVarExp(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1], false, true); 
        end;
 97 : begin
-         yyval := builder.CreateNum(yyv[yysp-0], yyv[yysp-1].text); 
+         yyval := builder.CreateVarExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0], true); 
        end;
 98 : begin
-         yyval := builder.CreateStr(yyv[yysp-0]); 
+         yyval := builder.CreateNum(yyv[yysp-0]); 
        end;
 99 : begin
-         yyval := builder.CreateTime(yyv[yysp-0]); 
+         yyval := builder.CreateNum(yyv[yysp-0], yyv[yysp-1].text); 
        end;
 100 : begin
-         yyval := builder.CreateConst(yyv[yysp-0], true); 
+         yyval := builder.CreateStr(yyv[yysp-0]); 
        end;
 101 : begin
-         yyval := builder.CreateConst(yyv[yysp-0], false); 
+         yyval := builder.CreateTime(yyv[yysp-0]); 
        end;
 102 : begin
-         yyval := builder.CreateConst(yyv[yysp-0], NullValue); 
+         yyval := builder.CreateConst(yyv[yysp-0], true); 
        end;
 103 : begin
-         yyval := builder.CreateRegex(yyv[yysp-0]); 
+         yyval := builder.CreateConst(yyv[yysp-0], false); 
        end;
 104 : begin
-         
+         yyval := builder.CreateConst(yyv[yysp-0], NullValue); 
        end;
 105 : begin
-         yyval := builder.CreateNames(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+         yyval := builder.CreateRegex(yyv[yysp-0]); 
        end;
 106 : begin
-         yyval := builder.CreateFunExp(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
-       end;
-107 : begin
-         yyval := builder.CreateSetConst(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
-       end;
-108 : begin
-         yyval := builder.CreateSetConst(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2]); 
-       end;
-109 : begin
-         yyval := builder.CreateSetIndex(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
-       end;
-110 : begin
-         yyval := builder.CreateSetIndex(yyv[yysp-4], yyv[yysp-0], yyv[yysp-4], yyv[yysp-1], '.'); 
-       end;
-111 : begin
-         yyval := EmptyResult; 
-       end;
-112 : begin
-         yyval := builder.CreateNames(yyv[yysp-0]); 
-       end;
-113 : begin
-         yyval := builder.CreateNames(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
-       end;
-114 : begin
-         yyval := EmptyResult; 
-       end;
-115 : begin
-         yyval := builder.CreateValues(yyv[yysp-0]); 
-       end;
-116 : begin
-         yyval := builder.CreateValues(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
-       end;
-117 : begin
          
        end;
+107 : begin
+         yyval := builder.CreateNames(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+       end;
+108 : begin
+         yyval := builder.CreateFunExp(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
+       end;
+109 : begin
+         yyval := builder.CreateSetConst(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+       end;
+110 : begin
+         yyval := builder.CreateSetConst(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2]); 
+       end;
+111 : begin
+         yyval := builder.CreateSetIndex(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
+       end;
+112 : begin
+         yyval := builder.CreateSetIndex(yyv[yysp-4], yyv[yysp-0], yyv[yysp-4], yyv[yysp-1], '.'); 
+       end;
+113 : begin
+         yyval := EmptyResult; 
+       end;
+114 : begin
+         yyval := builder.CreateNames(yyv[yysp-0]); 
+       end;
+115 : begin
+         yyval := builder.CreateNames(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
+       end;
+116 : begin
+         yyval := EmptyResult; 
+       end;
+117 : begin
+         yyval := builder.CreateValues(yyv[yysp-0]); 
+       end;
 118 : begin
-         yyval := builder.CreateValue(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
+         yyval := builder.CreateValues(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
        end;
 119 : begin
+         
+       end;
+120 : begin
+         yyval := builder.CreateValue(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
+       end;
+121 : begin
          yyval := builder.CreateValue(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0], true); 
        end;
 //-act]

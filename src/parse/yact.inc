@@ -9,76 +9,76 @@
          builder.BuildIf(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
        procedure A4; begin
-         builder.BuildIf(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], true); 
+         builder.BuildIf(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
        procedure A5; begin
-         builder.BuildElse(yyv[yysp-0]); 
+         builder.BuildIf(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], true); 
        end;
        procedure A6; begin
-         builder.BuildCase(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+         builder.BuildElse(yyv[yysp-0]); 
        end;
        procedure A7; begin
-         builder.BuildWhen(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+         builder.BuildCase(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
        procedure A8; begin
-         builder.BuildLoop(yyv[yysp-0]); 
+         builder.BuildWhen(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
        procedure A9; begin
-         builder.BuildLoop(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+         builder.BuildLoop(yyv[yysp-0]); 
        end;
        procedure A10; begin
-         builder.BuildForIn(yyv[yysp-4], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
+         builder.BuildLoop(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
        procedure A11; begin
-         builder.BuildForIn(yyv[yysp-6], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1], yyv[yysp-5].text); 
+         builder.BuildForIn(yyv[yysp-4], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
        end;
        procedure A12; begin
-         builder.BuildForIn(yyv[yysp-6], yyv[yysp-0], yyv[yysp-5], yyv[yysp-1], '', yyv[yysp-3].text); 
+         builder.BuildForIn(yyv[yysp-6], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1], yyv[yysp-5].text); 
        end;
        procedure A13; begin
-         builder.BuildForIn(yyv[yysp-8], yyv[yysp-0], yyv[yysp-5], yyv[yysp-1], yyv[yysp-7].text, yyv[yysp-3].text); 
+         builder.BuildForIn(yyv[yysp-6], yyv[yysp-0], yyv[yysp-5], yyv[yysp-1], '', yyv[yysp-3].text); 
        end;
        procedure A14; begin
-         builder.BuildFor(yyv[yysp-6], yyv[yysp-0], yyv[yysp-5], yyv[yysp-3], yyv[yysp-1]); 
+         builder.BuildForIn(yyv[yysp-8], yyv[yysp-0], yyv[yysp-5], yyv[yysp-1], yyv[yysp-7].text, yyv[yysp-3].text); 
        end;
        procedure A15; begin
-         builder.BuildFor(yyv[yysp-8], yyv[yysp-0], yyv[yysp-7], yyv[yysp-5], yyv[yysp-3], yyv[yysp-1].node); 
+         builder.BuildFor(yyv[yysp-6], yyv[yysp-0], yyv[yysp-5], yyv[yysp-3], yyv[yysp-1]); 
        end;
        procedure A16; begin
-         builder.BuildTry(yyv[yysp-0]); 
+         builder.BuildFor(yyv[yysp-8], yyv[yysp-0], yyv[yysp-7], yyv[yysp-5], yyv[yysp-3], yyv[yysp-1].node); 
        end;
        procedure A17; begin
-         builder.BuildExcept(yyv[yysp-0]); 
+         builder.BuildTry(yyv[yysp-0]); 
        end;
        procedure A18; begin
-         builder.BuildFinally(yyv[yysp-0]); 
+         builder.BuildExcept(yyv[yysp-0]); 
        end;
        procedure A19; begin
-         builder.BuildFun(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
+         builder.BuildFinally(yyv[yysp-0]); 
        end;
        procedure A20; begin
-         builder.BuildClass(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
+         builder.BuildFun(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A21; begin
-         builder.BuildClass(yyv[yysp-4], yyv[yysp-0], yyv[yysp-3], yyv[yysp-0], yyv[yysp-1].node); 
+         builder.BuildClass(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A22; begin
-         builder.BuildEnd(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildClass(yyv[yysp-4], yyv[yysp-0], yyv[yysp-3], yyv[yysp-0], yyv[yysp-1].node); 
        end;
        procedure A23; begin
-         
+         builder.BuildEnd(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A24; begin
          
        end;
        procedure A25; begin
-         if builder.BuildEnd(yyv[yysp-0]).val = -1 then yy_done; 
+         
        end;
        procedure A26; begin
          if builder.BuildEnd(yyv[yysp-0]).val = -1 then yy_done; 
        end;
        procedure A27; begin
-         
+         if builder.BuildEnd(yyv[yysp-0]).val = -1 then yy_done; 
        end;
        procedure A28; begin
          
@@ -105,79 +105,79 @@
          
        end;
        procedure A36; begin
-         builder.BuildExit(yyv[yysp-0]); 
+         
        end;
        procedure A37; begin
-         builder.BuildExit(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0]); 
+         
        end;
        procedure A38; begin
-         builder.BuildNext(yyv[yysp-0]); 
+         builder.BuildExit(yyv[yysp-0]); 
        end;
        procedure A39; begin
-         builder.BuildNext(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildExit(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A40; begin
-         builder.BuildReturn(yyv[yysp-0]); 
+         builder.BuildNext(yyv[yysp-0]); 
        end;
        procedure A41; begin
-         builder.BuildReturn(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildNext(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A42; begin
-         builder.BuildRaise(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildReturn(yyv[yysp-0]); 
        end;
        procedure A43; begin
-         builder.BuildUse(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildReturn(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A44; begin
-         builder.BuildUse(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0].text); 
+         builder.BuildRaise(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A45; begin
-         builder.BuildVar(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildUse(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A46; begin
-         builder.BuildVar(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0].node); 
+         builder.BuildUse(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0].text); 
        end;
        procedure A47; begin
-         builder.BuildVar(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], builder.BuildFunDef(yyv[yysp-3], yyv[yysp-0], yyv[yysp-1].node, true, yyv[yysp-2].text).node, true); 
+         builder.BuildVar(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A48; begin
-         builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); 
+         builder.BuildVar(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0].node); 
        end;
        procedure A49; begin
-         builder.BuildSet(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
+         builder.BuildVar(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2], builder.BuildFunDef(yyv[yysp-3], yyv[yysp-0], yyv[yysp-1].node, true, yyv[yysp-2].text).node, true); 
        end;
        procedure A50; begin
-         builder.BuildSet(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0], yyv[yysp-1].text); 
+         builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); 
        end;
        procedure A51; begin
-         builder.BuildCall(yyv[yysp-0]); 
+         builder.BuildSet(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
        end;
        procedure A52; begin
-         builder.BuildEcho(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildSet(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0], yyv[yysp-1].text); 
        end;
        procedure A53; begin
-         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], EOL); 
+         builder.BuildCall(yyv[yysp-0]); 
        end;
        procedure A54; begin
-         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], ' '); 
+         builder.BuildEcho(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A55; begin
-         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], #9); 
+         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], EOL); 
        end;
        procedure A56; begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], ' '); 
        end;
        procedure A57; begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         builder.BuildEcho(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], #9); 
        end;
        procedure A58; begin
-         yyval := builder.CreateExp(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A59; begin
          yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A60; begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         yyval := builder.CreateExp(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A61; begin
          yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
@@ -189,67 +189,67 @@
          yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A64; begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0], true); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A65; begin
-         yyval := builder.CreateExp(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0], true); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A66; begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0], true); 
        end;
        procedure A67; begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         yyval := builder.CreateExp(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1], yyv[yysp-0], true); 
        end;
        procedure A68; begin
-         yyval := builder.BuildFunDef(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1].node); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A69; begin
-         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1].node); 
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A70; begin
-         yyval := builder.BuildFunDef(yyv[yysp-0], yyv[yysp-0], nil); 
+         yyval := builder.BuildFunDef(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1].node); 
        end;
        procedure A71; begin
-         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1].node, true); yylast := yyval; 
+         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1].node); 
        end;
        procedure A72; begin
-         builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); yyval := yylast; 
+         yyval := builder.BuildFunDef(yyv[yysp-0], yyv[yysp-0], nil); 
        end;
        procedure A73; begin
-         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], builder.CreateNames(yyv[yysp-1]).node, true); yylast := yyval; 
+         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-1].node, true); yylast := yyval; 
        end;
        procedure A74; begin
          builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); yyval := yylast; 
        end;
        procedure A75; begin
-         yyval := builder.BuildFunDef(yyv[yysp-0], yyv[yysp-0], nil, true); yylast := yyval; 
+         yyval := builder.BuildFunDef(yyv[yysp-1], yyv[yysp-0], builder.CreateNames(yyv[yysp-1]).node, true); yylast := yyval; 
        end;
        procedure A76; begin
          builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); yyval := yylast; 
        end;
        procedure A77; begin
-         yyval := builder.CreateFunFun(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         yyval := builder.BuildFunDef(yyv[yysp-0], yyv[yysp-0], nil, true); yylast := yyval; 
        end;
        procedure A78; begin
-         yyval := builder.CreateSetNew(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         builder.BuildReturn(yyval, yyval, yyval); builder.BuildEnd(yyval, true); yyval := yylast; 
        end;
        procedure A79; begin
-         yyval := builder.CreateRef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
+         yyval := builder.CreateFunFun(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A80; begin
-         yyval := builder.CreateDotAny(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
+         yyval := builder.CreateSetNew(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A81; begin
-         yyval := builder.CreateFunExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], builder.CreateValues(yyv[yysp-2])); 
+         yyval := builder.CreateRef(yyv[yysp-1], yyv[yysp-0], yyv[yysp-0]); 
        end;
        procedure A82; begin
-         yyval := builder.CreateFunExp(yyv[yysp-2], yyv[yysp-0], builder.CreateFunFun(yyv[yysp-0], yyv[yysp-0], yyv[yysp-0]), builder.CreateValues(yyv[yysp-2])); 
+         yyval := builder.CreateDotAny(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-1], yyv[yysp-0]); 
        end;
        procedure A83; begin
-         
+         yyval := builder.CreateFunExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-0], builder.CreateValues(yyv[yysp-2])); 
        end;
        procedure A84; begin
-         
+         yyval := builder.CreateFunExp(yyv[yysp-2], yyv[yysp-0], builder.CreateFunFun(yyv[yysp-0], yyv[yysp-0], yyv[yysp-0]), builder.CreateValues(yyv[yysp-2])); 
        end;
        procedure A85; begin
          
@@ -261,99 +261,105 @@
          
        end;
        procedure A88; begin
-         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+         
        end;
        procedure A89; begin
          
        end;
        procedure A90; begin
-         
+         yyval := builder.CreateExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
        end;
        procedure A91; begin
-         yyval := builder.CreateId(yyv[yysp-0]); 
+         
        end;
        procedure A92; begin
-         yyval := builder.CreateId(yyv[yysp-1], true); 
+         
        end;
        procedure A93; begin
-         yyval := builder.CreateVarExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
+         yyval := builder.CreateId(yyv[yysp-0]); 
        end;
        procedure A94; begin
-         yyval := builder.CreateVarExp(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1], false, true); 
+         yyval := builder.CreateId(yyv[yysp-1], true); 
        end;
        procedure A95; begin
-         yyval := builder.CreateVarExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0], true); 
+         yyval := builder.CreateVarExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
        end;
        procedure A96; begin
-         yyval := builder.CreateNum(yyv[yysp-0]); 
+         yyval := builder.CreateVarExp(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1], false, true); 
        end;
        procedure A97; begin
-         yyval := builder.CreateNum(yyv[yysp-0], yyv[yysp-1].text); 
+         yyval := builder.CreateVarExp(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0], true); 
        end;
        procedure A98; begin
-         yyval := builder.CreateStr(yyv[yysp-0]); 
+         yyval := builder.CreateNum(yyv[yysp-0]); 
        end;
        procedure A99; begin
-         yyval := builder.CreateTime(yyv[yysp-0]); 
+         yyval := builder.CreateNum(yyv[yysp-0], yyv[yysp-1].text); 
        end;
        procedure A100; begin
-         yyval := builder.CreateConst(yyv[yysp-0], true); 
+         yyval := builder.CreateStr(yyv[yysp-0]); 
        end;
        procedure A101; begin
-         yyval := builder.CreateConst(yyv[yysp-0], false); 
+         yyval := builder.CreateTime(yyv[yysp-0]); 
        end;
        procedure A102; begin
-         yyval := builder.CreateConst(yyv[yysp-0], NullValue); 
+         yyval := builder.CreateConst(yyv[yysp-0], true); 
        end;
        procedure A103; begin
-         yyval := builder.CreateRegex(yyv[yysp-0]); 
+         yyval := builder.CreateConst(yyv[yysp-0], false); 
        end;
        procedure A104; begin
-         
+         yyval := builder.CreateConst(yyv[yysp-0], NullValue); 
        end;
        procedure A105; begin
-         yyval := builder.CreateNames(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+         yyval := builder.CreateRegex(yyv[yysp-0]); 
        end;
        procedure A106; begin
-         yyval := builder.CreateFunExp(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
-       end;
-       procedure A107; begin
-         yyval := builder.CreateSetConst(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
-       end;
-       procedure A108; begin
-         yyval := builder.CreateSetConst(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2]); 
-       end;
-       procedure A109; begin
-         yyval := builder.CreateSetIndex(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
-       end;
-       procedure A110; begin
-         yyval := builder.CreateSetIndex(yyv[yysp-4], yyv[yysp-0], yyv[yysp-4], yyv[yysp-1], '.'); 
-       end;
-       procedure A111; begin
-         yyval := EmptyResult; 
-       end;
-       procedure A112; begin
-         yyval := builder.CreateNames(yyv[yysp-0]); 
-       end;
-       procedure A113; begin
-         yyval := builder.CreateNames(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
-       end;
-       procedure A114; begin
-         yyval := EmptyResult; 
-       end;
-       procedure A115; begin
-         yyval := builder.CreateValues(yyv[yysp-0]); 
-       end;
-       procedure A116; begin
-         yyval := builder.CreateValues(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
-       end;
-       procedure A117; begin
          
        end;
+       procedure A107; begin
+         yyval := builder.CreateNames(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+       end;
+       procedure A108; begin
+         yyval := builder.CreateFunExp(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
+       end;
+       procedure A109; begin
+         yyval := builder.CreateSetConst(yyv[yysp-2], yyv[yysp-0], yyv[yysp-1]); 
+       end;
+       procedure A110; begin
+         yyval := builder.CreateSetConst(yyv[yysp-3], yyv[yysp-0], yyv[yysp-2]); 
+       end;
+       procedure A111; begin
+         yyval := builder.CreateSetIndex(yyv[yysp-3], yyv[yysp-0], yyv[yysp-3], yyv[yysp-1]); 
+       end;
+       procedure A112; begin
+         yyval := builder.CreateSetIndex(yyv[yysp-4], yyv[yysp-0], yyv[yysp-4], yyv[yysp-1], '.'); 
+       end;
+       procedure A113; begin
+         yyval := EmptyResult; 
+       end;
+       procedure A114; begin
+         yyval := builder.CreateNames(yyv[yysp-0]); 
+       end;
+       procedure A115; begin
+         yyval := builder.CreateNames(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
+       end;
+       procedure A116; begin
+         yyval := EmptyResult; 
+       end;
+       procedure A117; begin
+         yyval := builder.CreateValues(yyv[yysp-0]); 
+       end;
        procedure A118; begin
-         yyval := builder.CreateValue(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
+         yyval := builder.CreateValues(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
        end;
        procedure A119; begin
+         
+       end;
+       procedure A120; begin
+         yyval := builder.CreateValue(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0]); 
+       end;
+       procedure A121; begin
          yyval := builder.CreateValue(yyv[yysp-2], yyv[yysp-0], yyv[yysp-2], yyv[yysp-0], true); 
        end;
 //-act]
@@ -477,4 +483,6 @@ procedure AX_Init; begin
   AX[117] := @A117;
   AX[118] := @A118;
   AX[119] := @A119;
+  AX[120] := @A120;
+  AX[121] := @A121;
 end;

@@ -481,6 +481,9 @@ begin
     end;
     Curr := Curr.parent;
   end;
+  // `if exp {` (and a future `elsif exp {`) uses `}` as the block
+  // terminator: name the CIf "{" so BuildEnd accepts the closing brace.
+  if a0.text = '{' then CBloc(Curr).name := a0.text;
   Curr := flow.CIf(Curr).parse(exp.node);
 end;
 
