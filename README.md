@@ -103,6 +103,8 @@ Windows) and `fun/fun-safe` (the capability-restricted build), plus `lib/`,
 `install.sh` also creates `funcmd` and `funcmd-safe` compatibility symlinks.
 Every release also carries `capabilities.json` and `SHA256SUMS`; optional
 features that were unavailable are listed there.
+Linux artifacts are built on Ubuntu 24.04, so they need glibc 2.34 or newer;
+when getapi/FFI is enabled they also need `libffi.so.8` at run time.
 Nightly builds are prereleases, so `releases/latest` stays on the stable
 version. `fun.dll` is a separate licensed product and is not part of these
 archives.

@@ -104,6 +104,8 @@ curl -fsSL https://raw.githubusercontent.com/funlang/fun/main/install.sh | sh
 每个 release 另附 `capabilities.json` 与 `SHA256SUMS`，缺失的可选能力会明确
 列出。nightly 是 prerelease，`releases/latest` 仍指向稳定版。`fun.dll` 是
 单独授权的产品，不包含在这些产物中。
+Linux 产物在 Ubuntu 24.04 上构建，需要 glibc 2.34 或更新版本；启用
+getapi/FFI 时还需要运行时的 `libffi.so.8`。
 
 运行脚本：
 
