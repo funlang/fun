@@ -86,7 +86,9 @@ Prebuilt interpreters are attached to [GitHub Releases](https://github.com/funla
   use the bundled `install.sh` (curl does not set the quarantine attribute) or
   run `xattr -dr com.apple.quarantine <dir>` after extracting;
 - Windows x64: `.7z`. The build is unsigned, so SmartScreen may warn; extract
-  with 7-Zip and keep the bundled `.dll` files next to `fun.exe`.
+  with 7-Zip and keep the bundled `.dll` files next to `fun.exe`. The Windows
+  archive currently ships only `fun.exe`; `capabilities.json` reports
+  `safe: false` because the safe build is not yet produced on win64.
 
 macOS / Linux one-liner (verifies `SHA256SUMS`, installs under `~/.fun`):
 

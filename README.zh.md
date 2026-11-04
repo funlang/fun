@@ -86,7 +86,8 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
   （curl 下载不会设置隔离属性），或解压后执行
   `xattr -dr com.apple.quarantine <目录>`；
 - Windows x64：`.7z`。构建未签名，SmartScreen 可能提示；请用 7-Zip 解压，
-  并让随包的 `.dll` 与 `fun.exe` 保持同目录。
+  并让随包的 `.dll` 与 `fun.exe` 保持同目录。Windows 包目前只有 `fun.exe`，
+  `capabilities.json` 会标明 `safe: false`，因为 win64 的 safe 构建尚未产出。
 
 macOS / Linux 一行安装（校验 `SHA256SUMS`，安装到 `~/.fun`）：
 

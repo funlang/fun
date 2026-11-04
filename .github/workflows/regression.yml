@@ -472,7 +472,6 @@ jobs:
         with:
           path: |
             src\prj\fun\funcmd.exe
-            src\prj\fun\funcmd-safe.exe
             src\prj\fun\funcmd.flags.txt
           key: funcmd-v6-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
 
@@ -847,64 +846,6 @@ jobs:
           # This step runs in src\prj\fun, so keep the path relative to it.
           $built | Out-File -FilePath 'funcmd.flags.txt' -Encoding ascii
 
-      # Best effort until this combination is proven on win64. A failure leaves
-      # no funcmd-safe.exe, which capabilities.json reports as safe=false.
-      - name: Build funcmd-safe.exe (best effort)
-        if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
-        working-directory: src\prj\fun
-        shell: pwsh
-        continue-on-error: true
-        run: |
-          $safeLog = 'build-windows-x64-safe.log'
-          "safe build start" | Set-Content -FilePath $safeLog
-          try {
-            $label = ''
-            if (Test-Path 'funcmd.flags.txt') {
-              $label = (Get-Content 'funcmd.flags.txt' -Raw).Trim()
-            }
-            $caps = @($label -split '\s+' | Where-Object { $_ })
-            $base = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs',
-                      '-Twin64', '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx',
-                      '-dFunPack', "-Fu$((Resolve-Path '..\..\lib').Path)")
-            $safeUnits = Join-Path (Get-Location) 'units-safe'
-            New-Item -ItemType Directory -Force -Path $safeUnits | Out-Null
-            Remove-Item "$safeUnits\*.ppu", "$safeUnits\*.o", "$safeUnits\*.or" `
-              -Force -ErrorAction SilentlyContinue
-            $ok = $false
-            foreach ($sv in @(,$caps)) {
-              $safeArgv = $base + $sv + @('-dFunSafe', '-ofuncmd-safe.exe', "-FU$safeUnits")
-              "safe argv: $(($safeArgv | ForEach-Object { "[$_]" }) -join ' ')" |
-                Add-Content -FilePath $safeLog
-              & ppcrossx64 @safeArgv *>&1 | Tee-Object -FilePath $safeLog -Append
-              if ($LASTEXITCODE -eq 0) { $ok = $true; break }
-            }
-            if (-not $ok) { throw 'ppcrossx64 returned nonzero' }
-          } catch {
-            "EXCEPTION: $($_.Exception.Message)" | Add-Content -FilePath $safeLog
-            Remove-Item 'funcmd-safe.exe' -Force -ErrorAction SilentlyContinue
-            $tail = ((Get-Content $safeLog -Tail 25) -join '~')
-            Write-Host "::warning title=safe build skipped (windows-x64)::$($tail.Substring(0, [Math]::Min(2500, $tail.Length)))"
-            $global:LASTEXITCODE = 0
-          }
-          # gh marks an inline pwsh step failed if a caught native command left
-          # a nonzero LASTEXITCODE. This step is explicitly best effort.
-          exit 0
-
-      # The job log needs admin rights to download from the API. When the build
-      # step fails, publish the tails as annotations so the failure is visible
-      # to maintainers without opening the run in a browser.
-      - name: Windows build log tails
-        if: failure()
-        shell: pwsh
-        run: |
-          $logs = @()
-          $logs += Get-ChildItem $env:RUNNER_TEMP -Filter 'build-windows-x64*.log' -ErrorAction SilentlyContinue
-          $logs += Get-ChildItem 'src\prj\fun' -Filter 'build-windows-x64*.log' -ErrorAction SilentlyContinue
-          foreach ($f in $logs) {
-            $tail = (Get-Content $f.FullName -Tail 40) -join '~'
-            Write-Host "::error title=$($f.Name) tail::$($tail.Substring(0, [Math]::Min(3000, $tail.Length)))"
-          }
-
       - name: Capability probes
         shell: pwsh
         run: |
@@ -1037,15 +978,9 @@ jobs:
           if (-not $caps.ffi) { $missing += 'getapi/FFI unavailable' }
           if (-not $caps.tcc) { $missing += 'runtime C compile unavailable (no libtcc.dll)' }
           if (-not $caps.zlib_present) { $missing += 'zlib unavailable' }
+          if (-not $caps.safe) { $missing += 'safe build not provided on win-x64' }
           $caps.notes = ($missing -join '; ')
-          $safeNote = ''
-          $safeLog = 'src\prj\fun\build-windows-x64-safe.log'
-          if (-not $caps.safe -and (Test-Path $safeLog)) {
-            $safeNote = ' :: ' + (((Get-Content $safeLog -Tail 8) -join ' | ').Substring(0, [Math]::Min(900, ((Get-Content $safeLog -Tail 8) -join ' | ').Length)))
-          }
-          $files = (Get-ChildItem 'src\prj\fun' -Filter 'funcmd*' -ErrorAction SilentlyContinue |
-                    ForEach-Object { "$($_.Name):$($_.Length)" }) -join ','
-          Write-Host "::warning title=win stage::safe=$($caps.safe) log=$(Test-Path $safeLog) files=[$files] tcc=$($caps.tcc) regex=$($caps.regex) ffi=$($caps.ffi)$safeNote"
+          Write-Host "::warning title=win stage::safe=$($caps.safe) tcc=$($caps.tcc) regex=$($caps.regex) ffi=$($caps.ffi)"
           ($caps | ConvertTo-Json -Depth 5) |
             Out-File -FilePath "$stage\build-env.json" -Encoding utf8
           Get-ChildItem $stage | ForEach-Object { Write-Host "staged: $($_.Name)" }
