@@ -198,7 +198,7 @@ var gdep = base & 'git dep' & sep;   // the space also exercises clone/URL quoti
   "    version: '0.1.0'," & nl &
   "    bin: ''," & nl &
   "    lib: 'lib.fun'," & nl &
-  "    'fun': '9.4'," & nl &
+  "    'fun': '9.5.4'," & nl &
   '    dependencies: [],' & nl &
   '    resolved: []' & nl &
   '  ];' & nl &
@@ -221,7 +221,7 @@ var pdep = base & 'pathdep' & sep;
   "    version: '0.1.0'," & nl &
   "    bin: ''," & nl &
   "    lib: 'lib.fun'," & nl &
-  "    'fun': '9.4'," & nl &
+  "    'fun': '9.5.4'," & nl &
   '    dependencies: [],' & nl &
   '    resolved: []' & nl &
   '  ];' & nl &

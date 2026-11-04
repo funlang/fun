@@ -14,6 +14,8 @@
 # Usage: fun/test/lib-loadcheck.sh   (from the repo root)
 cd "$(dirname "$0")/../.." || exit 2
 ROOT="$(pwd)"
+FUNCMD="${FUNCMD:-src/prj/fun/funcmd}"
+[ -x "$FUNCMD" ] || FUNCMD="fun/fun"
 # Byte-order the module glob so the report is identical on every host: the
 # default collation differs between glibc and macOS (lib-ado vs lib-ado-schema,
 # lib-asm vs lib-asm-pro), which reorders the whole listing.
@@ -32,7 +34,7 @@ for f in fun/lib/*.fun; do
   if [ -f "fun/lib/${n}-unx.fun" ]; then t="fun/lib/${n}-unx.fun"; fi
   if [ -f "fun/lib/${n}-lnx.fun" ]; then t="fun/lib/${n}-lnx.fun"; fi
   printf "use '%s';\n?. 'loaded';\n" "$t" > fun/test/.loadcheck-one.fun
-  out=$(src/prj/fun/funcmd fun/test/.loadcheck-one.fun 2>&1 | tr -d '\r')
+  out=$("$FUNCMD" fun/test/.loadcheck-one.fun 2>&1 | tr -d '\r')
   if printf '%s' "$out" | grep -q '^loaded$'; then
     ok=$((ok+1)); printf 'LOAD  %s\n' "$n"
   else

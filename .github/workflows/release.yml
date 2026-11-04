@@ -1,0 +1,474 @@
+# ============================================================
+# release.yml -- trusted delivery for Fun.
+#
+# Two channels, one pipeline:
+#
+#   nightly  schedule 04:37 Asia/Shanghai, or manual dispatch. Publishes a
+#            prerelease only when code changed since the previous nightly and
+#            the exact commit passed regression. Dates come from the commit
+#            timestamp, never from the runner clock. Published as a
+#            lightweight tag and a GitHub prerelease.
+#
+#   stable   pushing an annotated v* tag, or manual dispatch. Publishes the
+#            tested commit at that tag as a normal release. The tag is created
+#            by a maintainer per RELEASING.md; this workflow never moves it.
+#
+# Artifacts are never rebuilt here. The regression workflow uploads one stage
+# per platform from a green run on main; this workflow downloads the stage that
+# matches the commit being released. That keeps the binary and the tests that
+# validated it from drifting apart, and keeps GITHUB_TOKEN-created tags from
+# needing a second workflow (assets are uploaded in the same job that creates
+# the release).
+#
+# secrets.HEARTBEAT_URL is optional. When set, a successful publish pings it,
+# and a failed run pings "<url>/fail". Scheduled workflows can be delayed or
+# dropped entirely by GitHub, and a dropped run produces no failure event, so
+# the heartbeat is the only reliable "it stopped running" signal.
+# ============================================================
+name: release
+
+on:
+  schedule:
+    # GitHub's busiest slots are on the hour. :37 also keeps a delayed run in
+    # the same Beijing night instead of racing the next day's.
+    - cron: '37 4 * * *'
+      timezone: 'Asia/Shanghai'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Release channel"
+        type: choice
+        options: [nightly, stable]
+        default: nightly
+      tag:
+        description: "Stable tag to publish (must already exist; empty = v<funRelease>)"
+        type: string
+        default: ""
+      force:
+        description: "Nightly: publish even if no code changed since the last nightly"
+        type: boolean
+        default: false
+      run_id:
+        description: "Optional regression run id to take artifacts from (advanced)"
+        type: string
+        default: ""
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  actions: read
+  id-token: write
+
+# Never let a delayed nightly be cancelled by the next day's run.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------- GATE ---
+  gate:
+    name: decide
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      should_release: ${{ steps.decide.outputs.should_release }}
+      reason: ${{ steps.decide.outputs.reason }}
+      channel: ${{ steps.decide.outputs.channel }}
+      tag: ${{ steps.decide.outputs.tag }}
+      version: ${{ steps.decide.outputs.version }}
+      sha: ${{ steps.decide.outputs.sha }}
+      date: ${{ steps.decide.outputs.date }}
+      run_id: ${{ steps.decide.outputs.run_id }}
+      previous_tag: ${{ steps.decide.outputs.previous_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Trace trigger (queued vs slow lane)
+        run: |
+          echo "event=${{ github.event_name }} schedule=${{ github.event.schedule }}"
+          date -u +"UTC %Y-%m-%dT%H:%M:%SZ"
+          TZ='Asia/Shanghai' date +"BJ  %Y-%m-%d %H:%M:%S %Z"
+          git fetch --tags --force
+
+      - name: Decide channel, tag and change set
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_CHANNEL: ${{ inputs.channel }}
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_FORCE: ${{ inputs.force }}
+          INPUT_RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+          out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
+
+          # --- channel ----------------------------------------------------
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            CHANNEL=stable
+            TAG="$GITHUB_REF_NAME"
+          elif [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+            CHANNEL=nightly
+            TAG=""
+          else
+            CHANNEL="${INPUT_CHANNEL:-nightly}"
+            TAG="${INPUT_TAG:-}"
+          fi
+          FORCE="${INPUT_FORCE:-false}"
+          out channel "$CHANNEL"
+
+          SHA=$(git rev-parse HEAD)
+          out sha "$SHA"
+
+          VERSION=$(sed -n "s/.*funRelease = '\([0-9][0-9.]*\)'.*/\1/p" src/core/version.inc | head -1)
+          [ -n "$VERSION" ] || { echo "::error::cannot read funRelease from src/core/version.inc"; exit 1; }
+
+          # A dated nightly must use the commit date, not the runner clock: a
+          # delayed schedule can cross midnight, and the tag should describe
+          # the code, not the queue.
+          COMMIT_TS=$(git log -1 --format=%ct "$SHA")
+          COMMIT_YMD=$(TZ='Asia/Shanghai' date -d "@$COMMIT_TS" +%Y%m%d)
+          out date "$COMMIT_YMD"
+
+          latest_stable=$(gh release list --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
+          next_patch=$(python3 - "$VERSION" "$latest_stable" <<'PY'
+          import sys
+          def bump(v):
+              p = [int(x) for x in v.split('.')]
+              while len(p) < 3:
+                  p.append(0)
+              p[2] += 1
+              return '.'.join(str(x) for x in p[:3])
+          def key(v):
+              p = [int(x) for x in v.split('.')]
+              while len(p) < 3:
+                  p.append(0)
+              return tuple(p[:3])
+          version = sys.argv[1].lstrip('v')
+          stable = (sys.argv[2] if len(sys.argv) > 2 else '').lstrip('v')
+          if stable and key(version) > key(stable):
+              # main is already preparing the next release (version.inc was
+              # bumped before the tag): use it as the prerelease base, so
+              # 9.6.0-nightly sorts below the upcoming 9.6.0.
+              print(version)
+          elif stable:
+              print(bump(stable))
+          else:
+              print(bump(version))
+          PY
+          )
+
+          # --- stable -----------------------------------------------------
+          if [ "$CHANNEL" = stable ]; then
+            # Nightly tags are lightweight and must never enter this channel.
+            case "$TAG" in
+              *-nightly.*)
+                out should_release false
+                out reason "tag $TAG is a nightly prerelease; push a stable vX.Y.Z tag"
+                echo "::notice::skipping nightly tag $TAG"
+                exit 0 ;;
+            esac
+            if [ -z "$TAG" ]; then TAG="v$VERSION"; fi
+            out tag "$TAG"
+
+            if ! git rev-parse -q --verify "refs/tags/$TAG^{commit}" >/dev/null; then
+              echo "::error::stable tag $TAG does not exist. Run per RELEASING.md, then dispatch with that tag."
+              exit 1
+            fi
+            TAG_SHA=$(git rev-parse "refs/tags/$TAG^{commit}")
+            if [ "$TAG" != "v$VERSION" ]; then
+              echo "::error::tag $TAG does not match funRelease $VERSION in src/core/version.inc; refusing to publish."
+              exit 1
+            fi
+            # Publish the tag's commit, even when the dispatch runs from a
+            # newer main. Checkout in the packaging job uses this SHA.
+            SHA="$TAG_SHA"
+            out sha "$SHA"
+            out version "$VERSION"
+            out previous_tag "$(git describe --tags --abbrev=0 "$SHA^" 2>/dev/null || true)"
+
+            sh src/prj/fun/check-roadmap.sh
+
+          # --- nightly ----------------------------------------------------
+          else
+            TAG="v${next_patch}-nightly.${COMMIT_YMD}"
+            out version "$next_patch"
+
+            # Waterline: the previous nightly if there is one, else the last
+            # stable release. "Changes in the last 24h" would silently create
+            # gaps whenever GitHub dropped or delayed a run.
+            PREV=$(gh release list --limit 100 --json tagName,isPrerelease \
+                     --jq '[.[] | select(.isPrerelease) | .tagName] | first // empty')
+            if [ -z "$PREV" ]; then
+              PREV=$(gh release list --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
+            fi
+            if [ -z "$PREV" ] || ! git rev-parse -q --verify "$PREV^{commit}" >/dev/null; then
+              PREV=$(git rev-list --max-parents=0 HEAD | tail -1)
+            fi
+
+            # Code paths only. README, docs and workflow edits do not warrant a
+            # binary release; a day with no commits at all certainly does not.
+            CHANGED=$(git rev-list --count "$PREV..$SHA" -- \
+                        src fun/lib fun/test fun/demos fun/demo 2>/dev/null || echo 0)
+            out previous_tag "$PREV"
+            echo "changed code commits since $PREV: $CHANGED"
+
+            if [ "$CHANGED" -eq 0 ] && [ "$FORCE" != "true" ]; then
+              out should_release false
+              out reason "no code changes since $PREV (tag $TAG not created)"
+              echo "::notice::no code changes since $PREV; not creating $TAG"
+              exit 0
+            fi
+
+            # Idempotency: reuse the tag when it already points at this commit,
+            # otherwise add a numeric suffix. Never move an existing tag.
+            candidate="$TAG"
+            n=1
+            while git rev-parse -q --verify "refs/tags/$candidate^{commit}" >/dev/null; do
+              existing=$(git rev-parse "refs/tags/$candidate^{commit}")
+              if [ "$existing" = "$SHA" ]; then
+                echo "::notice::reusing existing tag $candidate at $SHA"
+                TAG="$candidate"
+                break
+              fi
+              n=$((n + 1))
+              candidate="v${next_patch}-nightly.${COMMIT_YMD}.${n}"
+            done
+            TAG="$candidate"
+            out tag "$TAG"
+          fi
+
+          # --- which successful regression run owns the artifacts ---------
+          if [ -n "${INPUT_RUN_ID:-}" ]; then
+            RUN_ID="$INPUT_RUN_ID"
+            run_sha=$(gh run view "$RUN_ID" --json headSha --jq '.headSha // empty')
+            if [ "$run_sha" != "$SHA" ]; then
+              echo "::error::regression run $RUN_ID is for $run_sha, expected $SHA"
+              exit 1
+            fi
+          else
+            # Query by commit, not by scanning the recent list: a stable tag
+            # may point at a commit that fell out of the last 100 runs.
+            RUN_ID=$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/regression.yml/runs?head_sha=$SHA&status=success&event=push&per_page=10" \
+              --jq '[.workflow_runs[] | select(.head_branch == "main")][0].id // empty')
+          fi
+          if [ -z "$RUN_ID" ]; then
+            if [ "$CHANNEL" = stable ]; then
+              echo "::error::no successful main-branch regression run for $SHA; refusing to publish a stable release"
+              exit 1
+            fi
+            out should_release false
+            out reason "no successful main-branch regression run for $SHA; nothing to publish"
+            echo "::warning::no successful regression run for $SHA; not publishing"
+            exit 0
+          fi
+          out run_id "$RUN_ID"
+
+          out should_release true
+          out reason "publishing $TAG from commit $SHA (regression run $RUN_ID)"
+          echo "::notice::publishing $TAG from $SHA (regression run $RUN_ID)"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Release decision"
+            echo ""
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| channel | ${{ steps.decide.outputs.channel }} |"
+            echo "| release | ${{ steps.decide.outputs.should_release }} |"
+            echo "| tag | ${{ steps.decide.outputs.tag }} |"
+            echo "| version | ${{ steps.decide.outputs.version }} |"
+            echo "| commit | \`${{ steps.decide.outputs.sha }}\` |"
+            echo "| date (commit, Asia/Shanghai) | ${{ steps.decide.outputs.date }} |"
+            echo "| regression run | ${{ steps.decide.outputs.run_id }} |"
+            echo "| previous | ${{ steps.decide.outputs.previous_tag }} |"
+            echo "| reason | ${{ steps.decide.outputs.reason }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------- PACKAGE ---
+  package:
+    name: package
+    needs: gate
+    if: needs.gate.outputs.should_release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download the tested build stages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ needs.gate.outputs.run_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          for p in linux-x64 linux-arm64 macos-x64 macos-arm64 win-x64; do
+            gh run download "$RUN_ID" -n "fun-stage-$p" -D "raw/$p"
+            echo "downloaded $p"
+          done
+
+      - name: Build release assets
+        env:
+          TAG: ${{ needs.gate.outputs.tag }}
+          VERSION: ${{ needs.gate.outputs.version }}
+          SHA: ${{ needs.gate.outputs.sha }}
+          DATE: ${{ needs.gate.outputs.date }}
+          CHANNEL: ${{ needs.gate.outputs.channel }}
+          PREV: ${{ needs.gate.outputs.previous_tag }}
+        run: |
+          set -euo pipefail
+          if ! command -v 7z >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq p7zip-full
+          fi
+          EPOCH=$(git show -s --format=%ct "$SHA")
+          python3 src/prj/fun/release/package.py \
+            --raw raw --out dist \
+            --tag "$TAG" --version "$VERSION" --commit "$SHA" --date "$DATE" \
+            --channel "$CHANNEL" --previous-tag "$PREV" \
+            --source-epoch "$EPOCH" --repo-root .
+          ls -lh dist
+          ( cd dist && sha256sum -c SHA256SUMS )
+
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dist
+          path: dist/
+          retention-days: 7
+          if-no-files-found: error
+
+  # ------------------------------------------------------------- PUBLISH ---
+  publish:
+    name: publish
+    needs: [gate, package]
+    if: needs.gate.outputs.should_release == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+          path: dist
+
+      - name: Verify checksums
+        run: ( cd dist && sha256sum -c SHA256SUMS )
+
+      - name: Sign SHA256SUMS (keyless, optional)
+        id: sign
+        continue-on-error: true
+        env:
+          TAG: ${{ needs.gate.outputs.tag }}
+        run: |
+          set -euo pipefail
+          curl -sSfL https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 \
+            -o "$RUNNER_TEMP/cosign"
+          chmod +x "$RUNNER_TEMP/cosign"
+          "$RUNNER_TEMP/cosign" sign-blob --yes \
+            --output-signature dist/SHA256SUMS.sig \
+            --output-certificate dist/SHA256SUMS.pem \
+            dist/SHA256SUMS
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.gate.outputs.tag }}
+          VERSION: ${{ needs.gate.outputs.version }}
+          SHA: ${{ needs.gate.outputs.sha }}
+          CHANNEL: ${{ needs.gate.outputs.channel }}
+        run: |
+          set -euo pipefail
+          args=(--title "Fun $TAG" --notes-file dist/RELEASE_NOTES.md)
+          if [ "$CHANNEL" = nightly ]; then
+            args+=(--prerelease)
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::release $TAG exists; uploading assets with --clobber"
+            gh release upload "$TAG" dist/* --clobber
+            if [ "$CHANNEL" = stable ]; then
+              # A stable release must never be left as a prerelease by a retry.
+              gh release edit "$TAG" --prerelease=false --title "Fun $TAG" \
+                --notes-file dist/RELEASE_NOTES.md
+            fi
+          else
+            if [ "$CHANNEL" = nightly ]; then
+              # Nightly tags are lightweight and only ever created here, on the
+              # exact commit whose artifacts were tested.
+              gh release create "$TAG" --target "$SHA" "${args[@]}" dist/*
+            else
+              # The stable tag already exists (validated by the gate); do not
+              # ask gh to create or move it.
+              gh release create "$TAG" "${args[@]}" dist/*
+            fi
+          fi
+
+      - name: Clean up old nightlies (keep 14)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release list --limit 100 --json tagName,isPrerelease,publishedAt \
+            --jq '[.[] | select(.isPrerelease) | .tagName] | .[14:][]' |
+            while read -r t; do
+              case "$t" in
+                *-nightly.*)
+                  echo "deleting old nightly $t"
+                  gh release delete "$t" -y --cleanup-tag || true ;;
+              esac
+            done
+
+      - name: Summary
+        run: |
+          {
+            echo "## Published ${{ needs.gate.outputs.tag }}"
+            echo ""
+            cat dist/capabilities.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # A heartbeat must also fire on a correctly skipped night (no code changes),
+  # otherwise "pipeline healthy" and "nothing to ship" look identical to a
+  # monitor. It runs only when nothing failed.
+  heartbeat-ok:
+    name: heartbeat ok
+    needs: [gate, package, publish]
+    if: always() && !failure() && !cancelled()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Heartbeat (success)
+        env:
+          HEARTBEAT_URL: ${{ secrets.HEARTBEAT_URL }}
+        run: |
+          if [ -n "$HEARTBEAT_URL" ]; then
+            curl -fsS -m 10 "$HEARTBEAT_URL" >/dev/null || true
+          fi
+
+  notify-failure:
+    name: heartbeat failure
+    needs: [gate, package, publish]
+    if: always() && (needs.gate.result == 'failure' || needs.package.result == 'failure' || needs.publish.result == 'failure')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Heartbeat (failure)
+        env:
+          HEARTBEAT_URL: ${{ secrets.HEARTBEAT_URL }}
+        run: |
+          if [ -n "$HEARTBEAT_URL" ]; then
+            curl -fsS -m 10 "${HEARTBEAT_URL%/}/fail" >/dev/null || true
+          fi

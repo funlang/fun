@@ -13,7 +13,8 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT" || exit 2
-FUNCMD="$ROOT/src/prj/fun/funcmd"
+FUNCMD="${FUNCMD:-$ROOT/src/prj/fun/funcmd}"
+[ -x "$FUNCMD" ] || FUNCMD="$ROOT/fun/fun"
 # GNU `timeout` is not part of a stock macOS userland; use it when present so a
 # hung benchmark cannot wedge CI, and fall back to a plain run otherwise.
 if command -v timeout >/dev/null 2>&1; then

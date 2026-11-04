@@ -27,6 +27,11 @@ THIRD="$(cd "$HERE/../../.." && pwd)/src/3rd"
 
 PCRE_URL="https://downloads.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz"
 TCC_URL="https://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27.tar.bz2"
+# Pinned SHA256 of the upstream release archives. A mirror that serves a
+# different file (or a truncated/HTML error page) must not become a build
+# input: the release pipeline ships interned binaries, not just source.
+PCRE_SHA256="4e6ce03e0336e8b4a3d6c2b70b1c5e18590a5673a98186da90d4f33c23defc09"
+TCC_SHA256="de23af78fca90ce32dff2dd45b3432b2334740bb9bb7b05bf60fdbfc396ceb9c"
 
 force=0
 want_pcre=1
@@ -54,9 +59,29 @@ fetch() {
     fi
 }
 
-# install_dir <target-name> <url> <archive-name>
+# check_sha256 <file> <expected> <label>
+check_sha256() {
+    file="$1"; expected="$2"; label="$3"
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$file" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$file" | awk '{print $1}')
+    else
+        echo "warning: no sha256sum/shasum; cannot verify $label" >&2
+        return 0
+    fi
+    if [ "$actual" != "$expected" ]; then
+        echo "error: SHA256 mismatch for $label" >&2
+        echo "  expected $expected" >&2
+        echo "  actual   $actual" >&2
+        return 1
+    fi
+    echo "sha256  $label ok"
+}
+
+# install_dir <target-name> <url> <archive-name> <sha256>
 install_dir() {
-    target="$1"; url="$2"; archive="$3"
+    target="$1"; url="$2"; archive="$3"; sha256="$4"
     dest="$THIRD/$target"
     if [ -d "$dest" ] && [ "$force" -ne 1 ]; then
         echo "kept    src/3rd/$target (already present; use --force to re-fetch)"
@@ -66,6 +91,7 @@ install_dir() {
     trap 'rm -rf "$tmp"' EXIT INT TERM
     echo "fetch   $url"
     fetch "$url" "$tmp/$archive"
+    check_sha256 "$tmp/$archive" "$sha256" "$archive" || { rm -rf "$tmp"; exit 1; }
     echo "extract $archive"
     tar -xf "$tmp/$archive" -C "$tmp"
     # the tarball unpacks into a single top-level dir; use it as the target
@@ -82,10 +108,10 @@ install_dir() {
 mkdir -p "$THIRD"
 
 if [ "$want_pcre" -eq 1 ]; then
-    install_dir pcre-8 "$PCRE_URL" pcre-8.45.tar.gz
+    install_dir pcre-8 "$PCRE_URL" pcre-8.45.tar.gz "$PCRE_SHA256"
 fi
 if [ "$want_tcc" -eq 1 ]; then
-    install_dir tcc "$TCC_URL" tcc-0.9.27.tar.bz2
+    install_dir tcc "$TCC_URL" tcc-0.9.27.tar.bz2 "$TCC_SHA256"
 fi
 
 echo "third-party sources ready under src/3rd/"

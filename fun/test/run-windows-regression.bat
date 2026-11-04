@@ -88,6 +88,9 @@ set "FUNCMD=src\prj\fun\funcmd.exe"
 if exist "%FUNCMD%" goto findcmd
 set "FUNCMD=src\prj\fun\fun.exe"
 if exist "%FUNCMD%" goto findcmd
+rem A release archive ships fun\fun.exe instead of a build tree.
+set "FUNCMD=fun\fun.exe"
+if exist "%FUNCMD%" goto findcmd
 set "FUNCMD=bin\funcmd.exe"
 if exist "%FUNCMD%" goto findcmd
 set "FUNCMD=funcmd.exe"

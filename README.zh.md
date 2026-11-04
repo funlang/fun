@@ -4,13 +4,13 @@
 
 **English**: [README.md](README.md) · **简体中文**（本文件）
 
-- 版本：**9.5**
+- 版本：**9.5.4**
 - 官网：<https://funlang.org>
 - 作者：张卫东 &lt;zwd@funlang.org>
 - 授权：MIT（另有商业授权条款，见下文「许可证」）
 - 状态与路线图：[ROADMAP.md](ROADMAP.md)
 
-> **版本 9.5**：这不是玩具或原型——一门经历了超过 15 年（2010 至今）持续演化与生产级验证的成熟语言，其前身可追溯至 Nuva（2006）与 TemplateScript（2005）。
+> **版本 9.5.4**：这不是玩具或原型——一门经历了超过 15 年（2010 至今）持续演化与生产级验证的成熟语言，其前身可追溯至 Nuva（2006）与 TemplateScript（2005）。
 
 ---
 
@@ -77,6 +77,32 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 
 ## 快速开始
 
+### 预编译二进制
+
+预编译解释器见 [GitHub Releases](https://github.com/funlang/fun/releases)：
+
+- Linux x64 / arm64：`.tar.gz`，内含 `libtcc.so` 与标准库 `lib/`；
+- macOS x64 / arm64：`.zip`。构建**未签名、未公证**；请使用包内 `install.sh`
+  （curl 下载不会设置隔离属性），或解压后执行
+  `xattr -dr com.apple.quarantine <目录>`；
+- Windows x64：`.7z`。构建未签名，SmartScreen 可能提示；请用 7-Zip 解压，
+  并让随包的 `.dll` 与 `fun.exe` 保持同目录。
+
+macOS / Linux 一行安装（校验 `SHA256SUMS`，安装到 `~/.fun`）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/funlang/fun/main/install.sh | sh
+```
+
+每个压缩包内是一个 `fun/` 运行时目录：`fun/fun`（Windows 为 `fun/fun.exe`）
+与 `fun/fun-safe`（能力受限构建），以及 `lib/`、`demo/`、`demos/` 和
+`test/` 回归套件。运行 `./fun/fun --help`；Linux/macOS 可用
+`./fun/test/run-linux-regression.sh` 跑自带测试，Windows 用
+`fun\test\run-windows-regression.bat --portable`。
+每个 release 另附 `capabilities.json` 与 `SHA256SUMS`，缺失的可选能力会明确
+列出。nightly 是 prerelease，`releases/latest` 仍指向稳定版。`fun.dll` 是
+单独授权的产品，不包含在这些产物中。
+
 运行脚本：
 
 ```text
@@ -135,7 +161,7 @@ fun package()
     version: '0.1.0',
     bin: 'src/main.fun',
     lib: '',
-    'fun': '9.4',
+    'fun': '9.5.4',
     dependencies: [
       'hello': [source: 'github.com/acme/hello', version: 'v1.0.0'],
       'local': [source: '../libs/local']

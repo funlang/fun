@@ -51,6 +51,54 @@ git push origin vX.Y.Z
 - Leave the description empty (or paste the same summary) so the tag annotation is what readers see.
 - Open the release page and confirm the notes render.
 
+Pushing the tag also starts `.github/workflows/release.yml`. It verifies that
+the tag matches `funRelease` in `src/core/version.inc`, finds the successful
+regression run for that commit on `main`, downloads the build stages that run
+uploaded, and attaches the archives, `SHA256SUMS`, `capabilities.json` and
+`SBOM.cdx.json`. The tag annotation is used as the head of the release notes.
+If the tag was pushed before the commit had a green main-branch run, the job
+fails instead of publishing untested binaries.
+
+## 4. Nightly prereleases (automatic)
+
+`.github/workflows/release.yml` also runs every night at 04:37
+Asia/Shanghai. It is a delivery channel, not a release event:
+
+- A nightly is published only when code changed (`src/`, `fun/lib`,
+  `fun/test`, `fun/demos`, `fun/demo`) since the previous nightly. Docs and
+  CI-only changes do not produce one, and a day with no commits produces
+  nothing at all.
+- The date comes from the HEAD commit timestamp in Asia/Shanghai, not from
+  the runner clock, so a delayed run does not produce tomorrow's date.
+- The version is the next patch after the newest stable version, e.g.
+  `v9.5.5-nightly.20261104`. In SemVer this sorts below `v9.5.5`. Nightly
+  runs never modify `version.inc`, README, ROADMAP or CHANGELOG and never
+  create a commit.
+- The tag is created on the existing HEAD with `gh release create --target`.
+  If a run is repeated for the same commit it reuses that tag; if a second
+  commit lands the same day it uses `.2`, `.3`, and so on.
+- Every nightly is a GitHub **prerelease**, so `releases/latest` keeps
+  pointing at the stable release. Only the newest 14 nightlies are kept.
+
+Manual runs: Actions -> **release** -> Run workflow. Choose `nightly` and tick
+`force` to publish the current commit even when it has no new code changes.
+This is also how to test the pipeline. Choose `stable` with a tag to re-upload
+assets for an existing stable tag.
+
+Each artifact carries `capabilities.json` describing regex, getapi/FFI,
+runtime C compilation and the safe build. Missing optional dependencies are
+reported there and in the release notes; they are never silently presented as
+a full build.
+
+### Monitoring
+
+Scheduled workflows can be delayed for hours or dropped without a failure
+event. Set the repository secret `HEARTBEAT_URL` to a monitor URL (for
+example a healthchecks.io ping URL). A successful run, including a correctly
+skipped night, pings it; a failed run pings `<url>/fail`. An external monitor
+should alert after roughly one missed interval. Without that secret there is
+no out-of-band signal that the schedule stopped running.
+
 ## Repairing a published tag
 
 If a tag was published without a summary:

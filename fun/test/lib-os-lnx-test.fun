@@ -12,7 +12,8 @@ use 'fun/lib/lib-os-lnx.fun';
 ?. tryExecWait('sh', '-c "exit 3"', '', 0, false, 0, nil) = 3;
 
 ?. GetPId() > 0;
-?. GetProcName(GetPId(), nil).substr(-6) = 'funcmd';
+var procName = GetProcName(GetPId(), nil);
+?. procName.substr(-6) = 'funcmd' or procName.substr(-3) = 'fun';
 
 ?. tryFind('funcmd', 'src/prj/fun').length() > 0;
 ?. tryFind('base', 'src/prj/fun') = 'base';

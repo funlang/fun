@@ -51,6 +51,46 @@ git push origin vX.Y.Z
 - 描述留空（或粘贴同样的摘要），让页面显示 tag 注解。
 - 打开发布页确认说明正常显示。
 
+推送 tag 也会启动 `.github/workflows/release.yml`：校验 tag 与
+`src/core/version.inc` 中的 `funRelease` 一致，找到该 commit 在 `main` 上
+成功的 regression 运行，下载那次运行上传的各平台产物，并附加压缩包、
+`SHA256SUMS`、`capabilities.json` 与 `SBOM.cdx.json`。tag 注解会作为发布说明
+的开头。如果该 commit 还没有成功的 main 分支回归，任务会失败，而不是发布
+未经测试的二进制。
+
+## 4. 夜间预发布（自动）
+
+`.github/workflows/release.yml` 每晚北京时间 04:37 运行。它是交付通道，不是
+发版事件：
+
+- 只有自上一个 nightly 以来 `src/`、`fun/lib`、`fun/test`、`fun/demos`、
+  `fun/demo` 发生代码变更时才发布。纯文档/CI 改动不发；当天没有任何提交也
+  不发。
+- 日期取自 HEAD commit 时间戳的北京时间，不取 runner 墙钟，延迟跨午夜也不会
+  错一天。
+- 版本是当前最新稳定版的下一个 patch，例如
+  `v9.5.5-nightly.20261104`。按 SemVer 它低于 `v9.5.5`。nightly 不修改
+  `version.inc`、README、ROADMAP、CHANGELOG，也不产生任何提交。
+- tag 用 `gh release create --target` 打在现有 HEAD 上。同一 commit 重跑会复用
+  该 tag；同一天又有新提交则依次使用 `.2`、`.3`。
+- nightly 一律是 GitHub **prerelease**，`releases/latest` 继续指向稳定版。
+  仅保留最近 14 个 nightly。
+
+手动运行：Actions -> **release** -> Run workflow。选择 `nightly` 并勾选
+`force` 可以在没有新代码变更时发布当前 commit，也用于验证流水线。选择
+`stable` 并填写 tag 可为已有稳定版补传资产。
+
+每个产物都带 `capabilities.json`，记录 regex、getapi/FFI、运行时 C 编译与
+safe 构建能力。缺失的可选依赖会明确写进清单和发布说明，不会把降级构建
+标成完整版。
+
+### 监控
+
+schedule 可能延迟数小时，甚至被平台直接丢弃且不产生失败事件。设置仓库
+secret `HEARTBEAT_URL`（例如 healthchecks.io 的 ping URL）：成功运行（包括
+正确地跳过发布）会 ping 它，失败运行会 ping `<url>/fail`。外部监控应在约
+一个周期没有信号时报警。未配置该 secret 时，调度停止不会留下带外信号。
+
 ## 修补已发布的 tag
 
 如果某个 tag 已经推上去但没有摘要：

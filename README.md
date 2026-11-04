@@ -4,13 +4,13 @@
 
 **English** (this file) · [简体中文](README.zh.md)
 
-- Version: **9.5**
+- Version: **9.5.4**
 - Website: <https://funlang.org>
 - Author: Zhang Weidong &lt;zwd@funlang.org>
 - License: MIT, plus commercial terms (see [License](#license))
 - Status and roadmap: [ROADMAP.md](ROADMAP.md)
 
-> **Version 9.5**: this is not a toy or a prototype — a mature language refined and production-validated for over 15 years (2010–present), with a lineage that reaches back through Nuva (2006) and TemplateScript (2005).
+> **Version 9.5.4**: this is not a toy or a prototype — a mature language refined and production-validated for over 15 years (2010–present), with a lineage that reaches back through Nuva (2006) and TemplateScript (2005).
 
 ---
 
@@ -77,6 +77,35 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 
 ## Quick start
 
+### Prebuilt binaries
+
+Prebuilt interpreters are attached to [GitHub Releases](https://github.com/funlang/fun/releases):
+
+- Linux x64 / arm64: `.tar.gz`, with `libtcc.so` and the standard `lib/`;
+- macOS x64 / arm64: `.zip`. These builds are **unsigned and not notarized**;
+  use the bundled `install.sh` (curl does not set the quarantine attribute) or
+  run `xattr -dr com.apple.quarantine <dir>` after extracting;
+- Windows x64: `.7z`. The build is unsigned, so SmartScreen may warn; extract
+  with 7-Zip and keep the bundled `.dll` files next to `fun.exe`.
+
+macOS / Linux one-liner (verifies `SHA256SUMS`, installs under `~/.fun`):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/funlang/fun/main/install.sh | sh
+```
+
+Each archive contains a `fun/` runtime tree: `fun/fun` (`fun/fun.exe` on
+Windows) and `fun/fun-safe` (the capability-restricted build), plus `lib/`,
+`demo/`, `demos/` and the regression suite in `test/`. Run
+`./fun/fun --help`, or run the shipped suite with
+`./fun/test/run-linux-regression.sh` on Linux/macOS and
+`fun\test\run-windows-regression.bat --portable` on Windows.
+Every release also carries `capabilities.json` and `SHA256SUMS`; optional
+features that were unavailable are listed there.
+Nightly builds are prereleases, so `releases/latest` stays on the stable
+version. `fun.dll` is a separate licensed product and is not part of these
+archives.
+
 Run a script:
 
 ```text
@@ -136,7 +165,7 @@ fun package()
     version: '0.1.0',
     bin: 'src/main.fun',
     lib: '',
-    'fun': '9.4',
+    'fun': '9.5.4',
     dependencies: [
       'hello': [source: 'github.com/acme/hello', version: 'v1.0.0'],
       'local': [source: '../libs/local']

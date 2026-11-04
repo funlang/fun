@@ -3,6 +3,7 @@
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FUNCMD="$ROOT/fun/funcmd"
 [ -x "$FUNCMD" ] || FUNCMD="$ROOT/src/prj/fun/funcmd"
+[ -x "$FUNCMD" ] || FUNCMD="$ROOT/fun/fun"
 [ -x "$FUNCMD" ] || { echo "funcmd not built"; exit 2; }
 
 TMP="$(mktemp "${TMPDIR:-/tmp}/fun-io-stdio.XXXXXX")"

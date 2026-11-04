@@ -28,6 +28,8 @@ if [ ! -x "$FUNCMD" ]; then
     # The build script also copies it next to the runtime libs.
     if [ -x "$ROOT/fun/funcmd-safe" ]; then
         FUNCMD="$ROOT/fun/funcmd-safe"
+    elif [ -x "$ROOT/fun/fun-safe" ]; then
+        FUNCMD="$ROOT/fun/fun-safe"
     else
         echo "funcmd-safe not found at $FUNCMD" >&2
         echo "Build it first: cd src/prj/fun && SAFE=1 ./make-linux-x86_64.sh" >&2

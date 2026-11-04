@@ -8,7 +8,8 @@
 cd "$(dirname "$0")/../.." || exit 2
 PORT=18731
 MARKER=fun/test/.ajax-lnx-ready
-FUNCMD=src/prj/fun/funcmd
+FUNCMD="${FUNCMD:-src/prj/fun/funcmd}"
+[ -x "$FUNCMD" ] || FUNCMD="fun/fun"
 
 if ! command -v python3 >/dev/null 2>&1; then
     echo "run-ajax-lnx.sh: python3 not found (needed for the HTTP fixture)" >&2

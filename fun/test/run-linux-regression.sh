@@ -72,6 +72,10 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 FUNCMD="${FUNCMD:-$ROOT/src/prj/fun/funcmd}"
+# A release archive ships fun/fun instead of a build tree.
+if [ ! -x "$FUNCMD" ] && [ -x "$ROOT/fun/fun" ]; then
+    FUNCMD="$ROOT/fun/fun"
+fi
 EXPECTED="$HERE/expected"
 
 # --- host platform ---------------------------------------------------------

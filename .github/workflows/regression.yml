@@ -19,10 +19,10 @@
 # and art/notes/macos-port.md.
 #
 # Manual run: Actions -> regression -> Run workflow. Tick "safe_only" to run
-# just the linux-safe job (strict + readonly). Push and pull_request runs the
-# full suite without linux-safe; leave safe_only off for the same full suite.
+# just the linux-safe job (strict + readonly). Push, pull_request and a normal
+# manual run execute every job, including linux-safe.
 #
-# Status: all five jobs are a gate. The win64 build gets regex from the
+# Status: all six jobs are a gate. The win64 build gets regex from the
 # pcre3.dll that the job compiles with MinGW-w64 gcc (best effort), and
 # run-windows-regression.bat still probes for the engine so a regex-less build
 # skips the regex-dependent tests instead of failing. The remaining
@@ -112,8 +112,11 @@ jobs:
         id: cache-funcmd
         uses: actions/cache@v4
         with:
-          path: src/prj/fun/funcmd
-          key: funcmd-${{ matrix.name }}-fpc-3.2.2-${{ steps.src-hash.outputs.value }}
+          path: |
+            src/prj/fun/funcmd
+            src/prj/fun/funcmd-safe
+          # v2 also caches funcmd-safe (see the build step).
+          key: funcmd-v2-${{ matrix.name }}-fpc-3.2.2-${{ steps.src-hash.outputs.value }}
 
       # libtcc.so is dlopen'd next to funcmd by lib-tcc.fun; it is a separate
       # artifact on Linux only.
@@ -292,12 +295,26 @@ jobs:
           fi
           tail -n 5 "$log"
 
+          # The capability-restricted build ships with every nightly, so it is
+          # built here rather than in a separate manual-only job. SAFE=strict
+          # is the default safe level; the focused safe regression still runs
+          # as its own job below.
+          safe_log="$RUNNER_TEMP/build-${{ matrix.name }}-safe.log"
+          if ! SAFE=strict ${{ matrix.build }} >"$safe_log" 2>&1; then
+            tail -n 40 "$safe_log"
+            err="$(grep -B8 -m1 -E 'Fatal: There were|Fatal: Compilation|Error:' "$safe_log" | tr '\n' '|' | cut -c1-900)"
+            echo "::error title=safe build (${{ matrix.name }})::$err"
+            exit 1
+          fi
+          grep -E 'SAFE=strict' "$safe_log" || true
+
       # The build itself copies these into fun/; a cache hit has to do it too,
       # because input-console.sh prefers fun/funcmd when it exists.
       - name: Publish cached funcmd to fun/
         if: steps.cache-funcmd.outputs.cache-hit == 'true'
         run: |
           cp -f src/prj/fun/funcmd fun/funcmd
+          cp -f src/prj/fun/funcmd-safe fun/funcmd-safe
           if [ -f src/prj/fun/libtcc.so ]; then
             cp -f src/prj/fun/libtcc.so fun/libtcc.so
           fi
@@ -307,15 +324,41 @@ jobs:
           FUNREG_PLATFORM: ${{ matrix.platform }}
         run: fun/test/run-linux-regression.sh
 
+      # Release artifacts are built only from a green run on main. The release
+      # workflow downloads these stages from the successful regression run that
+      # matches the commit it is about to tag; it never rebuilds.
+      - name: Stage release build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p dist-stage
+          cp -f src/prj/fun/funcmd dist-stage/
+          cp -f src/prj/fun/funcmd-safe dist-stage/
+          if [ -f src/prj/fun/libtcc.so ]; then
+            cp -f src/prj/fun/libtcc.so dist-stage/
+          fi
+          # Probe the binaries that will actually be shipped (the build copies
+          # them into fun/, where the bundled lib/ is visible to lib-tcc.fun).
+          src/prj/fun/release/probe.sh \
+            "${{ matrix.name }}" dist-stage/build-env.json \
+            fun/funcmd fun/funcmd-safe fun/libtcc.so
+
+      - name: Upload release stage
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fun-stage-${{ matrix.name }}
+          path: dist-stage/
+          retention-days: 90
+          if-no-files-found: error
+
   # ----------------------------------------------------------------- SAFE ---
   # The safe build is a separate binary (-dFunSafe, funcmd-safe) with native
   # code, raw memory, file I/O and compile-from-file disabled. It has its own
   # focused capability test instead of the full regression suite, so the
-  # default build's baseline is unaffected. Manual only: push/PR skip it, and
-  # a workflow_dispatch run needs safe_only=true.
+  # default build's baseline is unaffected. This is part of the default gate
+  # (push/PR/dispatch); a dispatch with safe_only=true runs only this job.
   linux-safe:
     name: linux-safe
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.safe_only }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -427,8 +470,11 @@ jobs:
         id: cache-funcmd-win
         uses: actions/cache@v4
         with:
-          path: src\prj\fun\funcmd.exe
-          key: funcmd-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
+          path: |
+            src\prj\fun\funcmd.exe
+            src\prj\fun\funcmd-safe.exe
+            src\prj\fun\funcmd.flags.txt
+          key: funcmd-v2-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
 
       - name: Restore FPC cache (Windows)
         if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
@@ -796,6 +842,23 @@ jobs:
           }
           # visible from outside: which optional features this build carries
           Write-Host "::warning title=build (windows-x64) flags::[$built]"
+          "FUN_WIN_BUILD_LABEL=$built" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          # Cached next to the exe so a cache hit can still report capabilities.
+          $built | Out-File -FilePath 'src\prj\fun\funcmd.flags.txt' -Encoding ascii
+
+          # The capability-restricted build ships with every nightly. It uses
+          # the same optional-feature set that just built successfully.
+          $safeArgv = $argv + $v + @('-dFunSafe', '-ofuncmd-safe.exe')
+          Write-Host "safe argv: $(($safeArgv | ForEach-Object { "[$_]" }) -join ' ')"
+          & ppcrossx64 @safeArgv *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            $err = (Get-Content $log |
+                      Select-String -Pattern 'Fatal:|Error:' |
+                      Select-Object -Last 6 |
+                      ForEach-Object { $_.Line }) -join ' | '
+            Write-Host "::error title=safe build (windows-x64)::$err"
+            exit 1
+          }
 
       - name: Capability probes
         shell: pwsh
@@ -888,6 +951,60 @@ jobs:
             Write-Host "::error title=regression (windows-x64)::$($fails.Substring(0, [Math]::Min(900, $fails.Length)))"
             exit 1
           }
+
+      # Same contract as the POSIX jobs: only a green main run produces a
+      # release stage, and the release workflow downloads it instead of
+      # rebuilding. The label recorded by the build step says which optional
+      # features were compiled in; the DLL checks record what can be shipped.
+      - name: Stage release build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: |
+          $stage = "$env:GITHUB_WORKSPACE\dist-stage"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item 'src\prj\fun\funcmd.exe' $stage -Force
+          if (Test-Path 'src\prj\fun\funcmd-safe.exe') {
+            Copy-Item 'src\prj\fun\funcmd-safe.exe' $stage -Force
+          }
+          foreach ($dll in @('pcre3.dll', 'ffi.dll', 'libtcc.dll', 'zlib.dll')) {
+            if (Test-Path "src\prj\fun\$dll") { Copy-Item "src\prj\fun\$dll" $stage -Force }
+          }
+
+          $label = if (Test-Path 'src\prj\fun\funcmd.flags.txt') {
+            (Get-Content 'src\prj\fun\funcmd.flags.txt' -Raw).Trim()
+          } else { [string]$env:FUN_WIN_BUILD_LABEL }
+          $caps = [ordered]@{
+            platform       = 'win-x64'
+            commit_sha     = $env:GITHUB_SHA
+            tag            = ''
+            build_flags    = @($label -split '\s+' | Where-Object { $_ })
+            regex          = ($label -match 'dRegex')
+            ffi            = ($label -match 'dWinFFI')
+            tcc            = (Test-Path 'src\prj\fun\libtcc.dll')
+            safe           = (Test-Path 'src\prj\fun\funcmd-safe.exe')
+            safe_level     = 'strict'
+            libtcc_present = (Test-Path 'src\prj\fun\libtcc.dll')
+            zlib_present   = (Test-Path 'src\prj\fun\zlib.dll')
+            notes          = ''
+          }
+          $missing = @()
+          if (-not $caps.regex) { $missing += 'regex unavailable (PCRE DLL not built)' }
+          if (-not $caps.ffi) { $missing += 'getapi/FFI unavailable' }
+          if (-not $caps.tcc) { $missing += 'runtime C compile unavailable (no libtcc.dll)' }
+          if (-not $caps.zlib_present) { $missing += 'zlib unavailable' }
+          $caps.notes = ($missing -join '; ')
+          ($caps | ConvertTo-Json -Depth 5) |
+            Out-File -FilePath "$stage\build-env.json" -Encoding utf8
+          Get-ChildItem $stage | ForEach-Object { Write-Host "staged: $($_.Name)" }
+
+      - name: Upload release stage
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fun-stage-win-x64
+          path: dist-stage/
+          retention-days: 90
+          if-no-files-found: error
 
   # windows-arm64 is temporarily disabled: FPC 3.2.2 (the pinned toolchain) has
   # no win64/aarch64 target, so there is nothing to build with and the job could

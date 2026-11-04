@@ -4,7 +4,7 @@ fun package()
     version: '0.1.0',
     bin: 'src/main.fun',
     lib: '',
-    'fun': '9.4',
+    'fun': '9.5.4',
 
     dependencies: [
       // A path dependency: used in place, no git or network needed.
