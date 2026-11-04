@@ -219,15 +219,28 @@ jobs:
 
             if [ "$CHANGED" -eq 0 ] && [ "$FORCE" != "true" ]; then
               out should_release false
-              out reason "no code changes since $PREV (tag $TAG not created)"
-              echo "::notice::no code changes since $PREV; not creating $TAG"
+              out reason "no code changes since $PREV; no new nightly created"
+              echo "::notice::no code changes since $PREV; no new nightly created"
               exit 0
             fi
 
             # Idempotency: reuse the tag when it already points at this commit,
-            # otherwise add a numeric suffix. Never move an existing tag.
-            candidate="$TAG"
-            n=1
+            # otherwise add a numeric suffix. Never move an existing tag. Start
+            # above the highest suffix already used today, so deleting an old
+            # tag cannot make a newer nightly take a lower version.
+            maxsuffix=1
+            prefix="v${next_patch}-nightly.${COMMIT_YMD}"
+            for t in $(git tag -l "${prefix}*"); do
+              if [ "$t" = "$prefix" ]; then
+                s=1
+              else
+                s=${t#"$prefix."}
+                case "$s" in ''|*[!0-9]*) continue ;; esac
+              fi
+              [ "$s" -gt "$maxsuffix" ] && maxsuffix=$s
+            done
+            n=$maxsuffix
+            if [ "$n" -eq 1 ]; then candidate="$TAG"; else candidate="v${next_patch}-nightly.${COMMIT_YMD}.${n}"; fi
             while git rev-parse -q --verify "refs/tags/$candidate^{commit}" >/dev/null; do
               existing=$(git rev-parse "refs/tags/$candidate^{commit}")
               if [ "$existing" = "$SHA" ]; then
