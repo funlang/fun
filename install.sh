@@ -26,6 +26,7 @@ REPO="${FUN_REPO:-funlang/fun}"
 ROOT="${FUN_DIR:-$HOME/.fun}"
 API="${FUN_API_URL:-https://api.github.com/repos/$REPO}"
 TAG="${FUN_TAG:-}"
+EXPLICIT_TAG="$TAG"
 CHANNEL=stable
 
 usage() {
@@ -73,14 +74,22 @@ case "$(uname -m)" in
 esac
 platform="$os-$arch"
 
+latest_tag() {
+    curl -fsSL "$API/releases/latest" |
+      sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1
+}
+
+newest_nightly_tag() {
+    curl -fsSL "$API/releases?per_page=30" |
+      tr ',' '\n' | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' |
+      grep -- '-nightly\.' | head -n 1
+}
+
 if [ -z "$TAG" ]; then
     if [ "$CHANNEL" = nightly ]; then
-        TAG=$(curl -fsSL "$API/releases?per_page=30" |
-              tr ',' '\n' | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' |
-              grep -- '-nightly\.' | head -n 1) || true
+        TAG=$(newest_nightly_tag) || true
     else
-        TAG=$(curl -fsSL "$API/releases/latest" |
-              sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n 1) || true
+        TAG=$(latest_tag) || true
     fi
 fi
 [ -n "$TAG" ] || { echo "install: could not determine a release tag; pass --tag" >&2; exit 1; }
@@ -96,7 +105,22 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/fun-install.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
 echo "install: downloading $asset"
-curl -fL --retry 3 -o "$tmp/$asset" "$base/$asset"
+if ! curl -fL --retry 3 -o "$tmp/$asset" "$base/$asset"; then
+    if [ -n "$EXPLICIT_TAG" ] || [ "$CHANNEL" = nightly ]; then
+        echo "install: no $platform asset for $TAG" >&2
+        exit 1
+    fi
+    # The latest stable release may predate binary assets. Fall back to the
+    # newest nightly rather than failing outright, and say so clearly.
+    fallback=$(newest_nightly_tag) || true
+    [ -n "$fallback" ] || { echo "install: no downloadable release found" >&2; exit 1; }
+    echo "install: warning: stable $TAG has no $platform asset; using nightly $fallback"
+    TAG="$fallback"
+    asset="fun-${TAG}-${platform}.${ext}"
+    base="${FUN_BASE_URL:-https://github.com/$REPO/releases/download/$TAG}"
+    curl -fL --retry 3 -o "$tmp/$asset" "$base/$asset" || {
+        echo "install: no $platform asset for $TAG" >&2; exit 1; }
+fi
 curl -fsSL --retry 3 -o "$tmp/SHA256SUMS" "$base/SHA256SUMS"
 
 line=$(awk -v a="$asset" '$2 == a { print; exit }' "$tmp/SHA256SUMS")

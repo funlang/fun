@@ -96,6 +96,10 @@ macOS / Linux one-liner (verifies `SHA256SUMS`, installs under `~/.fun`):
 curl -fsSL https://raw.githubusercontent.com/funlang/fun/main/install.sh | sh
 ```
 
+If the latest stable release has no binaries yet, the installer says so and
+falls back to the newest nightly. Pass `--tag` or `--nightly` to choose
+explicitly.
+
 Each archive contains a `fun/` runtime tree: `fun/fun` (`fun/fun.exe` on
 Windows) and `fun/fun-safe` (the capability-restricted build), plus `lib/`,
 `demo/`, `demos/` and the regression suite in `test/`. Run

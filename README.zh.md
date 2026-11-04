@@ -95,6 +95,9 @@ macOS / Linux 一行安装（校验 `SHA256SUMS`，安装到 `~/.fun`）：
 curl -fsSL https://raw.githubusercontent.com/funlang/fun/main/install.sh | sh
 ```
 
+如果最新稳定版还没有二进制资产，安装脚本会明确提示并回退到最新 nightly。
+也可以直接用 `--tag` 或 `--nightly` 指定。
+
 每个压缩包内是一个 `fun/` 运行时目录：`fun/fun`（Windows 为 `fun/fun.exe`）
 与 `fun/fun-safe`（能力受限构建），以及 `lib/`、`demo/`、`demos/` 和
 `test/` 回归套件。运行 `./fun/fun --help`；Linux/macOS 可用
