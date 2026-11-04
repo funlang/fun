@@ -84,6 +84,9 @@ git push origin vX.Y.Z
 safe 构建能力。缺失的可选依赖会明确写进清单和发布说明，不会把降级构建
 标成完整版。
 
+产物使用 `SHA256SUMS` 校验，并附 `SBOM.cdx.json`。目前尚未启用
+Sigstore/cosign 签名，不要对外声称存在签名。
+
 ### 监控
 
 schedule 可能延迟数小时，甚至被平台直接丢弃且不产生失败事件。设置仓库

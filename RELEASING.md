@@ -90,6 +90,10 @@ runtime C compilation and the safe build. Missing optional dependencies are
 reported there and in the release notes; they are never silently presented as
 a full build.
 
+Assets are protected by `SHA256SUMS` and accompanied by `SBOM.cdx.json`.
+Sigstore/cosign signing is not enabled yet, so do not imply that signatures
+exist.
+
 ### Monitoring
 
 Scheduled workflows can be delayed for hours or dropped without a failure

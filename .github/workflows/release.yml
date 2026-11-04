@@ -59,7 +59,6 @@ on:
 permissions:
   contents: write
   actions: read
-  id-token: write
 
 # Never let a delayed nightly be cancelled by the next day's run.
 concurrency:
@@ -393,22 +392,6 @@ jobs:
 
       - name: Verify checksums
         run: ( cd dist && sha256sum -c SHA256SUMS )
-
-      - name: Sign SHA256SUMS (keyless, optional)
-        id: sign
-        continue-on-error: true
-        env:
-          TAG: ${{ needs.gate.outputs.tag }}
-        run: |
-          set -euo pipefail
-          curl -sSfL https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 \
-            -o "$RUNNER_TEMP/cosign"
-          chmod +x "$RUNNER_TEMP/cosign"
-          "$RUNNER_TEMP/cosign" sign-blob --yes \
-            --output-signature dist/SHA256SUMS.sig \
-            --output-certificate dist/SHA256SUMS.pem \
-            dist/SHA256SUMS
-          echo "signed=true" >> "$GITHUB_OUTPUT"
 
       - name: Create or update the release
         env:
