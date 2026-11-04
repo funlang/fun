@@ -19,8 +19,9 @@ from this directory that is `../../../src/prj/fun/funcmd`.
 cd fun/demos/test-demo
 
 fun test
-# tests/calc_test.fun   PASS (4)
-# 1 file, 4 tests: all passed
+# tests/calc_test.fun   PASS (5, 1 skipped)
+#   skip: platform specific (example: not available on this platform)
+# 1 file, 5 tests: 4 passed, 1 skipped
 ```
 
 A failing assertion prints the test name and a diagnostic; the exit code is 1:
@@ -34,11 +35,15 @@ test('broken', {
 ```text
 fun test
 # tests/calc_test.fun   FAIL
+# skip: platform specific (example: not available on this platform)
 # not ok broken
 #   math is broken
 #   expected 3, got 2
-# 1 file, 5 tests: 4 passed, 1 failed
+# 1 file, 6 tests: 4 passed, 1 failed, 1 skipped
 ```
+
+Call `test.skip('reason')` inside a test body to skip it; skipped tests are
+reported separately and do not fail the run.
 
 Notes:
 

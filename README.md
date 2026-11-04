@@ -224,6 +224,10 @@ manifest dependencies are available through the same launcher as `fun run`.
 - Assertions: `assert.equal`, `not_equal`, `is_true`, `is_false`, `match`,
   `contains`, `greater`, `less`, `is_nil`, `not_nil`, `raises`, `fail`; each
   takes an optional trailing message.
+- `test.skip('reason')` inside a test body ends that test as skipped; the
+  reason is optional, skips are counted separately, and they do not fail the
+  run. Do not catch it in a broad `try/except`: the test is still reported as
+  skipped, but the rest of the body continues.
 - `test.fun`, the globals `test`/`assert`/`runTests`, the aliases `as test` /
   `as assert`, and dependency keys `test`/`assert` are reserved. A third-party
   test library can be imported under another alias.

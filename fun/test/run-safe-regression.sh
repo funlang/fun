@@ -67,4 +67,10 @@ if [ -z "$TOTAL" ] || [ "$TOTAL" -lt 5 ]; then
     exit 1
 fi
 
-echo "safe regression: $TOTAL/$TOTAL passed"
+SKIPPED="$(printf '%s\n' "$SUMMARY" | sed -n 's/.* skipped: \([0-9][0-9]*\).*/\1/p')"
+if [ -z "$SKIPPED" ]; then SKIPPED=0; fi
+if [ "$SKIPPED" -gt 0 ]; then
+    echo "safe regression: $((TOTAL - SKIPPED))/$TOTAL passed, $SKIPPED skipped"
+else
+    echo "safe regression: $TOTAL/$TOTAL passed"
+fi

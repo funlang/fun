@@ -68,6 +68,19 @@ fun has(s, part)
   result = s.subpos(part) >= 0;
 end fun;
 
+fun countOf(s, part)
+  var n = 0;
+  var pos = 0;
+  loop
+    if pos >= s.length() then exit; end if;
+    var i = s.substr(pos).subpos(part);
+    if i < 0 then exit; end if;
+    n += 1;
+    pos += i + part.length();
+  end loop;
+  result = n;
+end fun;
+
 fun check(label, ok)
   ?. label & ': ' & ok;
   if not ok then ?. 'failed ' & label; end if;
@@ -248,6 +261,76 @@ check('assert.fail shown', has(fo, 'not ok explicit fail') and has(fo, 'unexpect
 check('matcher failure shown', has(fo, 'not ok matcher failure') and has(fo, 'must match'));
 check('passing test quiet', not has(fo, 'ok passing'));
 check('failure summary', has(fo, '2 files, 4 tests: 1 passed, 3 failed; 1 file failed to run'));
+
+// --- skip: a test that is intentionally not run --------------------------
+var skipp = base & 'skipping' & sep;
+(skipp & 'package.fun').save(
+  'fun package()' & nl &
+  '  result = [name: ' & "'skipping', version: '0.1.0', bin: '', lib: '', dependencies: [], resolved: []];" & nl &
+  'end fun;' & nl);
+(skipp & 'tests' & sep & 'a_test.fun').save(
+  "use 'test.fun';" & nl &
+  "?. 'skip log line';" & nl & nl &
+  "test('passing', { assert.equal(1, 1); });" & nl & nl &
+  "test('conditional', {" & nl &
+  '  var go = true;' & nl &
+  "  if go then test.skip('flag on'); end if;" & nl &
+  "  assert.fail('after skip');" & nl &
+  '});' & nl & nl &
+  "test('no reason', { test.skip(); });" & nl & nl &
+  "test('multiline', { test.skip('line1' & 13.toChar() & 10.toChar() & 'line2'); });" & nl & nl &
+  "test('numeric', { test.skip(0); });" & nl & nl &
+  "test('swallowed', {" & nl &
+  '  try' & nl &
+  "    test.skip('caught');" & nl &
+  '  except' & nl &
+  "    ?. 'caught';" & nl &
+  '  end try;' & nl &
+  '});' & nl);
+var sklog = base & 'skipping.log';
+var sk1 = runIn(skipp, funcmd & ' test', sklog);
+var sko = loadIf(sklog);
+check('skip exits 0', sk1 = 0);
+check('skip reason shown', has(sko, 'skip: conditional (flag on)'));
+check('skip no reason', has(sko, 'skip: no reason') and not has(sko, 'skip: no reason ('));
+check('skip reason normalized', has(sko, 'skip: multiline (line1 line2)'));
+check('skip numeric reason', has(sko, 'skip: numeric (0)'));
+check('skip swallowed', has(sko, 'skip: swallowed (caught)'));
+check('plain skip log not echoed', not has(sko, 'skip log line'));
+check('skip pass line', has(sko, 'PASS (6, 5 skipped)'));
+check('skip summary', has(sko, '1 file, 6 tests: 1 passed, 5 skipped'));
+
+var skmixp = base & 'skipping-mixed' & sep;
+(skmixp & 'package.fun').save(
+  'fun package()' & nl &
+  '  result = [name: ' & "'skipmix', version: '0.1.0', bin: '', lib: '', dependencies: [], resolved: []];" & nl &
+  'end fun;' & nl);
+(skmixp & 'tests' & sep & 'a_test.fun').save(
+  "use 'test.fun';" & nl & nl &
+  "test('passing', { assert.equal(1, 1); });" & nl &
+  "test('skipping', { test.skip('not now'); });" & nl &
+  "test('failing', { assert.fail('__fun_test_skip__: boom'); });" & nl);
+var skmixlog = base & 'skipping-mixed.log';
+var skm1 = runIn(skmixp, funcmd & ' test', skmixlog);
+var skmo = loadIf(skmixlog);
+check('mixed skip exits 1', skm1 = 1);
+check('mixed skip counts', has(skmo, '1 file, 3 tests: 1 passed, 1 failed, 1 skipped'));
+check('skip line shown in fail', has(skmo, 'skip: skipping (not now)') and not has(skmo, 'not ok skipping'));
+check('skip line shown once', countOf(skmo, 'skip: skipping (not now)') = 1);
+check('sentinel text is failure', has(skmo, 'not ok failing') and not has(skmo, 'skip: failing'));
+
+var skoutp = base & 'skipping-outside' & sep;
+(skoutp & 'package.fun').save(
+  'fun package()' & nl &
+  '  result = [name: ' & "'skipout', version: '0.1.0', bin: '', lib: '', dependencies: [], resolved: []];" & nl &
+  'end fun;' & nl);
+(skoutp & 'tests' & sep & 'a_test.fun').save(
+  "use 'test.fun';" & nl & nl &
+  "test.skip('outside');" & nl &
+  "test('a', { assert.equal(1, 1); });" & nl);
+var skoutlog = base & 'skipping-outside.log';
+var sout1 = runIn(skoutp, funcmd & ' test', skoutlog);
+check('skip outside body', sout1 = 1 and has(loadIf(skoutlog), 'can only be called inside a test body'));
 
 // --- reserved names and shadowing ----------------------------------------
 var resp = base & 'reserved' & sep;
