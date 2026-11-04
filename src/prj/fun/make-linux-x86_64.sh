@@ -186,7 +186,11 @@ if [ -n "$TCC_SRC" ] && [ -f "$TCC_SRC/libtcc.c" ] && command -v gcc >/dev/null 
         ( cd "$TCC_BUILD" && make libtcc.so ) || { echo "TCC build failed" >&2; exit 1; }
         cp "$TCC_BUILD/libtcc.so" "$TCC_LIB"
     fi
-    TCC_FLAGS="-k-rpath -k\$ORIGIN"
+    # Ubuntu 24.04's linker defaults to DT_RUNPATH (new dtags). lib-tcc.fun
+    # resolves "libtcc.so" with dlopen(), which does not consult the
+    # executable's RUNPATH, so force the old DT_RPATH form. Without this the
+    # binary silently loses runtime C compilation on newer distros.
+    TCC_FLAGS="-k-rpath -k\$ORIGIN -k--disable-new-dtags"
     echo "TCC enabled (libtcc.so next to funcmd, rpath \$ORIGIN)."
 else
     echo "TCC C source not found - building WITHOUT runtime C compile (lib-tcc.fun needs libtcc.so)." >&2

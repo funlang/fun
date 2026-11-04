@@ -14,6 +14,28 @@ if _tccos = 'linux' then
 elsif _tccos = 'macos' then
   tccdll = 'libtcc.dylib';
 end if;
+
+// Prefer the copy next to the executable. Newer linkers emit DT_RUNPATH for
+// -rpath, and dlopen() does not consult the executable's RUNPATH, so the bare
+// name alone fails on Ubuntu 24.04 even though libtcc.so is beside the binary.
+var tccpath = tccdll;
+if _tccos = 'linux' then
+  var exedir = 0.arg().replace(%[^/]*$%, '');
+  if exedir <> '' then tccpath = exedir & tccdll; end if;
+end if;
+
+fun _tccLoad(name)
+  result = [
+    New:     name.getapi('tcc_new',            'v:i' ),
+    Delete:  name.getapi('tcc_delete',         'i:v' ),
+    Error:   name.getapi('tcc_set_error_func', 'iic:v'),
+    Options: name.getapi('tcc_set_options',    'is:i'),
+    Compile: name.getapi('tcc_compile_string', 'is:i'),
+    Reloc:   name.getapi('tcc_relocate',       'ii:i'), // 1
+    Get:     name.getapi('tcc_get_symbol',     'is:i'),
+  ];
+end fun;
+
 var tcc = nil;
 var tcc_error = nil;
 try
@@ -22,15 +44,11 @@ try
   end fun;
   tcc_error = error.@toCallback(nil, 'is:C');
 
-  tcc = [
-    New:     tccdll.getapi('tcc_new',            'v:i' ),
-    Delete:  tccdll.getapi('tcc_delete',         'i:v' ),
-    Error:   tccdll.getapi('tcc_set_error_func', 'iic:v'),
-    Options: tccdll.getapi('tcc_set_options',    'is:i'),
-    Compile: tccdll.getapi('tcc_compile_string', 'is:i'),
-    Reloc:   tccdll.getapi('tcc_relocate',       'ii:i'), // 1
-    Get:     tccdll.getapi('tcc_get_symbol',     'is:i'),
-  ];
+  try
+    tcc = _tccLoad(tccpath);
+  except
+    if tccpath <> tccdll then tcc = _tccLoad(tccdll); else ?. @; end if;
+  end try;
 except ?. @;
 end try;
 

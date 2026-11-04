@@ -348,6 +348,18 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+      # The archive is the product, not the build tree. Run its own suite from
+      # an extracted copy so a packaging/path regression (for example libtcc.so
+      # no longer loading from fun/) blocks the release.
+      - name: Smoke-test the linux-x64 archive
+        run: |
+          set -euo pipefail
+          mkdir -p smoke
+          tar xzf dist/fun-*-linux-x64.tar.gz -C smoke
+          pkg=$(find smoke -mindepth 1 -maxdepth 1 -type d)
+          cd "$pkg"
+          ./fun/test/run-linux-regression.sh
+
   # ------------------------------------------------------------- PUBLISH ---
   publish:
     name: publish
