@@ -474,7 +474,7 @@ jobs:
             src\prj\fun\funcmd.exe
             src\prj\fun\funcmd-safe.exe
             src\prj\fun\funcmd.flags.txt
-          key: funcmd-v5-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
+          key: funcmd-v6-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
 
       - name: Restore FPC cache (Windows)
         if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
@@ -855,7 +855,7 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: |
-          $safeLog = "$env:RUNNER_TEMP\build-windows-x64-safe.log"
+          $safeLog = 'build-windows-x64-safe.log'
           "safe build start" | Set-Content -FilePath $safeLog
           try {
             $label = ''
@@ -897,7 +897,10 @@ jobs:
         if: failure()
         shell: pwsh
         run: |
-          foreach ($f in Get-ChildItem $env:RUNNER_TEMP -Filter 'build-windows-x64*.log' -ErrorAction SilentlyContinue) {
+          $logs = @()
+          $logs += Get-ChildItem $env:RUNNER_TEMP -Filter 'build-windows-x64*.log' -ErrorAction SilentlyContinue
+          $logs += Get-ChildItem 'src\prj\fun' -Filter 'build-windows-x64*.log' -ErrorAction SilentlyContinue
+          foreach ($f in $logs) {
             $tail = (Get-Content $f.FullName -Tail 40) -join '~'
             Write-Host "::error title=$($f.Name) tail::$($tail.Substring(0, [Math]::Min(3000, $tail.Length)))"
           }
@@ -1036,7 +1039,7 @@ jobs:
           if (-not $caps.zlib_present) { $missing += 'zlib unavailable' }
           $caps.notes = ($missing -join '; ')
           $safeNote = ''
-          $safeLog = "$env:RUNNER_TEMP\build-windows-x64-safe.log"
+          $safeLog = 'src\prj\fun\build-windows-x64-safe.log'
           if (-not $caps.safe -and (Test-Path $safeLog)) {
             $safeNote = ' :: ' + (((Get-Content $safeLog -Tail 8) -join ' | ').Substring(0, [Math]::Min(900, ((Get-Content $safeLog -Tail 8) -join ' | ').Length)))
           }
