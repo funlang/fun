@@ -99,6 +99,8 @@ curl -fsSL https://raw.githubusercontent.com/funlang/fun/main/install.sh | sh
 `test/` 回归套件。运行 `./fun/fun --help`；Linux/macOS 可用
 `./fun/test/run-linux-regression.sh` 跑自带测试，Windows 用
 `fun\test\run-windows-regression.bat --portable`。
+`install.sh` 会同时建立指向 `fun` / `fun-safe` 的 `funcmd` / `funcmd-safe`
+兼容软链接。
 每个 release 另附 `capabilities.json` 与 `SHA256SUMS`，缺失的可选能力会明确
 列出。nightly 是 prerelease，`releases/latest` 仍指向稳定版。`fun.dll` 是
 单独授权的产品，不包含在这些产物中。

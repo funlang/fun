@@ -129,6 +129,9 @@ inner=$(find "$tmp/x" -mindepth 1 -maxdepth 1 -type d | head -n 1)
 [ -n "$inner" ] || { echo "install: unexpected archive layout" >&2; exit 1; }
 (cd "$inner" && tar cf - .) | (cd "$dest" && tar xf -)
 chmod +x "$dest/fun/fun" "$dest/fun/fun-safe" 2>/dev/null || true
+# Compatibility links: older docs and scripts invoke funcmd and funcmd-safe.
+ln -sfn fun "$dest/fun/funcmd"
+ln -sfn fun-safe "$dest/fun/funcmd-safe"
 
 # macOS: no code signing, so the only reliable path is to avoid/remove the
 # quarantine attribute. curl downloads are not quarantined; this also handles
@@ -143,6 +146,7 @@ if [ -z "${FUN_NO_PATH:-}" ]; then
     bin="$HOME/.local/bin"
     mkdir -p "$bin"
     ln -sfn "$dest/fun/fun" "$bin/fun"
+    ln -sfn "$dest/fun/fun" "$bin/funcmd"
     case ":$PATH:" in
         *":$bin:"*) ;;
         *) echo "install: add $bin to PATH (or run $dest/fun/fun directly)" ;;

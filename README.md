@@ -100,6 +100,7 @@ Windows) and `fun/fun-safe` (the capability-restricted build), plus `lib/`,
 `./fun/fun --help`, or run the shipped suite with
 `./fun/test/run-linux-regression.sh` on Linux/macOS and
 `fun\test\run-windows-regression.bat --portable` on Windows.
+`install.sh` also creates `funcmd` and `funcmd-safe` compatibility symlinks.
 Every release also carries `capabilities.json` and `SHA256SUMS`; optional
 features that were unavailable are listed there.
 Nightly builds are prereleases, so `releases/latest` stays on the stable

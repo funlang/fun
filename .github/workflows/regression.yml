@@ -871,6 +871,18 @@ jobs:
             exit 1
           }
 
+      # The job log needs admin rights to download from the API. When the build
+      # step fails, publish the tails as annotations so the failure is visible
+      # to maintainers without opening the run in a browser.
+      - name: Windows build log tails
+        if: failure()
+        shell: pwsh
+        run: |
+          foreach ($f in Get-ChildItem $env:RUNNER_TEMP -Filter 'build-windows-x64*.log' -ErrorAction SilentlyContinue) {
+            $tail = (Get-Content $f.FullName -Tail 40) -join '~'
+            Write-Host "::error title=$($f.Name) tail::$($tail.Substring(0, [Math]::Min(3000, $tail.Length)))"
+          }
+
       - name: Capability probes
         shell: pwsh
         run: |
