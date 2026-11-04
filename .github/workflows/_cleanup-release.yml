@@ -1,0 +1,23 @@
+# Temporary: remove the first nightly, which shipped before the libtcc fix.
+name: cleanup broken nightly (temporary)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/_cleanup-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Delete the superseded nightly release and tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete v9.5.5-nightly.20261104 -y --cleanup-tag || true
+          gh release view v9.5.5-nightly.20261104.2 --json tagName,isPrerelease
