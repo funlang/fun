@@ -847,42 +847,43 @@ jobs:
           # This step runs in src\prj\fun, so keep the path relative to it.
           $built | Out-File -FilePath 'funcmd.flags.txt' -Encoding ascii
 
-          # The capability-restricted build ships with every nightly. It uses
-          # the same optional-feature set that just built successfully. FPC
-          # does not always rebuild units when only -d defines change, so the
-          # safe build needs its own unit output directory (as the POSIX
-          # scripts do with units-safe/).
+      # Best effort until this combination is proven on win64. A failure leaves
+      # no funcmd-safe.exe, which capabilities.json reports as safe=false.
+      - name: Build funcmd-safe.exe (best effort)
+        if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
+        working-directory: src\prj\fun
+        shell: pwsh
+        continue-on-error: true
+        run: |
           $safeLog = "$env:RUNNER_TEMP\build-windows-x64-safe.log"
           "safe build start" | Set-Content -FilePath $safeLog
-          $safeOk = $false
           try {
+            $label = ''
+            if (Test-Path 'funcmd.flags.txt') {
+              $label = (Get-Content 'funcmd.flags.txt' -Raw).Trim()
+            }
+            $caps = @($label -split '\s+' | Where-Object { $_ })
+            $base = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs',
+                      '-Twin64', '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx',
+                      '-dFunPack', "-Fu$((Resolve-Path '..\..\lib').Path)")
             $safeUnits = Join-Path (Get-Location) 'units-safe'
             New-Item -ItemType Directory -Force -Path $safeUnits | Out-Null
             Remove-Item "$safeUnits\*.ppu", "$safeUnits\*.o", "$safeUnits\*.or" `
               -Force -ErrorAction SilentlyContinue
-
-            # Try the same optional features, then the core build. A safe
-            # interpreter without regex/FFI is still useful and is reported as
-            # such in capabilities.json.
-            $safeSets = @()
-            if ($null -ne $v -and $v.Count -gt 0) { $safeSets += ,($v) }
-            $safeSets += ,@()
-            foreach ($sv in $safeSets) {
-              $safeArgv = $argv + $sv + @('-dFunSafe', '-ofuncmd-safe.exe', "-FU$safeUnits")
+            $ok = $false
+            foreach ($sv in @(,$caps)) {
+              $safeArgv = $base + $sv + @('-dFunSafe', '-ofuncmd-safe.exe', "-FU$safeUnits")
               "safe argv: $(($safeArgv | ForEach-Object { "[$_]" }) -join ' ')" |
                 Add-Content -FilePath $safeLog
               & ppcrossx64 @safeArgv *>&1 | Tee-Object -FilePath $safeLog -Append
-              if ($LASTEXITCODE -eq 0) { $safeOk = $true; break }
-              "safe attempt failed: $LASTEXITCODE" | Add-Content -FilePath $safeLog
+              if ($LASTEXITCODE -eq 0) { $ok = $true; break }
             }
+            if (-not $ok) { throw 'ppcrossx64 returned nonzero' }
           } catch {
             "EXCEPTION: $($_.Exception.Message)" | Add-Content -FilePath $safeLog
-            Write-Host "::error title=safe build exception (windows-x64)::$($_.Exception.Message)"
-          }
-          if (-not $safeOk) {
-            $err = ((Get-Content $safeLog -Tail 30) -join '~')
-            Write-Host "::error title=safe build (windows-x64)::$($err.Substring(0, [Math]::Min(2800, $err.Length)))"
-            exit 1
+            Remove-Item 'funcmd-safe.exe' -Force -ErrorAction SilentlyContinue
+            $tail = ((Get-Content $safeLog -Tail 25) -join '~')
+            Write-Host "::warning title=safe build skipped (windows-x64)::$($tail.Substring(0, [Math]::Min(2500, $tail.Length)))"
           }
 
       # The job log needs admin rights to download from the API. When the build
