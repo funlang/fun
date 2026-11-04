@@ -474,7 +474,7 @@ jobs:
             src\prj\fun\funcmd.exe
             src\prj\fun\funcmd-safe.exe
             src\prj\fun\funcmd.flags.txt
-          key: funcmd-v2-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
+          key: funcmd-v3-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
 
       - name: Restore FPC cache (Windows)
         if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
@@ -884,7 +884,11 @@ jobs:
             Remove-Item 'funcmd-safe.exe' -Force -ErrorAction SilentlyContinue
             $tail = ((Get-Content $safeLog -Tail 25) -join '~')
             Write-Host "::warning title=safe build skipped (windows-x64)::$($tail.Substring(0, [Math]::Min(2500, $tail.Length)))"
+            $global:LASTEXITCODE = 0
           }
+          # gh marks an inline pwsh step failed if a caught native command left
+          # a nonzero LASTEXITCODE. This step is explicitly best effort.
+          exit 0
 
       # The job log needs admin rights to download from the API. When the build
       # step fails, publish the tails as annotations so the failure is visible
@@ -1031,6 +1035,7 @@ jobs:
           if (-not $caps.tcc) { $missing += 'runtime C compile unavailable (no libtcc.dll)' }
           if (-not $caps.zlib_present) { $missing += 'zlib unavailable' }
           $caps.notes = ($missing -join '; ')
+          Write-Host "::warning title=win stage::safe=$($caps.safe) tcc=$($caps.tcc) regex=$($caps.regex) ffi=$($caps.ffi)"
           ($caps | ConvertTo-Json -Depth 5) |
             Out-File -FilePath "$stage\build-env.json" -Encoding utf8
           Get-ChildItem $stage | ForEach-Object { Write-Host "staged: $($_.Name)" }
