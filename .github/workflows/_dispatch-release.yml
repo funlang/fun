@@ -40,3 +40,5 @@ jobs:
           gh workflow run release.yml --ref main \
             --field channel=nightly --field force=false
           echo "release dispatched for $GITHUB_SHA"
+
+# verification pass 2
