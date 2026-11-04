@@ -23,12 +23,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          trap 'echo "::error title=dispatch helper failed::line $LINENO: $BASH_COMMAND"' ERR
+          gh --version
           echo "waiting for regression of $GITHUB_SHA"
           for i in $(seq 1 36); do
-            line=$(gh run list --workflow=regression.yml --branch=main --limit 30 \
-                     --json databaseId,headSha,status,conclusion |
-                   jq -r --arg sha "$GITHUB_SHA" \
-                     '[.[] | select(.headSha == $sha)][0] | "\(.databaseId) \(.status) \(.conclusion)"')
+            json=$(gh run list --workflow=regression.yml --branch=main --limit 30 \
+                     --json databaseId,headSha,status,conclusion)
+            line=$(printf '%s' "$json" | python3 -c '
+          import json, os, sys
+          sha = os.environ["GITHUB_SHA"]
+          runs = [r for r in json.load(sys.stdin) if r["headSha"] == sha]
+          r = runs[0] if runs else {}
+          print(str(r.get("databaseId", "")) + " " + str(r.get("status", "")) + " " + str(r.get("conclusion") or ""))
+          ')
             echo "$(date -u +%H:%M:%S) $line"
             set -- $line
             [ "${3:-}" = "success" ] && break
