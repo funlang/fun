@@ -26,7 +26,6 @@ REPO="${FUN_REPO:-funlang/fun}"
 ROOT="${FUN_DIR:-$HOME/.fun}"
 API="${FUN_API_URL:-https://api.github.com/repos/$REPO}"
 TAG="${FUN_TAG:-}"
-EXPLICIT_TAG="$TAG"
 CHANNEL=stable
 
 usage() {
@@ -50,6 +49,9 @@ while [ $# -gt 0 ]; do
         *) echo "install: unknown argument: $1" >&2; usage >&2; exit 2 ;;
     esac
 done
+
+# Set only after parsing, so --tag counts as explicit too.
+EXPLICIT_TAG="$TAG"
 
 need() {
     command -v "$1" >/dev/null 2>&1 || {
