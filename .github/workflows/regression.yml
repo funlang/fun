@@ -474,7 +474,7 @@ jobs:
             src\prj\fun\funcmd.exe
             src\prj\fun\funcmd-safe.exe
             src\prj\fun\funcmd.flags.txt
-          key: funcmd-v3-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
+          key: funcmd-v5-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
 
       - name: Restore FPC cache (Windows)
         if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
@@ -1040,7 +1040,9 @@ jobs:
           if (-not $caps.safe -and (Test-Path $safeLog)) {
             $safeNote = ' :: ' + (((Get-Content $safeLog -Tail 8) -join ' | ').Substring(0, [Math]::Min(900, ((Get-Content $safeLog -Tail 8) -join ' | ').Length)))
           }
-          Write-Host "::warning title=win stage::safe=$($caps.safe) tcc=$($caps.tcc) regex=$($caps.regex) ffi=$($caps.ffi)$safeNote"
+          $files = (Get-ChildItem 'src\prj\fun' -Filter 'funcmd*' -ErrorAction SilentlyContinue |
+                    ForEach-Object { "$($_.Name):$($_.Length)" }) -join ','
+          Write-Host "::warning title=win stage::safe=$($caps.safe) log=$(Test-Path $safeLog) files=[$files] tcc=$($caps.tcc) regex=$($caps.regex) ffi=$($caps.ffi)$safeNote"
           ($caps | ConvertTo-Json -Depth 5) |
             Out-File -FilePath "$stage\build-env.json" -Encoding utf8
           Get-ChildItem $stage | ForEach-Object { Write-Host "staged: $($_.Name)" }
