@@ -847,16 +847,27 @@ jobs:
           $built | Out-File -FilePath 'src\prj\fun\funcmd.flags.txt' -Encoding ascii
 
           # The capability-restricted build ships with every nightly. It uses
-          # the same optional-feature set that just built successfully.
-          $safeArgv = $argv + $v + @('-dFunSafe', '-ofuncmd-safe.exe')
+          # the same optional-feature set that just built successfully. FPC
+          # does not always rebuild units when only -d defines change, so the
+          # safe build needs its own unit output directory (as the POSIX
+          # scripts do with units-safe/).
+          $safeUnits = Join-Path (Get-Location) 'units-safe'
+          New-Item -ItemType Directory -Force -Path $safeUnits | Out-Null
+          Remove-Item "$safeUnits\*.ppu", "$safeUnits\*.o", "$safeUnits\*.or" `
+            -Force -ErrorAction SilentlyContinue
+          $safeArgv = $argv + $v + @('-dFunSafe', '-ofuncmd-safe.exe', "-FU$safeUnits")
           Write-Host "safe argv: $(($safeArgv | ForEach-Object { "[$_]" }) -join ' ')"
-          & ppcrossx64 @safeArgv *>&1 | Tee-Object -FilePath $log
+          $safeLog = "$env:RUNNER_TEMP\build-windows-x64-safe.log"
+          & ppcrossx64 @safeArgv *>&1 | Tee-Object -FilePath $safeLog
           if ($LASTEXITCODE -ne 0) {
-            $err = (Get-Content $log |
+            $err = (Get-Content $safeLog |
                       Select-String -Pattern 'Fatal:|Error:' |
                       Select-Object -Last 6 |
                       ForEach-Object { $_.Line }) -join ' | '
-            Write-Host "::error title=safe build (windows-x64)::$err"
+            if ([string]::IsNullOrEmpty($err)) {
+              $err = ((Get-Content $safeLog -Tail 20) -join '~')
+            }
+            Write-Host "::error title=safe build (windows-x64)::$($err.Substring(0, [Math]::Min(2500, $err.Length)))"
             exit 1
           }
 
