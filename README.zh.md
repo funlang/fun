@@ -188,6 +188,9 @@ fun test
 - 断言：`assert.equal`、`not_equal`、`is_true`、`is_false`、`match`、`contains`、
   `greater`、`less`、`is_nil`、`not_nil`、`raises`、`fail`，每个都可带最后一个
   自定义消息参数。
+- 在测试块内调用 `test.skip('reason')` 可跳过当前测试；reason 可省略，
+  跳过数单独统计，不影响套件通过。不要用宽泛的 `try/except` 捕获它：
+  测试仍记为跳过，但测试块剩余语句会继续执行。
 - `test.fun`、全局名 `test`/`assert`/`runTests`、别名 `as test`/`as assert`、
   依赖键 `test`/`assert` 为保留名；三方测试库请换别名导入。
 - `dist/`、`.` 开头目录和 path 依赖目录不会参与发现。

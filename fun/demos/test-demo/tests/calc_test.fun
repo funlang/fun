@@ -17,3 +17,7 @@ test('divides', {
 test('rejects division by zero', {
   assert.raises({ safe_div(1, 0); }, 'division by zero');
 });
+
+test('platform specific', {
+  test.skip('example: not available on this platform');
+});

@@ -17,6 +17,21 @@ assert.fail shown: True
 matcher failure shown: True
 passing test quiet: True
 failure summary: True
+skip exits 0: True
+skip reason shown: True
+skip no reason: True
+skip reason normalized: True
+skip numeric reason: True
+skip swallowed: True
+plain skip log not echoed: True
+skip pass line: True
+skip summary: True
+mixed skip exits 1: True
+mixed skip counts: True
+skip line shown in fail: True
+skip line shown once: True
+sentinel text is failure: True
+skip outside body: True
 reserved dependency key: True
 reserved alias: True
 root shadow: True

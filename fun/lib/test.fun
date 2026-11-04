@@ -5,6 +5,7 @@
 //
 // Test files import `test.fun` and register blocks:
 //   test('name', { assert.equal(1 + 1, 2); });
+// Inside a body, test.skip('reason') ends the test as skipped.
 // Assertions: equal, not_equal, is_true, is_false, match (regex), contains
 // (substring), greater, less, is_nil, not_nil, raises, fail; each takes an
 // optional trailing message.
@@ -12,6 +13,10 @@
 var _tests = new [];
 var _current = '';
 var _nl = 10.toChar();
+var _inTest = false;
+var _skipPending = false;
+var _skipReason = '';
+var _SKIP_PREFIX = '__fun_test_skip__:';
 
 fun test(name, body)
   // Function-body array literals are singletons; allocate per test.
@@ -20,6 +25,21 @@ fun test(name, body)
   t.@add(body);
   _tests.@add(t);
 end fun;
+
+fun _test_skip(reason)
+  if not _inTest then
+    raise 'test.skip: can only be called inside a test body';
+  end if;
+  var why = '';
+  if reason.type() <> 0 then
+    why = ('' & reason).replace(13.toChar() & 10.toChar(), ' ').replace(13.toChar(), ' ').replace(10.toChar(), ' ');
+  end if;
+  if not _skipPending then _skipReason = why; end if;
+  _skipPending = true;
+  raise _SKIP_PREFIX & why;
+end fun;
+
+test.skip = _test_skip;
 
 fun _str(v)
   result = '' & v;
@@ -134,20 +154,39 @@ var assert = [
 
 fun runTests()
   var failed = 0;
+  var skipped = 0;
   var i = 0;
   while i < _tests.@count() do
     var t = _tests[i];
     _current = t[0];
+    _skipPending = false;
+    _skipReason = '';
+    _inTest = true;
+    var completed = false;
+    var err = '';
     try
       t[1]();
-      ?. 'ok ' & _current;
+      completed = true;
     except
+      err = _str(@);
+    end try;
+    _inTest = false;
+    if _skipPending then
+      skipped += 1;
+      var line = 'skip: ' & _current;
+      if _skipReason <> '' then line &= ' (' & _skipReason & ')'; end if;
+      ?. line;
+    elsif completed then
+      ?. 'ok ' & _current;
+    else
       failed += 1;
       ?. 'not ok ' & _current;
-      var m = _str(@);
-      if m <> '' then ?. '  ' & m; end if;
-    end try;
+      if err <> '' then ?. '  ' & err; end if;
+    end if;
     i += 1;
   end do;
-  ?. '# tests: ' & _tests.@count() & ' passed: ' & (_tests.@count() - failed) & ' failed: ' & failed;
+  var total = _tests.@count();
+  var summary = '# tests: ' & total & ' passed: ' & (total - failed - skipped) & ' failed: ' & failed;
+  if skipped > 0 then summary &= ' skipped: ' & skipped; end if;
+  ?. summary;
 end fun;
