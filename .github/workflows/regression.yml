@@ -1035,7 +1035,12 @@ jobs:
           if (-not $caps.tcc) { $missing += 'runtime C compile unavailable (no libtcc.dll)' }
           if (-not $caps.zlib_present) { $missing += 'zlib unavailable' }
           $caps.notes = ($missing -join '; ')
-          Write-Host "::warning title=win stage::safe=$($caps.safe) tcc=$($caps.tcc) regex=$($caps.regex) ffi=$($caps.ffi)"
+          $safeNote = ''
+          $safeLog = "$env:RUNNER_TEMP\build-windows-x64-safe.log"
+          if (-not $caps.safe -and (Test-Path $safeLog)) {
+            $safeNote = ' :: ' + (((Get-Content $safeLog -Tail 8) -join ' | ').Substring(0, [Math]::Min(900, ((Get-Content $safeLog -Tail 8) -join ' | ').Length)))
+          }
+          Write-Host "::warning title=win stage::safe=$($caps.safe) tcc=$($caps.tcc) regex=$($caps.regex) ffi=$($caps.ffi)$safeNote"
           ($caps | ConvertTo-Json -Depth 5) |
             Out-File -FilePath "$stage\build-env.json" -Encoding utf8
           Get-ChildItem $stage | ForEach-Object { Write-Host "staged: $($_.Name)" }
