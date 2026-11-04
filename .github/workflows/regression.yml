@@ -844,7 +844,8 @@ jobs:
           Write-Host "::warning title=build (windows-x64) flags::[$built]"
           "FUN_WIN_BUILD_LABEL=$built" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           # Cached next to the exe so a cache hit can still report capabilities.
-          $built | Out-File -FilePath 'src\prj\fun\funcmd.flags.txt' -Encoding ascii
+          # This step runs in src\prj\fun, so keep the path relative to it.
+          $built | Out-File -FilePath 'funcmd.flags.txt' -Encoding ascii
 
           # The capability-restricted build ships with every nightly. It uses
           # the same optional-feature set that just built successfully. FPC
