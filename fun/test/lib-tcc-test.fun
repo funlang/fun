@@ -11,6 +11,8 @@ if 'host'.arg().getJson(fd: true).os = 'macos' then
   else
     try
       var dts = tcc.New();
+      ?. 'debug ts=' & dts;
+      tcc.Options(dts, '-nostdlib -nostdinc -O2');
       var dc = tcc.Compile(dts, 'int dadd(int a, int b) { return a + b; }');
       ?. 'debug compile=' & dc;
       var dr = tcc.Reloc(dts, 1);

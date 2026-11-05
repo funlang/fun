@@ -29,13 +29,17 @@ end if;
 
 fun _tccLoad(name)
   result = [
-    New:     name.getapi('tcc_new',            'v:i' ),
-    Delete:  name.getapi('tcc_delete',         'i:v' ),
-    Error:   name.getapi('tcc_set_error_func', 'iic:v'),
-    Options: name.getapi('tcc_set_options',    'is:i'),
-    Compile: name.getapi('tcc_compile_string', 'is:i'),
-    Reloc:   name.getapi('tcc_relocate',       'ii:i'), // 1
-    Get:     name.getapi('tcc_get_symbol',     'is:i'),
+    // TCCState* and symbol addresses are pointers. Use 'p' (full width) rather
+    // than 'i' (signed 32-bit): Linux happens to place TCC's heap below 4GB,
+    // but macOS returns addresses above it, so 'i' truncates the state and
+    // every following call sees a bogus pointer.
+    New:     name.getapi('tcc_new',            'v:p' ),
+    Delete:  name.getapi('tcc_delete',         'p:v' ),
+    Error:   name.getapi('tcc_set_error_func', 'ppc:v'),
+    Options: name.getapi('tcc_set_options',    'ps:v'),
+    Compile: name.getapi('tcc_compile_string', 'ps:i'),
+    Reloc:   name.getapi('tcc_relocate',       'pi:i'), // 1 = AUTO
+    Get:     name.getapi('tcc_get_symbol',     'ps:p'),
   ];
 end fun;
 
@@ -45,7 +49,7 @@ try
   fun error(p, m)
     ?. m;
   end fun;
-  tcc_error = error.@toCallback(nil, 'is:C');
+  tcc_error = error.@toCallback(nil, 'ps:C');
 
   try
     tcc = _tccLoad(tccpath);
