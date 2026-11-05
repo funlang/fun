@@ -19,6 +19,7 @@
 #   ./make-macos.sh                 # FPC from PATH, or /usr/local/bin, /opt/homebrew/bin
 #   FPC=/path/to/fpc ./make-macos.sh
 #   PCRE_SRC=/abs/path/to/pcre ./make-macos.sh
+#   TCC_SRC=/abs/path/to/tcc ./make-macos.sh
 #   ./make-macos.sh -dFunTraceback  # extra FPC switches are appended
 #
 # Root privilege is never needed and no Apple SDK download is required.
