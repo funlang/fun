@@ -1098,9 +1098,13 @@ jobs:
             Write-Host "::error title=safe regression (windows-x64)::funcmd-safe.exe is missing"
             exit 1
           }
-          cmd /c "fun\test\run-safe-regression.bat strict"
+          $out = cmd /c "fun\test\run-safe-regression.bat strict" 2>&1
+          $out | Write-Host
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "::error title=safe regression (windows-x64)::run-safe-regression.bat exited $LASTEXITCODE"
+            $fails = ($out | Select-String -Pattern 'not ok|FAIL|failed|safe regression|Error' |
+                        Select-Object -Last 20 | ForEach-Object { $_.Line }) -join ' | '
+            if ([string]::IsNullOrEmpty($fails)) { $fails = "runner exited $LASTEXITCODE" }
+            Write-Host "::error title=safe regression (windows-x64)::$fails"
             exit $LASTEXITCODE
           }
 

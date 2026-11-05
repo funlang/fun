@@ -93,7 +93,7 @@ done
     "$TMP"/x86_64-gen.o "$TMP"/x86_64-link.o "$TMP"/i386-asm.o "$TMP"/tccpe.o
 if [ -n "$NM" ]; then
     for sym in tcc_new tcc_delete tcc_compile_string tcc_relocate tcc_get_symbol; do
-        if ! "$NM" -g --defined-only "$OUT/libtcc.dll" 2>/dev/null | grep -q " $sym\$"; then
+        if ! "$NM" -g --defined-only "$OUT/libtcc.dll" 2>/dev/null | tr -d '\r' | grep -q " $sym\$"; then
             echo "build-win64-deps: libtcc.dll is missing export $sym" >&2
             exit 1
         fi
@@ -120,7 +120,7 @@ done
 if [ -n "$STRIP" ]; then "$STRIP" --strip-unneeded "$OUT/zlib.dll" || true; fi
 if [ -n "$OBJDUMP" ]; then
     for sym in compress uncompress deflateInit2_ inflateInit2_ zlibVersion; do
-        if ! "$OBJDUMP" -p "$OUT/zlib.dll" 2>/dev/null | grep -q "\[.*\] $sym\$"; then
+        if ! "$OBJDUMP" -p "$OUT/zlib.dll" 2>/dev/null | tr -d '\r' | grep -q "\[.*\] $sym\$"; then
             echo "build-win64-deps: zlib.dll is missing export $sym" >&2
             exit 1
         fi
