@@ -10,6 +10,12 @@
 // nil there and the JIT C path raises.
 var tccdll = 'libtcc.dll';
 var _tccos = 'host'.arg().getJson(fd: true).os;
+// 32-bit Windows still goes through the legacy winapi.pas getapi, which passes
+// a 'p' argument as the address of the Fun value rather than the pointer it
+// holds. There a pointer must travel as 'i': on that host an int and a pointer
+// are both 32 bits, and 'i' passes the raw value. The 64-bit Windows libffi
+// backend and the Unix ones take 'p' correctly, so only win32 rewrites.
+var _tccWin32 = _tccos = 'windows' and 'host'.arg().getJson(fd: true).bits = 32;
 if _tccos = 'linux' then
   tccdll = 'libtcc.so';
 elsif _tccos = 'macos' then
@@ -27,19 +33,26 @@ if _tccos = 'linux' or _tccos = 'macos' then
   if exedir <> '' then tccpath = exedir & tccdll; end if;
 end if;
 
+// FFI signature for this host: 'p' everywhere except win32 (see above).
+fun _tccSig(sig)
+  if _tccWin32 then sig = sig.replace('p', 'i'); end if;
+  result = sig;
+end fun;
+
 fun _tccLoad(name)
   result = [
     // TCCState* and symbol addresses are pointers. Use 'p' (full width) rather
     // than 'i' (signed 32-bit): Linux happens to place TCC's heap below 4GB,
     // but macOS returns addresses above it, so 'i' truncates the state and
-    // every following call sees a bogus pointer.
-    New:     name.getapi('tcc_new',            'v:p' ),
-    Delete:  name.getapi('tcc_delete',         'p:v' ),
-    Error:   name.getapi('tcc_set_error_func', 'ppc:v'),
-    Options: name.getapi('tcc_set_options',    'ps:v'),
-    Compile: name.getapi('tcc_compile_string', 'ps:i'),
-    Reloc:   name.getapi('tcc_relocate',       'pi:i'), // 1 = AUTO
-    Get:     name.getapi('tcc_get_symbol',     'ps:p'),
+    // every following call sees a bogus pointer. _tccSig() maps these back to
+    // 'i' on 32-bit Windows, where 'p' itself is what is broken.
+    New:     name.getapi('tcc_new',            _tccSig('v:p' )),
+    Delete:  name.getapi('tcc_delete',         _tccSig('p:v' )),
+    Error:   name.getapi('tcc_set_error_func', _tccSig('ppc:v')),
+    Options: name.getapi('tcc_set_options',    _tccSig('ps:v')),
+    Compile: name.getapi('tcc_compile_string', _tccSig('ps:i')),
+    Reloc:   name.getapi('tcc_relocate',       _tccSig('pi:i')), // 1 = AUTO
+    Get:     name.getapi('tcc_get_symbol',     _tccSig('ps:p')),
   ];
 end fun;
 
@@ -49,7 +62,7 @@ try
   fun error(p, m)
     ?. m;
   end fun;
-  tcc_error = error.@toCallback(nil, 'ps:C');
+  tcc_error = error.@toCallback(nil, _tccSig('ps:C'));
 
   try
     tcc = _tccLoad(tccpath);
