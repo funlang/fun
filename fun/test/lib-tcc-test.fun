@@ -3,6 +3,26 @@
 // make-linux-x86_64.sh from src/3rd/tcc; funcmd links -rpath $ORIGIN).
 use 'fun/lib/lib-tcc.fun';
 
+// TEMPORARY diagnostics for the macOS bring-up. Print on macOS only so the
+// Linux snapshot is unchanged; remove once libtcc works on Darwin.
+if 'host'.arg().getJson(fd: true).os = 'macos' then
+  if tcc = nil then
+    ?. 'debug: tcc module is nil';
+  else
+    try
+      var dts = tcc.New();
+      var dc = tcc.Compile(dts, 'int dadd(int a, int b) { return a + b; }');
+      ?. 'debug compile=' & dc;
+      var dr = tcc.Reloc(dts, 1);
+      ?. 'debug reloc=' & dr;
+      var dp = tcc.Get(dts, 'dadd');
+      ?. 'debug ptr=' & dp;
+    except m
+      ?. 'debug error: ' & m;
+    end try;
+  end if;
+end if;
+
 // integer path
 var add = ccompile(`int add(int a, int b) { return a + b; }`, 'ii:i');
 ?. add.call(3, 4);
