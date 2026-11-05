@@ -37,6 +37,24 @@ class _FailWriter()
   end fun;
 end class;
 
+class _FailReader()
+  fun read(n)
+    raise 'io: test scanner read failure';
+  end fun;
+end class;
+
+fun scanTokens(r, opts)
+  var out = new [];
+  var sc = io.scanner(r, opts);
+  while sc.scan() do out.@add(sc.text()); end do;
+  result = new [tokens: out, err: sc.err()];
+end fun;
+
+fun errHas(st, part)
+  var e = st['err'];
+  result = e <> nil and ('' & e).subpos(part) >= 0;
+end fun;
+
 // process stdio API and validation (no terminal read/write here)
 var stdinR = io.stdin();
 ?. stdinR.read(0) = '';
@@ -265,6 +283,12 @@ dst = io.buffer();
 ?. io.copy(dst, g) = 11;
 g.close();
 ?. dst.text() = 'hello world';
+
+g = fs.open(p, 'r');
+var sf = scanTokens(g);
+?. sf['tokens'].@count() = 1 and sf['tokens'][0] = 'hello world';
+g.close();
+
 ?. fs.removeAll(root);
 ?. fs.exists(root) = false;
 
@@ -287,3 +311,93 @@ cw2.write(['x', 'y']);
 var rr = csv.reader(out).read();
 ?. rr[0] = 'x';
 ?. rr[1] = 'y';
+
+// scanner: line/token splitting over any Reader
+var st = scanTokens(io.buffer(''));
+?. st['tokens'].@count() = 0;
+?. st['err'] = nil;
+
+st = scanTokens(io.buffer('a'));
+?. st['tokens'].@count() = 1 and st['tokens'][0] = 'a';
+?. st['err'] = nil;
+
+st = scanTokens(io.buffer('a' & nl));
+?. st['tokens'].@count() = 1 and st['tokens'][0] = 'a';
+
+st = scanTokens(io.buffer(nl));
+?. st['tokens'].@count() = 1 and st['tokens'][0] = '';
+
+st = scanTokens(io.buffer('a' & nl & nl & 'b'));
+?. st['tokens'].@count() = 3;
+?. st['tokens'][0] = 'a' and st['tokens'][1] = '' and st['tokens'][2] = 'b';
+
+st = scanTokens(io.buffer('a' & 13.toChar() & nl & 'b' & 13.toChar() & nl));
+?. st['tokens'].@count() = 2;
+?. st['tokens'][0] = 'a' and st['tokens'][1] = 'b';
+
+st = scanTokens(io.buffer('a' & 13.toChar() & nl & 'b'));
+?. st['tokens'].@count() = 2 and st['tokens'][1] = 'b';
+
+st = scanTokens(_ShortReader('a' & nl & 'b', 1));
+?. st['tokens'].@count() = 2 and st['tokens'][0] = 'a' and st['tokens'][1] = 'b';
+
+st = scanTokens(io.buffer('a,b,,c'), [delimiter: ',']);
+?. st['tokens'].@count() = 4;
+?. st['tokens'][0] = 'a' and st['tokens'][2] = '' and st['tokens'][3] = 'c';
+
+st = scanTokens(io.buffer('a,'), [delimiter: ',']);
+?. st['tokens'].@count() = 1 and st['tokens'][0] = 'a';
+
+st = scanTokens(io.buffer(','), [delimiter: ',']);
+?. st['tokens'].@count() = 1 and st['tokens'][0] = '';
+
+st = scanTokens(io.buffer('a||b'), [delimiter: '||']);
+?. st['tokens'].@count() = 2 and st['tokens'][0] = 'a' and st['tokens'][1] = 'b';
+
+st = scanTokens(io.buffer('a' & 13.toChar() & ',b'), [delimiter: ',']);
+?. st['tokens'][0] = 'a' & 13.toChar();
+
+st = scanTokens(io.buffer('abcd'), [maxToken: 4]);
+?. st['tokens'].@count() = 1 and st['tokens'][0] = 'abcd' and st['err'] = nil;
+
+st = scanTokens(io.buffer('abcd'), [maxToken: 3]);
+?. st['tokens'].@count() = 0 and errHas(st, 'token too long');
+
+st = scanTokens(io.buffer('abcd,'), [delimiter: ',', maxToken: 3]);
+?. st['tokens'].@count() = 0 and errHas(st, 'token too long');
+
+st = scanTokens(io.buffer('abcd,'), [delimiter: ',', maxToken: 4]);
+?. st['tokens'].@count() = 1 and st['tokens'][0] = 'abcd';
+
+st = scanTokens(_FailReader());
+?. st['tokens'].@count() = 0 and errHas(st, 'scanner read failure');
+
+var bad = false;
+try
+  io.scanner(nil);
+except
+  bad = true;
+end try;
+?. bad;
+bad = false;
+try
+  io.scanner(io.buffer('x'), [delimiter: '']);
+except
+  bad = true;
+end try;
+?. bad;
+bad = false;
+try
+  io.scanner(io.buffer('x'), [maxToken: 0]);
+except
+  bad = true;
+end try;
+?. bad;
+
+var sc = io.scanner(io.buffer('x'));
+?. sc.text() = '';
+?. sc.scan();
+?. sc.text() = 'x';
+?. not sc.scan();
+?. sc.text() = 'x';
+?. sc.err() = nil;
