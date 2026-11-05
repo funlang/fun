@@ -14,6 +14,11 @@ if 'host'.arg().getJson(fd: true).os = 'macos' then
     dbg &= ' tcc=nil';
   else
     dbg &= ' tcc=ok';
+    try
+      for _k: _v in tcc do dbg &= ' K:' & _k; end do;
+    except
+      dbg &= ' iter=err';
+    end try;
     if tcc.New = nil then dbg &= ' NewFn=nil'; else dbg &= ' NewFn=ok'; end if;
     try
       var mf = 'libSystem.B.dylib'.getapi('malloc', 'n:p');
