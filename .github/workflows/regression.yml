@@ -133,7 +133,7 @@ jobs:
           path: |
             src/prj/fun/libtcc.so
             src/prj/fun/libtcc.dylib
-          key: libtcc-${{ matrix.name }}-${{ steps.src-hash.outputs.value }}
+          key: libtcc-v2-${{ matrix.name }}-${{ steps.src-hash.outputs.value }}
 
       - name: Cache Free Pascal (Linux)
         if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true'))
@@ -277,7 +277,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: src/3rd
-          key: third-party-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src/prj/fun/fetch-3rd-party.sh') }}
+          key: third-party-v2-${{ runner.os }}-${{ runner.arch }}-${{ matrix.fetch_all }}-${{ hashFiles('src/prj/fun/fetch-3rd-party.sh') }}
 
       - name: Fetch third-party C sources
         if: (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true')) && steps.cache-third.outputs.cache-hit != 'true'
@@ -315,21 +315,20 @@ jobs:
           fi
           grep -E 'SAFE=strict' "$safe_log" || true
 
-      - name: Diagnose libtcc (macOS)
+      - name: Verify libtcc (macOS)
         if: runner.os == 'macOS'
         run: |
-          {
-            for p in src/prj/fun/libtcc.dylib fun/libtcc.dylib; do
-              echo "path=$p exists=$([ -f "$p" ] && echo yes || echo no)"
-              if [ -f "$p" ]; then
-                ls -l "$p"
-                file "$p"
-                otool -L "$p"
-                codesign -dv "$p" 2>&1 || true
-              fi
-            done
-          } > "$RUNNER_TEMP/tcc-info.txt" 2>&1 || true
-          echo "::notice title=libtcc::$(tr '\n' '~' < "$RUNNER_TEMP/tcc-info.txt" | cut -c1-1500)"
+          p=src/prj/fun/libtcc.dylib
+          if [ ! -f "$p" ]; then
+            echo "::error title=libtcc missing::expected $p after the macOS build"
+            echo "third-party contents:"
+            ls -la src/3rd || true
+            exit 1
+          fi
+          ls -l "$p"
+          file "$p"
+          otool -L "$p"
+          codesign -dv "$p" 2>&1 || true
 
       # The build itself copies these into fun/; a cache hit has to do it too,
       # because input-console.sh prefers fun/funcmd when it exists.
