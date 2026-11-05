@@ -372,6 +372,34 @@ jobs:
           cd "$pkg"
           ./fun/test/run-linux-regression.sh
 
+      # The archive is also the installer. Check that every platform carries
+      # the scripts the README tells users to run, before publishing.
+      - name: Verify installers in release archives
+        run: |
+          set -euo pipefail
+          checked=0
+          for a in dist/fun-*-linux-*.tar.gz dist/fun-*-macos-*.zip; do
+            [ -f "$a" ] || continue
+            case "$a" in
+              *.tar.gz) listing=$(tar tzf "$a") ;;
+              *.zip) listing=$(python3 -c 'import sys, zipfile; print("\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))' "$a") ;;
+            esac
+            printf '%s\n' "$listing" | grep -q '/install.sh$' || {
+              echo "::error::$a does not contain install.sh"; exit 1; }
+            checked=$((checked + 1))
+          done
+          for a in dist/fun-*-win-*.7z; do
+            [ -f "$a" ] || continue
+            listing=$(7z l -ba "$a")
+            for f in install.cmd install.ps1 uninstall.cmd uninstall.ps1; do
+              printf '%s\n' "$listing" | grep -q "$f\$" || {
+                echo "::error::$a does not contain $f"; exit 1; }
+            done
+            checked=$((checked + 1))
+          done
+          [ "$checked" -gt 0 ] || { echo "::error::no archives found"; exit 1; }
+          echo "verified installers in $checked archives"
+
   # ------------------------------------------------------------- PUBLISH ---
   publish:
     name: publish

@@ -33,7 +33,11 @@
 
 # ---- Batch / Makefiles ----------------------------------------------------
 *.bat     text eol=crlf
+*.cmd     text eol=crlf
 *.mak     text eol=crlf
+
+# ---- PowerShell installers ------------------------------------------------
+*.ps1     text eol=crlf
 
 # ---- Test snapshots -------------------------------------------------------
 *.txt   text eol=lf

@@ -94,6 +94,12 @@ Assets are protected by `SHA256SUMS` and accompanied by `SBOM.cdx.json`.
 Sigstore/cosign signing is not enabled yet, so do not imply that signatures
 exist.
 
+Every Unix archive carries `install.sh`; the Windows archive carries
+`install.cmd`, `install.ps1`, `uninstall.cmd` and `uninstall.ps1`. The package
+job verifies their presence before publishing. `install.sh` is also uploaded
+as a top-level release asset. See the README for the Windows PATH and file
+association behavior.
+
 ### Monitoring
 
 Scheduled workflows can be delayed for hours or dropped without a failure

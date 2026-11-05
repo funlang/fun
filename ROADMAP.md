@@ -4,7 +4,7 @@
 > 本文只维护当前基线、优先级、技术债和发版门槛。
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
-> 最近更新：2026-11-03
+> 最近更新：2026-11-05
 > 基线：Fun 9.5.4（tag `v9.5.4`）
 
 ## 0. 当前基线
@@ -65,6 +65,9 @@
 | P-08 | macOS | P2 | OPEN | arm64 真机验证、`libtcc.dylib`、签名/公证未做 | `art/notes/macos-port.md` |
 | P-09 | 架构 | P3 | OPEN | LoongArch 工具链与编码器未做 | `art/notes/arch-machine-code-plan.md` |
 | P-10 | 架构 | P3 | OPEN | Linux aarch64 交叉产物仍缺 `-dRegex` 与 `-dLinuxFFI` | `README.zh.md` |
+| P-11 | 平台/数据库 | P3 | OPEN | unixODBC 第二数据库后端未接：缺少开发头文件、驱动探测和 CI 覆盖；当前 ODBC 概念只在 Windows/ADO 侧成立 | `art/notes/linux-capabilities.md` |
+| P-12 | macOS | P2 | OPEN | TCC 与未签名 CLI 的权限提示未处理：访问 Desktop/Documents/Downloads 会触发 TCC，签名/公证见 P-08；安装脚本只能清 quarantine | `art/notes/macos-port.md` |
+| P-13 | Windows/ARM | P3 | OPEN | win-arm64 无构建：FPC 3.2.2 没有 win64/aarch64 target，`regression.yml` 的 windows-arm64 job 仍禁用，需更新 FPC 或交叉工具链 | `.github/workflows/regression.yml` |
 | Q-01 | 质量 | P2 | DONE | `lib-ado-schema.Filter` 丢外键 | `art/notes/linux-capabilities.md` |
 | Q-02 | 质量 | P2 | DONE | `lib-fd`/`lib-bnf` 仍有已知功能项（重名组已修） | `art/notes/port-decisions.md` |
 | Q-03 | 质量 | P3 | DONE | Windows `make-*.bat` 仍写 `-dRegexx` 拼写，实际不启用 regex | `src/prj/fun/make-win64.bat` |
@@ -109,3 +112,9 @@
   stdio 拆为 S-09。
 - 2026-11-03：发布 9.5.4；`if`/条件循环新增 `{}` 块写法，`cli` 支持可选 stdin，
   修复裸 `var` 实参的命名绑定问题。
+- 2026-11-05：发布脚本内置跨平台安装器：Unix 的 `install.sh` 增加
+  `--bin-dir` / `--add-path`（带标记、可重复执行）；Windows 压缩包新增
+  `install.cmd` / `install.ps1` / `uninstall.cmd` / `uninstall.ps1`，
+  默认按用户安装到 `%LOCALAPPDATA%\Programs\Fun`，注册 PATH、`.fun`/`.foo`/
+  `.fxx` 关联、Win+R `App Paths` 和“设置 > 应用”卸载项。技术债补记
+  unixODBC、macOS TCC 与 win-arm64 FPC target。

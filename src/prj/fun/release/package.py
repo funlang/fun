@@ -36,6 +36,8 @@ SUPPORTED = UNIX_PLATFORMS | WIN_PLATFORMS
 
 LICENSE_FILES = ["LICENSE", "LICENSE.custom", "LICENSE.dll"]
 DOC_FILES = ["README.md", "SAFETY.zh.md"]
+UNIX_INSTALLER = ["install.sh"]
+WIN_INSTALLER = ["install.ps1", "install.cmd", "uninstall.ps1", "uninstall.cmd"]
 
 
 def die(msg):
@@ -181,12 +183,25 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
         notes += [
             "",
             "Keep the .dll files in fun/ next to fun.exe.",
+            "Install: extract this archive and double-click install.cmd.",
+            "It installs to %LOCALAPPDATA%\\Programs\\Fun, adds <dir>\\fun to",
+            "PATH, registers .fun/.foo/.fxx, and adds an Apps & Features entry.",
+            "Use install.cmd -AllUsers (elevated), -Dir DIR, -NoPath, -NoAssoc",
+            "or -Portable for other layouts. uninstall.cmd reverses it.",
+            "",
             "This is an unsigned 7z archive: Windows SmartScreen may warn. Use",
             "7-Zip (or another extractor that does not add Mark-of-the-Web).",
         ]
     else:
-        notes += ["", "Keep lib/ and libtcc.so next to fun/fun.",
-                  "Run the shipped suite with: fun/test/run-linux-regression.sh"]
+        notes += [
+            "",
+            "Keep lib/ and libtcc.so next to fun/fun.",
+            "Install this extracted tree: ./install.sh --local",
+            "(adds a fun symlink under ~/.local/bin; pass --add-path to append",
+            "that directory to a shell profile). Without --local it downloads",
+            "the newest release instead.",
+            "Run the shipped suite with: fun/test/run-linux-regression.sh",
+        ]
     if meta["channel"] == "nightly":
         notes += ["", "This is a nightly prerelease: it may be replaced or deleted."]
     if platform.startswith("macos"):
@@ -198,14 +213,18 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
         ]
     write_text(dest / "RUNNING.txt", "\n".join(notes) + "\n", epoch=epoch)
 
-    if platform.startswith("macos"):
-        # install.sh is the supported way to avoid Gatekeeper without code
-        # signing. It is also published as a top-level release asset.
-        p = repo_root / "install.sh"
-        if p.is_file():
-            shutil.copy2(p, dest / "install.sh")
-            os.chmod(dest / "install.sh", 0o755)
-            os.utime(dest / "install.sh", (epoch, epoch))
+    # Ship the installer next to the runtime tree, so an extracted archive is
+    # self-installing on every platform. On macOS install.sh is also the
+    # supported way to avoid Gatekeeper without code signing.
+    installer_files = WIN_INSTALLER if is_win else UNIX_INSTALLER
+    for installer_name in installer_files:
+        p = repo_root / installer_name
+        if not p.is_file():
+            die(f"missing installer file {installer_name}")
+        shutil.copy2(p, dest / installer_name)
+        if installer_name.endswith(".sh"):
+            os.chmod(dest / installer_name, 0o755)
+        os.utime(dest / installer_name, (epoch, epoch))
 
     # Normalize every entry, including directories, after all copies. tar
     # stores directory mtimes and 7z reads them from the filesystem; leaving
@@ -395,6 +414,7 @@ def notes(meta, caps_list, archives, repo_root, previous):
         lines.append(f"| {c['platform']} | [`{a.name}`]({base}/{a.name}) |")
     lines += [
         f"| macOS / Linux | [`install.sh`]({base}/install.sh) |",
+        "| Windows | extract the `.7z`, then run `install.cmd` |",
         "",
         f"_{meta['channel']} · `{meta['commit'][:12]}` · {meta['date']} (UTC+8)_",
         "",
@@ -438,7 +458,9 @@ def notes(meta, caps_list, archives, repo_root, previous):
         "Verify with `sha256sum -c SHA256SUMS` (Linux/macOS) or",
         "`Get-FileHash` (Windows).",
         "Windows `.7z` and macOS `.zip` assets are unsigned; SmartScreen or",
-        "Gatekeeper may warn. Run `./install.sh` or clear the quarantine bit.",
+        "Gatekeeper may warn. Run `./install.sh --local` from an extracted",
+        "macOS/Linux archive or `install.cmd` on Windows so PATH and file",
+        "associations are registered for you.",
         "",
     ]
     return "\n".join(lines)

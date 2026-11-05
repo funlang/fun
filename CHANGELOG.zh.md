@@ -6,6 +6,15 @@
 
 ## [Unreleased]
 
+- 发布压缩包内置安装器。macOS/Linux 的 `install.sh` 新增 `--bin-dir` 和可选的
+  幂等 `--add-path`（向 shell 配置追加带标记的 PATH 块），`--local` 可离线
+  安装解压目录，Linux 压缩包也开始携带该脚本。Windows `.7z` 新增
+  `install.cmd`/`install.ps1` 与
+  `uninstall.cmd`/`uninstall.ps1`：默认按用户（或 `-AllUsers`）安装到
+  `%LOCALAPPDATA%\Programs\Fun`，注册用户 PATH、`.fun`/`.foo`/`.fxx` 文件关联、
+  Win+R 的 `App Paths` 项，以及“设置 > 应用”卸载项。其他布局可用
+  `-Portable`、`-NoPath`、`-NoAssoc`、`-Dir`。
+
 - win64 现在随包提供能力受限解释器：Windows CI 用与 `funcmd.exe` 相同的特性
   集构建 `funcmd-safe.exe`，运行 safe 能力测试，并把两个二进制一起放入产物。
   探针通过时 `capabilities.json` 报告 `safe: true`。

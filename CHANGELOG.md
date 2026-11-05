@@ -6,6 +6,17 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Release archives now carry a platform installer. On macOS/Linux `install.sh`
+  gains `--bin-dir` and an opt-in, idempotent `--add-path` that appends a
+  marker block to the shell profile; `--local` installs the extracted tree
+  offline; it is now included in Linux archives too.
+  Windows `.7z` archives ship `install.cmd`/`install.ps1` and
+  `uninstall.cmd`/`uninstall.ps1`: a per-user (or `-AllUsers`) install to
+  `%LOCALAPPDATA%\Programs\Fun`, user PATH registration, `.fun`/`.foo`/`.fxx`
+  file associations, a Win+R `App Paths` entry, and an Apps & Features
+  uninstall entry. `-Portable`, `-NoPath`, `-NoAssoc` and `-Dir` cover the
+  other layouts.
+
 - win64 now ships the capability-restricted interpreter: the Windows CI builds
   `funcmd-safe.exe` with the same feature set as `funcmd.exe`, runs the focused
   safe capability test, and stages both binaries. `capabilities.json` reports

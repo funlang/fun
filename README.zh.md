@@ -83,12 +83,14 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 
 - Linux x64 / arm64：`.tar.gz`，内含 `libtcc.so` 与标准库 `lib/`；
 - macOS x64 / arm64：`.zip`。构建**未签名、未公证**；请使用包内 `install.sh`
-  （curl 下载不会设置隔离属性），或解压后执行
+  `--local`（curl 下载不会设置隔离属性），或解压后执行
   `xattr -dr com.apple.quarantine <目录>`；
 - Windows x64：`.7z`。构建未签名，SmartScreen 可能提示；请用 7-Zip 解压，
-  并让随包的 `.dll` 与 `fun.exe` 保持同目录。包内包含 `fun.exe`、
-  `fun-safe.exe`，以及 CI 构建的 x86-64 运行期 DLL（`pcre3.dll`、`ffi.dll`、
-  `libtcc.dll`、`zlib.dll`）；个别构建缺失的能力由 `capabilities.json` 记录。
+  然后双击包内 `install.cmd`（也可以运行
+  `powershell -ExecutionPolicy Bypass -File install.ps1`）。包内包含 `fun.exe`、
+  `fun-safe.exe`、安装脚本，以及 CI 构建的 x86-64 运行期 DLL（`pcre3.dll`、
+  `ffi.dll`、`libtcc.dll`、`zlib.dll`）；个别构建缺失的能力由
+  `capabilities.json` 记录。
 
 macOS / Linux 一行安装（校验 `SHA256SUMS`，安装到 `~/.fun`）：
 
@@ -97,15 +99,33 @@ curl -fsSL https://raw.githubusercontent.com/funlang/fun/main/install.sh | sh
 ```
 
 如果最新稳定版还没有二进制资产，安装脚本会明确提示并回退到最新 nightly。
-也可以直接用 `--tag` 或 `--nightly` 指定。
+也可以直接用 `--tag` 或 `--nightly` 指定。默认把 `fun` 链接到
+`~/.local/bin`；该目录不在 `PATH` 时，可加 `--add-path` 向 `~/.profile`
+（zsh 为 `~/.zshrc`）追加一段带标记的 PATH 配置，或用 `--bin-dir DIR`
+把链接放到已有的 PATH 目录。
+
+Windows 安装（当前用户，无需管理员权限）：
+
+1. 用 7-Zip 解压 `.7z`；
+2. 双击解压目录里的 `install.cmd`。
+
+`install.cmd` 会把运行时复制到 `%LOCALAPPDATA%\Programs\Fun`，把
+`%LOCALAPPDATA%\Programs\Fun\fun` 加入用户 `PATH`，注册 `.fun`、`.foo`、
+`.fxx` 的 `Fun Script` 关联（双击脚本即可运行），在 Win+R 中加入 `fun`，
+并在**设置 > 应用**中生成卸载项。常用参数：`-AllUsers`（需管理员，安装到
+`Program Files`）、`-Dir DIR`、`-NoPath`、`-NoAssoc`、`-Portable`。
+从安装目录运行 `uninstall.cmd`，或在**设置 > 应用**中卸载。Windows 可能
+保留已有的用户选择；用一次**打开方式 > 选择其他应用**选中 Fun 即可。
 
 每个压缩包内是一个 `fun/` 运行时目录：`fun/fun`（Windows 为 `fun/fun.exe`）
 与 `fun/fun-safe`（能力受限构建），以及 `lib/`、`demo/`、`demos/` 和
 `test/` 回归套件。运行 `./fun/fun --help`；Linux/macOS 可用
 `./fun/test/run-linux-regression.sh` 跑自带测试，Windows 用
 `fun\test\run-windows-regression.bat --portable`。
-`install.sh` 会同时建立指向 `fun` / `fun-safe` 的 `funcmd` / `funcmd-safe`
-兼容软链接。
+`install.sh` 出现在所有 Unix 压缩包内（不再只限 macOS），同时建立指向
+`fun` / `fun-safe` 的 `funcmd` / `funcmd-safe` 兼容软链接。两个安装脚本都
+与运行时目录一起打包，是获得全局 `fun` 命令的受支持方式。解压后运行
+`./install.sh --local` 会离线安装该目录；不带 `--local` 则下载最新版本。
 每个 release 另附 `capabilities.json` 与 `SHA256SUMS`，缺失的可选能力会明确
 列出。nightly 是 prerelease，`releases/latest` 仍指向稳定版。`fun.dll` 是
 单独授权的产品，不包含在这些产物中。

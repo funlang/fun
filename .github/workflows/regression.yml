@@ -417,6 +417,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The Windows release archive ships these scripts. Parse them here so a
+      # syntax error fails CI instead of the user's first double-click.
+      - name: Validate Windows installer syntax
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($file in @('install.ps1', 'uninstall.ps1')) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Join-Path $PWD $file), [ref]$tokens, [ref]$errors) | Out-Null
+            foreach ($e in $errors) {
+              Write-Host "::error file=$file,line=$($e.Extent.StartLineNumber)::$($e.Message)"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
+          Write-Host 'install.ps1 and uninstall.ps1 parse cleanly'
+
       # The helper DLLs feed the interpreter build, so restore them first: the
       # funcmd.exe key records which capabilities the cached binary has. Both
       # caches live before the toolchain so a full hit skips FPC as well.

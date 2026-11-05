@@ -87,6 +87,11 @@ safe 构建能力。缺失的可选依赖会明确写进清单和发布说明，
 产物使用 `SHA256SUMS` 校验，并附 `SBOM.cdx.json`。目前尚未启用
 Sigstore/cosign 签名，不要对外声称存在签名。
 
+每个 Unix 压缩包内含 `install.sh`；Windows 压缩包内含 `install.cmd`、
+`install.ps1`、`uninstall.cmd`、`uninstall.ps1`。打包 job 会在发布前
+校验这些文件。`install.sh` 同时作为顶层 release 资产上传。Windows 的
+PATH 与文件关联行为见 README。
+
 ### 监控
 
 schedule 可能延迟数小时，甚至被平台直接丢弃且不产生失败事件。设置仓库

@@ -83,11 +83,12 @@ Prebuilt interpreters are attached to [GitHub Releases](https://github.com/funla
 
 - Linux x64 / arm64: `.tar.gz`, with `libtcc.so` and the standard `lib/`;
 - macOS x64 / arm64: `.zip`. These builds are **unsigned and not notarized**;
-  use the bundled `install.sh` (curl does not set the quarantine attribute) or
-  run `xattr -dr com.apple.quarantine <dir>` after extracting;
+  use the bundled `install.sh --local` (curl does not set the quarantine
+  attribute) or run `xattr -dr com.apple.quarantine <dir>` after extracting;
 - Windows x64: `.7z`. The build is unsigned, so SmartScreen may warn; extract
-  with 7-Zip and keep the bundled `.dll` files next to `fun.exe`. The archive
-  ships `fun.exe`, `fun-safe.exe`, and the x86-64 runtime DLLs
+  with 7-Zip and double-click `install.cmd` (or run
+  `powershell -ExecutionPolicy Bypass -File install.ps1`). The archive ships
+  `fun.exe`, `fun-safe.exe`, the installers, and the x86-64 runtime DLLs
   (`pcre3.dll`, `ffi.dll`, `libtcc.dll`, `zlib.dll`) that the CI built;
   `capabilities.json` records anything a particular build could not provide.
 
@@ -99,7 +100,25 @@ curl -fsSL https://raw.githubusercontent.com/funlang/fun/main/install.sh | sh
 
 If the latest stable release has no binaries yet, the installer says so and
 falls back to the newest nightly. Pass `--tag` or `--nightly` to choose
-explicitly.
+explicitly. The default install links `fun` into `~/.local/bin`; when that
+directory is not on `PATH`, add `--add-path` to append a marker-delimited
+block to `~/.profile` (or `~/.zshrc` for zsh), or pass `--bin-dir DIR` to put
+the links somewhere already on `PATH`.
+
+Windows install (per-user, no administrator rights):
+
+1. Extract the `.7z` archive with 7-Zip.
+2. Double-click `install.cmd` in the extracted folder.
+
+`install.cmd` copies the tree to `%LOCALAPPDATA%\Programs\Fun`, adds
+`%LOCALAPPDATA%\Programs\Fun\fun` to the user `PATH`, registers `.fun`,
+`.foo` and `.fxx` with a `Fun Script` ProgID (so double-clicking a script
+runs it), adds a Win+R `fun` entry, and appears in **Settings > Apps** for
+uninstalling. Useful options: `-AllUsers` (elevated, under `Program Files`),
+`-Dir DIR`, `-NoPath`, `-NoAssoc`, `-Portable`. Run `uninstall.cmd` from the
+install directory, or use **Settings > Apps**, to remove it. Windows may keep
+an existing per-user choice for an extension; use **Open with > Choose
+another app** once to select Fun.
 
 Each archive contains a `fun/` runtime tree: `fun/fun` (`fun/fun.exe` on
 Windows) and `fun/fun-safe` (the capability-restricted build), plus `lib/`,
@@ -107,7 +126,11 @@ Windows) and `fun/fun-safe` (the capability-restricted build), plus `lib/`,
 `./fun/fun --help`, or run the shipped suite with
 `./fun/test/run-linux-regression.sh` on Linux/macOS and
 `fun\test\run-windows-regression.bat --portable` on Windows.
-`install.sh` also creates `funcmd` and `funcmd-safe` compatibility symlinks.
+`install.sh` is included in every Unix archive (not only macOS) and also
+creates `funcmd` and `funcmd-safe` compatibility symlinks. Both installers are
+packaged next to the runtime tree and are the supported way to get a global
+`fun` command. Run `./install.sh --local` from an extracted archive to install
+that exact tree offline; plain `./install.sh` downloads a release.
 Every release also carries `capabilities.json` and `SHA256SUMS`; optional
 features that were unavailable are listed there.
 Linux artifacts are built on Ubuntu 24.04, so they need glibc 2.34 or newer;
