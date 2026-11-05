@@ -70,9 +70,9 @@ if errorlevel 1 (
 
 rem Parse "# tests: N" so an accidentally empty run cannot pass.
 set "TOTAL="
-for /f "tokens=2 delims=#" %%a in ("%SUMMARY%") do (
-    for /f "tokens=2 delims=: " %%b in ("%%a") do set "TOTAL=%%b"
-)
+rem for /f drops the leading '#' delimiter, so read the third ':'/' ' token
+rem directly: "# tests: 15 passed: 15 failed: 0" -> 15.
+for /f "tokens=3 delims=: " %%a in ("%SUMMARY%") do set "TOTAL=%%a"
 if not defined TOTAL (
     echo safe regression: could not read the test count ^(got: %SUMMARY%^) 1>&2
     popd & exit /b 1
