@@ -14,6 +14,19 @@ if 'host'.arg().getJson(fd: true).os = 'macos' then
     dbg &= ' tcc=nil';
   else
     dbg &= ' tcc=ok';
+    dbg &= ' path=[' & tccpath & ']';
+    try
+      var tf = tccpath.getapi('tcc_new', 'v:p');
+      if tf = nil then
+        dbg &= ' direct=nil';
+      else
+        dbg &= ' direct=ok';
+        var tp = tf();
+        dbg &= ' directTs=' & _dv(tp);
+      end if;
+    except
+      dbg &= ' direct=err:' & @;
+    end try;
     try
       for _k: _v in tcc do dbg &= ' K:' & _k; end do;
     except
