@@ -15,8 +15,14 @@
 //     var all = io.readAll(b);
 //     io.copy(out, b);
 //     io.writeString(out, 'done');
+//
+//     var sc = io.scanner(io.buffer('a' & 10.toChar() & 'b'));
+//     while sc.scan() do ?. sc.text(); end do;
+// A scanner splits a reader by '\n' (or opts.delimiter) and reports read
+// errors through err(); it never closes the reader.
 
 var _IO_CHUNK = 8192;
+var _IO_NL = 10.toChar();
 
 var _ioState = new [
   hostKnown: false,
@@ -413,6 +419,109 @@ class _IoBuffer(s)
   end fun;
 end class;
 
+class _IoScanner(r, opts)
+  var r = r;
+  var delim = _IO_NL;
+  var lineMode = true;
+  var maxToken = 65536;
+  var buf = '';
+  var tok = '';
+  var lastErr = nil;
+  var eof = false;
+  var done = false;
+
+  if r = nil then raise 'io.scanner: reader is required'; end if;
+  if opts <> nil then
+    if opts.@has('delimiter') then
+      var d = opts['delimiter'];
+      if d.type() <> 8 then
+        raise 'io.scanner: delimiter must be a non-empty string';
+      end if;
+      if d = '' then
+        raise 'io.scanner: delimiter must be a non-empty string';
+      end if;
+      this.delim = d;
+      this.lineMode = (d = _IO_NL);
+    end if;
+    if opts.@has('maxToken') then
+      var m = opts['maxToken'];
+      if m.type() <> 3 then
+        raise 'io.scanner: maxToken must be a positive integer';
+      end if;
+      if m <= 0 then
+        raise 'io.scanner: maxToken must be a positive integer';
+      end if;
+      this.maxToken = m;
+    end if;
+  end if;
+
+  fun scan()
+    if this.lastErr <> nil or this.done then result = false; return; end if;
+    loop
+      var i = this.buf.subpos(this.delim);
+      if i >= 0 then
+        if i > this.maxToken then
+          this.lastErr = 'io.scanner: token too long';
+          result = false;
+          return;
+        end if;
+        this.tok = this.buf.substr(0, i);
+        this.buf = this.buf.substr(i + this.delim.length());
+        if this.lineMode and this.tok.length() > 0 and this.tok[this.tok.length() - 1] = 13.toChar() then
+          this.tok = this.tok.substr(0, this.tok.length() - 1);
+        end if;
+        result = true;
+        return;
+      end if;
+      if this.buf.length() > this.maxToken then
+        this.lastErr = 'io.scanner: token too long';
+        result = false;
+        return;
+      end if;
+      if this.eof then
+        if this.buf = '' then
+          this.done = true;
+          result = false;
+          return;
+        end if;
+        this.tok = this.buf;
+        this.buf = '';
+        if this.lineMode and this.tok.length() > 0 and this.tok[this.tok.length() - 1] = 13.toChar() then
+          this.tok = this.tok.substr(0, this.tok.length() - 1);
+        end if;
+        this.done = true;
+        result = true;
+        return;
+      end if;
+      var s = nil;
+      try
+        s = this.r.read(_IO_CHUNK);
+      except
+        this.lastErr = '' & @;
+        result = false;
+        return;
+      end try;
+      if s = nil or s = '' then
+        this.eof = true;
+      elsif s.type() <> 8 then
+        this.lastErr = 'io.scanner: reader returned a non-string';
+        result = false;
+        return;
+      else
+        this.buf &= s;
+      end if;
+    end loop;
+  end fun;
+
+  fun text()
+    result = this.tok;
+  end fun;
+
+  fun err()
+    result = this.lastErr;
+  end fun;
+end class;
+
 class _IoStdin()
   fun read(n)
     var sz = _ioReadSize(n);
@@ -495,6 +604,10 @@ end class;
 class _IoApi()
   fun buffer(text)
     result = _IoBuffer(text);
+  end fun;
+
+  fun scanner(r, opts)
+    result = _IoScanner(r, opts);
   end fun;
 
   fun stdin()

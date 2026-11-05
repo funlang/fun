@@ -799,6 +799,21 @@ io.writeString(out, 'done');
 `io.buffer` 作为流，`fs.open` 句柄也可直接使用；格式 reader/writer 不关闭、
 不 flush 底层 IO。
 
+`io.scanner` 按 token 遍历任意 Reader，默认按行（`\n` 或 `\r\n`，最后一行可无
+换行）。`scan()` 在 EOF 或出错时返回 false，`text()` 是当前 token，`err()`
+报告 `token too long` 或 Reader 错误。`maxToken` 默认 64 KB，`delimiter`
+可替换换行符：
+
+```fun
+use 'io.fun';
+var sc = io.scanner(io.stdin());
+while sc.scan() do ?. sc.text(); end do;
+if sc.err() <> nil then raise sc.err(); end if;
+```
+
+自定义分隔符用 `io.scanner(r, [delimiter: ','])`；扫描器不关闭 Reader，并且
+可能预读，不要和直接 `read()` 混用。
+
 进程标准流沿用同一契约：
 
 ```fun

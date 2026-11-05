@@ -864,6 +864,22 @@ io.writeString(out, 'done');
 `io.buffer` where a format or helper expects a stream; `fs.open` handles work
 directly. Format readers/writers never close or flush the underlying IO.
 
+`io.scanner` walks any reader token by token, by default one line at a time
+(`\n` or `\r\n`; the final line may omit the newline). `scan()` returns false
+at EOF or on error; `text()` is the current token and `err()` reports
+`token too long` or a reader error. `maxToken` defaults to 64 KB, and
+`delimiter` replaces the newline:
+
+```fun
+use 'io.fun';
+var sc = io.scanner(io.stdin());
+while sc.scan() do ?. sc.text(); end do;
+if sc.err() <> nil then raise sc.err(); end if;
+```
+
+Use `io.scanner(r, [delimiter: ','])` for a custom separator; the scanner never
+closes the reader and may read ahead, so do not mix it with direct `read()`.
+
 Process stdio uses the same contract:
 
 ```fun
