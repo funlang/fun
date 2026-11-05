@@ -82,8 +82,8 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 Prebuilt interpreters are attached to [GitHub Releases](https://github.com/funlang/fun/releases):
 
 - Linux x64 / arm64: `.tar.gz`, with `libtcc.so` and the standard `lib/`;
-- macOS x64 / arm64: `.zip`. The x64 archive includes `libtcc.dylib`; arm64
-  does not yet. These builds are **unsigned and not notarized**;
+- macOS x64 / arm64: `.zip`. Both archives include `libtcc.dylib`. These
+  builds are **unsigned and not notarized**;
   use the bundled `install.sh --local` (curl does not set the quarantine
   attribute) or run `xattr -dr com.apple.quarantine <dir>` after extracting;
 - Windows x64: `.7z`. The build is unsigned, so SmartScreen may warn; extract
@@ -505,18 +505,18 @@ and a second build mode for untrusted scripts:
 | -------------- | ----- | --- | --------------- | --- | ---------- |
 | linux-arm64    | yes   | yes | yes             | yes | yes        |
 | linux-x64      | yes   | yes | yes             | yes | yes        |
-| macos-arm64    | yes   | yes | pending         | yes | yes        |
+| macos-arm64    | yes   | yes | yes             | yes | yes        |
 | macos-x64      | yes   | yes | yes             | yes | yes        |
 | win-x64        | yes   | yes | yes             | yes | yes        |
 
 `safe build` is the separate `fun-safe` binary (`-dFunSafe`, strict level); it
 ships next to the default interpreter, so the default build and its behaviour
 are unchanged. Every other column describes the default binary. `runtime C` is
-now available on macOS x64 through `libtcc.dylib`; Apple Silicon still lacks a
-Darwin arm64 TCC backend, so `#!C` and the JIT C path stay unavailable there
-while `#!asm` still works. The release notes and each archive's
-`capabilities.json` are generated from probes, so a degraded build cannot
-claim a capability it does not have.
+now available on both macOS architectures through `libtcc.dylib`. Apple
+Silicon uses a small TCC patch for the Darwin ucontext fields and `MAP_JIT`
+handling. The release notes and each archive's `capabilities.json` are
+generated from probes, so a degraded build cannot claim a capability it does
+not have.
 
 ### Cross builds (macOS and Linux aarch64, from Linux x86_64)
 
@@ -548,7 +548,7 @@ sources/binaries are **not** shipped. If one is missing the build script
 | Component | Where to put it | Where to get it | Who builds it |
 | --------- | --------------- | --------------- | ------------- |
 | PCRE 8 (8-bit) | `src/3rd/pcre-8/` | <https://www.pcre.org/> (8.x source, e.g. 8.45) | Linux: `make-linux-x86_64.sh` compiles it with gcc (static, `-dRegex`); Windows (i386): `src/regex/pcre/make.bat` (Borland bcc32 + make, `-Dpcresrc=<path>`; the objects `pcrd.pas` `{$LINK}`s); win64: the CI builds `pcre3.dll` with MinGW-w64 gcc and links it dynamically (`-dRegex -dPCRE_WinDLL`, see below) |
-| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | the tinycc release on savannah/nongnu, or repo.or.cz tag `release_0_9_27` | `make-linux-x86_64.sh` produces `libtcc.so`; `build-win64-deps.sh` produces the x86-64 `libtcc.dll` (win64); `build-tcc-darwin.sh` produces `libtcc.dylib` (macOS x86_64) |
+| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | the tinycc release on savannah/nongnu, or repo.or.cz tag `release_0_9_27` | `make-linux-x86_64.sh` produces `libtcc.so`; `build-win64-deps.sh` produces the x86-64 `libtcc.dll` (win64); `build-tcc-darwin.sh` produces `libtcc.dylib` (macOS x86_64 and arm64, the latter with `patches/tcc-darwin-arm64.patch`) |
 | libffi (win64) | `ffi.dll` next to `funcmd.exe` | MSYS2 `mingw-w64-x86_64-libffi`, or any x86_64 libffi build | the win64 CI installs it so `getapi` works there (`-dWinFFI`); Linux/macOS use the libffi that ships with FPC |
 | zlib 1.2.11 (win64) | `src/3rd/zlib-1.2.11/` | <https://zlib.net/fossils/> | `build-win64-deps.sh` produces the x86-64 `zlib.dll`; Linux/macOS use the system zlib |
 

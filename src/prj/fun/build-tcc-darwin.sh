@@ -8,17 +8,17 @@
 # Cross use (Linux x86_64, with Zig):
 #   CC="$ZIG cc" TCC_TARGET_FLAGS="-target x86_64-macos" \
 #       ./build-tcc-darwin.sh x86_64 /path/to/libtcc.dylib
+#   CC="$ZIG cc" TCC_TARGET_FLAGS="-target aarch64-macos" \
+#       ./build-tcc-darwin.sh arm64 /path/to/libtcc.dylib
 #
 # Inputs:
 #   TCC_SRC          TCC source tree (default: ../../3rd/tcc)
 #   CC               C compiler command (default: cc); may contain arguments
 #   TCC_TARGET_FLAGS extra compiler/linker flags (e.g. -target x86_64-macos)
 #
-# Only x86_64 is enabled for now. The arm64 backend needs two pieces that
-# TCC 0.9.27 does not provide for Darwin: __darwin_arm_thread_state64 field
-# names in tccrun.c and MAP_JIT / pthread_jit_write_protect_np handling for
-# Apple Silicon. Keep this script as the single build entry point when that
-# work starts, so make-macos.sh does not grow another platform branch.
+# x86_64 builds TCC directly. arm64 first applies patches/tcc-darwin-arm64.patch,
+# which adds the __darwin_arm_thread_state64 field names and MAP_JIT /
+# pthread_jit_write_protect_np handling that TCC 0.9.27 lacks.
 # ============================================================
 set -e
 
@@ -31,11 +31,8 @@ TCC_TARGET_FLAGS="${TCC_TARGET_FLAGS:-}"
 
 case "$ARCH" in
     x86_64|amd64) ARCH=x86_64 ;;
-    *)
-        echo "build-tcc-darwin: unsupported arch '$ARCH' (only x86_64 is enabled)" >&2
-        echo "  arm64 needs the TCC ucontext and MAP_JIT changes described in the header" >&2
-        exit 2
-        ;;
+    arm64|aarch64) ARCH=arm64 ;;
+    *) echo "build-tcc-darwin: unsupported arch '$ARCH'" >&2; exit 2 ;;
 esac
 
 if [ ! -f "$TCC_SRC/libtcc.c" ]; then
@@ -53,13 +50,32 @@ printf '#define TCC_VERSION "0.9.27"\n' > "$TMP/config.h"
 
 # libtcc's Unix objects; tcc.c/tcctools.c are the command-line front end and
 # are not part of the library.
-FILES="libtcc tccpp tccgen tccelf tccasm tccrun x86_64-gen x86_64-link i386-asm"
-DEFS="-DTCC_TARGET_X86_64 -DTCC_TARGET_MACHO -DONE_SOURCE=0"
+if [ "$ARCH" = arm64 ]; then
+    FILES="libtcc tccpp tccgen tccelf tccasm tccrun arm64-gen arm64-link"
+    DEFS="-DTCC_TARGET_ARM64 -DTCC_TARGET_MACHO -DONE_SOURCE=0"
+else
+    FILES="libtcc tccpp tccgen tccelf tccasm tccrun x86_64-gen x86_64-link i386-asm"
+    DEFS="-DTCC_TARGET_X86_64 -DTCC_TARGET_MACHO -DONE_SOURCE=0"
+fi
+
+SRC="$TCC_SRC"
+if [ "$ARCH" = arm64 ]; then
+    PATCH="$HERE/patches/tcc-darwin-arm64.patch"
+    [ -f "$PATCH" ] || { echo "build-tcc-darwin: missing $PATCH" >&2; exit 1; }
+    # Keep src/3rd pristine: patch a private copy so repeated builds and the
+    # shared third-party cache never depend on the order they ran in.
+    cp -R "$TCC_SRC" "$TMP/tcc"
+    SRC="$TMP/tcc"
+    ( cd "$SRC" && patch -p1 -s < "$PATCH" ) || {
+        echo "build-tcc-darwin: could not apply $PATCH" >&2
+        exit 1
+    }
+fi
 
 for f in $FILES; do
     # shellcheck disable=SC2086
-    $CC $TCC_TARGET_FLAGS -c -O2 -fPIC -I"$TMP" -I"$TCC_SRC" $DEFS \
-        "$TCC_SRC/$f.c" -o "$TMP/$f.o"
+    $CC $TCC_TARGET_FLAGS -c -O2 -fPIC -I"$TMP" -I"$SRC" $DEFS \
+        "$SRC/$f.c" -o "$TMP/$f.o"
 done
 
 mkdir -p "$(dirname "$OUT")"

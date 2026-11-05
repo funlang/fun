@@ -91,7 +91,7 @@ jobs:
             fpc_tar: ""
             build: ./make-macos.sh
             fetch_all: true
-            tcc: false
+            tcc: true
     runs-on: ${{ matrix.os }}
     # A hard ceiling: install/hdiutil steps have hung on macOS runners before,
     # and the default six-hour limit is not a useful failure mode.

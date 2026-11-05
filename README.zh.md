@@ -82,7 +82,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 预编译解释器见 [GitHub Releases](https://github.com/funlang/fun/releases)：
 
 - Linux x64 / arm64：`.tar.gz`，内含 `libtcc.so` 与标准库 `lib/`；
-- macOS x64 / arm64：`.zip`。x64 包内含 `libtcc.dylib`，arm64 暂无。构建
+- macOS x64 / arm64：`.zip`。两个包都内含 `libtcc.dylib`。构建
   **未签名、未公证**；请使用包内 `install.sh`
   `--local`（curl 下载不会设置隔离属性），或解压后执行
   `xattr -dr com.apple.quarantine <目录>`；
@@ -484,15 +484,15 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | ------------- | ----- | --- | -------------- | --- | --------- |
 | linux-arm64   | yes   | yes | yes            | yes | yes       |
 | linux-x64     | yes   | yes | yes            | yes | yes       |
-| macos-arm64   | yes   | yes | pending        | yes | yes       |
+| macos-arm64   | yes   | yes | yes            | yes | yes       |
 | macos-x64     | yes   | yes | yes            | yes | yes       |
 | win-x64       | yes   | yes | yes            | yes | yes       |
 
 `safe 构建` 指独立的 `fun-safe` 二进制（`-dFunSafe`，strict 档），与默认解释器
 一起发布，默认构建的行为不受影响；其余列均描述默认二进制。`运行时 C` 已在
-macOS x64 上通过 `libtcc.dylib` 补齐；Apple Silicon 仍缺 Darwin arm64 的 TCC
-后端，因此 `#!C` 与 JIT 的 C 路径在那里不可用，但 `#!asm` 仍可用。release notes
-与每个包里的 `capabilities.json` 都由实测探针生成，降级构建无法虚报能力。
+macOS x64 与 arm64 上通过 `libtcc.dylib` 补齐；Apple Silicon 使用一个小补丁
+处理 Darwin ucontext 字段与 `MAP_JIT`。release notes 与每个包里的
+`capabilities.json` 都由实测探针生成，降级构建无法虚报能力。
 
 ### 交叉构建（在 Linux x86_64 上构建 macOS 与 Linux aarch64）
 
@@ -521,7 +521,7 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 | 组件 | 放到哪里 | 从哪里获取 | 由谁构建 |
 | ---- | -------- | ---------- | -------- |
 | PCRE 8（8-bit） | `src/3rd/pcre-8/` | <https://www.pcre.org/>（8.x 源码，如 8.45） | Linux：`make-linux-x86_64.sh` 用 gcc 静态编译（`-dRegex`）；Windows(i386)：`src/regex/pcre/make.bat`（Borland bcc32 + make，可 `-Dpcresrc=<路径>`，产物即 `pcrd.pas` 里 `{$LINK}` 的对象）；win64：CI 用 MinGW-w64 gcc 编出 `pcre3.dll` 并动态链接（`-dRegex -dPCRE_WinDLL`） |
-| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | savannah/nongnu 的 tinycc 发行包，或 repo.or.cz 的 `release_0_9_27` tag | `make-linux-x86_64.sh` 产出 `libtcc.so`；`build-win64-deps.sh` 产出 x86-64 的 `libtcc.dll`（win64）；`build-tcc-darwin.sh` 产出 `libtcc.dylib`（macOS x86_64） |
+| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | savannah/nongnu 的 tinycc 发行包，或 repo.or.cz 的 `release_0_9_27` tag | `make-linux-x86_64.sh` 产出 `libtcc.so`；`build-win64-deps.sh` 产出 x86-64 的 `libtcc.dll`（win64）；`build-tcc-darwin.sh` 产出 `libtcc.dylib`（macOS x86_64 与 arm64，arm64 使用 `patches/tcc-darwin-arm64.patch`） |
 | libffi（win64） | 放在 `funcmd.exe` 旁的 `ffi.dll` | MSYS2 的 `mingw-w64-x86_64-libffi`，或任意 x86_64 libffi 构建 | win64 CI 会装好它，从而让 `getapi` 可用（`-dWinFFI`）；Linux / macOS 用 FPC 自带的 libffi |
 | zlib 1.2.11（win64） | `src/3rd/zlib-1.2.11/` | <https://zlib.net/fossils/> | `build-win64-deps.sh` 产出 x86-64 的 `zlib.dll`；Linux / macOS 用系统 zlib |
 

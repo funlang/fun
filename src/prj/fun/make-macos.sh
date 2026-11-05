@@ -12,8 +12,8 @@
 # a notice (regex / getapi off), exactly like the Linux script.
 #
 # Runtime C compilation uses libtcc.dylib, built here from the vendored TCC on
-# x86_64. Apple Silicon is not enabled yet: TCC 0.9.27 needs Darwin arm64
-# ucontext fields and MAP_JIT handling that upstream does not have.
+# both x86_64 and arm64. Apple Silicon needs a small TCC patch for the Darwin
+# ucontext fields and MAP_JIT handling; build-tcc-darwin.sh applies it.
 #
 # Usage:
 #   ./make-macos.sh                 # FPC from PATH, or /usr/local/bin, /opt/homebrew/bin
@@ -119,18 +119,19 @@ TCC_LIB="$HERE/libtcc.dylib"
 TCC_OK=0
 if [ -n "$TCC_SRC" ] && [ -f "$TCC_SRC/libtcc.c" ]; then
     case "$(uname -m)" in
-        x86_64)
-            if [ ! -f "$TCC_LIB" ] || [ "$TCC_SRC/libtcc.c" -nt "$TCC_LIB" ]; then
-                TCC_SRC="$TCC_SRC" sh "$HERE/build-tcc-darwin.sh" x86_64 "$TCC_LIB"
-            fi
-            TCC_OK=1
-            echo "TCC enabled (libtcc.dylib next to funcmd)."
-            ;;
-        *)
-            echo "TCC not built on $(uname -m): libtcc.dylib is x86_64-only for now." >&2
-            echo "  Runtime C (#!C) stays unavailable on Apple Silicon." >&2
-            ;;
+        arm64|aarch64) TCC_ARCH=arm64 ;;
+        x86_64|amd64)  TCC_ARCH=x86_64 ;;
+        *)             TCC_ARCH="" ;;
     esac
+    if [ -n "$TCC_ARCH" ]; then
+        if [ ! -f "$TCC_LIB" ] || [ "$TCC_SRC/libtcc.c" -nt "$TCC_LIB" ]; then
+            TCC_SRC="$TCC_SRC" sh "$HERE/build-tcc-darwin.sh" "$TCC_ARCH" "$TCC_LIB"
+        fi
+        TCC_OK=1
+        echo "TCC enabled for $TCC_ARCH (libtcc.dylib next to funcmd)."
+    else
+        echo "TCC not built on $(uname -m): unsupported macOS architecture." >&2
+    fi
 else
     echo "TCC C source not found - building WITHOUT runtime C (lib-tcc.fun needs libtcc.dylib)." >&2
 fi

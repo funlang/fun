@@ -1,6 +1,0 @@
-# Extra skips for macOS arm64. The runner merges this file with
-# regression-skip-macos.txt, so only arch-specific differences belong here.
-#
-# libtcc.dylib is built for x86_64 only: TCC 0.9.27 lacks the Darwin arm64
-# ucontext fields and MAP_JIT handling. Remove this line when that work lands.
-lib-tcc-test.fun	no libtcc.dylib build for macOS arm64 yet
