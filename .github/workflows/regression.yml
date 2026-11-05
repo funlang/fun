@@ -841,11 +841,19 @@ jobs:
             }
 
             $env:CC = $gcc
+            # Git Bash does not treat a backslashed Windows path as a command
+            # name; forward slashes work in both bash and gcc.
+            $env:CC = $gcc.Replace('\', '/')
             $env:ZLIB_SRC = $zlib.Replace('\', '/')
             $bash = (Get-Command bash -ErrorAction SilentlyContinue).Source
             if (-not $bash) { throw 'no bash to run build-win64-deps.sh' }
-            & $bash 'src/prj/fun/build-win64-deps.sh'
-            if ($LASTEXITCODE -ne 0) { throw "build-win64-deps.sh exited $LASTEXITCODE" }
+            $depLog = "$env:RUNNER_TEMP\build-windows-x64-deps.log"
+            & $bash 'src/prj/fun/build-win64-deps.sh' *>&1 |
+              Tee-Object -FilePath $depLog
+            if ($LASTEXITCODE -ne 0) {
+              $tail = ((Get-Content $depLog -Tail 20) -join ' | ')
+              throw "build-win64-deps.sh exited $LASTEXITCODE :: $tail"
+            }
             foreach ($dll in @('libtcc.dll', 'zlib.dll')) {
               $p = Join-Path $env:GITHUB_WORKSPACE "src\prj\fun\$dll"
               if (-not (Test-Path $p)) { throw "$dll was not produced" }
@@ -907,6 +915,14 @@ jobs:
                     '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx',
                     '-dFunPack',
                     "-Fu$((Resolve-Path '..\..\lib').Path)")
+          # Keep the normal build's .ppu/.o/.obj out of the project directory:
+          # the safe build uses units-safe, and stale normal units in the
+          # current directory have confused the win64 compiler before.
+          $units = Join-Path (Get-Location) 'units'
+          New-Item -ItemType Directory -Force -Path $units | Out-Null
+          Remove-Item (Join-Path $units '*.ppu'), (Join-Path $units '*.o'), `
+                      (Join-Path $units '*.or') -Force -ErrorAction SilentlyContinue
+          $argv += "-FU$units"
 
           $built = $null
           $tried = @()
@@ -969,8 +985,14 @@ jobs:
             Out-File -FilePath $log -Encoding ascii
           & ppcrossx64 @argv *>&1 | Tee-Object -FilePath $log -Append
           if ($LASTEXITCODE -ne 0) {
-            $tail = ((Get-Content $log -Tail 30) -join '~')
-            Write-Host "::error title=safe build (windows-x64)::exit=$LASTEXITCODE $($tail.Substring(0, [Math]::Min(2500, $tail.Length)))"
+            $errs = (Get-Content $log |
+                       Select-String -Pattern 'Fatal:|Error:' |
+                       Select-Object -Last 8 |
+                       ForEach-Object { $_.Line }) -join ' | '
+            if ([string]::IsNullOrEmpty($errs)) {
+              $errs = ((Get-Content $log -Tail 20) -join ' | ')
+            }
+            Write-Host "::error title=safe build (windows-x64)::exit=$LASTEXITCODE $errs"
             exit 1
           }
           if (-not (Test-Path 'funcmd-safe.exe')) {
