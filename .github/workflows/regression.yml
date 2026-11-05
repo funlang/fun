@@ -315,6 +315,22 @@ jobs:
           fi
           grep -E 'SAFE=strict' "$safe_log" || true
 
+      - name: Diagnose libtcc (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          {
+            for p in src/prj/fun/libtcc.dylib fun/libtcc.dylib; do
+              echo "path=$p exists=$([ -f "$p" ] && echo yes || echo no)"
+              if [ -f "$p" ]; then
+                ls -l "$p"
+                file "$p"
+                otool -L "$p"
+                codesign -dv "$p" 2>&1 || true
+              fi
+            done
+          } > "$RUNNER_TEMP/tcc-info.txt" 2>&1 || true
+          echo "::notice title=libtcc::$(tr '\n' '~' < "$RUNNER_TEMP/tcc-info.txt" | cut -c1-1500)"
+
       # The build itself copies these into fun/; a cache hit has to do it too,
       # because input-console.sh prefers fun/funcmd when it exists.
       - name: Publish cached funcmd to fun/
