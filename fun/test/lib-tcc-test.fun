@@ -17,8 +17,8 @@ if 'host'.arg().getJson(fd: true).os = 'macos' then
       ?. 'debug reloc=' & dr;
       var dp = tcc.Get(dts, 'dadd');
       ?. 'debug ptr=' & dp;
-    except m
-      ?. 'debug error: ' & m;
+    except
+      ?. 'debug error: ' & @;
     end try;
   end if;
 end if;
