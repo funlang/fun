@@ -69,7 +69,10 @@ test('movs is string-only and ignores a numeric destination', {
 });
 
 test('toNum bounded reinterpret reads are allowed', {
-  var i = 'abcd'.toNum(ptr: 1);
+  // fun.uint is 4 bytes on 32-bit/Linux-x64 and 8 bytes on win64, so use an
+  // 8-byte source for the integer read; the short read must yield 0.
+  var i = 'abcdefgh'.toNum(ptr: 1);
+  assert.equal('abc'.toNum(ptr: 1), 0);
   'abcd'.toNum(ptr: 2);
   'abcdefgh'.toNum(ptr: 3);
   assert.is_true(i <> 0);
