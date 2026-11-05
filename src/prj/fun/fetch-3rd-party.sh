@@ -19,6 +19,7 @@
 #   src/prj/fun/fetch-3rd-party.sh --pcre-only
 #   src/prj/fun/fetch-3rd-party.sh --tcc-only
 #   src/prj/fun/fetch-3rd-party.sh --zlib-only
+#   src/prj/fun/fetch-3rd-party.sh --win64-deps   # TCC + zlib, no PCRE
 #
 # Needs curl or wget, tar (with gzip/bzip2 support), and network access.
 # ============================================================
@@ -47,7 +48,8 @@ for a in "$@"; do
         --pcre-only) want_tcc=0; want_zlib=0 ;;
         --tcc-only)  want_pcre=0; want_zlib=0 ;;
         --zlib-only) want_pcre=0; want_tcc=0 ;;
-        *) echo "usage: $0 [--force|--pcre-only|--tcc-only|--zlib-only]" >&2; exit 2 ;;
+        --win64-deps) want_pcre=0 ;;
+        *) echo "usage: $0 [--force|--pcre-only|--tcc-only|--zlib-only|--win64-deps]" >&2; exit 2 ;;
     esac
 done
 

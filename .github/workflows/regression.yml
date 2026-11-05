@@ -830,26 +830,22 @@ jobs:
               throw "compiler target is not x86_64: $(& $gcc -dumpmachine)"
             }
 
-            # zlib 1.2.11 matches ZLIB_VERSION in fun/lib/lib-zlib.fun.
-            $zlib = Join-Path $env:RUNNER_TEMP 'zlib-1.2.11'
-            if (-not (Test-Path (Join-Path $zlib 'deflate.c'))) {
-              $tar = Join-Path $env:RUNNER_TEMP 'zlib-1.2.11.tar.gz'
-              curl.exe -fL --retry 3 --retry-all-errors -o $tar `
-                'https://zlib.net/fossils/zlib-1.2.11.tar.gz'
-              if ($LASTEXITCODE -ne 0) { throw "zlib download failed ($LASTEXITCODE)" }
-              tar.exe -xf $tar -C $env:RUNNER_TEMP
-            }
-
-            $env:CC = $gcc
             # Git Bash does not treat a backslashed Windows path as a command
             # name; forward slashes work in both bash and gcc.
             $env:CC = $gcc.Replace('\', '/')
-            $env:ZLIB_SRC = $zlib.Replace('\', '/')
             $bash = (Get-Command bash -ErrorAction SilentlyContinue).Source
             if (-not $bash) { throw 'no bash to run build-win64-deps.sh' }
             $depLog = "$env:RUNNER_TEMP\build-windows-x64-deps.log"
-            & $bash 'src/prj/fun/build-win64-deps.sh' *>&1 |
+            # TCC and zlib are not tracked in the repo. fetch-3rd-party.sh
+            # verifies the pinned SHA256 and unpacks them into src/3rd/.
+            & $bash 'src/prj/fun/fetch-3rd-party.sh' '--win64-deps' *>&1 |
               Tee-Object -FilePath $depLog
+            if ($LASTEXITCODE -ne 0) {
+              $tail = ((Get-Content $depLog -Tail 20) -join ' | ')
+              throw "fetch-3rd-party.sh exited $LASTEXITCODE :: $tail"
+            }
+            & $bash 'src/prj/fun/build-win64-deps.sh' *>&1 |
+              Tee-Object -FilePath $depLog -Append
             if ($LASTEXITCODE -ne 0) {
               $tail = ((Get-Content $depLog -Tail 20) -join ' | ')
               throw "build-win64-deps.sh exited $LASTEXITCODE :: $tail"
@@ -979,7 +975,8 @@ jobs:
                       (Join-Path $units '*.or') -Force -ErrorAction SilentlyContinue
           $argv = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs', '-Twin64',
                     '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx', '-dFunPack') + $flags +
-                  @('-dFunSafe', '-ofuncmd-safe.exe', "-FU$units")
+                  @('-dFunSafe', '-ofuncmd-safe.exe', "-FU$units",
+                    "-Fu$((Resolve-Path '..\..\lib').Path)")
           Write-Host "safe argv: $(($argv | ForEach-Object { "[$_]" }) -join ' ')"
           "safe argv: $(($argv | ForEach-Object { "[$_]" }) -join ' ')" |
             Out-File -FilePath $log -Encoding ascii
