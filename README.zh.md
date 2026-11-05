@@ -82,7 +82,8 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 预编译解释器见 [GitHub Releases](https://github.com/funlang/fun/releases)：
 
 - Linux x64 / arm64：`.tar.gz`，内含 `libtcc.so` 与标准库 `lib/`；
-- macOS x64 / arm64：`.zip`。构建**未签名、未公证**；请使用包内 `install.sh`
+- macOS x64 / arm64：`.zip`。x64 包内含 `libtcc.dylib`，arm64 暂无。构建
+  **未签名、未公证**；请使用包内 `install.sh`
   `--local`（curl 下载不会设置隔离属性），或解压后执行
   `xattr -dr com.apple.quarantine <目录>`；
 - Windows x64：`.7z`。构建未签名，SmartScreen 可能提示；请用 7-Zip 解压，
@@ -297,11 +298,11 @@ Fun 的特殊之处在于，一段脚本在无需独立工具链的情况下能�
 | ---------- | --------------------------------- | ------------------------------------------------ |
 | 高层       | JSON / FD 数据，list / set / tree | 原生集合与解析器                                 |
 | 原生调用   | `dll.getapi(name, 'signature')`   | 紧凑签名约定的 FFI                               |
-| 运行时 C   | `ccompile(code, ...)`             | 内置 Tiny C 编译器（`libtcc.dll`/`.so`）          |
+| 运行时 C   | `ccompile(code, ...)`             | 内置 Tiny C 编译器（`libtcc.dll`/`.so`/`.dylib`） |
 | JIT        | `NewJit(...)`                     | 在 C（TCC）与汇编之间分发                        |
 | 机器码     | `Assembly(code, ...).Load()`      | 内联汇编、可执行内存分配                         |
 
-例如，`lib-tcc` 加载 `libtcc.dll`（Linux 上为 `libtcc.so`）并暴露 `tcc_new`、`tcc_compile_string`、`tcc_get_symbol` 等，从而你可以从字符串编译 C 源码并立即调用所得到的符号。`lib-asm` 分配可执行内存、写入机器码并调用之；`lib-jit` 则根据源码形态自动选择路径（`#!c` → TCC，否则走汇编）。
+例如，`lib-tcc` 加载 `libtcc.dll`（Linux 为 `libtcc.so`，macOS x64 为 `libtcc.dylib`）并暴露 `tcc_new`、`tcc_compile_string`、`tcc_get_symbol` 等，从而你可以从字符串编译 C 源码并立即调用所得到的符号。`lib-asm` 分配可执行内存、写入机器码并调用之；`lib-jit` 则根据源码形态自动选择路径（`#!c` → TCC，否则走汇编）。
 
 一段脚本可以同时混合两者：`NewJit` 在运行时编译 C **和**内联汇编，并且两者都能通过 `@toCallback` 直接回调回 Fun 函数。下面的片段对 `1..n` 求和——一次走汇编、一次走编译出的 C，两次都把结果交给 Fun 回调（完整版本见 [`test-jit-cb.fun`](fun/demos/benchmarks/test-jit-cb.fun)）：
 
@@ -484,14 +485,14 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | linux-arm64   | yes   | yes | yes            | yes | yes       |
 | linux-x64     | yes   | yes | yes            | yes | yes       |
 | macos-arm64   | yes   | yes | pending        | yes | yes       |
-| macos-x64     | yes   | yes | pending        | yes | yes       |
+| macos-x64     | yes   | yes | yes            | yes | yes       |
 | win-x64       | yes   | yes | yes            | yes | yes       |
 
 `safe 构建` 指独立的 `fun-safe` 二进制（`-dFunSafe`，strict 档），与默认解释器
-一起发布，默认构建的行为不受影响；其余列均描述默认二进制。`运行时 C` 是唯一
-未补齐的中间层：macOS 尚无 `libtcc.dylib`，因此 `#!C` 与 JIT 的 C 路径不可用，
-但 `#!asm` 仍可用。release notes 与每个包里的 `capabilities.json` 都由实测探针
-生成，降级构建无法虚报能力。
+一起发布，默认构建的行为不受影响；其余列均描述默认二进制。`运行时 C` 已在
+macOS x64 上通过 `libtcc.dylib` 补齐；Apple Silicon 仍缺 Darwin arm64 的 TCC
+后端，因此 `#!C` 与 JIT 的 C 路径在那里不可用，但 `#!asm` 仍可用。release notes
+与每个包里的 `capabilities.json` 都由实测探针生成，降级构建无法虚报能力。
 
 ### 交叉构建（在 Linux x86_64 上构建 macOS 与 Linux aarch64）
 
@@ -520,7 +521,7 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 | 组件 | 放到哪里 | 从哪里获取 | 由谁构建 |
 | ---- | -------- | ---------- | -------- |
 | PCRE 8（8-bit） | `src/3rd/pcre-8/` | <https://www.pcre.org/>（8.x 源码，如 8.45） | Linux：`make-linux-x86_64.sh` 用 gcc 静态编译（`-dRegex`）；Windows(i386)：`src/regex/pcre/make.bat`（Borland bcc32 + make，可 `-Dpcresrc=<路径>`，产物即 `pcrd.pas` 里 `{$LINK}` 的对象）；win64：CI 用 MinGW-w64 gcc 编出 `pcre3.dll` 并动态链接（`-dRegex -dPCRE_WinDLL`） |
-| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | savannah/nongnu 的 tinycc 发行包，或 repo.or.cz 的 `release_0_9_27` tag | `make-linux-x86_64.sh` 产出 `libtcc.so`；`build-win64-deps.sh` 产出 x86-64 的 `libtcc.dll`（win64） |
+| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | savannah/nongnu 的 tinycc 发行包，或 repo.or.cz 的 `release_0_9_27` tag | `make-linux-x86_64.sh` 产出 `libtcc.so`；`build-win64-deps.sh` 产出 x86-64 的 `libtcc.dll`（win64）；`build-tcc-darwin.sh` 产出 `libtcc.dylib`（macOS x86_64） |
 | libffi（win64） | 放在 `funcmd.exe` 旁的 `ffi.dll` | MSYS2 的 `mingw-w64-x86_64-libffi`，或任意 x86_64 libffi 构建 | win64 CI 会装好它，从而让 `getapi` 可用（`-dWinFFI`）；Linux / macOS 用 FPC 自带的 libffi |
 | zlib 1.2.11（win64） | `src/3rd/zlib-1.2.11/` | <https://zlib.net/fossils/> | `build-win64-deps.sh` 产出 x86-64 的 `zlib.dll`；Linux / macOS 用系统 zlib |
 

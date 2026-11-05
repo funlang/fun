@@ -15,8 +15,8 @@
 # Build first (native FPC):  cd src/prj/fun && ./make-macos.sh
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# Apple Silicon has its own snapshot dir (expected/macos-aarch64/); it still
-# reads the macos skip list (see the runner's platform fallback).
+# Apple Silicon has its own snapshot dir (expected/macos-aarch64/) and merges
+# its own skip file with regression-skip-macos.txt.
 case "$(uname -m 2>/dev/null)" in
     arm64|aarch64) FUNREG_PLATFORM=macos-aarch64 ;;
     *)             FUNREG_PLATFORM=macos ;;

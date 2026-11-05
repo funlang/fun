@@ -96,7 +96,14 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
             "date": meta["date"],
             "safe": (src / src_safe).is_file(),
             "safe_level": "strict",
-            "libtcc_present": (src / ("libtcc.dll" if is_win else "libtcc.so")).is_file(),
+            "libtcc_present": any(
+                (src / name).is_file()
+                for name in (
+                    ("libtcc.dll",)
+                    if is_win
+                    else (("libtcc.dylib",) if platform.startswith("macos") else ("libtcc.so",))
+                )
+            ),
             "executables": ["fun/" + exe]
             + (["fun/" + safe_exe] if (src / src_safe).is_file() else []),
         }
@@ -136,11 +143,13 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
                 shutil.copy2(p, runtime / dll)
                 os.utime(runtime / dll, (epoch, epoch))
     else:
-        tcc = src / "libtcc.so"
-        if tcc.is_file():
-            shutil.copy2(tcc, runtime / "libtcc.so")
-            os.chmod(runtime / "libtcc.so", 0o755)
-            os.utime(runtime / "libtcc.so", (epoch, epoch))
+        tcc_names = ("libtcc.dylib",) if platform.startswith("macos") else ("libtcc.so",)
+        for tcc_name in tcc_names:
+            tcc = src / tcc_name
+            if tcc.is_file():
+                shutil.copy2(tcc, runtime / tcc_name)
+                os.chmod(runtime / tcc_name, 0o755)
+                os.utime(runtime / tcc_name, (epoch, epoch))
 
     # The interpreter resolves the standard library next to the executable,
     # so lib/ must sit inside fun/. demo/demos/test are the same tree users
@@ -195,7 +204,7 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
     else:
         notes += [
             "",
-            "Keep lib/ and libtcc.so next to fun/fun.",
+            "Keep lib/ and libtcc.so (libtcc.dylib on macOS) next to fun/fun.",
             "Install this extracted tree: ./install.sh --local",
             "(adds a fun symlink under ~/.local/bin; pass --add-path to append",
             "that directory to a shell profile). Without --local it downloads",

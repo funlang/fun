@@ -11,8 +11,9 @@
 # bundled libffi unit when both are available; otherwise it degrades and prints
 # a notice (regex / getapi off), exactly like the Linux script.
 #
-# Not built on macOS: libtcc.dylib (no macOS build of the vendored TCC yet), so
-# lib-tcc.fun / lib-jit.fun stay unavailable and their tests are skipped.
+# Runtime C compilation uses libtcc.dylib, built here from the vendored TCC on
+# x86_64. Apple Silicon is not enabled yet: TCC 0.9.27 needs Darwin arm64
+# ucontext fields and MAP_JIT handling that upstream does not have.
 #
 # Usage:
 #   ./make-macos.sh                 # FPC from PATH, or /usr/local/bin, /opt/homebrew/bin
@@ -106,6 +107,33 @@ else
     echo "PCRE C source not found - building WITHOUT regex." >&2
 fi
 
+# --- Optional: bundled Tiny C Compiler (libtcc.dylib) ---------------------
+# lib-tcc.fun loads 'libtcc.dylib' next to the executable. TCC is not linked
+# into funcmd; it is dlopen'd at run time, so no extra FPC flags are needed.
+TCC_SRC="${TCC_SRC:-}"
+if [ -z "$TCC_SRC" ] && [ -d "$HERE/../../3rd/tcc" ]; then
+    TCC_SRC="$(cd "$HERE/../../3rd/tcc" && pwd)"
+fi
+TCC_LIB="$HERE/libtcc.dylib"
+TCC_OK=0
+if [ -n "$TCC_SRC" ] && [ -f "$TCC_SRC/libtcc.c" ]; then
+    case "$(uname -m)" in
+        x86_64)
+            if [ ! -f "$TCC_LIB" ] || [ "$TCC_SRC/libtcc.c" -nt "$TCC_LIB" ]; then
+                TCC_SRC="$TCC_SRC" sh "$HERE/build-tcc-darwin.sh" x86_64 "$TCC_LIB"
+            fi
+            TCC_OK=1
+            echo "TCC enabled (libtcc.dylib next to funcmd)."
+            ;;
+        *)
+            echo "TCC not built on $(uname -m): libtcc.dylib is x86_64-only for now." >&2
+            echo "  Runtime C (#!C) stays unavailable on Apple Silicon." >&2
+            ;;
+    esac
+else
+    echo "TCC C source not found - building WITHOUT runtime C (lib-tcc.fun needs libtcc.dylib)." >&2
+fi
+
 # --- Optional: getapi() via FPC's bundled libffi unit --------------------
 # The engine maps -dDarwinFFI to its UnixFFI symbol; libffi itself is part of
 # libSystem on macOS, so only FPC's 'ffi' unit has to be locatable.
@@ -152,4 +180,8 @@ fi
 if [ -f "$BUILD_BIN" ] && [ -d "$ROOT/fun" ]; then
     cp -f "$BUILD_BIN" "$TARGET_BIN"
     echo "Copied $(basename "$BUILD_BIN") to $TARGET_BIN"
+fi
+if [ "$TCC_OK" = 1 ] && [ -f "$TCC_LIB" ] && [ -d "$ROOT/fun" ]; then
+    cp -f "$TCC_LIB" "$ROOT/fun/libtcc.dylib"
+    echo "Copied libtcc.dylib to $ROOT/fun/libtcc.dylib"
 fi

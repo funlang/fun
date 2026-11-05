@@ -27,14 +27,14 @@
 # PLATFORM is derived from `uname -s` plus `uname -m` (linux / macos, and
 # macos-aarch64 on Apple Silicon) and can be overridden with
 # FUNREG_PLATFORM=<name>. Arch-suffixed ids (macos-aarch64, linux-aarch64) look
-# for their own skip list and snapshots first, then fall back to the base id.
+# for their own snapshots first, then fall back to the base id.
 # Two per-platform files tune the run:
 #
 #   fun/test/regression-skip-<platform>.txt   name<TAB>reason for tests that
 #       cannot run on that host at all (a Linux-only /proc or libc.so backend,
 #       an unimplemented JIT, ...). Skipped tests are reported as SKIP and do
-#       not count as failures. A missing arch-specific file falls back to the
-#       base id's (macos-aarch64 reads regression-skip-macos.txt).
+#       not count as failures. An arch-specific file is merged with the base
+#       id's (macos-aarch64 reads its own file, then regression-skip-macos.txt).
 #   fun/test/expected/<platform>/<name>.txt   a host-specific snapshot that
 #       overrides the shared fun/test/expected/<name>.txt for that host. Only
 #       tests whose *portable* output legitimately differs per host need one;
@@ -91,13 +91,19 @@ esac
 PLATFORM="${FUNREG_PLATFORM:-$PLATFORM}"
 PLATFORM_BASE="${PLATFORM%%-*}"
 PLATFORM_EXPECTED="$EXPECTED/$PLATFORM"
-SKIPFILE="$HERE/regression-skip-$PLATFORM.txt"
-# Arch-suffixed ids (macos-aarch64, linux-aarch64) fall back to the base id's
-# skip list when they have no file of their own.
-if [ ! -f "$SKIPFILE" ] && [ "$PLATFORM_BASE" != "$PLATFORM" ] \
-   && [ -f "$HERE/regression-skip-$PLATFORM_BASE.txt" ]; then
-    SKIPFILE="$HERE/regression-skip-$PLATFORM_BASE.txt"
-fi
+# Skip lists are merged. An arch-suffixed id (macos-aarch64, linux-aarch64)
+# reads its own entries first, then the base id's (macos, linux), so a test can
+# run on macos-x64 while staying skipped on macos-arm64 without duplicating the
+# whole base list.
+SKIPFILES=""
+for _p in "$PLATFORM" "$PLATFORM_BASE"; do
+    _f="$HERE/regression-skip-$_p.txt"
+    [ -f "$_f" ] || continue
+    case " $SKIPFILES " in
+        *" $_f "*) ;;
+        *) SKIPFILES="$SKIPFILES $_f" ;;
+    esac
+done
 
 # --update writes into the host's own snapshot dir. `?.` emits the platform's
 # native newline, so a POSIX update must not overwrite the CRLF snapshots that
@@ -149,8 +155,16 @@ fi
 
 # Is NAME in the platform skip file? Prints its reason and returns 0 if so.
 skip_reason() {
-    [ -f "$SKIPFILE" ] || return 1
-    awk -F'\t' -v n="$1" '$1==n { print ($2=="" ? "platform-specific" : $2); found=1; exit } END { exit(found?0:1) }' "$SKIPFILE"
+    for f in $SKIPFILES; do
+        r=$(awk -F'\t' -v n="$1" \
+            '$1==n { print ($2=="" ? "platform-specific" : $2); found=1; exit }
+             END { exit(found?0:1) }' "$f")
+        if [ $? -eq 0 ]; then
+            printf '%s\n' "$r"
+            return 0
+        fi
+    done
+    return 1
 }
 
 # The snapshot a test is compared against: arch-specific, then base-platform,
@@ -169,10 +183,12 @@ update=0
 case "${1:-}" in
     --list)
         awk -F'\t' -v plat="$PLATFORM" '{printf "%-24s %-30s %-5s %s\n", $1, "fun/"$2, $3, plat}' "$LISTFILE"
-        if [ -f "$SKIPFILE" ]; then
+        if [ -n "$SKIPFILES" ]; then
             echo
             echo "skipped on $PLATFORM:"
-            awk -F'\t' '!/^#/ && NF{printf "  %-24s %s\n", $1, $2}' "$SKIPFILE"
+            for f in $SKIPFILES; do
+                awk -F'\t' '!/^#/ && NF{printf "  %-24s %s\n", $1, $2}' "$f"
+            done
         fi
         exit 0
         ;;
@@ -199,7 +215,9 @@ if [ -f "$HERE/ffi/build.sh" ]; then
         echo "warning: could not build fun/test/ffi/libffitest (FFI tests may fail)" >&2
 fi
 
-printf 'platform: %s%s\n' "$PLATFORM" "$( [ -f "$SKIPFILE" ] && printf ' (skip list: %s)' "${SKIPFILE##*/}" )"
+skip_note=""
+for f in $SKIPFILES; do skip_note="$skip_note ${f##*/}"; done
+printf 'platform: %s%s\n' "$PLATFORM" "$( [ -n "$skip_note" ] && printf ' (skip lists:%s)' "$skip_note" )"
 printf '%-26s %s\n' "TEST" "RESULT"
 printf '%-26s %s\n' "--------------------------" "------"
 

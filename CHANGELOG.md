@@ -6,6 +6,13 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- macOS x64 gains runtime C compilation. `make-macos.sh` now builds
+  `libtcc.dylib` from the vendored TCC through `build-tcc-darwin.sh`, installs
+  it next to `funcmd`, and `lib-tcc.fun` resolves it there. The macOS x64
+  archive reports `tcc: true` and runs the `lib-tcc-test` regression. Apple
+  Silicon remains on the old behavior: TCC 0.9.27 still needs Darwin arm64
+  ucontext fields and `MAP_JIT` handling.
+
 - Release archives now carry a platform installer. On macOS/Linux `install.sh`
   gains `--bin-dir` and an opt-in, idempotent `--add-path` that appends a
   marker block to the shell profile; `--local` installs the extracted tree

@@ -5,8 +5,9 @@
 // libtcc.dll next to fun.exe; on Linux the build produces libtcc.so from
 // src/3rd/tcc and places it next to funcmd, and funcmd is linked with
 // -rpath $ORIGIN so the bare name resolves (see art/notes/library-port-plan.md).
-// macOS would need libtcc.dylib (cross-built with Zig; not produced yet), so
-// `tcc` stays nil there and the JIT C path raises.
+// macOS x86_64 builds libtcc.dylib from the same source and places it next to
+// funcmd. Apple Silicon still lacks a Darwin arm64 TCC backend, so `tcc` stays
+// nil there and the JIT C path raises.
 var tccdll = 'libtcc.dll';
 var _tccos = 'host'.arg().getJson(fd: true).os;
 if _tccos = 'linux' then
@@ -18,8 +19,10 @@ end if;
 // Prefer the copy next to the executable. Newer linkers emit DT_RUNPATH for
 // -rpath, and dlopen() does not consult the executable's RUNPATH, so the bare
 // name alone fails on Ubuntu 24.04 even though libtcc.so is beside the binary.
+// macOS has the same problem: a bare dlopen() name does not search the
+// executable's directory.
 var tccpath = tccdll;
-if _tccos = 'linux' then
+if _tccos = 'linux' or _tccos = 'macos' then
   var exedir = 0.arg().replace(%[^/]*$%, '');
   if exedir <> '' then tccpath = exedir & tccdll; end if;
 end if;

@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+- macOS x64 补上运行时 C：`make-macos.sh` 通过 `build-tcc-darwin.sh` 从内置
+  TCC 源码构建 `libtcc.dylib`，放到 `funcmd` 旁，`lib-tcc.fun` 会从可执行文件
+  目录加载。macOS x64 产物报告 `tcc: true`，并运行 `lib-tcc-test` 回归。
+  Apple Silicon 保持原状：TCC 0.9.27 仍缺 Darwin arm64 的 ucontext 字段和
+  `MAP_JIT` 处理。
+
 - 发布压缩包内置安装器。macOS/Linux 的 `install.sh` 新增 `--bin-dir` 和可选的
   幂等 `--add-path`（向 shell 配置追加带标记的 PATH 块），`--local` 可离线
   安装解压目录，Linux 压缩包也开始携带该脚本。Windows `.7z` 新增
