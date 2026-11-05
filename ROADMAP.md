@@ -62,11 +62,11 @@
 | P-05 | 平台 | P3 | OPEN | MySQL/ODBC 第二数据库后端未做 | `art/notes/linux-capabilities.md` |
 | P-06 | 平台 | P3 | OPEN | `lib-os` B 档（GetIPs/inotify 等）未做 | `art/notes/linux-capabilities.md` |
 | P-07 | 机器码 | P2 | OPEN | `asm-list` 的 x86-64 表覆盖不全 | `art/notes/arch-machine-code-plan.md` |
-| P-08 | macOS | P2 | OPEN | arm64 真机验证、`libtcc.dylib`、签名/公证未做 | `art/notes/macos-port.md` |
+| P-08 | macOS | P2 | OPEN | arm64 真机验证、`libtcc.dylib`（Tiny C Compiler）、签名/公证未做 | `art/notes/macos-port.md` |
 | P-09 | 架构 | P3 | OPEN | LoongArch 工具链与编码器未做 | `art/notes/arch-machine-code-plan.md` |
 | P-10 | 架构 | P3 | OPEN | Linux aarch64 交叉产物仍缺 `-dRegex` 与 `-dLinuxFFI` | `README.zh.md` |
 | P-11 | 平台/数据库 | P3 | OPEN | unixODBC 第二数据库后端未接：缺少开发头文件、驱动探测和 CI 覆盖；当前 ODBC 概念只在 Windows/ADO 侧成立 | `art/notes/linux-capabilities.md` |
-| P-12 | macOS | P2 | OPEN | TCC 与未签名 CLI 的权限提示未处理：访问 Desktop/Documents/Downloads 会触发 TCC，签名/公证见 P-08；安装脚本只能清 quarantine | `art/notes/macos-port.md` |
+| P-12 | macOS | P2 | OPEN | Apple TCC（隐私权限）未处理：访问 Desktop/Documents/Downloads 会触发系统授权，签名/公证见 P-08；安装脚本只能清 quarantine，不能预授权 | `art/notes/macos-port.md` |
 | P-13 | Windows/ARM | P3 | OPEN | win-arm64 无构建：FPC 3.2.2 没有 win64/aarch64 target，`regression.yml` 的 windows-arm64 job 仍禁用，需更新 FPC 或交叉工具链 | `.github/workflows/regression.yml` |
 | Q-01 | 质量 | P2 | DONE | `lib-ado-schema.Filter` 丢外键 | `art/notes/linux-capabilities.md` |
 | Q-02 | 质量 | P2 | DONE | `lib-fd`/`lib-bnf` 仍有已知功能项（重名组已修） | `art/notes/port-decisions.md` |
