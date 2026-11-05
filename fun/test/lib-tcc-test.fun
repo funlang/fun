@@ -14,6 +14,14 @@ if 'host'.arg().getJson(fd: true).os = 'macos' then
     dbg &= ' tcc=nil';
   else
     dbg &= ' tcc=ok';
+    if tcc.New = nil then dbg &= ' NewFn=nil'; else dbg &= ' NewFn=ok'; end if;
+    try
+      var mf = 'libSystem.B.dylib'.getapi('malloc', 'n:p');
+      var mp = mf(16);
+      dbg &= ' malloc=' & _dv(mp);
+    except
+      dbg &= ' malloc=err';
+    end try;
     var dts = tcc.New();
     dbg &= ' ts=' & _dv(dts);
     tcc.Options(dts, '-nostdlib -nostdinc -O2');
