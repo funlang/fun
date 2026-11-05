@@ -6,23 +6,25 @@ use 'fun/lib/lib-tcc.fun';
 // TEMPORARY diagnostics for the macOS bring-up. Print on macOS only so the
 // Linux snapshot is unchanged; remove once libtcc works on Darwin.
 if 'host'.arg().getJson(fd: true).os = 'macos' then
+  fun _dv(v)
+    if v = nil then result = 'nil'; else result = '' & v; end if;
+  end fun;
+  var dbg = 'DBG';
   if tcc = nil then
-    ?. 'debug: tcc module is nil';
+    dbg &= ' tcc=nil';
   else
-    try
-      var dts = tcc.New();
-      ?. 'debug ts=' & dts;
-      tcc.Options(dts, '-nostdlib -nostdinc -O2');
-      var dc = tcc.Compile(dts, 'int dadd(int a, int b) { return a + b; }');
-      ?. 'debug compile=' & dc;
-      var dr = tcc.Reloc(dts, 1);
-      ?. 'debug reloc=' & dr;
-      var dp = tcc.Get(dts, 'dadd');
-      ?. 'debug ptr=' & dp;
-    except
-      ?. 'debug error: ' & @;
-    end try;
+    dbg &= ' tcc=ok';
+    var dts = tcc.New();
+    dbg &= ' ts=' & _dv(dts);
+    tcc.Options(dts, '-nostdlib -nostdinc -O2');
+    var dc = tcc.Compile(dts, 'int dadd(int a, int b) { return a + b; }');
+    dbg &= ' comp=' & _dv(dc);
+    var dr = tcc.Reloc(dts, 1);
+    dbg &= ' reloc=' & _dv(dr);
+    var dp = tcc.Get(dts, 'dadd');
+    dbg &= ' ptr=' & _dv(dp);
   end if;
+  raise dbg;
 end if;
 
 // integer path
