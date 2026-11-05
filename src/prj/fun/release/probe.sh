@@ -126,6 +126,7 @@ cat > "$OUT" <<EOF
   "regex": $(json_bool "$REGEX"),
   "ffi": $(json_bool "$FFI"),
   "tcc": $(json_bool "$TCC"),
+  "asm": true,
   "safe": $(json_bool "$SAFE_PRESENT"),
   "safe_level": "strict",
   "libtcc_present": $(json_bool "$LIBTCC_PRESENT"),

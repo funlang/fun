@@ -20,6 +20,11 @@ var _zlib_facts = 'host'.arg().getJson(fd: true);
 var _zlib_unix  = _zlib_facts.os = 'linux' or _zlib_facts.os = 'macos';
 var _zlib_mac   = _zlib_facts.os = 'macos';
 var _zlib_ptr   = _zlib_facts.bits div 8;
+// uLong is 32-bit on every Windows target (LLP64), but 64-bit on LP64 Unix.
+// z_stream mixes pointers and uLong, so the two widths must be tracked apart:
+// win64 is 8-byte pointers with 32-bit uLong.
+var _zlib_ulong = 8;
+if not _zlib_unix then _zlib_ulong = 4; end if;
 
 var ZLIB_VERSION = "1.2.11";
 var ZLIB_SIZE    = 14 * 4;
@@ -30,6 +35,9 @@ var zlib = nil;
 if _zlib_unix then
   if _zlib_mac then zlibdll = 'libz.1.dylib'; else zlibdll = 'libz.so.1'; end if;
   ZLIB_SIZE = 112;          // sizeof(z_stream) on LP64
+elsif _zlib_ptr = 8 then
+  // x86_64 Windows: 8-byte pointers, 4-byte uInt/uLong, 8-byte alignment.
+  ZLIB_SIZE = 88;
 end if;
 try
   if _zlib_unix then
@@ -71,8 +79,8 @@ fun _zp(x)
 end fun;
 
 // Pointer-width little-endian pack/unpack. lib-utils' int2str/str2int are
-// fixed at 4 bytes (Fun's >> is 32-bit); a uLongf*/z_stream* field is 8 bytes
-// on LP64 and addresses live above 4GB, so div/mod by 256 is used instead.
+// fixed at 4 bytes (Fun's >> is 32-bit); an address is 8 bytes on LP64 and
+// lives above 4GB, so div/mod by 256 is used instead.
 fun _zw(v)
   result = '';
   var u = v;
@@ -82,13 +90,32 @@ fun _zw(v)
   end do;
 end fun;
 
-fun _zr(s, off)
+// uLong-sized pack/unpack (uLongf*, total_out). Kept separate from the pointer
+// helpers because win64 is LLP64: 8-byte pointers, 4-byte uLong.
+fun _zwl(v)
+  result = '';
+  var u = v;
+  for i = 0 to _zlib_ulong - 1 do
+    result &= (u mod 256).toChar();
+    u = u div 256;
+  end do;
+end fun;
+
+fun _zrw(s, off, w)
   result = 0;
   var m = 1;
-  for i = 0 to _zlib_ptr - 1 do
+  for i = 0 to w - 1 do
     result += s.toByte(off + i) * m;
     m *= 256;
   end do;
+end fun;
+
+fun _zr(s, off)
+  result = _zrw(s, off, _zlib_ptr);
+end fun;
+
+fun _zl(s, off)
+  result = _zrw(s, off, _zlib_ulong);
 end fun;
 
 fun compress(s, noheader)
@@ -96,10 +123,10 @@ fun compress(s, noheader)
   if zlib then
     var bound = _bound(s.length());
     var r = 0.toChar().x(bound);
-    var l = _zw(bound);
+    var l = _zwl(bound);
     var ret = zlib.compress(_zp(r), _zp(l), s, s.length());
     if ret = 0 then
-      result = r.substr(len: _zr(l, 0));
+      result = r.substr(len: _zl(l, 0));
       if noheader then
         result = (result.toByte(2) bit and 0xfe).toChar() & result.substr(3, -7) & '\x00\x00\xff\xff'.escape();
       end if;
@@ -116,10 +143,10 @@ fun decompress(s, length)
     var cap = length;
     if cap = 0 then cap = 1; end if;
     var r = 0.toChar().x(cap);
-    var l = _zw(cap);
+    var l = _zwl(cap);
     var ret = zlib.uncompress(_zp(r), _zp(l), s, s.length());
     if ret = 0 then
-      result = r.substr(len: _zr(l, 0));
+      result = r.substr(len: _zl(l, 0));
     else ?, 'decompress error:'; ?. ret;
     end if;
   end if;
@@ -129,9 +156,13 @@ var @PI = 0;  // ptr of in,  next_in
 var @LI = 4;  // len of in,  avail_in (uInt, always 4 bytes)
 var @PO = 12; // ptr of out, next_out
 var @LO = 16; // len of out, avail_out (uInt, always 4 bytes)
-var @LA = 20; // len of all, total_out (uLong, pointer width)
+var @LA = 20; // len of all, total_out (uLong: 8 on LP64, 4 on Windows)
 if _zlib_unix then
   @PI = 0; @LI = 8; @PO = 24; @LO = 32; @LA = 40;
+elsif _zlib_ptr = 8 then
+  // win64: next_in 0(8), avail_in 8(4), total_in 12(4), next_out 16(8),
+  // avail_out 24(4), total_out 28(4).
+  @PI = 0; @LI = 8; @PO = 16; @LO = 24; @LA = 28;
 end if;
 
 fun flate(s, inde, args, init)
@@ -153,14 +184,14 @@ fun flate(s, inde, args, init)
       _zw(r.toNum(-1))     .move(@PO+zp);
       int2str(ZLIB_BLOCK) .move(@LO+zp);
     end if;
-    var       all = _zr(zs, @LA);
+    var       all = _zl(zs, @LA);
     if all > lr then
       result &= args?.rs?.Write?(r, all - lr) or r.substr(len: all - lr);
       lr = all;
     end if;
     ret = zlib[inde & 'flate'].call(_zp(zs), not args?.ws? and 4 or 0);
     //?, ret; ?. echoBuff(zs);
-    exit when all = _zr(zs, @LA);
+    exit when all = _zl(zs, @LA);
   end loop;
   ret = init and not args?.dontEnd? and zlib[inde & 'flateEnd'].call(_zp(zs));
   result = args?.rs?.Get?() or result;

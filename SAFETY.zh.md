@@ -20,7 +20,8 @@
 > 运行时 `-safe` 开关：需要安全能力时单独编译。测试见
 > `fun/test/safe-mode-test.fun` / `safe-readonly-test.fun` 与
 > `fun/test/run-safe-regression.sh`，CI 是独立的 `linux-safe` job，只在
-> 手动触发（`safe_only`）时运行。
+> 手动触发（`safe_only`）时运行；Windows 侧由 `fun/test/run-safe-regression.bat`
+> 跑同一套 strict 测试，随 win64 产物一起发布。
 >
 > 作者同日定：
 > - **不做 COW**：字符串赋值/传参保持**引用语义**（`b := a; b[i] = x` 改到 `a` 是预期行为）。
@@ -255,5 +256,6 @@ SAFE=custom SAFE_ALLOW=read,write,compile ./make-linux-x86_64.sh
 交叉构建本来就是独立临时目录），不会互相复用 `.ppu`。拦截逻辑本身仍是
 平台无关的编译条件。
 
-`fun/test/run-safe-regression.sh` 目前只在 Linux 上跑（需要 `funcmd-safe`）；
-macOS/Windows 上可以用 `FUNCMD=<path-to-safe-binary>` 跑同一组测试。
+`fun/test/run-safe-regression.sh` 跑 POSIX 构建（需要 `funcmd-safe`）；
+Windows 用 `fun/test/run-safe-regression.bat`。macOS 上也可以用
+`FUNCMD=<path-to-safe-binary>` 跑同一组测试。

@@ -4,6 +4,20 @@
 
 **English**: [CHANGELOG.md](CHANGELOG.md) · **简体中文**（本文件）
 
+## [Unreleased]
+
+- win64 现在随包提供能力受限解释器：Windows CI 用与 `funcmd.exe` 相同的特性
+  集构建 `funcmd-safe.exe`，运行 safe 能力测试，并把两个二进制一起放入产物。
+  探针通过时 `capabilities.json` 报告 `safe: true`。
+
+- win64 补齐运行时 C 与 zlib。`build-win64-deps.sh` 用钉住的 TCC / zlib 源码
+  编译 x86-64 的 `libtcc.dll` 与 `zlib.dll`（旧包内副本是 32 位），Windows job
+  在发布前实测两者。README 与 release notes 用同一张矩阵展示 regex、FFI、
+  运行时 C、asm 与 safe。
+
+- Release notes 把直接下载链接放在最前，缩短变更列表，去掉许可证段落；
+  每个压缩包内仍保留 LICENSE 文件。
+
 ## [9.5.4] - 2026-11-03
 
 - `if` 和条件循环新增 `{}` 块写法：`if 表达式 { ... }`、

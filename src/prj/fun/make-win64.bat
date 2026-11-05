@@ -17,6 +17,16 @@ rem so no bcc32 objects or MinGW CRT are needed. Without the DLL, skip it.
 set "REGEX="
 if exist pcre3.dll set "REGEX=-dRegex -dPCRE_WinDLL"
 
+rem getapi uses FPC's bundled libffi on win64 (lffi.pas), which needs ffi.dll
+rem next to funcmd.exe. Enable it only when the DLL is actually there; a bare
+rem -dWinFFI without the library fails to link. CI builds ffi.dll from MSYS2.
+set "FFI="
+if exist ffi.dll set "FFI=-dWinFFI"
+
+rem The 64-bit runtime DLLs are not the 32-bit copies from an old release:
+rem   CC=x86_64-w64-mingw32-gcc sh build-win64-deps.sh
+rem puts x86_64 libtcc.dll and zlib.dll here (see that script).
+
 rem SAFE=strict|readonly|readwrite|custom builds funcmd-safe.exe with the same
 rem compile-time macros as the POSIX scripts (SAFE_ALLOW=read,write,compile for
 rem custom). The unit cache is separate (units-safe) so the two modes cannot
@@ -84,4 +94,4 @@ if /i not "%1"=="read" if /i not "%1"=="write" if /i not "%1"=="compile" (
 exit /b 0
 
 :build
-%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %REGEX% %SAFE_FLAGS% %SAFE_OUT% %SAFE_UNITS% -Fu..\..\lib
+%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %REGEX% %FFI% %SAFE_FLAGS% %SAFE_OUT% %SAFE_UNITS% -Fu..\..\lib

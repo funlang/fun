@@ -86,9 +86,10 @@ Prebuilt interpreters are attached to [GitHub Releases](https://github.com/funla
   use the bundled `install.sh` (curl does not set the quarantine attribute) or
   run `xattr -dr com.apple.quarantine <dir>` after extracting;
 - Windows x64: `.7z`. The build is unsigned, so SmartScreen may warn; extract
-  with 7-Zip and keep the bundled `.dll` files next to `fun.exe`. The Windows
-  archive currently ships only `fun.exe`; `capabilities.json` reports
-  `safe: false` because the safe build is not yet produced on win64.
+  with 7-Zip and keep the bundled `.dll` files next to `fun.exe`. The archive
+  ships `fun.exe`, `fun-safe.exe`, and the x86-64 runtime DLLs
+  (`pcre3.dll`, `ffi.dll`, `libtcc.dll`, `zlib.dll`) that the CI built;
+  `capabilities.json` records anything a particular build could not provide.
 
 macOS / Linux one-liner (verifies `SHA256SUMS`, installs under `~/.fun`):
 
@@ -471,6 +472,27 @@ Building with `-DFunDll` produces the embeddable runtime `fun.dll`, which export
 
 The full grammar is defined in [`src/parse/bnf/fun.ebnf`](src/parse/bnf/fun.ebnf).
 
+### Platform capability matrix
+
+Three capability layers (regex, FFI, runtime C) plus the machine-code layer,
+and a second build mode for untrusted scripts:
+
+| Platform       | regex | FFI | runtime C (tcc) | asm | safe build |
+| -------------- | ----- | --- | --------------- | --- | ---------- |
+| linux-arm64    | yes   | yes | yes             | yes | yes        |
+| linux-x64      | yes   | yes | yes             | yes | yes        |
+| macos-arm64    | yes   | yes | pending         | yes | yes        |
+| macos-x64      | yes   | yes | pending         | yes | yes        |
+| win-x64        | yes   | yes | yes             | yes | yes        |
+
+`safe build` is the separate `fun-safe` binary (`-dFunSafe`, strict level); it
+ships next to the default interpreter, so the default build and its behaviour
+are unchanged. Every other column describes the default binary. `runtime C` is
+the only open middle-layer gap: macOS has no `libtcc.dylib` yet, so `#!C` and
+the JIT C path stay unavailable there while `#!asm` still works. The release
+notes and each archive's `capabilities.json` are generated from probes, so a
+degraded build cannot claim a capability it does not have.
+
 ### Cross builds (macOS and Linux aarch64, from Linux x86_64)
 
 The last two rows are the only builds that need a bootstrapped toolchain. Both
@@ -501,9 +523,9 @@ sources/binaries are **not** shipped. If one is missing the build script
 | Component | Where to put it | Where to get it | Who builds it |
 | --------- | --------------- | --------------- | ------------- |
 | PCRE 8 (8-bit) | `src/3rd/pcre-8/` | <https://www.pcre.org/> (8.x source, e.g. 8.45) | Linux: `make-linux-x86_64.sh` compiles it with gcc (static, `-dRegex`); Windows (i386): `src/regex/pcre/make.bat` (Borland bcc32 + make, `-Dpcresrc=<path>`; the objects `pcrd.pas` `{$LINK}`s); win64: the CI builds `pcre3.dll` with MinGW-w64 gcc and links it dynamically (`-dRegex -dPCRE_WinDLL`, see below) |
-| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | the tinycc release on savannah/nongnu, or repo.or.cz tag `release_0_9_27` | `make-linux-x86_64.sh` produces `libtcc.so` (placed next to `funcmd`) |
+| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | the tinycc release on savannah/nongnu, or repo.or.cz tag `release_0_9_27` | `make-linux-x86_64.sh` produces `libtcc.so`; `build-win64-deps.sh` produces the x86-64 `libtcc.dll` (win64) |
 | libffi (win64) | `ffi.dll` next to `funcmd.exe` | MSYS2 `mingw-w64-x86_64-libffi`, or any x86_64 libffi build | the win64 CI installs it so `getapi` works there (`-dWinFFI`); Linux/macOS use the libffi that ships with FPC |
-| Windows runtime DLLs | `fun/libtcc.dll`, `fun/zlib.dll` | official release or build them yourself | no build step; keep them beside `fun.exe` for `ccompile` / `NewJit` |
+| zlib 1.2.11 (win64) | `src/3rd/zlib-1.2.11/` | <https://zlib.net/fossils/> | `build-win64-deps.sh` produces the x86-64 `zlib.dll`; Linux/macOS use the system zlib |
 
 - Once the directories are in place, `cd src/prj/fun && ./make-linux-x86_64.sh` builds PCRE and TCC automatically.
 - Or point at them explicitly: `PCRE_SRC=/path/to/pcre TCC_SRC=/path/to/tcc ./make-linux-x86_64.sh`.
@@ -551,9 +573,15 @@ runs the four host-independent FFI cases (`ffi-int64`, `ffi-float`,
 `ffi-float-cb`, `ffi-callbacks`) against the shared snapshots, so 64-bit
 integers, float/mixed arguments and `@toCallback` closures are covered on win64
 too; `ffi-scalar` stays Unix-only (it calls `getpid`/libm directly).
+
 `DyLibWin()` in `lib-host.fun` picks the helper's name per host, and the runner
 probes for both the DLL and a working `getapi`, adding those cases to its skip
 list when either is missing.
+
+The Windows job also runs `build-win64-deps.sh` (x86-64 `libtcc.dll` and
+`zlib.dll`), probes both with a real compile/deflate call, builds
+`funcmd-safe.exe` with the same feature set, and runs the focused safe test.
+The stage step copies only what those probes accepted.
 
 `windows-arm64` is disabled: FPC 3.2.2, the pinned toolchain, has no
 win64/aarch64 target, so there is nothing to build with.
@@ -563,6 +591,10 @@ For untrusted scripts, build the separate capability-restricted interpreter:
 ```sh
 cd src/prj/fun && SAFE=strict ./make-linux-x86_64.sh   # produces funcmd-safe
 fun/test/run-safe-regression.sh strict                  # focused capability tests
+
+# Windows
+cd src\prj\fun && set SAFE=strict && make-win64.bat      # produces funcmd-safe.exe
+fun\test\run-safe-regression.bat strict
 ```
 
 `funcmd-safe` (`-dFunSafe`) removes native code (`getapi` / `@toCallback` /
@@ -571,9 +603,10 @@ COM), arbitrary-address memory access, file access, and compile-from-file or
 `SAFE=strict` blocks all of them, `SAFE=readonly` allows file reads,
 `SAFE=readwrite` also allows writes, and `SAFE=custom
 SAFE_ALLOW=read,write,compile` selects categories explicitly. The default
-`funcmd` and its full regression suite are unchanged; a separate `linux-safe`
-CI job verifies strict and readonly, and it only runs on manual dispatch
-(`safe_only`), not on push/PR.
+`funcmd` and its full regression suite are unchanged. Every release also ships
+the strict build; a separate `linux-safe` CI job verifies strict and readonly,
+and the Windows job builds and runs the same strict capability test. The
+`linux-safe` job only runs on manual dispatch (`safe_only`), not on push/PR.
 
 ---
 

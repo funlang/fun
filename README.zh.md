@@ -86,8 +86,9 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
   （curl 下载不会设置隔离属性），或解压后执行
   `xattr -dr com.apple.quarantine <目录>`；
 - Windows x64：`.7z`。构建未签名，SmartScreen 可能提示；请用 7-Zip 解压，
-  并让随包的 `.dll` 与 `fun.exe` 保持同目录。Windows 包目前只有 `fun.exe`，
-  `capabilities.json` 会标明 `safe: false`，因为 win64 的 safe 构建尚未产出。
+  并让随包的 `.dll` 与 `fun.exe` 保持同目录。包内包含 `fun.exe`、
+  `fun-safe.exe`，以及 CI 构建的 x86-64 运行期 DLL（`pcre3.dll`、`ffi.dll`、
+  `libtcc.dll`、`zlib.dll`）；个别构建缺失的能力由 `capabilities.json` 记录。
 
 macOS / Linux 一行安装（校验 `SHA256SUMS`，安装到 `~/.fun`）：
 
@@ -454,6 +455,24 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 
 完整文法定义见 [`src/parse/bnf/fun.ebnf`](src/parse/bnf/fun.ebnf)。
 
+### 平台能力矩阵
+
+三个能力层（regex、FFI、运行时 C）加机器码层，以及面向不可信脚本的第二构建模式：
+
+| 平台          | regex | FFI | 运行时 C (tcc) | asm | safe 构建 |
+| ------------- | ----- | --- | -------------- | --- | --------- |
+| linux-arm64   | yes   | yes | yes            | yes | yes       |
+| linux-x64     | yes   | yes | yes            | yes | yes       |
+| macos-arm64   | yes   | yes | pending        | yes | yes       |
+| macos-x64     | yes   | yes | pending        | yes | yes       |
+| win-x64       | yes   | yes | yes            | yes | yes       |
+
+`safe 构建` 指独立的 `fun-safe` 二进制（`-dFunSafe`，strict 档），与默认解释器
+一起发布，默认构建的行为不受影响；其余列均描述默认二进制。`运行时 C` 是唯一
+未补齐的中间层：macOS 尚无 `libtcc.dylib`，因此 `#!C` 与 JIT 的 C 路径不可用，
+但 `#!asm` 仍可用。release notes 与每个包里的 `capabilities.json` 都由实测探针
+生成，降级构建无法虚报能力。
+
 ### 交叉构建（在 Linux x86_64 上构建 macOS 与 Linux aarch64）
 
 最后两行是仅有的、需要先搭交叉工具链的构建。二者都在 **Linux x86_64 构建机**
@@ -481,9 +500,9 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 | 组件 | 放到哪里 | 从哪里获取 | 由谁构建 |
 | ---- | -------- | ---------- | -------- |
 | PCRE 8（8-bit） | `src/3rd/pcre-8/` | <https://www.pcre.org/>（8.x 源码，如 8.45） | Linux：`make-linux-x86_64.sh` 用 gcc 静态编译（`-dRegex`）；Windows(i386)：`src/regex/pcre/make.bat`（Borland bcc32 + make，可 `-Dpcresrc=<路径>`，产物即 `pcrd.pas` 里 `{$LINK}` 的对象）；win64：CI 用 MinGW-w64 gcc 编出 `pcre3.dll` 并动态链接（`-dRegex -dPCRE_WinDLL`） |
-| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | savannah/nongnu 的 tinycc 发行包，或 repo.or.cz 的 `release_0_9_27` tag | `make-linux-x86_64.sh`，产出 `libtcc.so`（放在 `funcmd` 旁） |
+| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | savannah/nongnu 的 tinycc 发行包，或 repo.or.cz 的 `release_0_9_27` tag | `make-linux-x86_64.sh` 产出 `libtcc.so`；`build-win64-deps.sh` 产出 x86-64 的 `libtcc.dll`（win64） |
 | libffi（win64） | 放在 `funcmd.exe` 旁的 `ffi.dll` | MSYS2 的 `mingw-w64-x86_64-libffi`，或任意 x86_64 libffi 构建 | win64 CI 会装好它，从而让 `getapi` 可用（`-dWinFFI`）；Linux / macOS 用 FPC 自带的 libffi |
-| Windows 运行期 DLL | `fun/libtcc.dll`、`fun/zlib.dll` | 官方发行包或自行构建 | 无需构建；运行时与 `fun.exe` 同目录，供 `ccompile` / `NewJit` 使用 |
+| zlib 1.2.11（win64） | `src/3rd/zlib-1.2.11/` | <https://zlib.net/fossils/> | `build-win64-deps.sh` 产出 x86-64 的 `zlib.dll`；Linux / macOS 用系统 zlib |
 
 - 放好目录后，`cd src/prj/fun && ./make-linux-x86_64.sh` 会自动编译 PCRE 与 TCC。
 - 也可以显式指定路径：`PCRE_SRC=/path/to/pcre TCC_SRC=/path/to/tcc ./make-linux-x86_64.sh`。
@@ -526,6 +545,10 @@ float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scala
 （它直接调 `getpid`/libm）。`lib-host.fun` 的 `DyLibWin()` 按宿主取辅助库名，runner
 会同时探测该 DLL 与可用的 `getapi`，任一缺失就把这几个用例放进跳过名单。
 
+Windows job 还会运行 `build-win64-deps.sh`（x86-64 `libtcc.dll` 与 `zlib.dll`），
+用真实的 C 编译 / deflate 调用实测两者，以同一特性集构建 `funcmd-safe.exe`，
+并运行 focused safe 测试；stage 步骤只复制探针通过的文件。
+
 `windows-arm64` 已暂时禁用：所钉住的工具链 FPC 3.2.2 没有 win64/aarch64 目标，
 没有可用的构建方式。
 
@@ -534,15 +557,20 @@ float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scala
 ```sh
 cd src/prj/fun && SAFE=strict ./make-linux-x86_64.sh   # 产出 funcmd-safe
 fun/test/run-safe-regression.sh strict                  # 只跑安全能力测试
+
+# Windows
+cd src\prj\fun && set SAFE=strict && make-win64.bat      # 产出 funcmd-safe.exe
+fun\test\run-safe-regression.bat strict
 ```
 
 `funcmd-safe`（`-dFunSafe`）在编译期去掉本机代码（`getapi` / `@toCallback` /
 COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载代码这些路径。
 档位在构建脚本选择：`SAFE=strict` 全禁，`SAFE=readonly` 放开文件读，
 `SAFE=readwrite` 再放开文件写，`SAFE=custom SAFE_ALLOW=read,write,compile`
-按需组合。默认的 `funcmd` 与完整回归不受影响，CI 里的 `linux-safe` job
-分别验证 strict 与 readonly，且只在手动触发（`safe_only`）时运行，
-普通 push/PR 不会跑 safe 部分。
+按需组合。默认的 `funcmd` 与完整回归不受影响。每个 release 都同时提供 strict
+构建；CI 的 `linux-safe` job 分别验证 strict 与 readonly，Windows job 也会
+构建并运行同一套 strict 能力测试。`linux-safe` job 只在手动触发
+（`safe_only`）时运行，普通 push/PR 不会跑 safe 部分。
 
 ---
 

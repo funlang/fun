@@ -7,6 +7,7 @@
 #
 #   src/3rd/pcre-8/   PCRE 8.45   -> regex (-dRegex)
 #   src/3rd/tcc/      TCC 0.9.27  -> libtcc.so, runtime C compile (lib-tcc.fun)
+#   src/3rd/zlib-1.2.11/ zlib    -> zlib.dll on win64 (lib-zlib.fun)
 #
 # A missing dependency only degrades the build, so this script is a convenience
 # for developers and CI; it is safe to re-run (an existing directory is left
@@ -17,6 +18,7 @@
 #   src/prj/fun/fetch-3rd-party.sh --force      # re-fetch even if present
 #   src/prj/fun/fetch-3rd-party.sh --pcre-only
 #   src/prj/fun/fetch-3rd-party.sh --tcc-only
+#   src/prj/fun/fetch-3rd-party.sh --zlib-only
 #
 # Needs curl or wget, tar (with gzip/bzip2 support), and network access.
 # ============================================================
@@ -27,21 +29,25 @@ THIRD="$(cd "$HERE/../../.." && pwd)/src/3rd"
 
 PCRE_URL="https://downloads.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz"
 TCC_URL="https://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27.tar.bz2"
+ZLIB_URL="https://zlib.net/fossils/zlib-1.2.11.tar.gz"
 # Pinned SHA256 of the upstream release archives. A mirror that serves a
 # different file (or a truncated/HTML error page) must not become a build
 # input: the release pipeline ships interned binaries, not just source.
 PCRE_SHA256="4e6ce03e0336e8b4a3d6c2b70b1c5e18590a5673a98186da90d4f33c23defc09"
 TCC_SHA256="de23af78fca90ce32dff2dd45b3432b2334740bb9bb7b05bf60fdbfc396ceb9c"
+ZLIB_SHA256="c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1"
 
 force=0
 want_pcre=1
 want_tcc=1
+want_zlib=1
 for a in "$@"; do
     case "$a" in
         --force)     force=1 ;;
-        --pcre-only) want_tcc=0 ;;
-        --tcc-only)  want_pcre=0 ;;
-        *) echo "usage: $0 [--force|--pcre-only|--tcc-only]" >&2; exit 2 ;;
+        --pcre-only) want_tcc=0; want_zlib=0 ;;
+        --tcc-only)  want_pcre=0; want_zlib=0 ;;
+        --zlib-only) want_pcre=0; want_tcc=0 ;;
+        *) echo "usage: $0 [--force|--pcre-only|--tcc-only|--zlib-only]" >&2; exit 2 ;;
     esac
 done
 
@@ -112,6 +118,9 @@ if [ "$want_pcre" -eq 1 ]; then
 fi
 if [ "$want_tcc" -eq 1 ]; then
     install_dir tcc "$TCC_URL" tcc-0.9.27.tar.bz2 "$TCC_SHA256"
+fi
+if [ "$want_zlib" -eq 1 ]; then
+    install_dir zlib-1.2.11 "$ZLIB_URL" zlib-1.2.11.tar.gz "$ZLIB_SHA256"
 fi
 
 echo "third-party sources ready under src/3rd/"

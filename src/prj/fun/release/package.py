@@ -100,6 +100,9 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
         }
     )
     caps.setdefault("notes", "")
+    # Older stage files predate the probe field; every supported target has a
+    # machine-code backend, so absence means "not recorded", not "no".
+    caps.setdefault("asm", True)
 
     name = f"fun-{meta['tag']}-{platform}"
     dest = layout_root / name
@@ -349,7 +352,8 @@ def sbom(meta, caps_list):
             {
                 "type": "library",
                 "name": "zlib",
-                "version": "unknown",
+                "version": "1.2.11",
+                "purl": "pkg:generic/zlib@1.2.11",
                 "licenses": [{"license": {"id": "Zlib"}}],
             }
         )
@@ -376,76 +380,67 @@ def sbom(meta, caps_list):
 
 def notes(meta, caps_list, archives, repo_root, previous):
     lines = []
-    if meta["channel"] == "stable":
-        body = git_tag_message(repo_root, meta["tag"])
-        if body:
-            lines += [body, "", "---", ""]
     lines += [
         f"## Fun {meta['tag']}",
         "",
-        f"- Channel: **{meta['channel']}**",
-        f"- Commit: `{meta['commit']}`",
-        f"- Date: {meta['date']} (Asia/Shanghai, from the commit timestamp)",
+        "### Downloads",
+        "",
+        "| Platform | Archive |",
+        "| --- | --- |",
+    ]
+    # Direct links first: a release page should not require scrolling to the
+    # bottom to install. Names match the uploaded assets.
+    base = f"https://github.com/funlang/fun/releases/download/{meta['tag']}"
+    for c, a in zip(caps_list, archives):
+        lines.append(f"| {c['platform']} | [`{a.name}`]({base}/{a.name}) |")
+    lines += [
+        f"| macOS / Linux | [`install.sh`]({base}/install.sh) |",
+        "",
+        f"_{meta['channel']} · `{meta['commit'][:12]}` · {meta['date']} (UTC+8)_",
         "",
     ]
+
     if meta["channel"] == "nightly":
         lines += [
-            "Nightly prereleases are automatic and sort below the matching stable",
-            "version. `releases/latest` continues to point at the stable release.",
+            "Nightly prerelease; `releases/latest` still points at the stable build.",
             "",
         ]
-        commits = git_log(repo_root, previous, meta["commit"])
+        commits = git_log(repo_root, previous, meta["commit"], limit=12)
         if commits:
-            lines += ["### Changes since " + previous, ""]
+            lines += ["### Changes", ""]
             lines += [f"- {c}" for c in commits]
             lines += [""]
+    else:
+        body = git_tag_message(repo_root, meta["tag"])
+        if body:
+            lines += ["### Changes", "", body, ""]
 
     lines += [
         "### Capabilities",
         "",
-        "| platform | regex | getapi/FFI | runtime C | safe | notes |",
-        "|---|---|---|---|---|---|",
+        "| platform | regex | FFI | runtime C (tcc) | asm | safe build | notes |",
+        "|---|---|---|---|---|---|---|",
     ]
     for c in caps_list:
         mark = lambda v: "yes" if v else "no"
         note = (c.get("notes") or "").replace("|", "/").strip()
         lines.append(
             f"| {c['platform']} | {mark(c.get('regex'))} | {mark(c.get('ffi'))} | "
-            f"{mark(c.get('tcc'))} | {mark(c.get('safe'))} | {note} |"
+            f"{mark(c.get('tcc'))} | {mark(c.get('asm', True))} | "
+            f"{mark(c.get('safe'))} | {note} |"
         )
     lines += [
         "",
-        "`capabilities.json` in this release and inside each archive is the",
-        "machine-readable version of this table. A missing optional dependency",
-        "degrades the build; it is reported here rather than hidden.",
-        "",
-        "### Assets",
-        "",
-    ]
-    for c, a in zip(caps_list, archives):
-        lines.append(f"- `{a.name}` ({c['platform']})")
-    lines.append("- `install.sh` (macOS/Linux installer; curl + SHA256 verification)")
-    lines += [
+        "The first five columns describe the default binary. `safe build` is the",
+        "separate capability-restricted `fun-safe` binary (strict level).",
+        "`capabilities.json` in each archive is the machine-readable table.",
         "",
         "Verify with `sha256sum -c SHA256SUMS` (Linux/macOS) or",
         "`Get-FileHash` (Windows).",
-        "Windows assets are unsigned `.7z` archives; SmartScreen may warn.",
-        "macOS assets are unsigned `.zip` archives. Run `./install.sh` or clear",
-        "the quarantine attribute after extracting.",
-        "",
-        "### Licensing",
-        "",
-        "`fun` (built from `funcmd.dpr`) is MIT. `fun.dll`, the separately licensed embedded runtime for",
-        "closed-source products and SaaS backends, is **not** included in any",
-        "asset here; see LICENSE.dll.",
+        "Windows `.7z` and macOS `.zip` assets are unsigned; SmartScreen or",
+        "Gatekeeper may warn. Run `./install.sh` or clear the quarantine bit.",
         "",
     ]
-    if any(c["platform"].startswith("macos") for c in caps_list):
-        lines += [
-            "macOS artifacts are unsigned and not notarized. Gatekeeper may warn;",
-            "see README for the current status.",
-            "",
-        ]
     return "\n".join(lines)
 
 

@@ -465,6 +465,18 @@ jobs:
           "value=${{ hashFiles('src/**') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "dlls=${{ hashFiles('src/prj/fun/pcre3.dll', 'src/prj/fun/ffi.dll') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
+      # 64-bit libtcc.dll / zlib.dll. They are loaded by name from next to
+      # funcmd.exe, so the archive can only ship them if this job builds them
+      # for x86_64 (the copies in fun/ are 32-bit bcc32 builds).
+      - name: Restore win64 runtime DLLs
+        id: cache-win64-runtime
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            src\prj\fun\libtcc.dll
+            src\prj\fun\zlib.dll
+          key: win64-runtime-tcc-0.9.27-zlib-1.2.11-v1-${{ steps.src-hash.outputs.value }}
+
       # Build reuse, same rule as the unix job.
       - name: Restore built funcmd.exe
         id: cache-funcmd-win
@@ -472,8 +484,9 @@ jobs:
         with:
           path: |
             src\prj\fun\funcmd.exe
+            src\prj\fun\funcmd-safe.exe
             src\prj\fun\funcmd.flags.txt
-          key: funcmd-v6-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
+          key: funcmd-v7-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
 
       - name: Restore FPC cache (Windows)
         if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
@@ -783,6 +796,84 @@ jobs:
           path: fun\test\ffi\libffitest.dll
           key: win64-libffitest-v1
 
+      - name: Build win64 runtime DLLs (tcc + zlib, best effort)
+        if: steps.cache-win64-runtime.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # libtcc.dll and zlib.dll are loaded by bare name from next to
+          # funcmd.exe. The historical copies in fun/ are 32-bit, so win64
+          # needs x86_64 builds or runtime C and lib-zlib stay unavailable.
+          # Compile the pinned sources directly (build-win64-deps.sh); the
+          # same gcc that built pcre3.dll is used.
+          $ErrorActionPreference = 'Stop'
+          try {
+            function Test-CC([string]$exe) {
+              if (-not (Test-Path $exe)) { return $false }
+              $o = Join-Path $env:RUNNER_TEMP 'cctest-deps.o'
+              Remove-Item -Force $o -ErrorAction SilentlyContinue
+              'int main(void){return 0;}' | & $exe -c -x c - -o $o 2>&1 | Out-Null
+              return (($LASTEXITCODE -eq 0) -and (Test-Path $o))
+            }
+            $gcc = $env:FUN_CC
+            if (-not $gcc -or -not (Test-CC $gcc)) {
+              $gcc = $null
+              $cands = @()
+              $onpath = Get-Command gcc -ErrorAction SilentlyContinue
+              if ($onpath) { $cands += $onpath.Source }
+              $cands += 'C:\mingw64\bin\gcc.exe'
+              $cands += 'C:\tools\mingw64\bin\gcc.exe'
+              foreach ($c in $cands) { if (Test-CC $c) { $gcc = $c; break } }
+            }
+            if (-not $gcc) { throw 'no usable x86_64-w64-mingw32 C compiler' }
+            Write-Host "gcc: $gcc  target=$(& $gcc -dumpmachine)"
+            if ((& $gcc -dumpmachine) -notmatch 'x86_64') {
+              throw "compiler target is not x86_64: $(& $gcc -dumpmachine)"
+            }
+
+            # zlib 1.2.11 matches ZLIB_VERSION in fun/lib/lib-zlib.fun.
+            $zlib = Join-Path $env:RUNNER_TEMP 'zlib-1.2.11'
+            if (-not (Test-Path (Join-Path $zlib 'deflate.c'))) {
+              $tar = Join-Path $env:RUNNER_TEMP 'zlib-1.2.11.tar.gz'
+              curl.exe -fL --retry 3 --retry-all-errors -o $tar `
+                'https://zlib.net/fossils/zlib-1.2.11.tar.gz'
+              if ($LASTEXITCODE -ne 0) { throw "zlib download failed ($LASTEXITCODE)" }
+              tar.exe -xf $tar -C $env:RUNNER_TEMP
+            }
+
+            $env:CC = $gcc
+            $env:ZLIB_SRC = $zlib.Replace('\', '/')
+            $bash = (Get-Command bash -ErrorAction SilentlyContinue).Source
+            if (-not $bash) { throw 'no bash to run build-win64-deps.sh' }
+            & $bash 'src/prj/fun/build-win64-deps.sh'
+            if ($LASTEXITCODE -ne 0) { throw "build-win64-deps.sh exited $LASTEXITCODE" }
+            foreach ($dll in @('libtcc.dll', 'zlib.dll')) {
+              $p = Join-Path $env:GITHUB_WORKSPACE "src\prj\fun\$dll"
+              if (-not (Test-Path $p)) { throw "$dll was not produced" }
+              Write-Host "built $p ($((Get-Item $p).Length) bytes)"
+            }
+            Write-Host "::warning title=win64 runtime DLLs ok::libtcc.dll + zlib.dll are x86_64"
+          } catch {
+            Write-Host "::warning title=win64 runtime DLLs::$($_.Exception.Message)"
+          }
+          $global:LASTEXITCODE = 0
+
+      - name: Check win64 runtime DLLs
+        id: win64-runtime-present
+        shell: pwsh
+        run: |
+          $ok = (Test-Path 'src\prj\fun\libtcc.dll') -and (Test-Path 'src\prj\fun\zlib.dll')
+          "ok=$($ok.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Save win64 runtime DLLs
+        if: steps.cache-win64-runtime.outputs.cache-hit != 'true' && steps.win64-runtime-present.outputs.ok == 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            src\prj\fun\libtcc.dll
+            src\prj\fun\zlib.dll
+          key: win64-runtime-tcc-0.9.27-zlib-1.2.11-v1-${{ steps.src-hash.outputs.value }}
+
       - name: Build funcmd.exe
         if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
         working-directory: src\prj\fun
@@ -845,6 +936,48 @@ jobs:
           # Cached next to the exe so a cache hit can still report capabilities.
           # This step runs in src\prj\fun, so keep the path relative to it.
           $built | Out-File -FilePath 'funcmd.flags.txt' -Encoding ascii
+
+      - name: Build funcmd-safe.exe
+        if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
+        working-directory: src\prj\fun
+        shell: pwsh
+        run: |
+          # Same compiler and optional features as funcmd.exe, plus -dFunSafe.
+          # This is a separate binary so the default interpreter and its
+          # regression baseline are unchanged. The unit cache is separate: a
+          # safe build must never reuse normal .ppu files (or vice versa).
+          $log = "$env:RUNNER_TEMP\build-windows-x64-safe.log"
+          # Reuse the exact optional-feature set the normal build just proved
+          # it can link. funcmd.flags.txt holds the label; the core fallback
+          # is the human-readable string "no optional features".
+          $flags = @()
+          if (Test-Path 'funcmd.flags.txt') {
+            $label = (Get-Content 'funcmd.flags.txt' -Raw).Trim()
+            if ($label -and $label -ne 'no optional features') {
+              $flags = @($label -split '\s+' | Where-Object { $_ })
+            }
+          }
+          $units = Join-Path (Get-Location) 'units-safe'
+          New-Item -ItemType Directory -Force -Path $units | Out-Null
+          Remove-Item (Join-Path $units '*.ppu'), (Join-Path $units '*.o'), `
+                      (Join-Path $units '*.or') -Force -ErrorAction SilentlyContinue
+          $argv = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs', '-Twin64',
+                    '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx', '-dFunPack') + $flags +
+                  @('-dFunSafe', '-ofuncmd-safe.exe', "-FU$units")
+          Write-Host "safe argv: $(($argv | ForEach-Object { "[$_]" }) -join ' ')"
+          "safe argv: $(($argv | ForEach-Object { "[$_]" }) -join ' ')" |
+            Out-File -FilePath $log -Encoding ascii
+          & ppcrossx64 @argv *>&1 | Tee-Object -FilePath $log -Append
+          if ($LASTEXITCODE -ne 0) {
+            $tail = ((Get-Content $log -Tail 30) -join '~')
+            Write-Host "::error title=safe build (windows-x64)::exit=$LASTEXITCODE $($tail.Substring(0, [Math]::Min(2500, $tail.Length)))"
+            exit 1
+          }
+          if (-not (Test-Path 'funcmd-safe.exe')) {
+            Write-Host "::error title=safe build (windows-x64)::ppcrossx64 succeeded but funcmd-safe.exe is missing"
+            exit 1
+          }
+          Write-Host "::warning title=safe build (windows-x64) ok::funcmd-safe.exe=$((Get-Item 'funcmd-safe.exe').Length) bytes"
 
       - name: Capability probes
         shell: pwsh
@@ -938,6 +1071,66 @@ jobs:
             exit 1
           }
 
+      - name: Safe capability regression (strict)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'src\prj\fun\funcmd-safe.exe') -and
+              -not (Test-Path 'fun\funcmd-safe.exe')) {
+            Write-Host "::error title=safe regression (windows-x64)::funcmd-safe.exe is missing"
+            exit 1
+          }
+          cmd /c "fun\test\run-safe-regression.bat strict"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error title=safe regression (windows-x64)::run-safe-regression.bat exited $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+
+      - name: Runtime C and zlib probes (win64)
+        shell: pwsh
+        run: |
+          # File presence is not proof: the DLL must be x86_64 and its ABI
+          # must match the bindings. Record the result for the stage step and
+          # drop a DLL that cannot be used, so capabilities.json and the
+          # archive tell the same story.
+          $exe = "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe"
+          function Run-Probe([string]$name, [string[]]$lines) {
+            $f = "$env:RUNNER_TEMP\probe-$name.fun"
+            $lines -join "`n" | Out-File -FilePath $f -Encoding ascii
+            $out = & $exe $f 2>&1
+            Write-Host "::warning title=probe $name::exit=$LASTEXITCODE out=[$($out -join '~')]"
+            return (($out | Select-Object -Last 1) -as [string]).Trim()
+          }
+
+          $tcc = Run-Probe 'tcc' @(
+            "use 'fun/lib/lib-tcc.fun';",
+            "try",
+            "  var f = ccompile('int add(int a, int b) { return a + b; }', 'ii:i');",
+            "  ?. f.call(3, 4); f.del();",
+            "except",
+            "  ?. 'off';",
+            "end try;")
+          $zlib = Run-Probe 'zlib' @(
+            "use 'fun/lib/lib-zlib.fun';",
+            "var ok = false;",
+            "try",
+            "  ok = decompress(compress('win64 zlib'), 64) = 'win64 zlib'",
+            "       and inflate(deflate('win64 zlib')) = 'win64 zlib';",
+            "except",
+            "  ok = false;",
+            "end try;",
+            "if ok then ?. 'on'; else ?. 'off'; end if;")
+          if ($tcc -eq '7') { "FUN_WIN_TCC=1" | Out-File $env:GITHUB_ENV -Append -Encoding utf8 }
+          else {
+            "FUN_WIN_TCC=0" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+            Remove-Item 'src\prj\fun\libtcc.dll' -Force -ErrorAction SilentlyContinue
+          }
+          if ($zlib -eq 'on') { "FUN_WIN_ZLIB=1" | Out-File $env:GITHUB_ENV -Append -Encoding utf8 }
+          else {
+            "FUN_WIN_ZLIB=0" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+            Remove-Item 'src\prj\fun\zlib.dll' -Force -ErrorAction SilentlyContinue
+          }
+          $global:LASTEXITCODE = 0
+
       # Same contract as the POSIX jobs: only a green main run produces a
       # release stage, and the release workflow downloads it instead of
       # rebuilding. The label recorded by the build step says which optional
@@ -959,6 +1152,8 @@ jobs:
           $label = if (Test-Path 'src\prj\fun\funcmd.flags.txt') {
             (Get-Content 'src\prj\fun\funcmd.flags.txt' -Raw).Trim()
           } else { [string]$env:FUN_WIN_BUILD_LABEL }
+          $tccOk  = ($env:FUN_WIN_TCC -eq '1')
+          $zlibOk = ($env:FUN_WIN_ZLIB -eq '1')
           $caps = [ordered]@{
             platform       = 'win-x64'
             commit_sha     = $env:GITHUB_SHA
@@ -966,18 +1161,22 @@ jobs:
             build_flags    = @($label -split '\s+' | Where-Object { $_ })
             regex          = ($label -match 'dRegex')
             ffi            = ($label -match 'dWinFFI')
-            tcc            = (Test-Path 'src\prj\fun\libtcc.dll')
+            tcc            = $tccOk
+            # lib-asm / lib-asm-pro are pure Fun plus VirtualAlloc; a win64
+            # build carries the x86-64 backend, so the machine-code layer is
+            # available whenever the interpreter itself is.
+            asm            = $true
             safe           = (Test-Path 'src\prj\fun\funcmd-safe.exe')
             safe_level     = 'strict'
-            libtcc_present = (Test-Path 'src\prj\fun\libtcc.dll')
-            zlib_present   = (Test-Path 'src\prj\fun\zlib.dll')
+            libtcc_present = $tccOk
+            zlib_present   = $zlibOk
             notes          = ''
           }
           $missing = @()
           if (-not $caps.regex) { $missing += 'regex unavailable (PCRE DLL not built)' }
           if (-not $caps.ffi) { $missing += 'getapi/FFI unavailable' }
-          if (-not $caps.tcc) { $missing += 'runtime C compile unavailable (no libtcc.dll)' }
-          if (-not $caps.zlib_present) { $missing += 'zlib unavailable' }
+          if (-not $caps.tcc) { $missing += 'runtime C compile unavailable (libtcc.dll missing or unusable)' }
+          if (-not $caps.zlib_present) { $missing += 'zlib unavailable (zlib.dll missing or unusable)' }
           if (-not $caps.safe) { $missing += 'safe build not provided on win-x64' }
           $caps.notes = ($missing -join '; ')
           Write-Host "::warning title=win stage::safe=$($caps.safe) tcc=$($caps.tcc) regex=$($caps.regex) ffi=$($caps.ffi)"

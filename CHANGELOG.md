@@ -4,6 +4,22 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 **English** (this file) · [简体中文](CHANGELOG.zh.md)
 
+## [Unreleased]
+
+- win64 now ships the capability-restricted interpreter: the Windows CI builds
+  `funcmd-safe.exe` with the same feature set as `funcmd.exe`, runs the focused
+  safe capability test, and stages both binaries. `capabilities.json` reports
+  `safe: true` when the probe passes.
+
+- win64 gains runtime C and zlib. `build-win64-deps.sh` compiles the pinned TCC
+  and zlib sources into x86-64 `libtcc.dll` and `zlib.dll` (the old bundled
+  copies were 32-bit), and the Windows job probes both before publishing. The
+  release notes and README now show regex, FFI, runtime C, asm and safe as one
+  matrix.
+
+- Release notes put direct download links first, shorten the change list, and
+  drop the licensing paragraph; each archive still carries its LICENSE files.
+
 ## [9.5.4] - 2026-11-03
 
 - Add brace-delimited blocks for `if` and conditional loops:
