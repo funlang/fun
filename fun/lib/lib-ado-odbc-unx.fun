@@ -619,7 +619,9 @@ fun _odbcExecOne(h, sql, ps, bind)
       _odbcBindAll(a, st, ps, keep);
     end if;
     rc = a.execdirect(st, sql.toNum(-1), sql.length());
-    if not _odbcOk(rc) then
+    // ODBC 3.x reports a searched UPDATE/DELETE that matched no rows as
+    // SQL_NO_DATA; that is a successful statement with a zero row count.
+    if not _odbcOk(rc) and rc <> SQL_NO_DATA then
       raise 'ODBC exec: ' & OdbcDiag(a, SQL_HANDLE_STMT, st) & '\nSQL:\n' & sql;
     end if;
     result = _odbcReadResult(a, st, keep);

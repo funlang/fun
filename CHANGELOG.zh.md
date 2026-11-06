@@ -6,8 +6,8 @@
 
 ## [Unreleased]
 
-- Unix 的 `lib-ado-unx` 新增 unixODBC 后端。连接串带 `odbc:` 前缀、`DRIVER=`
-  或 `DSN=` 时改走 `lib-ado-odbc-unx.fun`，不再只连内嵌 SQLite，现有 ORM
+- Unix 的 `lib-ado-unx` 新增 unixODBC 后端。连接串带 `odbc:`/`ODBC;` 前缀、
+  `DRIVER=`、`DSN=` 或 `FILEDSN=` 时改走 `lib-ado-odbc-unx.fun`，不再只连内嵌 SQLite，现有 ORM
   栈可直接接 MySQL、PostgreSQL、SQL Server 等驱动。参数按 ORM DataType
   绑定，结果按列类型读回（超过 2^53 的 Int64 不丢精度），事务和 ODBC 目录
   函数（表/列/主键/外键）齐全。未安装 unixODBC 的机器仍走原来的内嵌

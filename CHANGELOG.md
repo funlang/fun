@@ -7,7 +7,7 @@ This project records notable changes in the style of [Keep a Changelog](https://
 ## [Unreleased]
 
 - Unix `lib-ado-unx` gains a unixODBC backend. Connection strings with an
-  `odbc:` prefix, `DRIVER=`, or `DSN=` now go through `lib-ado-odbc-unx.fun`
+  `odbc:`/`ODBC;` prefix, `DRIVER=`, `DSN=`, or `FILEDSN=` now go through `lib-ado-odbc-unx.fun`
   instead of embedded SQLite, so the existing ORM stack can reach MySQL,
   PostgreSQL, SQL Server and other drivers. Parameters are bound by ORM
   DataType, results are read typed (Int64 above 2^53 survives), and

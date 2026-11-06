@@ -36,6 +36,14 @@ fun main(cn)
   var u = db.Execute('UPDATE t SET n = 0 WHERE n > 0', false);
   ?. 'updated=' & u[0].rows;
 
+  // ODBC reports a searched UPDATE/DELETE that matches no rows as SQL_NO_DATA,
+  // which still means success with a zero row count.
+  var z1 = db.Execute('UPDATE t SET n = n WHERE n = 999', false);
+  ?. 'zero-update=' & z1[0].rows;
+  var z2 = db.Execute('DELETE FROM t WHERE n = 999', false);
+  ?. 'zero-delete=' & z2[0].rows;
+  ?. 'zero-select=' & db.Execute('SELECT id FROM t WHERE id = -1', false).@count();
+
   db.Begin();
   db.Execute("INSERT INTO t(name,n) VALUES('dave',9)");
   db.Rollback();
@@ -185,6 +193,12 @@ fun main(cn)
   initdb.Init();
   ?. 'init=' & (not initdb.Closed()) & ':' & initdb.quotes;
   initdb.Close();
+
+  // ADO-style connection strings start with 'ODBC;'; the backend strips it.
+  var adostr = ADO('ODBC;' & cn.substr(5));
+  adostr.Open();
+  ?. 'adoprefix=' & adostr.Execute('SELECT 1 AS x', false)[0].x;
+  adostr.Close();
 end fun;
 
 var cn = HostEnvGet('ODBC_TEST_CN');
