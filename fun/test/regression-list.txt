@@ -95,6 +95,7 @@ lib-ajax-lnx-test.fun	test/lib-ajax-lnx-test.fun	snap
 run-ajax-lnx.sh	test/run-ajax-lnx.sh	shell
 lib-ado-lnx-test.fun	test/lib-ado-lnx-test.fun	snap
 lib-ado-schema-lnx-test.fun	test/lib-ado-schema-lnx-test.fun	snap
+run-ado-odbc.sh	test/run-ado-odbc.sh	shell
 lib-xml-lnx-test.fun	test/lib-xml-lnx-test.fun	snap
 lib-winsock-lnx-test.fun	test/lib-winsock-lnx-test.fun	snap
 lib-jsonrpc-lnx-test.fun	test/lib-jsonrpc-lnx-test.fun	snap

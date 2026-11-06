@@ -10,10 +10,11 @@
 ## 0. 当前基线
 
 - **版本**：9.5.4，`src/core/version.inc` 的 `funRelease = '9.5.4'`。
-- **回归**：Linux `126/126`（`sh fun/test/run-linux-regression.sh`）。
+- **回归**：Linux `127/127`（`sh fun/test/run-linux-regression.sh`）。
 - **可加载性**：`73/79`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
-- **标准库**：77 个模块（`fun/lib` 有 79 个基础 `.fun`，内部 `lib-base`/`lib-type` 不计）。
+- **标准库**：77 个模块（`fun/lib` 有 79 个基础 `.fun`，内部 `lib-base`/`lib-type`
+  与 `-unx`/`-lnx` 后端单元不计）。
 - **平台**：Linux x86_64 / arm64、macOS x64 / arm64、Windows x64（FPC）；
   Delphi/Win32 继续人工验证。
 - **CI**：GitHub Actions 的 `regression` 工作流覆盖 6 个构建作业（4 个 POSIX 平台 +
@@ -59,13 +60,13 @@
 | P-02 | 平台 | P2 | OPEN | `lib-os` 全量 host 分派器未做 | `art/notes/library-port-plan.md` |
 | P-03 | 平台 | P2 | OPEN | `lib-message`/`lib-async`/`lib-jsasync` 仍依赖消息泵或线程 | `art/notes/linux-capabilities.md` |
 | P-04 | 平台 | P3 | OPEN | `lib-icmp` raw socket 未做，需 root/CAP_NET_RAW | `art/notes/linux-capabilities.md` |
-| P-05 | 平台 | P3 | OPEN | MySQL/ODBC 第二数据库后端未做 | `art/notes/linux-capabilities.md` |
+| P-05 | 平台 | P3 | DONE | 第二数据库后端：unixODBC（P-11）已接，MySQL/PostgreSQL 等经驱动管理器接入 | `art/notes/linux-capabilities.md` |
 | P-06 | 平台 | P3 | OPEN | `lib-os` B 档（GetIPs/inotify 等）未做 | `art/notes/linux-capabilities.md` |
 | P-07 | 机器码 | P2 | OPEN | `asm-list` 的 x86-64 表覆盖不全 | `art/notes/arch-machine-code-plan.md` |
 | P-08 | macOS | P2 | OPEN | x64/arm64 的 `libtcc.dylib` 已接（arm64 用 ucontext + MAP_JIT 补丁，待 CI/真机复验）；arm64 真机验证、签名/公证未做 | `art/notes/macos-port.md` |
 | P-09 | 架构 | P3 | OPEN | LoongArch 工具链与编码器未做 | `art/notes/arch-machine-code-plan.md` |
 | P-10 | 架构 | P3 | OPEN | Linux aarch64 交叉产物仍缺 `-dRegex` 与 `-dLinuxFFI` | `README.zh.md` |
-| P-11 | 平台/数据库 | P3 | OPEN | unixODBC 第二数据库后端未接：缺少开发头文件、驱动探测和 CI 覆盖；当前 ODBC 概念只在 Windows/ADO 侧成立 | `art/notes/linux-capabilities.md` |
+| P-11 | 平台/数据库 | P3 | DONE | unixODBC 第二数据库后端已接：`lib-ado-unx` 按 `odbc:`/`DRIVER=`/`DSN=` 自动分派，参数、事务、OpenSchema（SQLTables/Columns/PrimaryKeys/ForeignKeys）齐全；CI 装 `unixodbc`+`libsqliteodbc` 并跑 `run-ado-odbc.sh` | `art/notes/linux-capabilities.md` |
 | P-12 | macOS | P2 | OPEN | Apple TCC（隐私权限）未处理：访问 Desktop/Documents/Downloads 会触发系统授权，签名/公证见 P-08；安装脚本只能清 quarantine，不能预授权 | `art/notes/macos-port.md` |
 | P-13 | Windows/ARM | P3 | OPEN | win-arm64 无构建：FPC 3.2.2 没有 win64/aarch64 target，`regression.yml` 的 windows-arm64 job 仍禁用，需更新 FPC 或交叉工具链 | `.github/workflows/regression.yml` |
 | Q-01 | 质量 | P2 | DONE | `lib-ado-schema.Filter` 丢外键 | `art/notes/linux-capabilities.md` |
@@ -118,3 +119,10 @@
   默认按用户安装到 `%LOCALAPPDATA%\Programs\Fun`，注册 PATH、`.fun`/`.foo`/
   `.fxx` 关联、Win+R `App Paths` 和“设置 > 应用”卸载项。技术债补记
   unixODBC、macOS TCC 与 win-arm64 FPC target。
+- 2026-11-06：接入 unixODBC 第二数据库后端（P-05/P-11 关闭）。新增
+  `lib-ado-odbc-unx.fun`，`lib-ado-unx` 在连接串含 `odbc:`/`DRIVER=`/`DSN=`
+  时自动分派；SQLite 仍走内嵌路径，未装 unixODBC 的机器不受影响。参数按
+  ORM DataType 绑定、结果按列类型读取，支持事务和 ODBC 目录函数
+  （SQLTables/SQLColumns/SQLPrimaryKeys/SQLForeignKeys）。新增
+  `run-ado-odbc.sh`（无驱动时 SKIP）与 `unixodbc`+`libsqliteodbc` CI 步骤，
+  回归 `126/126 → 127/127`。

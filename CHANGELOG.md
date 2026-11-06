@@ -6,6 +6,15 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Unix `lib-ado-unx` gains a unixODBC backend. Connection strings with an
+  `odbc:` prefix, `DRIVER=`, or `DSN=` now go through `lib-ado-odbc-unx.fun`
+  instead of embedded SQLite, so the existing ORM stack can reach MySQL,
+  PostgreSQL, SQL Server and other drivers. Parameters are bound by ORM
+  DataType, results are read typed (Int64 above 2^53 survives), and
+  transactions plus the ODBC schema catalog functions are supported. Hosts
+  without unixODBC keep the unchanged embedded-SQLite path; the new
+  `run-ado-odbc.sh` regression skips when no driver is present.
+
 - macOS x64 and arm64 gain runtime C compilation. `make-macos.sh` now builds
   `libtcc.dylib` from the vendored TCC through `build-tcc-darwin.sh`, installs
   it next to `funcmd`, and `lib-tcc.fun` resolves it there. Both macOS

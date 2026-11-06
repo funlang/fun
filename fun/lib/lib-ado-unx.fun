@@ -1,7 +1,8 @@
 // Copyright (c) 2010-2026 Zhang Weidong <zwd@funlang.org>
 // SPDX-License-Identifier: MIT
 //
-// lib-ado-unx: the Unix backend of lib-ado -- a database connection on SQLite.
+// lib-ado-unx: the Unix backend of lib-ado -- SQLite by default, unixODBC on
+// request.
 //
 // The Windows lib-ado.fun is COM-shaped (ADODB.Connection/Command/Recordset, an
 // ODBC provider), so it cannot be reused on Unix. Following the <name>-unx
@@ -10,6 +11,7 @@
 //
 //     use 'lib-ado-unx.fun';
 //     var db = ADO('mydb.sqlite');      // or ':memory:' / 'Data Source=...'
+//     var db = ADO('odbc:DSN=prod');    // or 'DRIVER=...;DATABASE=...'
 //     db.Open();
 //     var rows = db.Execute('SELECT id, name FROM t WHERE id > ?', false, ps: [[v: 1, dt: 1]]);
 //
@@ -26,8 +28,10 @@
 //   * OpenSchema(schema) for adSchemaTables/Columns/PrimaryKeys/ForeignKeys, with
 //     the ADO column names lib-ado-schema.fun reads.
 //
-// Connection string: SQLite has no providers, so the string is the database file,
-// ':memory:', or an ADO-ish 'Data Source=<file>' / 'DSN=<file>' / 'sqlite:<file>'.
+// Connection string: a string with 'DRIVER='/'DSN=' or an 'odbc:' prefix is
+// handed to lib-ado-odbc-unx (unixODBC); everything else stays on embedded
+// SQLite: a database file, ':memory:', or an ADO-ish 'Data Source=<file>' /
+// 'sqlite:<file>'. SQLite needs no system driver, so the ODBC path is opt-in.
 //
 // Native handles are module-level getapi variables (the lib-crypt-unx pattern).
 // OUT parameters (sqlite3** / stmt**) are passed as the real address of a Fun
@@ -36,6 +40,7 @@
 
 use 'lib-host.fun';
 use 'lib-ado-base.fun';
+use 'lib-ado-odbc-unx.fun';
 
 var _lib = DyLib('libsqlite3.so.0', 'libsqlite3.dylib');
 var _PTR = 'host'.arg().getJson(fd: true).bits div 8; // pointer width
@@ -142,7 +147,6 @@ fun _conn_str(cn)
   var k = low.subpos('datasource=');
   if k < 0 then k = low.subpos('data source='); end if;
   if k < 0 then k = low.subpos('filename='); end if;
-  if k < 0 then k = low.subpos('dsn='); end if;
   if k >= 0 then
     s = s.substr(s.subpos('=') + 1);
     s = _trim(s).replace(/^["'\{\}\(\s]++/, '').replace(/["'\{\}\)\s;]++$/, '');
@@ -152,12 +156,31 @@ fun _conn_str(cn)
   result = s;
 end fun;
 
+// A connection string selects the ODBC backend with an explicit 'odbc:'
+// prefix, or by the standard ODBC keys DRIVER=/DSN=. Everything else stays on
+// the embedded SQLite backend, so existing ':memory:' and file paths keep
+// working without unixODBC installed.
+fun _is_odbc(cn)
+  var s = _trim(cn or '');
+  var low = s.lower();
+  result = low.substr(0, 5) = 'odbc:'
+        or low.subpos('driver=') >= 0
+        or low.subpos('dsn=') >= 0;
+end fun;
+
+fun _odbc_cn(cn)
+  var s = _trim(cn or '');
+  if s.lower().substr(0, 5) = 'odbc:' then s = _trim(s.substr(5)); end if;
+  result = s;
+end fun;
+
 // ---------------------------------------------------------------
 // ADO
 // ---------------------------------------------------------------
 class ADO(cnString, args)
   var cn = _conn_str(cnString);
   var db = nil;
+  var _odbc = nil;
   var quotes = '"%s"';
   var dot = '.';
   var schema = nil;
@@ -166,7 +189,26 @@ class ADO(cnString, args)
   var ps = new [selectAutoId: 'SELECT last_insert_rowid() AS autoId'];
 
   fun Open()
-    if db <> nil then result = true; return; end if;
+    if db <> nil or _odbc <> nil then result = true; return; end if;
+    if _is_odbc(cnString) then
+      var oh = OdbcOpen(_odbc_cn(cnString));
+      _odbc = oh;
+      if oh.driver.lower().subpos('sqlite') >= 0 then
+        if ps.selectAutoId = nil then
+          ps.selectAutoId = 'SELECT last_insert_rowid() AS autoId';
+        end if;
+      else
+        // Only drop the embedded-SQLite default; a caller-supplied identity
+        // query (lib-orm-rpc's selectAutoId) must survive Open().
+        if ps.selectAutoId = 'SELECT last_insert_rowid() AS autoId' then
+          ps.selectAutoId = nil;
+        end if;
+      end if;
+      if oh.quote <> '' then quotes = oh.quote & '%s' & oh.quote; end if;
+      dot = oh.sep;
+      result = true;
+      return;
+    end if;
     var cn2 = cn;
     if cn2 = '' then cn2 = ':memory:'; end if;
     var buf = 0.toChar().x(_PTR);
@@ -189,23 +231,30 @@ class ADO(cnString, args)
   end fun;
 
   fun Close()
+    if _odbc <> nil then
+      try OdbcClose(_odbc); except end try;
+      _odbc = nil;
+    end if;
     if db <> nil then
       try _close(db); except end try;
       db = nil;
     end if;
   end fun;
 
-  var Closed() = db = nil;
+  var Closed() = db = nil and _odbc = nil;
 
   fun Begin()
+    if _odbc <> nil then OdbcBegin(_odbc); return; end if;
     _execRaw('BEGIN');
   end fun;
 
   fun Commit()
+    if _odbc <> nil then OdbcCommit(_odbc); return; end if;
     _execRaw('COMMIT');
   end fun;
 
   fun Rollback()
+    if _odbc <> nil then OdbcRollback(_odbc); return; end if;
     _execRaw('ROLLBACK');
   end fun;
 
@@ -253,6 +302,7 @@ class ADO(cnString, args)
   // Run one or more ';'-separated statements. Returns a list of result sets:
   // a set is a list of row maps (SELECT), or [[rows: n]] (no result columns).
   fun _run(sql, ps)
+    if _odbc <> nil then result = OdbcRun(_odbc, sql, ps); return; end if;
     result = new [];
     var rest = _trim(sql);
     var first = true;
@@ -360,6 +410,7 @@ class ADO(cnString, args)
   // ---------------------------------------------------------------
   fun OpenSchema(schema)
     if Closed() then Open(); end if;
+    if _odbc <> nil then result = OdbcSchema(_odbc, schema); return; end if;
     if schema = adSchemaDBInfoLiterals then
       result = new [[LiteralName: 'QUOTE', LiteralValue: '"'], [LiteralName: 'SCHEMA_SEPARATOR', LiteralValue: '.']];
     elsif schema = adSchemaTables then
