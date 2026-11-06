@@ -20,6 +20,7 @@
 #       --repo-root . [--previous-tag v9.5.4] [--source-epoch <unix>]
 # ============================================================
 import argparse
+import fnmatch
 import hashlib
 import json
 import os
@@ -39,6 +40,17 @@ DOC_FILES = ["README.md", "SAFETY.zh.md"]
 UNIX_INSTALLER = ["install.sh"]
 WIN_INSTALLER = ["install.ps1", "install.cmd", "uninstall.ps1", "uninstall.cmd"]
 
+# Build intermediates for the assembler tables. lib-asm-pro and lib-asm-a64
+# embed only the compressed ``asm-list*.fd2.gz`` at parse time, so the editable
+# ``.fd`` source and the prefix-packed ``.fd2`` are dead weight in a release
+# (about 1.6 MB uncompressed per platform). They stay in the repository for
+# fun/lib/tools/make-asm-list.fun.
+PACKAGE_EXCLUDE_PATTERNS = ("asm-list*.fd", "asm-list*.fd2")
+
+
+def is_build_intermediate(name):
+    return any(fnmatch.fnmatchcase(name, pat) for pat in PACKAGE_EXCLUDE_PATTERNS)
+
 
 def die(msg):
     print(f"package: error: {msg}", file=sys.stderr)
@@ -54,7 +66,11 @@ def sha256_file(path):
 
 
 def copy_tree(src, dst, epoch):
-    shutil.copytree(src, dst)
+    shutil.copytree(
+        src,
+        dst,
+        ignore=lambda _dir, names: [n for n in names if is_build_intermediate(n)],
+    )
     for p in dst.rglob("*"):
         if p.is_file():
             os.utime(p, (epoch, epoch))

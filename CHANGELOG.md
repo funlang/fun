@@ -47,6 +47,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
 - Release notes put direct download links first, shorten the change list, and
   drop the licensing paragraph; each archive still carries its LICENSE files.
 
+- Release archives no longer ship the assembler table intermediates
+  `asm-list.fd`/`asm-list.fd2` and their AArch64 counterparts. The runtime only
+  embeds `asm-list*.fd2.gz`, so this removes about 1.6 MB of dead weight per
+  platform (a Linux tar.gz is about 245 KB smaller). The repository keeps all
+  four files for `make-asm-list.fun`.
+
 ## [9.5.4] - 2026-11-03
 
 - Add brace-delimited blocks for `if` and conditional loops:
