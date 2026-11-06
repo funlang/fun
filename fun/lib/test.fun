@@ -6,6 +6,8 @@
 // Test files import `test.fun` and register blocks:
 //   test('name', { assert.equal(1 + 1, 2); });
 // Inside a body, test.skip('reason') ends the test as skipped.
+// test.todo(name, body, reason) marks an expected failure; test.todo(name, reason)
+// is a placeholder. Todo tests do not fail the run.
 // Assertions: equal, not_equal, is_true, is_false, match (regex), contains
 // (substring), greater, less, is_nil, not_nil, raises, fail; each takes an
 // optional trailing message.
@@ -26,20 +28,45 @@ fun test(name, body)
   _tests.@add(t);
 end fun;
 
+fun _oneLine(v)
+  if v.type() = 0 then result = ''; return; end if;
+  result = ('' & v).replace(13.toChar() & 10.toChar(), ' ').replace(13.toChar(), ' ').replace(10.toChar(), ' ');
+end fun;
+
 fun _test_skip(reason)
   if not _inTest then
     raise 'test.skip: can only be called inside a test body';
   end if;
-  var why = '';
-  if reason.type() <> 0 then
-    why = ('' & reason).replace(13.toChar() & 10.toChar(), ' ').replace(13.toChar(), ' ').replace(10.toChar(), ' ');
-  end if;
+  var why = _oneLine(reason);
   if not _skipPending then _skipReason = why; end if;
   _skipPending = true;
   raise _SKIP_PREFIX & why;
 end fun;
 
 test.skip = _test_skip;
+
+fun _test_todo(name, body, reason)
+  // Two-argument form: a function is an expected-failure body; any other
+  // second value is the placeholder reason. Three-argument form: the body
+  // must be a function (or nil for a placeholder), never a silent non-call.
+  if reason = nil then
+    if body.type() <> 0 then
+      reason = body;
+      body = nil;
+    end if;
+  elsif body.type() <> 0 then
+    raise 'test.todo: expected-failure body must be a function';
+  end if;
+  var why = _oneLine(reason);
+  var t = new [];
+  t.@add(name);
+  t.@add(body);
+  t.@add(true);
+  t.@add(why);
+  _tests.@add(t);
+end fun;
+
+test.todo = _test_todo;
 
 fun _str(v)
   result = '' & v;
@@ -155,27 +182,43 @@ var assert = [
 fun runTests()
   var failed = 0;
   var skipped = 0;
+  var todo = 0;
   var i = 0;
   while i < _tests.@count() do
     var t = _tests[i];
     _current = t[0];
     _skipPending = false;
     _skipReason = '';
-    _inTest = true;
+    var isTodo = t.@count() > 2 and t[2] = true;
+    var todoReason = '';
+    if t.@count() > 3 then todoReason = t[3]; end if;
     var completed = false;
     var err = '';
-    try
-      t[1]();
-      completed = true;
-    except
-      err = _str(@);
-    end try;
-    _inTest = false;
+    // Placeholder todos have no body; normal nil bodies keep the old ok behavior.
+    if not (isTodo and t[1] = nil) then
+      _inTest = true;
+      try
+        t[1]();
+        completed = true;
+      except
+        err = _str(@);
+      end try;
+      _inTest = false;
+    end if;
     if _skipPending then
       skipped += 1;
       var line = 'skip: ' & _current;
       if _skipReason <> '' then line &= ' (' & _skipReason & ')'; end if;
       ?. line;
+    elsif isTodo then
+      todo += 1;
+      if completed then
+        ?. 'todo passed: ' & _current & ' (remove todo)';
+      else
+        var todoLine = 'todo: ' & _current;
+        if todoReason <> '' then todoLine &= ' (' & todoReason & ')'; end if;
+        ?. todoLine;
+      end if;
     elsif completed then
       ?. 'ok ' & _current;
     else
@@ -186,7 +229,8 @@ fun runTests()
     i += 1;
   end do;
   var total = _tests.@count();
-  var summary = '# tests: ' & total & ' passed: ' & (total - failed - skipped) & ' failed: ' & failed;
-  if skipped > 0 then summary &= ' skipped: ' & skipped; end if;
+  var summary = '# tests: ' & total & ' passed: ' & (total - failed - skipped - todo) & ' failed: ' & failed;
+  if skipped > 0 or todo > 0 then summary &= ' skipped: ' & skipped; end if;
+  if todo > 0 then summary &= ' todo: ' & todo; end if;
   ?. summary;
 end fun;

@@ -57,7 +57,7 @@ if not "%RC%"=="0" (
     popd & exit /b 1
 )
 
-rem The runner prints "ok: N, failed: 0, skipped: M, # tests: T" as its last line.
+rem The runner prints "# tests: N passed: P failed: F [skipped: S] [todo: T]".
 set "SUMMARY="
 for /f "usebackq delims=" %%l in ("%OUTFILE%") do set "SUMMARY=%%l"
 del "%OUTFILE%" >nul 2>&1
@@ -68,20 +68,40 @@ if errorlevel 1 (
     popd & exit /b 1
 )
 
-rem Parse "# tests: N" so an accidentally empty run cannot pass.
+rem Parse "# tests: N passed: P failed: F skipped: S todo: T" so an
+rem accidentally empty run cannot pass.
 set "TOTAL="
-rem for /f drops the leading '#' delimiter, so read the third ':'/' ' token
-rem directly: "# tests: 15 passed: 15 failed: 0" -> 15.
-for /f "tokens=3 delims=: " %%a in ("%SUMMARY%") do set "TOTAL=%%a"
+set "FAILED="
+set "SKIPPED="
+set "TODO="
+for /f "tokens=1-11 delims=: " %%a in ("%SUMMARY%") do (
+    set "TOTAL=%%c"
+    set "FAILED=%%g"
+    set "SKIPPED=%%i"
+    set "TODO=%%k"
+)
 if not defined TOTAL (
     echo safe regression: could not read the test count ^(got: %SUMMARY%^) 1>&2
     popd & exit /b 1
 )
+if not defined FAILED set "FAILED=0"
+if not defined SKIPPED set "SKIPPED=0"
+if not defined TODO set "TODO=0"
 if %TOTAL% LSS 5 (
     echo safe regression: expected at least 5 tests, got %TOTAL% 1>&2
     popd & exit /b 1
 )
 
+set /a PASSED=TOTAL-SKIPPED-TODO
+set "MSG=safe regression: %PASSED%/%TOTAL% passed"
+if %SKIPPED% GTR 0 set "MSG=%MSG%, %SKIPPED% skipped"
+if %TODO% GTR 0 set "MSG=%MSG%, %TODO% todo"
+if %SKIPPED% GTR 0 goto :safe_counts
+if %TODO% GTR 0 goto :safe_counts
 echo safe regression: %TOTAL% tests passed
+goto :safe_done
+:safe_counts
+echo %MSG%
+:safe_done
 popd
 exit /b 0

@@ -21,3 +21,5 @@ test('rejects division by zero', {
 test('platform specific', {
   test.skip('example: not available on this platform');
 });
+
+test.todo('future case', 'example placeholder');
