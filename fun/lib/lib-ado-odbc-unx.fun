@@ -652,6 +652,17 @@ fun _odbcDefaultSchema(h)
   if h.driver.lower().subpos('sqlite') < 0 then result = ''; end if;
 end fun;
 
+// SQLTables/SQLColumns return TABLE_SCHEM for schema-aware servers (Postgres,
+// SQL Server) and TABLE_CAT for catalog-only ones (MySQL). Prefer the schema,
+// then the catalog, then the driver default.
+fun _odbcSchemaOf(r, def)
+  result = r.TABLE_SCHEM or r.TABLE_CAT or def;
+end fun;
+
+fun _odbcSchemaOf2(schem, cat, def)
+  result = schem or cat or def;
+end fun;
+
 fun _odbcTablesRaw(h)
   var a = h.api;
   var st = _odbcAlloc(a, SQL_HANDLE_STMT, h.dbc);
@@ -673,7 +684,7 @@ fun OdbcTables(h)
     var tn = r.TABLE_NAME or '';
     if tn <> '' and tn.lower().substr(0, 7) <> 'sqlite_' then
       result.@add(new [
-        TABLE_SCHEMA: r.TABLE_SCHEM or def,
+        TABLE_SCHEMA: _odbcSchemaOf(r, def),
         TABLE_NAME:   tn,
         TABLE_TYPE:   (r.TABLE_TYPE or 'TABLE').upper()
       ]);
@@ -696,7 +707,7 @@ fun _odbcPKeysRaw(h)
         end if;
         for r in _odbcReadResult(a, st, nil) do
           result.@add(new [
-            TABLE_SCHEMA: r.TABLE_SCHEM or def,
+            TABLE_SCHEMA: _odbcSchemaOf(r, def),
             TABLE_NAME:   r.TABLE_NAME or tn,
             COLUMN_NAME:  r.COLUMN_NAME or '',
             PK_NAME:      r.PK_NAME or ('pk_' & tn)
@@ -733,7 +744,7 @@ fun OdbcColumns(h)
         for r in _odbcReadResult(a, st, nil) do
           var tn2 = r.TABLE_NAME or tn;
           var cn = r.COLUMN_NAME or '';
-          var sch = r.TABLE_SCHEM or def;
+          var sch = _odbcSchemaOf(r, def);
           result.@add(new [
             TABLE_SCHEMA: sch,
             TABLE_NAME:   tn2,
@@ -773,10 +784,10 @@ fun OdbcFKeys(h)
           var fk = r.FKTABLE_NAME or tn;
           var pk = r.PKTABLE_NAME or '';
           result.@add(new [
-            FK_TABLE_SCHEMA: r.FKTABLE_SCHEM or def,
+            FK_TABLE_SCHEMA: _odbcSchemaOf2(r.FKTABLE_SCHEM, r.FKTABLE_CAT, def),
             FK_TABLE_NAME:   fk,
             FK_COLUMN_NAME:  r.FKCOLUMN_NAME or '',
-            PK_TABLE_SCHEMA: r.PKTABLE_SCHEM or def,
+            PK_TABLE_SCHEMA: _odbcSchemaOf2(r.PKTABLE_SCHEM, r.PKTABLE_CAT, def),
             PK_TABLE_NAME:   pk,
             PK_COLUMN_NAME:  r.PKCOLUMN_NAME or '',
             FK_NAME:         r.FK_NAME or ('fk_' & fk & '_' & pk)

@@ -12,6 +12,7 @@
 //     use 'lib-ado-unx.fun';
 //     var db = ADO('mydb.sqlite');      // or ':memory:' / 'Data Source=...'
 //     var db = ADO('odbc:DSN=prod');    // or 'DRIVER=...;DATABASE=...'
+//     var db = ADO('ODBC;DSN=prod');    // ADO-style prefix is stripped too
 //     db.Open();
 //     var rows = db.Execute('SELECT id, name FROM t WHERE id > ?', false, ps: [[v: 1, dt: 1]]);
 //
@@ -28,10 +29,11 @@
 //   * OpenSchema(schema) for adSchemaTables/Columns/PrimaryKeys/ForeignKeys, with
 //     the ADO column names lib-ado-schema.fun reads.
 //
-// Connection string: a string with 'DRIVER='/'DSN=' or an 'odbc:' prefix is
-// handed to lib-ado-odbc-unx (unixODBC); everything else stays on embedded
-// SQLite: a database file, ':memory:', or an ADO-ish 'Data Source=<file>' /
-// 'sqlite:<file>'. SQLite needs no system driver, so the ODBC path is opt-in.
+// Connection string: a string with 'DRIVER='/'DSN='/'FILEDSN=' or an
+// 'odbc:'/'ODBC;' prefix is handed to lib-ado-odbc-unx (unixODBC); everything
+// else stays on embedded SQLite: a database file, ':memory:', or an ADO-ish
+// 'Data Source=<file>' / 'sqlite:<file>'. SQLite needs no system driver, so
+// the ODBC path is opt-in.
 //
 // Native handles are module-level getapi variables (the lib-crypt-unx pattern).
 // OUT parameters (sqlite3** / stmt**) are passed as the real address of a Fun
@@ -157,9 +159,9 @@ fun _conn_str(cn)
 end fun;
 
 // A connection string selects the ODBC backend with an explicit 'odbc:'
-// prefix, or by the standard ODBC keys DRIVER=/DSN=. Everything else stays on
-// the embedded SQLite backend, so existing ':memory:' and file paths keep
-// working without unixODBC installed.
+// prefix, or by the standard ODBC keys DRIVER=/DSN=/FILEDSN=. Everything else
+// stays on the embedded SQLite backend, so existing ':memory:' and file paths
+// keep working without unixODBC installed.
 fun _is_odbc(cn)
   var s = _trim(cn or '');
   var low = s.lower();
@@ -171,6 +173,7 @@ end fun;
 fun _odbc_cn(cn)
   var s = _trim(cn or '');
   if s.lower().substr(0, 5) = 'odbc:' then s = _trim(s.substr(5)); end if;
+  if s.lower().substr(0, 5) = 'odbc;' then s = _trim(s.substr(5)); end if;
   result = s;
 end fun;
 
@@ -204,7 +207,11 @@ class ADO(cnString, args)
           ps.selectAutoId = nil;
         end if;
       end if;
-      if oh.quote <> '' then quotes = oh.quote & '%s' & oh.quote; end if;
+      if oh.quote = '[' then
+        quotes = '[%s]';
+      elsif oh.quote <> '' then
+        quotes = oh.quote & '%s' & oh.quote;
+      end if;
       dot = oh.sep;
       result = true;
       return;
