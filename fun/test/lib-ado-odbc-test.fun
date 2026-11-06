@@ -103,6 +103,19 @@ fun main(cn)
   var pks = db.OpenSchema(adSchemaPrimaryKeys);
   ?. 'pkeys=' & pks.@count() & ':' & pks[0].COLUMN_NAME;
 
+  // Composite PK/FK metadata comes back as one row per column.
+  db.Execute('CREATE TABLE cp(a INTEGER, b INTEGER, PRIMARY KEY(a,b))');
+  db.Execute('CREATE TABLE cf(x INTEGER, y INTEGER, FOREIGN KEY(x,y) REFERENCES cp(a,b))');
+  var cpk = 0;
+  for p in db.OpenSchema(adSchemaPrimaryKeys) do
+    if p.TABLE_NAME = 'cp' then cpk += 1; end if;
+  end do;
+  var cfk = 0;
+  for f in db.OpenSchema(adSchemaForeignKeys) do
+    if f.FK_TABLE_NAME = 'cf' then cfk += 1; end if;
+  end do;
+  ?. 'composite=' & cpk & ',' & cfk;
+
   // ---- lib-orm through the same connection ----
   db.Execute('DROP TABLE t');
   db.Execute('DROP TABLE b');
@@ -111,7 +124,9 @@ fun main(cn)
   db.Execute('DROP TABLE bigdata');
   db.Execute('DROP TABLE empty');
   db.Execute('DROP TABLE num');
-  db.Execute('CREATE TABLE "User"(id INTEGER PRIMARY KEY, name TEXT, age INTEGER)');
+  db.Execute('DROP TABLE cp');
+  db.Execute('DROP TABLE cf');
+  db.Execute('CREATE TABLE "User"(id INTEGER PRIMARY KEY, name TEXT UNIQUE, age INTEGER)');
 
   fun F(alias, name, dt, isP, isAuto)
     result = new [Alias: alias, Name: name, DataType: dt, IsPrimary: isP, IsAutoId: isAuto];
@@ -141,6 +156,15 @@ fun main(cn)
   var r3 = OrmDelete(db, new [User: new [name: 'bob']]);
   ?. 'orm delete rows=' & r3.User.rows;
   ?. 'orm remaining=' & db.Execute('SELECT COUNT(*) AS c FROM "User"', false)[0].c;
+
+  // A failed multi-row save rolls the whole transaction back.
+  var dup = false;
+  try
+    OrmSave(db, new [User: new [[name: 'dave'], [name: 'alice']]]);
+  except
+    dup = true;
+  end try;
+  ?. 'orm rollback=' & dup & ':' & db.Execute('SELECT COUNT(*) AS c FROM "User"', false)[0].c;
 
   var eac = db.ExecuteAndClose('SELECT 42 AS x', false);
   ?. 'eac=' & eac[0].x & ' closed=' & db.Closed();
