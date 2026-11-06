@@ -32,6 +32,25 @@ skip line shown in fail: True
 skip line shown once: True
 sentinel text is failure: True
 skip outside body: True
+todo exits 0: True
+todo placeholder shown: True
+todo bare shown: True
+todo expected failure shown: True
+todo passed shown: True
+todo skip wins: True
+todo no reason body shown: True
+todo numeric reason shown: True
+todo zero reason shown: True
+todo pass line: True
+todo summary: True
+todo mixed exits 1: True
+todo mixed counts: True
+todo mixed line shown: True
+todo bad body: True
+todo multi summary: True
+todo multi pass lines: True
+todo fake summary: True
+todo fake no counts: True
 reserved dependency key: True
 reserved alias: True
 root shadow: True

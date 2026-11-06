@@ -69,8 +69,13 @@ fi
 
 SKIPPED="$(printf '%s\n' "$SUMMARY" | sed -n 's/.* skipped: \([0-9][0-9]*\).*/\1/p')"
 if [ -z "$SKIPPED" ]; then SKIPPED=0; fi
-if [ "$SKIPPED" -gt 0 ]; then
-    echo "safe regression: $((TOTAL - SKIPPED))/$TOTAL passed, $SKIPPED skipped"
+TODO="$(printf '%s\n' "$SUMMARY" | sed -n 's/.* todo: \([0-9][0-9]*\).*/\1/p')"
+if [ -z "$TODO" ]; then TODO=0; fi
+if [ "$SKIPPED" -gt 0 ] || [ "$TODO" -gt 0 ]; then
+    MSG="safe regression: $((TOTAL - SKIPPED - TODO))/$TOTAL passed"
+    if [ "$SKIPPED" -gt 0 ]; then MSG="$MSG, $SKIPPED skipped"; fi
+    if [ "$TODO" -gt 0 ]; then MSG="$MSG, $TODO todo"; fi
+    echo "$MSG"
 else
     echo "safe regression: $TOTAL/$TOTAL passed"
 fi

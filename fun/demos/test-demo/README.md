@@ -19,9 +19,10 @@ from this directory that is `../../../src/prj/fun/funcmd`.
 cd fun/demos/test-demo
 
 fun test
-# tests/calc_test.fun   PASS (5, 1 skipped)
+# tests/calc_test.fun   PASS (6, 1 skipped, 1 todo)
 #   skip: platform specific (example: not available on this platform)
-# 1 file, 5 tests: 4 passed, 1 skipped
+#   todo: future case (example placeholder)
+# 1 file, 6 tests: 4 passed, 1 skipped, 1 todo
 ```
 
 A failing assertion prints the test name and a diagnostic; the exit code is 1:
@@ -36,14 +37,16 @@ test('broken', {
 fun test
 # tests/calc_test.fun   FAIL
 # skip: platform specific (example: not available on this platform)
+# todo: future case (example placeholder)
 # not ok broken
 #   math is broken
 #   expected 3, got 2
-# 1 file, 6 tests: 4 passed, 1 failed, 1 skipped
+# 1 file, 7 tests: 4 passed, 1 failed, 1 skipped, 1 todo
 ```
 
 Call `test.skip('reason')` inside a test body to skip it; skipped tests are
-reported separately and do not fail the run.
+reported separately and do not fail the run. `test.todo('name', 'reason')` is a
+placeholder, and `test.todo('name', { ... }, 'reason')` is an expected failure.
 
 Notes:
 

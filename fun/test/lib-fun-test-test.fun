@@ -332,6 +332,101 @@ var skoutlog = base & 'skipping-outside.log';
 var sout1 = runIn(skoutp, funcmd & ' test', skoutlog);
 check('skip outside body', sout1 = 1 and has(loadIf(skoutlog), 'can only be called inside a test body'));
 
+// --- todo: placeholder and expected-failure tests ------------------------
+var todop = base & 'todos' & sep;
+(todop & 'package.fun').save(
+  'fun package()' & nl &
+  '  result = [name: ' & "'todos', version: '0.1.0', bin: '', lib: '', dependencies: [], resolved: []];" & nl &
+  'end fun;' & nl);
+(todop & 'tests' & sep & 'a_test.fun').save(
+  "use 'test.fun';" & nl & nl &
+  "test('ok', { assert.equal(1, 1); });" & nl &
+  "test.todo('planned', 'not written');" & nl &
+  "test.todo('bare');" & nl &
+  "test.todo('known red', { assert.fail('expected'); }, 'bug 1');" & nl &
+  "test.todo('fixed', { assert.equal(1, 1); }, 'should pass');" & nl &
+  "test.todo('skip inside', { test.skip('caught'); }, 'todo skip');" & nl &
+  "test.todo('no reason body', { assert.fail('expected'); });" & nl &
+  "test.todo('numeric reason', 7);" & nl &
+  "test.todo('zero reason', 0);" & nl);
+var todolog = base & 'todos.log';
+var td1 = runIn(todop, funcmd & ' test', todolog);
+var tdo = loadIf(todolog);
+check('todo exits 0', td1 = 0);
+check('todo placeholder shown', has(tdo, 'todo: planned (not written)'));
+check('todo bare shown', has(tdo, 'todo: bare') and not has(tdo, 'todo: bare ('));
+check('todo expected failure shown', has(tdo, 'todo: known red (bug 1)'));
+check('todo passed shown', has(tdo, 'todo passed: fixed (remove todo)'));
+check('todo skip wins', has(tdo, 'skip: skip inside (caught)') and not has(tdo, 'todo: skip inside'));
+check('todo no reason body shown', has(tdo, 'todo: no reason body') and not has(tdo, 'todo passed: no reason body'));
+check('todo numeric reason shown', has(tdo, 'todo: numeric reason (7)') and not has(tdo, 'todo passed: numeric reason'));
+check('todo zero reason shown', has(tdo, 'todo: zero reason (0)'));
+check('todo pass line', has(tdo, 'PASS (9, 1 skipped, 7 todo)'));
+check('todo summary', has(tdo, '1 file, 9 tests: 1 passed, 1 skipped, 7 todo'));
+
+var tdmixp = base & 'todo-mixed' & sep;
+(tdmixp & 'package.fun').save(
+  'fun package()' & nl &
+  '  result = [name: ' & "'todomix', version: '0.1.0', bin: '', lib: '', dependencies: [], resolved: []];" & nl &
+  'end fun;' & nl);
+(tdmixp & 'tests' & sep & 'a_test.fun').save(
+  "use 'test.fun';" & nl & nl &
+  "test('ok', { assert.equal(1, 1); });" & nl &
+  "test('fails', { assert.fail('boom'); });" & nl &
+  "test.todo('known red', { assert.fail('expected'); }, 'bug 2');" & nl);
+var tdmixlog = base & 'todo-mixed.log';
+var tdm1 = runIn(tdmixp, funcmd & ' test', tdmixlog);
+var tdmixo = loadIf(tdmixlog);
+check('todo mixed exits 1', tdm1 = 1);
+check('todo mixed counts', has(tdmixo, '1 file, 3 tests: 1 passed, 1 failed, 1 todo'));
+check('todo mixed line shown', has(tdmixo, 'todo: known red (bug 2)') and has(tdmixo, 'not ok fails'));
+
+var tdbadp = base & 'todo-bad-body' & sep;
+(tdbadp & 'package.fun').save(
+  'fun package()' & nl &
+  '  result = [name: ' & "'todobad', version: '0.1.0', bin: '', lib: '', dependencies: [], resolved: []];" & nl &
+  'end fun;' & nl);
+(tdbadp & 'tests' & sep & 'a_test.fun').save(
+  "use 'test.fun';" & nl & nl &
+  "test.todo('bad', 'not a function', 'reason');" & nl &
+  "test('a', { assert.equal(1, 1); });" & nl);
+var tdbadlog = base & 'todo-bad-body.log';
+var tdbad1 = runIn(tdbadp, funcmd & ' test', tdbadlog);
+check('todo bad body', tdbad1 = 1 and has(loadIf(tdbadlog), 'expected-failure body must be a function'));
+
+var tdmultip = base & 'todo-multi' & sep;
+(tdmultip & 'package.fun').save(
+  'fun package()' & nl &
+  '  result = [name: ' & "'todomulti', version: '0.1.0', bin: '', lib: '', dependencies: [], resolved: []];" & nl &
+  'end fun;' & nl);
+(tdmultip & 'tests' & sep & 'a_test.fun').save(
+  "use 'test.fun';" & nl & nl &
+  "test('a', { assert.equal(1, 1); });" & nl &
+  "test.todo('multi todo', 'reason');" & nl);
+(tdmultip & 'tests' & sep & 'b_test.fun').save(
+  "use 'test.fun';" & nl & nl &
+  "test('b', { assert.equal(2, 2); });" & nl);
+var tdmultilog = base & 'todo-multi.log';
+var tdmulti1 = runIn(tdmultip, funcmd & ' test', tdmultilog);
+var tdmultio = loadIf(tdmultilog);
+check('todo multi summary', tdmulti1 = 0 and has(tdmultio, '2 files, 3 tests: 2 passed, 1 todo'));
+check('todo multi pass lines', has(tdmultio, 'PASS (2, 1 todo)') and has(tdmultio, 'PASS (1)'));
+
+var tdfakep = base & 'todo-fake-summary' & sep;
+(tdfakep & 'package.fun').save(
+  'fun package()' & nl &
+  '  result = [name: ' & "'todofake', version: '0.1.0', bin: '', lib: '', dependencies: [], resolved: []];" & nl &
+  'end fun;' & nl);
+(tdfakep & 'tests' & sep & 'a_test.fun').save(
+  "use 'test.fun';" & nl & nl &
+  "?. '# tests: 1 passed: 1 failed: 9 skipped: 0 todo: 5';" & nl &
+  "raise 'boom after fake summary';" & nl);
+var tdfakelog = base & 'todo-fake-summary.log';
+var tdfake1 = runIn(tdfakep, funcmd & ' test', tdfakelog);
+var tdfakeo = loadIf(tdfakelog);
+check('todo fake summary', tdfake1 = 1 and has(tdfakeo, '1 file, 0 tests: 1 file failed to run'));
+check('todo fake no counts', not has(tdfakeo, 'todo: 5') and not has(tdfakeo, 'passed,'));
+
 // --- reserved names and shadowing ----------------------------------------
 var resp = base & 'reserved' & sep;
 (resp & 'package.fun').save(

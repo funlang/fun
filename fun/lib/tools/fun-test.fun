@@ -32,7 +32,9 @@ var _sumOk = false;
 var _sumTotal = 0;
 var _sumFailed = 0;
 var _sumSkipped = 0;
+var _sumTodo = 0;
 var _skipped = 0;
+var _todo = 0;
 
 var _system = LibC().getapi('system', 's:i');
 var _putenv;
@@ -297,6 +299,7 @@ fun parseSummary(text)
   _sumTotal = 0;
   _sumFailed = 0;
   _sumSkipped = 0;
+  _sumTodo = 0;
   var pos = 0;
   while pos < text.length() do
     var e = text.substr(pos).subpos(_nl);
@@ -315,23 +318,43 @@ fun parseSummary(text)
         var p2 = r2.subpos(' failed: ');
         if p2 >= 0 then
           var tail = r2.substr(p2 + 9);
-          var p3 = tail.subpos(' skipped: ');
-          if p3 >= 0 then
-            _sumFailed = tail.substr(0, p3).toNum();
-            _sumSkipped = tail.substr(p3 + 10).toNum();
+          var ps = tail.subpos(' skipped: ');
+          var pt = tail.subpos(' todo: ');
+          if ps >= 0 then
+            _sumFailed = tail.substr(0, ps).toNum();
+            var afterSkip = tail.substr(ps + 10);
+            var rt = afterSkip.subpos(' todo: ');
+            if rt >= 0 then
+              _sumSkipped = afterSkip.substr(0, rt).toNum();
+              _sumTodo = afterSkip.substr(rt + 7).toNum();
+            else
+              _sumSkipped = afterSkip.toNum();
+              _sumTodo = 0;
+            end if;
+          elsif pt >= 0 then
+            _sumFailed = tail.substr(0, pt).toNum();
+            _sumSkipped = 0;
+            _sumTodo = tail.substr(pt + 7).toNum();
           else
             _sumFailed = tail.toNum();
             _sumSkipped = 0;
+            _sumTodo = 0;
           end if;
           _sumTotal = rest.substr(0, p1).toNum();
           _sumOk = true;
+          if _sumTotal < 0 or _sumFailed < 0 or _sumSkipped < 0 or _sumTodo < 0 then
+            _sumOk = false;
+          end if;
+          if _sumFailed + _sumSkipped + _sumTodo > _sumTotal then
+            _sumOk = false;
+          end if;
         end if;
       end if;
     end if;
   end do;
 end fun;
 
-fun addSkipLines(text)
+fun addStatusLines(text)
   var pos = 0;
   while pos < text.length() do
     var e = text.substr(pos).subpos(_nl);
@@ -342,7 +365,10 @@ fun addSkipLines(text)
     else
       pos = text.length();
     end if;
-    if line.substr(0, 6) = 'skip: ' then _report.@add('  ' & line); end if;
+    var p6 = line.substr(0, 6);
+    if p6 = 'skip: ' or p6 = 'todo: ' or line.substr(0, 13) = 'todo passed: ' then
+      _report.@add('  ' & line);
+    end if;
   end do;
 end fun;
 
@@ -385,6 +411,7 @@ fun runTestFile(rel)
       _total += _sumTotal;
       _failed += _sumFailed;
       _skipped += _sumSkipped;
+      _todo += _sumTodo;
     end if;
     addFailureLines(text);
     if text = '' then
@@ -393,10 +420,12 @@ fun runTestFile(rel)
   else
     _total += _sumTotal;
     _skipped += _sumSkipped;
+    _todo += _sumTodo;
     var pass = padTo(rel, _maxLen) & '   PASS (' & _sumTotal;
     if _sumSkipped > 0 then pass &= ', ' & _sumSkipped & ' skipped'; end if;
+    if _sumTodo > 0 then pass &= ', ' & _sumTodo & ' todo'; end if;
     _report.@add(pass & ')');
-    if _sumSkipped > 0 then addSkipLines(text); end if;
+    if _sumSkipped > 0 or _sumTodo > 0 then addStatusLines(text); end if;
   end if;
 end fun;
 
@@ -407,10 +436,13 @@ end fun;
 fun finishReport()
   var head = pluralWord(_files.@count(), 'file') & ', ' & pluralWord(_total, 'test');
   if _fileFails = 0 then
-    if _skipped = 0 then
+    if _skipped = 0 and _todo = 0 then
       _report.@add(head & ': all passed');
     else
-      _report.@add(head & ': ' & (_total - _skipped) & ' passed, ' & _skipped & ' skipped');
+      var okMsg = head & ': ' & (_total - _skipped - _todo) & ' passed';
+      if _skipped > 0 then okMsg &= ', ' & _skipped & ' skipped'; end if;
+      if _todo > 0 then okMsg &= ', ' & _todo & ' todo'; end if;
+      _report.@add(okMsg);
     end if;
     return;
   end if;
@@ -419,11 +451,13 @@ fun finishReport()
     if c = 0 then c = _fileFails; end if;
     var crashMsg = head & ': ' & pluralWord(c, 'file') & ' failed to run';
     if _skipped > 0 then crashMsg &= ', ' & _skipped & ' skipped'; end if;
+    if _todo > 0 then crashMsg &= ', ' & _todo & ' todo'; end if;
     _report.@add(crashMsg);
     return;
   end if;
-  var msg = head & ': ' & (_total - _failed - _skipped) & ' passed, ' & _failed & ' failed';
+  var msg = head & ': ' & (_total - _failed - _skipped - _todo) & ' passed, ' & _failed & ' failed';
   if _skipped > 0 then msg &= ', ' & _skipped & ' skipped'; end if;
+  if _todo > 0 then msg &= ', ' & _todo & ' todo'; end if;
   if _crashed > 0 then msg &= '; ' & pluralWord(_crashed, 'file') & ' failed to run'; end if;
   _report.@add(msg);
 end fun;

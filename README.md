@@ -237,6 +237,10 @@ manifest dependencies are available through the same launcher as `fun run`.
   reason is optional, skips are counted separately, and they do not fail the
   run. Do not catch it in a broad `try/except`: the test is still reported as
   skipped, but the rest of the body continues.
+- `test.todo('name', 'reason')` registers a placeholder that is not run;
+  `test.todo('name', { ... }, 'reason')` runs the body and treats a failure as
+  expected. A todo body that passes prints `todo passed: ... (remove todo)`.
+  Todos are counted separately and do not fail the run.
 - `test.fun`, the globals `test`/`assert`/`runTests`, the aliases `as test` /
   `as assert`, and dependency keys `test`/`assert` are reserved. A third-party
   test library can be imported under another alias.
