@@ -260,9 +260,10 @@ fun OdbcOpen(cn)
     a.free(SQL_HANDLE_ENV, env);
     raise 'ODBC connect failed: ' & e & ' - ' & cn;
   end if;
-  var drv = _odbcInfo(a, dbc, SQL_DRIVER_NAME, 256);
-  var quote = _odbcInfo(a, dbc, SQL_IDENTIFIER_QUOTE_CHAR, 16);
-  var sep = _odbcInfo(a, dbc, SQL_CATALOG_NAME_SEPARATOR, 8);
+  // A space means "no quoting support" in ODBC, so trim before the default.
+  var drv = _odbcTrim(_odbcInfo(a, dbc, SQL_DRIVER_NAME, 256));
+  var quote = _odbcTrim(_odbcInfo(a, dbc, SQL_IDENTIFIER_QUOTE_CHAR, 16));
+  var sep = _odbcTrim(_odbcInfo(a, dbc, SQL_CATALOG_NAME_SEPARATOR, 8));
   if quote = '' then quote = '"'; end if;
   if sep = '' then sep = '.'; end if;
   result = new [api: a, env: env, dbc: dbc, driver: drv, quote: quote, sep: sep, txn: false];

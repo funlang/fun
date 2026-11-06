@@ -1,6 +1,7 @@
 // lib-ado-odbc-unx on unixODBC: raw SQL, parameters, transactions, schema,
-// and the lib-orm stack through an ODBC driver (the SQLite ODBC driver is the
-// usual local/CI target, but nothing here is SQLite-specific).
+// and the lib-orm stack through an ODBC driver. The driver under test is the
+// SQLite ODBC driver (no server needed); a couple of assertions use
+// last_insert_rowid()/sqlite_master and are therefore SQLite-flavoured.
 //
 // The connection string comes from ODBC_TEST_CN so the test skips cleanly on
 // hosts without unixODBC. run-ado-odbc.sh sets it when a driver is present.
@@ -146,6 +147,13 @@ fun main(cn)
   lazy.Commit();
   ?. 'lazy=' & lazy.Execute("SELECT COUNT(*) AS c FROM sqlite_master WHERE name='lazy'", false)[0].c;
   lazy.Close();
+
+  // Init() matches the Windows backend: it opens and installs the driver's
+  // identifier literal, which ORM SQL generation depends on.
+  var initdb = ADO(cn);
+  initdb.Init();
+  ?. 'init=' & (not initdb.Closed()) & ':' & initdb.quotes;
+  initdb.Close();
 end fun;
 
 var cn = HostEnvGet('ODBC_TEST_CN');

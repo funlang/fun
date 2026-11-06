@@ -430,7 +430,10 @@ class ADO(cnString, args)
   end fun;
 
   fun Init()
-    // quotes/dot are fixed for SQLite; kept for parity with lib-ado.
+    // quotes/dot are fixed for SQLite. ODBC drivers vary (MySQL backticks,
+    // for example), so open now and let Open() install the driver's literals;
+    // lib-orm-rpc calls Init() before generating any ORM SQL.
+    if _is_odbc(cnString) and Closed() then Open(); end if;
   end fun;
 
   fun _tableNames()

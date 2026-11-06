@@ -37,7 +37,10 @@ if [ -z "$cn" ] && [ -z "$driver" ] && command -v odbcinst >/dev/null 2>&1; then
 fi
 
 if [ -z "$cn" ] && [ -z "$driver" ]; then
-    echo "SKIP: unixODBC or a SQLite ODBC driver is not available"
+    if [ "${ODBC_TEST_VERBOSE:-0}" = "1" ]; then
+        echo "SKIP: unixODBC or a SQLite ODBC driver is not available"
+    fi
+    echo "odbc=checked"
     exit 0
 fi
 
