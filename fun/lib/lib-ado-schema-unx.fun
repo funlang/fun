@@ -1,9 +1,10 @@
 // Copyright (c) 2010-2026 Zhang Weidong <zwd@funlang.org>
 // SPDX-License-Identifier: MIT
 //
-// lib-ado-schema-unx: the Unix backend of lib-ado-schema (SQLite via
-// lib-ado-unx). Only the ADO import differs from the Windows file, which
-// stays untouched; the schema column names OpenSchema returns are the same.
+// lib-ado-schema-unx: the Unix backend of lib-ado-schema (lib-ado-unx, i.e.
+// embedded SQLite or unixODBC). Only the ADO import differs from the Windows
+// file, which stays untouched; the schema column names OpenSchema returns are
+// the same.
 
 use 'lib-ado-unx.fun';
 use 'lib-ado-base.fun';

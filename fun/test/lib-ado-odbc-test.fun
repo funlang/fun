@@ -82,6 +82,11 @@ fun main(cn)
   var er = db.Execute('SELECT v FROM empty', false);
   ?. 'empty=' & er[0].v.length() & ',' & er[1].v.eq(nil);
 
+  // NUMERIC keeps its decimal scale when bound as SQL_C_CHAR.
+  db.Execute('CREATE TABLE num(v NUMERIC)');
+  db.Execute('INSERT INTO num VALUES(?)', false, ps: [[v: -123.456, dt: 5]]);
+  ?. 'numeric=' & db.Execute('SELECT v FROM num', false)[0].v;
+
   // Extra parameter markers are rejected before reaching the driver.
   var badp = false;
   try
@@ -105,6 +110,7 @@ fun main(cn)
   db.Execute('DROP TABLE flag');
   db.Execute('DROP TABLE bigdata');
   db.Execute('DROP TABLE empty');
+  db.Execute('DROP TABLE num');
   db.Execute('CREATE TABLE "User"(id INTEGER PRIMARY KEY, name TEXT, age INTEGER)');
 
   fun F(alias, name, dt, isP, isAuto)
@@ -146,6 +152,7 @@ fun main(cn)
   lazy.Execute('CREATE TABLE lazy(v INTEGER)');
   lazy.Commit();
   ?. 'lazy=' & lazy.Execute("SELECT COUNT(*) AS c FROM sqlite_master WHERE name='lazy'", false)[0].c;
+  lazy.Execute('DROP TABLE lazy');
   lazy.Close();
 
   // Init() matches the Windows backend: it opens and installs the driver's

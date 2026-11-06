@@ -7,6 +7,7 @@
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
+cd "$ROOT" || exit 2
 FUNCMD="${FUNCMD:-$ROOT/src/prj/fun/funcmd}"
 [ -x "$FUNCMD" ] || FUNCMD="$ROOT/fun/fun"
 
@@ -56,7 +57,7 @@ export ODBC_TEST_CN
 # The regression runner compares shell-test output byte for byte. Keep the
 # normal line stable whether ODBC is present or not; set ODBC_TEST_VERBOSE=1
 # to see the full SQL/ORM trace.
-out="$("$FUNCMD" fun/test/lib-ado-odbc-test.fun 2>&1)"
+out="$("$FUNCMD" "$ROOT/fun/test/lib-ado-odbc-test.fun" 2>&1)"
 rc=$?
 if [ "$rc" -ne 0 ]; then
     printf '%s\n' "$out"

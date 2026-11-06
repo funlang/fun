@@ -63,6 +63,10 @@ var SQL_C_BINARY  = -2;
 var SQL_C_SBIGINT = -25;
 
 var SQL_CHAR           = 1;
+var SQL_WCHAR          = -8;
+var SQL_WVARCHAR       = -9;
+var SQL_WLONGVARCHAR   = -10;
+var SQL_GUID           = -11;
 var SQL_NUMERIC        = 2;
 var SQL_DECIMAL        = 3;
 var SQL_INTEGER        = 4;
@@ -71,6 +75,7 @@ var SQL_FLOAT          = 6;
 var SQL_REAL           = 7;
 var SQL_DOUBLE         = 8;
 var SQL_VARCHAR        = 12;
+var SQL_LONGVARCHAR    = -1;
 var SQL_BINARY         = -2;
 var SQL_VARBINARY      = -3;
 var SQL_LONGVARBINARY  = -4;
@@ -411,8 +416,10 @@ fun _odbcParamType(dt)
     when 6  do result = SQL_BIT;
     when 7  do result = SQL_VARCHAR;
     when 8  do result = SQL_VARCHAR;
-    when [9, 10] do result = SQL_VARCHAR;
-    when [11, 12] do result = SQL_VARBINARY;
+    when 9  do result = SQL_VARCHAR;
+    when 10 do result = SQL_LONGVARCHAR;
+    when 11 do result = SQL_VARBINARY;
+    when 12 do result = SQL_LONGVARBINARY;
     else result = SQL_VARCHAR;
   end case;
 end fun;
@@ -443,7 +450,11 @@ fun _odbcBindOne(a, st, i, p, keep)
   var vt = SQL_C_CHAR;
   var pt = _odbcParamType(dt);
   var dec = 0;
-  if pt = SQL_VARBINARY then
+  if pt = SQL_NUMERIC then
+    var dp = raw.subpos('.');
+    if dp >= 0 then dec = raw.length() - dp - 1; end if;
+  end if;
+  if pt = SQL_VARBINARY or pt = SQL_LONGVARBINARY then
     vt = SQL_C_BINARY;
   end if;
   var ind = _odbcI64Buf(len);
@@ -660,7 +671,7 @@ fun OdbcTables(h)
   result = new [];
   for r in _odbcTablesRaw(h) do
     var tn = r.TABLE_NAME or '';
-    if tn <> '' and tn.lower().substr(0, 6) <> 'sqlite' then
+    if tn <> '' and tn.lower().substr(0, 7) <> 'sqlite_' then
       result.@add(new [
         TABLE_SCHEMA: r.TABLE_SCHEM or def,
         TABLE_NAME:   tn,
@@ -707,7 +718,7 @@ fun OdbcColumns(h)
   var def = _odbcDefaultSchema(h);
   var pks = new [];
   for p in _odbcPKeysRaw(h) do
-    pks[p.TABLE_NAME & '.' & p.COLUMN_NAME] = 1;
+    pks[(p.TABLE_SCHEMA or def) & '.' & p.TABLE_NAME & '.' & p.COLUMN_NAME] = 1;
   end do;
   result = new [];
   for t in OdbcTables(h) do
@@ -722,14 +733,15 @@ fun OdbcColumns(h)
         for r in _odbcReadResult(a, st, nil) do
           var tn2 = r.TABLE_NAME or tn;
           var cn = r.COLUMN_NAME or '';
+          var sch = r.TABLE_SCHEM or def;
           result.@add(new [
-            TABLE_SCHEMA: r.TABLE_SCHEM or def,
+            TABLE_SCHEMA: sch,
             TABLE_NAME:   tn2,
             COLUMN_NAME:  cn,
             ORDINAL_POSITION: r.ORDINAL_POSITION or 0,
             DATA_TYPE:    _odbcAdoType(r.DATA_TYPE or 0),
             IS_NULLABLE:  (r.IS_NULLABLE or 'YES').upper() = 'YES',
-            Column_Flags: pks[tn2 & '.' & cn] and 16 or 0,
+            Column_Flags: pks[sch & '.' & tn2 & '.' & cn] and 16 or 0,
             CHARACTER_MAXIMUM_LENGTH: r.COLUMN_SIZE or 0,
             NUMBERIC_SCALE: r.DECIMAL_DIGITS or 0
           ]);
@@ -787,8 +799,13 @@ fun _odbcAdoType(t)
   elsif n = SQL_REAL then result = 4;                    // adSingle
   elsif n = SQL_FLOAT or n = SQL_DOUBLE then result = 5;// adDouble
   elsif n = SQL_NUMERIC or n = SQL_DECIMAL then result = 131; // adNumeric
-  elsif n = SQL_BINARY or n = SQL_VARBINARY or n = SQL_LONGVARBINARY then
+  elsif n = SQL_LONGVARCHAR then result = 201;           // adLongVarChar
+  elsif n = SQL_WLONGVARCHAR then result = 201;          // adLongVarChar
+  elsif n = SQL_LONGVARBINARY then result = 205;         // adLongVarBinary
+  elsif n = SQL_BINARY or n = SQL_VARBINARY then
     result = 204;                                        // adVarBinary
+  elsif n = SQL_GUID then result = 72;                   // adGUID
+  elsif n = SQL_WCHAR or n = SQL_WVARCHAR then result = 200; // adVarChar
   elsif n = SQL_TYPE_DATE then result = 133;             // adDBDate
   elsif n = SQL_TYPE_TIME then result = 134;             // adDBTime
   elsif n = SQL_TYPE_TIMESTAMP then result = 135;        // adDBTimeStamp
