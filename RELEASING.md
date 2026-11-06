@@ -68,6 +68,11 @@ Asia/Shanghai. It is a delivery channel, not a release event:
   `fun/test`, `fun/demos`, `fun/demo`) since the previous nightly. Docs and
   CI-only changes do not produce one, and a day with no commits produces
   nothing at all.
+- The exact HEAD commit must also have a successful main-branch regression
+  run. If that push-triggered run is missing (GitHub Actions can drop the event
+  during an incident), the gate dispatches `regression` for `main` and waits
+  for the same commit instead of silently skipping. A failed or mismatched
+  dispatched run fails the gate, so `HEARTBEAT_URL` reports it.
 - The date comes from the HEAD commit timestamp in Asia/Shanghai, not from
   the runner clock, so a delayed run does not produce tomorrow's date.
 - The version is the next patch after the newest stable version, e.g.

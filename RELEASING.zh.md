@@ -66,6 +66,10 @@ git push origin vX.Y.Z
 - 只有自上一个 nightly 以来 `src/`、`fun/lib`、`fun/test`、`fun/demos`、
   `fun/demo` 发生代码变更时才发布。纯文档/CI 改动不发；当天没有任何提交也
   不发。
+- 该 HEAD commit 还必须有成功的 main 分支 regression 运行。如果这次 push
+  触发的运行缺失（GitHub Actions 故障时可能丢事件），gate 会为 `main` 重新
+  触发 regression 并等待同一个 commit，而不是静默跳过。重触发的运行失败或
+  指向别的 commit 时 gate 失败，`HEARTBEAT_URL` 会收到失败信号。
 - 日期取自 HEAD commit 时间戳的北京时间，不取 runner 墙钟，延迟跨午夜也不会
   错一天。
 - 版本是当前最新稳定版的下一个 patch，例如

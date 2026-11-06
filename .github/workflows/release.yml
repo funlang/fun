@@ -58,7 +58,10 @@ on:
 
 permissions:
   contents: write
-  actions: read
+  # write is needed only for the nightly fallback below: when the push that
+  # produced HEAD never created a regression run (a GitHub Actions incident can
+  # drop the event), the gate dispatches one instead of skipping the night.
+  actions: write
 
 # Never let a delayed nightly be cancelled by the next day's run.
 concurrency:
@@ -70,7 +73,9 @@ jobs:
   gate:
     name: decide
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # A nightly may wait for a dispatched regression run (a few minutes on a
+    # normal day, longer when the runners are busy).
+    timeout-minutes: 45
     outputs:
       should_release: ${{ steps.decide.outputs.should_release }}
       reason: ${{ steps.decide.outputs.reason }}
@@ -274,10 +279,57 @@ jobs:
               echo "::error::no successful main-branch regression run for $SHA; refusing to publish a stable release"
               exit 1
             fi
-            out should_release false
-            out reason "no successful main-branch regression run for $SHA; nothing to publish"
-            echo "::warning::no successful regression run for $SHA; not publishing"
-            exit 0
+
+            # A scheduled run must not publish untested code, but it also must
+            # not quietly skip the night when the missing run was lost rather
+            # than absent because the code was never tested. The push event
+            # for HEAD can be dropped during a GitHub Actions incident (for
+            # example 2026-11-05), so dispatch the regression run ourselves and
+            # wait for it. Only this exact commit is accepted.
+            echo "::notice::no successful regression run for $SHA yet; dispatching one"
+            before=$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/workflows/regression.yml/runs?per_page=1" \
+              --jq '.workflow_runs[0].id // 0')
+            gh workflow run regression.yml --ref "$GITHUB_REF_NAME"
+
+            RUN_ID=""
+            for _ in $(seq 1 18); do
+              sleep 10
+              candidate=$(gh api \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/regression.yml/runs?per_page=20" \
+                --jq "[.workflow_runs[] | select(.id > $before)][0].id // empty")
+              [ -n "$candidate" ] || continue
+              candidate_sha=$(gh api \
+                "repos/$GITHUB_REPOSITORY/actions/runs/$candidate" --jq '.head_sha')
+              if [ "$candidate_sha" = "$SHA" ]; then
+                RUN_ID="$candidate"
+                break
+              fi
+              echo "::error::dispatched regression is for $candidate_sha, expected $SHA (did main move?); refusing to publish"
+              exit 1
+            done
+            if [ -z "$RUN_ID" ]; then
+              echo "::error::dispatched regression for $SHA but no run appeared"
+              exit 1
+            fi
+
+            echo "::notice::waiting for dispatched regression run $RUN_ID"
+            state=""
+            for _ in $(seq 1 60); do
+              state=$(gh run view "$RUN_ID" --json status,conclusion \
+                        --jq '"\(.status):\(.conclusion // "")"')
+              case "$state" in
+                completed:success) break ;;
+                completed:*)
+                  echo "::error::dispatched regression run $RUN_ID finished $state"
+                  exit 1 ;;
+              esac
+              sleep 30
+            done
+            if [ "$state" != "completed:success" ]; then
+              echo "::error::dispatched regression run $RUN_ID did not finish successfully (state $state)"
+              exit 1
+            fi
           fi
           out run_id "$RUN_ID"
 
