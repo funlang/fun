@@ -38,9 +38,9 @@ fun main(cn)
 
   // ODBC reports a searched UPDATE/DELETE that matches no rows as SQL_NO_DATA,
   // which still means success with a zero row count.
-  var z1 = db.Execute('UPDATE t SET n = n WHERE n = 999', false);
+  var z1 = db.Execute('UPDATE t SET n = n WHERE n = ?', false, ps: [[v: 999, dt: 1]]);
   ?. 'zero-update=' & z1[0].rows;
-  var z2 = db.Execute('DELETE FROM t WHERE n = 999', false);
+  var z2 = db.Execute('DELETE FROM t WHERE n = ?', false, ps: [[v: 999, dt: 1]]);
   ?. 'zero-delete=' & z2[0].rows;
   ?. 'zero-select=' & db.Execute('SELECT id FROM t WHERE id = -1', false).@count();
 
