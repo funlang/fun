@@ -244,16 +244,19 @@ class ADO(cnString, args)
   var Closed() = db = nil and _odbc = nil;
 
   fun Begin()
+    if Closed() then Open(); end if;
     if _odbc <> nil then OdbcBegin(_odbc); return; end if;
     _execRaw('BEGIN');
   end fun;
 
   fun Commit()
+    if Closed() then Open(); end if;
     if _odbc <> nil then OdbcCommit(_odbc); return; end if;
     _execRaw('COMMIT');
   end fun;
 
   fun Rollback()
+    if Closed() then Open(); end if;
     if _odbc <> nil then OdbcRollback(_odbc); return; end if;
     _execRaw('ROLLBACK');
   end fun;

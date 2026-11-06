@@ -63,6 +63,33 @@ fun main(cn)
   var fs = db.Execute('SELECT v FROM flag', false);
   ?. 'bool=' & fs[0].v & ',' & fs[1].v;
 
+  // SQLGetData chunking: text and binary both cross the 4096-byte buffer.
+  var bigblob = '';
+  for i = 0 to 4999 do bigblob &= (i mod 256).toChar(); end do;
+  var bigtext = '中'.x(2000);
+  db.Execute('CREATE TABLE bigdata(t TEXT, b BLOB)');
+  db.Execute('INSERT INTO bigdata VALUES(?,?)', false,
+             ps: [[v: bigtext, dt: 10], [v: bigblob, dt: 12]]);
+  var bd = db.Execute('SELECT t,b FROM bigdata', false)[0];
+  ?. 'bigdata=' & bd.t.length() & ',' & bd.b.length()
+     & ':' & (bd.t = bigtext) & ',' & (bd.b = bigblob);
+
+  // An empty string must stay '' and not collapse into NULL.
+  db.Execute('CREATE TABLE empty(v TEXT)');
+  db.Execute('INSERT INTO empty VALUES(?)', false, ps: [[v: '', dt: 9]]);
+  db.Execute('INSERT INTO empty VALUES(?)', false, ps: [[v: nil, dt: 9]]);
+  var er = db.Execute('SELECT v FROM empty', false);
+  ?. 'empty=' & er[0].v.length() & ',' & er[1].v.eq(nil);
+
+  // Extra parameter markers are rejected before reaching the driver.
+  var badp = false;
+  try
+    db.Execute('SELECT ? AS x', false, ps: [[v: 1, dt: 1], [v: 2, dt: 1]]);
+  except
+    badp = true;
+  end try;
+  ?. 'badparams=' & badp;
+
   var tabs = db.OpenSchema(adSchemaTables);
   ?. 'tables=' & tabs.@count() & ':' & tabs[0].TABLE_NAME;
   var cols = db.OpenSchema(adSchemaColumns);
@@ -75,6 +102,8 @@ fun main(cn)
   db.Execute('DROP TABLE b');
   db.Execute('DROP TABLE big');
   db.Execute('DROP TABLE flag');
+  db.Execute('DROP TABLE bigdata');
+  db.Execute('DROP TABLE empty');
   db.Execute('CREATE TABLE "User"(id INTEGER PRIMARY KEY, name TEXT, age INTEGER)');
 
   fun F(alias, name, dt, isP, isAuto)
@@ -108,6 +137,15 @@ fun main(cn)
 
   var eac = db.ExecuteAndClose('SELECT 42 AS x', false);
   ?. 'eac=' & eac[0].x & ' closed=' & db.Closed();
+
+  // lib-orm calls Begin() before its first Execute(); that must dispatch to
+  // ODBC and open the connection, not fall through to the SQLite path.
+  var lazy = ADO(cn);
+  lazy.Begin();
+  lazy.Execute('CREATE TABLE lazy(v INTEGER)');
+  lazy.Commit();
+  ?. 'lazy=' & lazy.Execute("SELECT COUNT(*) AS c FROM sqlite_master WHERE name='lazy'", false)[0].c;
+  lazy.Close();
 end fun;
 
 var cn = HostEnvGet('ODBC_TEST_CN');

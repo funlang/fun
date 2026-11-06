@@ -125,4 +125,7 @@
   ORM DataType 绑定、结果按列类型读取，支持事务和 ODBC 目录函数
   （SQLTables/SQLColumns/SQLPrimaryKeys/SQLForeignKeys）。新增
   `run-ado-odbc.sh`（无驱动时 SKIP）与 `unixodbc`+`libsqliteodbc` CI 步骤，
-  回归 `126/126 → 127/127`。
+  回归 `126/126 → 127/127`。验证时补了 `Begin`/`Commit`/`Rollback` 的隐式
+  `Open()`（ORM 先开事务再执行，未显式 Open 时曾误走 SQLite 路径）和
+  `?` 参数个数预检；ODBC 测试补了大文本/大 BLOB 分块、空串与 NULL、
+  事务隐式打开。

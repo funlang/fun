@@ -353,6 +353,49 @@ fun _odbcSplit(sql)
   if _odbcTrim(tail) <> '' then result.@add(tail); end if;
 end fun;
 
+// Count '?' outside quoted strings and comments, so a literal question mark in
+// SQL text is not mistaken for a parameter marker.
+fun _odbcParamCount(sql)
+  result = 0;
+  var n = sql.length();
+  var i = 0;
+  var q = 0;
+  var line = false;
+  var block = false;
+  while i < n do
+    var c = sql.toByte(i);
+    if line then
+      if c = 10 then line = false; end if;
+    elsif block then
+      if c = 42 and i + 1 < n and sql.toByte(i + 1) = 47 then
+        block = false;
+        i += 1;
+      end if;
+    elsif q <> 0 then
+      if c = q then
+        if i + 1 < n and sql.toByte(i + 1) = q then
+          i += 1;
+        else
+          q = 0;
+        end if;
+      end if;
+    else
+      if c = 39 or c = 34 or c = 96 then
+        q = c;
+      elsif c = 45 and i + 1 < n and sql.toByte(i + 1) = 45 then
+        line = true;
+        i += 1;
+      elsif c = 47 and i + 1 < n and sql.toByte(i + 1) = 42 then
+        block = true;
+        i += 1;
+      elsif c = 63 then
+        result += 1;
+      end if;
+    end if;
+    i += 1;
+  end do;
+end fun;
+
 // ---------------------------------------------------------------
 // parameter binding. ps = [{v, dt}, ...], dt is the ORM DataType 0..12.
 // ---------------------------------------------------------------
@@ -575,8 +618,15 @@ end fun;
 
 fun OdbcRun(h, sql, ps)
   result = new [];
+  var parts = _odbcSplit(sql);
+  if parts.@count() > 0 and ps?.@count?() > 0 then
+    var nq = _odbcParamCount(parts[0]);
+    if nq <> ps.@count() then
+      raise 'Execute: ? count (%s) != params (%s).\nSQL:\n%s'.format(nq, ps.@count(), sql);
+    end if;
+  end if;
   var first = true;
-  for q in _odbcSplit(sql) do
+  for q in parts do
     result.@add(_odbcExecOne(h, q, ps, first));
     first = false;
   end do;
