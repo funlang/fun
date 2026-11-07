@@ -10,8 +10,9 @@ This project records notable changes in the style of [Keep a Changelog](https://
   machine-written JavaScript. The worker is a separate one-shot process built
   on QuickJS-ng v0.18.0 with no `quickjs-libc`, so scripts get JSON `input` and
   a JSON return value but no file, network, process, module, or console APIs.
-  `process.run` supplies the hard timeout; QuickJS adds memory, stack, and
-  output limits plus seeded `Math.random` and a fixed `Date.now`. Errors carry
+  `process.run` supplies the hard timeout; the worker enforces memory, stack,
+  and output limits, and QuickJS is seeded with a fixed `Math.random` and
+  `Date.now`. Errors carry
   stable `kind` / `line` / `column` fields. `src/prj/fun/build-jsbox.sh`
   fetches and SHA256-verifies the pinned engine; `fun/test/run-jsbox-test.sh`
   covers syntax/runtime errors, timeout, OOM, output limit, isolation, modern

@@ -9,8 +9,8 @@
 - 新增 `fun-jsbox` 沙箱进程与 `fun/lib/lib-jsbox.fun` 桥接，用于运行机写
   JavaScript。worker 是基于 QuickJS-ng v0.18.0 的独立一次性进程，不链接
   `quickjs-libc`，因此脚本只有 JSON `input` 和 JSON 返回值，没有文件、网络、
-  进程、模块或 console API。`process.run` 负责硬超时；QuickJS 侧限制内存、
-  栈和输出，并固定 `Math.random` 种子与 `Date.now`。错误带稳定的
+  进程、模块或 console API。`process.run` 负责硬超时；worker 侧限制内存、
+  栈和输出，QuickJS 固定 `Math.random` 种子与 `Date.now`。错误带稳定的
   `kind` / `line` / `column` 字段。`src/prj/fun/build-jsbox.sh` 按需下载并
   SHA256 校验引擎；`fun/test/run-jsbox-test.sh` 覆盖语法/运行时错误、超时、
   OOM、输出上限、进程隔离、现代语法、Unicode 和选项处理。seccomp/bubblewrap
