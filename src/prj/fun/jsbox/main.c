@@ -407,6 +407,10 @@ static int64_t clamp_i64(int64_t v, int64_t lo, int64_t hi)
 
 static int64_t get_int_prop(JSContext *ctx, JSValue obj, const char *name, int64_t def)
 {
+    if (JS_IsException(obj)) {
+        JS_FreeValue(ctx, JS_GetException(ctx));
+        return def;
+    }
     JSValue v = JS_GetPropertyStr(ctx, obj, name);
     int64_t out = def;
     if (JS_IsException(v)) {
@@ -472,7 +476,15 @@ static int parse_request(const char *json, size_t len, Request *r, Err *e)
     }
 
     int ok = 0;
-    JSValue req = JS_ParseJSON(ctx, json, len, "<request>");
+    JSValue req = JS_UNDEFINED;
+    JSValue jproto = JS_UNDEFINED;
+    JSValue jop = JS_UNDEFINED;
+    JSValue jcode = JS_UNDEFINED;
+    JSValue jinput = JS_UNDEFINED;
+    JSValue jstr = JS_UNDEFINED;
+    JSValue jlim = JS_UNDEFINED;
+
+    req = JS_ParseJSON(ctx, json, len, "<request>");
     if (JS_IsException(req)) {
         capture_exception(ctx, 0, NULL, e);
         snprintf(e->kind, sizeof(e->kind), "protocol");
@@ -480,84 +492,110 @@ static int parse_request(const char *json, size_t len, Request *r, Err *e)
         goto done;
     }
 
-    JSValue jproto = JS_GetPropertyStr(ctx, req, "protocol");
+    jproto = JS_GetPropertyStr(ctx, req, "protocol");
+    if (JS_IsException(jproto)) {
+        JS_FreeValue(ctx, JS_GetException(ctx));
+        err_set(e, "protocol", "ProtocolError", "cannot read protocol", 0);
+        goto done;
+    }
     if (!JS_IsUndefined(jproto) && !JS_IsNull(jproto)) {
         int64_t proto = -1;
-        if (JS_ToInt64Ext(ctx, &proto, jproto) != 0 || proto != JSBOX_PROTOCOL) {
+        int conv = JS_ToInt64Ext(ctx, &proto, jproto);
+        if (conv != 0)
             JS_FreeValue(ctx, JS_GetException(ctx));
+        if (conv != 0 || proto != JSBOX_PROTOCOL) {
             err_set(e, "protocol", "ProtocolError", "unsupported protocol version", 0);
-            JS_FreeValue(ctx, jproto);
             goto done;
         }
     }
-    JS_FreeValue(ctx, jproto);
 
-    JSValue jop = JS_GetPropertyStr(ctx, req, "op");
+    jop = JS_GetPropertyStr(ctx, req, "op");
+    if (JS_IsException(jop)) {
+        JS_FreeValue(ctx, JS_GetException(ctx));
+        err_set(e, "protocol", "ProtocolError", "cannot read op", 0);
+        goto done;
+    }
     if (!JS_IsUndefined(jop) && !JS_IsNull(jop)) {
         char *op = js_to_cstring(ctx, jop, NULL);
         int is_eval = op && strcmp(op, "eval") == 0;
         free(op);
         if (!is_eval) {
+            if (JS_HasException(ctx))
+                JS_FreeValue(ctx, JS_GetException(ctx));
             err_set(e, "protocol", "ProtocolError", "unsupported op", 0);
-            JS_FreeValue(ctx, jop);
             goto done;
         }
     }
-    JS_FreeValue(ctx, jop);
 
-    JSValue jcode = JS_GetPropertyStr(ctx, req, "code");
+    jcode = JS_GetPropertyStr(ctx, req, "code");
+    if (JS_IsException(jcode)) {
+        JS_FreeValue(ctx, JS_GetException(ctx));
+        err_set(e, "protocol", "ProtocolError", "cannot read code", 0);
+        goto done;
+    }
     if (!JS_IsString(jcode)) {
         err_set(e, "protocol", "ProtocolError", "missing string field: code", 0);
-        JS_FreeValue(ctx, jcode);
         goto done;
     }
     r->code = js_to_cstring(ctx, jcode, &r->code_len);
-    JS_FreeValue(ctx, jcode);
     if (!r->code) {
+        if (JS_HasException(ctx))
+            JS_FreeValue(ctx, JS_GetException(ctx));
         err_set(e, "protocol", "ProtocolError", "code is not valid UTF-8", 0);
         goto done;
     }
 
-    JSValue jinput = JS_GetPropertyStr(ctx, req, "input");
+    jinput = JS_GetPropertyStr(ctx, req, "input");
+    if (JS_IsException(jinput)) {
+        JS_FreeValue(ctx, JS_GetException(ctx));
+        err_set(e, "protocol", "ProtocolError", "cannot read input", 0);
+        goto done;
+    }
     if (JS_IsUndefined(jinput) || JS_IsNull(jinput)) {
         r->input = xstrndup("null", 4);
         r->input_len = 4;
     } else {
-        JSValue jstr = JS_JSONStringify(ctx, jinput, JS_UNDEFINED, JS_UNDEFINED);
+        jstr = JS_JSONStringify(ctx, jinput, JS_UNDEFINED, JS_UNDEFINED);
         if (JS_IsException(jstr) || JS_IsUndefined(jstr)) {
             if (JS_IsException(jstr))
                 JS_FreeValue(ctx, JS_GetException(ctx));
             err_set(e, "protocol", "ProtocolError", "input is not JSON-serializable", 0);
-            JS_FreeValue(ctx, jstr);
-            JS_FreeValue(ctx, jinput);
             goto done;
         }
         r->input = js_to_cstring(ctx, jstr, &r->input_len);
-        JS_FreeValue(ctx, jstr);
         if (!r->input) {
+            if (JS_HasException(ctx))
+                JS_FreeValue(ctx, JS_GetException(ctx));
             err_set(e, "protocol", "ProtocolError", "input is not valid UTF-8", 0);
-            JS_FreeValue(ctx, jinput);
             goto done;
         }
     }
-    JS_FreeValue(ctx, jinput);
 
-    JSValue jlim = JS_GetPropertyStr(ctx, req, "limits");
+    jlim = JS_GetPropertyStr(ctx, req, "limits");
+    if (JS_IsException(jlim)) {
+        JS_FreeValue(ctx, JS_GetException(ctx));
+        jlim = JS_UNDEFINED;
+    }
     r->timeout_ms = clamp_i64(get_int_prop(ctx, jlim, "timeout_ms", DEFAULT_TIMEOUT_MS),
                               1, HARD_TIMEOUT_MS);
     r->memory_bytes = clamp_i64(get_int_prop(ctx, jlim, "memory_bytes", DEFAULT_MEMORY_BYTES),
                                 256 * 1024, HARD_MEMORY_BYTES);
     r->output_bytes = clamp_i64(get_int_prop(ctx, jlim, "output_bytes", DEFAULT_OUTPUT_BYTES),
                                 1024, HARD_OUTPUT_BYTES);
-    JS_FreeValue(ctx, jlim);
 
     r->seed = (uint32_t)get_int_prop(ctx, req, "seed", 1);
     r->now_ms = get_int_prop(ctx, req, "now_ms", 0);
 
-    JS_FreeValue(ctx, req);
     ok = 1;
 
 done:
+    JS_FreeValue(ctx, jlim);
+    JS_FreeValue(ctx, jstr);
+    JS_FreeValue(ctx, jinput);
+    JS_FreeValue(ctx, jcode);
+    JS_FreeValue(ctx, jop);
+    JS_FreeValue(ctx, jproto);
+    JS_FreeValue(ctx, req);
     if (!ok) {
         free(r->code);
         r->code = NULL;

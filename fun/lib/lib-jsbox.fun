@@ -68,10 +68,10 @@ fun _jbOpt(opts, name, def)
   end try;
 end fun;
 
-fun _jbClamp(v, lo, hi)
-  if v.eq(nil) then result = lo; return; end if;
+fun _jbClamp(v, def, lo, hi)
+  if v.eq(nil) then result = def; return; end if;
   var t = v.type();
-  if not (t.eq(3) or t.eq(5)) then result = lo; return; end if;
+  if not (t.eq(3) or t.eq(5)) then result = def; return; end if;
   if v < lo then result = lo; return; end if;
   if v > hi then result = hi; return; end if;
   result = v;
@@ -124,9 +124,9 @@ fun run(code, input, opts)
     return;
   end if;
 
-  var timeout = _jbClamp(_jbOpt(opts, 'timeout', _JB_TIMEOUT), 1, _JB_MAX_TIMEOUT);
-  var memory = _jbClamp(_jbOpt(opts, 'memory', _JB_MEMORY), 256 * 1024, _JB_MAX_MEMORY);
-  var output = _jbClamp(_jbOpt(opts, 'output', _JB_OUTPUT), 1024, _JB_MAX_OUTPUT);
+  var timeout = _jbClamp(_jbOpt(opts, 'timeout', _JB_TIMEOUT), _JB_TIMEOUT, 1, _JB_MAX_TIMEOUT);
+  var memory = _jbClamp(_jbOpt(opts, 'memory', _JB_MEMORY), _JB_MEMORY, 256 * 1024, _JB_MAX_MEMORY);
+  var output = _jbClamp(_jbOpt(opts, 'output', _JB_OUTPUT), _JB_OUTPUT, 1024, _JB_MAX_OUTPUT);
   var seed = _jbOpt(opts, 'seed', 1);
   var now = _jbOpt(opts, 'now', 0);
 

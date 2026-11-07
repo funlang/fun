@@ -31,6 +31,7 @@ QJS_SRC="${QJS_SRC:-$THIRD/quickjs-ng}"
 OUT="${OUT:-$ROOT/fun/fun-jsbox}"
 OBJ="${OBJ:-$HERE/.jsbox-obj}"
 CC="${CC:-gcc}"
+EXTRA_CFLAGS="${EXTRA_CFLAGS:-}"
 
 OS="$(uname -s 2>/dev/null || echo unknown)"
 case "$OS" in
@@ -95,7 +96,7 @@ if [ ! -f "$QJS_SRC/quickjs.c" ]; then
 fi
 
 mkdir -p "$OBJ"
-CFLAGS="-std=gnu11 -O2 -fPIE -D_GNU_SOURCE -I$QJS_SRC"
+CFLAGS="-std=gnu11 -O2 -fPIE -D_GNU_SOURCE -I$QJS_SRC $EXTRA_CFLAGS"
 
 echo "Building fun-jsbox from $QJS_SRC"
 for f in quickjs libregexp libunicode dtoa; do

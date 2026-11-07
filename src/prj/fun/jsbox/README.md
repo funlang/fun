@@ -22,6 +22,14 @@ verifies the tarball SHA256. To use another checkout:
 QJS_SRC=/path/to/quickjs-ng src/prj/fun/build-jsbox.sh
 ```
 
+`EXTRA_CFLAGS`, `OUT`, `OBJ`, and `CC` are honoured for debug or alternate
+builds:
+
+```sh
+EXTRA_CFLAGS="-O1 -g -fstack-protector-all -D_FORTIFY_SOURCE=2" \
+OUT=/tmp/fun-jsbox-debug OBJ=/tmp/jsbox-obj src/prj/fun/build-jsbox.sh
+```
+
 Only the QuickJS-ng core is linked (`quickjs.c`, `libregexp.c`, `libunicode.c`,
 `dtoa.c`). `quickjs-libc` is deliberately not linked, so there is no `std`,
 `os`, `console`, or module loader.
@@ -209,4 +217,6 @@ fun/test/run-jsbox-test.sh
 
 This builds the worker and runs `fun/test/jsbox_test.fun`, covering the happy
 path, syntax/runtime errors, timeout, OOM, output limit, determinism, absent
-host APIs, Unicode, and invalid option types.
+host APIs, Unicode, one-shot process isolation, falsy JSON results, input
+copying, non-JSON results, thrown non-Error values, seeds, and invalid option
+types.

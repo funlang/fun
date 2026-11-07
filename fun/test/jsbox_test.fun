@@ -114,6 +114,74 @@ if _have then
     assert.equal(r.value.n, 7);
   });
 
+  test('jsbox: one-shot process isolation', {
+    var a = jsb.run('Object.prototype.x = 1; globalThis.y = 2; return 1;', nil);
+    assert.is_true(a.ok);
+    var b = jsb.run('return [({}).x, globalThis.y];', nil);
+    assert.is_true(b.ok);
+    assert.is_nil(b.value[0]);
+    assert.is_nil(b.value[1]);
+  });
+
+  test('jsbox: falsy JSON results are preserved', {
+    var z = jsb.run('return 0', nil);
+    assert.is_true(z.ok);
+    assert.equal(z.value, 0);
+    var f = jsb.run('return false', nil);
+    assert.is_true(f.ok);
+    assert.is_false(f.value);
+    var s = jsb.run('return ""', nil);
+    assert.is_true(s.ok);
+    assert.equal(s.value, '');
+    var n = jsb.run('return null', nil);
+    assert.is_true(n.ok);
+    assert.is_nil(n.value);
+  });
+
+  test('jsbox: input is a copy', {
+    var input = [a: 1];
+    var r = jsb.run('input.a = 99; return input.a;', input);
+    assert.is_true(r.ok);
+    assert.equal(r.value, 99);
+    assert.equal(input.a, 1);
+  });
+
+  test('jsbox: non-JSON results are rejected', {
+    var b = jsb.run('return 1n', nil);
+    assert.is_false(b.ok);
+    assert.equal(b.error.kind, 'runtime');
+    var c = jsb.run('var a = {}; a.self = a; return a;', nil);
+    assert.is_false(c.ok);
+    assert.equal(c.error.kind, 'runtime');
+    var u = jsb.run('return undefined', nil);
+    assert.is_false(u.ok);
+    assert.equal(u.error.kind, 'runtime');
+  });
+
+  test('jsbox: thrown non-Error values', {
+    var r = jsb.run('throw null', nil);
+    assert.is_false(r.ok);
+    assert.equal(r.error.kind, 'runtime');
+  });
+
+  test('jsbox: different seeds differ', {
+    var a = jsb.run('return Math.random()', nil, [seed: 1]);
+    var b = jsb.run('return Math.random()', nil, [seed: 2]);
+    assert.is_true(a.ok);
+    assert.is_true(b.ok);
+    assert.is_true(a.value <> b.value);
+  });
+
+  test('jsbox: non-numeric limits use defaults', {
+    var r = jsb.run('return 1', nil, [timeout: 'x', memory: 'y', output: 'z']);
+    assert.is_true(r.ok);
+    assert.equal(r.value, 1);
+  });
+
+  test('jsbox: opts must be a set', {
+    assert.raises({ jsb.run('return 1', nil, 'x'); }, 'opts must be a set');
+  });
+
   test('jsbox: invalid code type raises', {
     assert.raises({ jsb.run(123, nil); }, 'code must be a string');
   });
