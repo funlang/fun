@@ -974,10 +974,19 @@ if not r.ok then
 end if;
 ```
 
-错误路径是 JSON Pointer（`/user/name`、`/tags/0`）。v0 支持 `type`（含类型列表）、
-`properties` / `required` / `additionalProperties`、`items` / `minItems` / `maxItems`、
-数值上下界、`minLength` / `maxLength`（按 Unicode 码点计数）、`pattern`、`enum`
-与 `const`；`$ref`、组合关键字和元组式 `items` 暂未支持。
+错误路径是 JSON Pointer（`/user/name`、`/tags/0`）。文本数据可以直接先解析再校验：
+`JsonSchema.checkJson(text, schema)` / `JsonSchema.checkFd(text, schema)`，
+布尔快捷方式是 `validJson` / `validFd`；解析失败会作为普通结果返回，关键字为
+`parse`。
+
+v0.x 支持 `type`（含类型列表）、`properties` / `required` /
+`additionalProperties`、`items`（单 schema 或元组）/ `additionalItems` /
+`minItems` / `maxItems` / `uniqueItems`、数值上下界、`minLength` / `maxLength`
+（按 Unicode 码点计数）、`pattern` / `patternProperties` / `propertyNames`、
+`enum`、`const`、`allOf` / `anyOf` / `oneOf` / `not`、同文档 `$ref` 与
+`$defs` / `definitions`，以及 `format` 的 `email`、`date`、`time`、
+`date-time`、`uri`、`uri-reference`、`uuid`、`ipv4`、`hostname`、`regex`。
+外部 `$ref`、`dependencies`、`if` / `then` / `else` 和 `contains` 暂未支持。
 
 > **平台拆分惯例**：Windows 实现保留原名，Unix 后端为 `<name>-unx.fun`（Linux + macOS），
 > 旧的 `<name>-lnx.fun` 名字保留为它之上的薄包装；两者共用的逻辑放在

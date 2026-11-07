@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+- `jsonschema` 补齐 v0.x 关键字。`checkJson` / `checkFd`（以及布尔快捷
+  `validJson` / `validFd`）先解析文本再校验；JSON 标量根保留原类型，非法
+  JSON 作为普通结果返回（关键字 `parse`），schema 文本按严格模式解析。新增
+  同文档 `$ref` 与 `$defs` / `definitions`（含转义与递归指针）、
+  `allOf` / `anyOf` / `oneOf` / `not`、`uniqueItems`、元组式 `items` 与
+  `additionalItems`、`patternProperties`、`propertyNames`，以及 `format`
+  （`email`、`date`、`time`、`date-time`、`uri`、`uri-reference`、`uuid`、
+  `ipv4`、`hostname`、`regex`）。未知 format 仍按注解放行。外部 `$ref`、
+  `dependencies`、`if` / `then` / `else` 和 `contains` 暂不在范围内。
+
 - Unix 的 `lib-ado-unx` 新增 unixODBC 后端。连接串带 `odbc:`/`ODBC;` 前缀、
   `DRIVER=`、`DSN=` 或 `FILEDSN=` 时改走 `lib-ado-odbc-unx.fun`，不再只连内嵌 SQLite，现有 ORM
   栈可直接接 MySQL、PostgreSQL、SQL Server 等驱动。参数按 ORM DataType

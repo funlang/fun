@@ -6,6 +6,18 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `jsonschema` gains the v0.x keyword set. `checkJson` / `checkFd` (and the
+  `validJson` / `validFd` shortcuts) parse text before validating; scalar JSON
+  roots keep their type, malformed JSON returns a normal result with keyword
+  `parse`, and schema text is parsed strictly. New keywords: same-document
+  `$ref` with `$defs` / `definitions` (including escaped and recursive
+  pointers), `allOf` / `anyOf` / `oneOf` / `not`, `uniqueItems`, tuple `items`
+  with `additionalItems`, `patternProperties`, `propertyNames`, and `format`
+  (`email`, `date`, `time`, `date-time`, `uri`, `uri-reference`, `uuid`,
+  `ipv4`, `hostname`, `regex`). Unknown formats remain annotations. External
+  `$ref`, `dependencies`, `if` / `then` / `else` and `contains` are still out of
+  scope.
+
 - Unix `lib-ado-unx` gains a unixODBC backend. Connection strings with an
   `odbc:`/`ODBC;` prefix, `DRIVER=`, `DSN=`, or `FILEDSN=` now go through `lib-ado-odbc-unx.fun`
   instead of embedded SQLite, so the existing ORM stack can reach MySQL,

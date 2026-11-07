@@ -1066,11 +1066,21 @@ if not r.ok then
 end if;
 ```
 
-Errors carry a JSON Pointer path (`/user/name`, `/tags/0`). v0 covers `type`
-(including lists), `properties` / `required` / `additionalProperties`,
-`items` / `minItems` / `maxItems`, numeric bounds, `minLength` / `maxLength`
-(counted in Unicode code points), `pattern`, `enum` and `const`; `$ref`,
-composition keywords and tuple `items` are not supported yet.
+Errors carry a JSON Pointer path (`/user/name`, `/tags/0`). Text input can be
+parsed first with `JsonSchema.checkJson(text, schema)` or
+`JsonSchema.checkFd(text, schema)`; `validJson` / `validFd` are the boolean
+shortcuts, and a parse failure is reported as a normal result with keyword
+`parse`.
+
+The v0.x subset covers `type` (including lists), `properties` / `required` /
+`additionalProperties`, `items` (single schema or tuple) / `additionalItems` /
+`minItems` / `maxItems` / `uniqueItems`, numeric bounds, `minLength` /
+`maxLength` (counted in Unicode code points), `pattern` /
+`patternProperties` / `propertyNames`, `enum`, `const`, `allOf` / `anyOf` /
+`oneOf` / `not`, same-document `$ref` with `$defs` / `definitions`, and
+`format` for `email`, `date`, `time`, `date-time`, `uri`, `uri-reference`,
+`uuid`, `ipv4`, `hostname` and `regex`. External `$ref`, `dependencies`,
+`if` / `then` / `else` and `contains` are not supported yet.
 
 > **Platform-split convention**: the Windows implementation keeps the plain
 > module name, and the Unix backend is `<name>-unx.fun` (Linux + macOS); the

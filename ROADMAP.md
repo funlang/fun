@@ -4,7 +4,7 @@
 > 本文只维护当前基线、优先级、技术债和发版门槛。
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
-> 最近更新：2026-11-05
+> 最近更新：2026-11-07
 > 基线：Fun 9.5.4（tag `v9.5.4`）
 
 ## 0. 当前基线
@@ -30,7 +30,6 @@
 
 | ID | 事项 | 状态 | 优先级 | 验收 | 关联 |
 |---|---|---|---|---|---|
-| D-01 | JSON Schema v0.x | OPEN | P1 | `checkJson`/`checkFd`、`$ref/$defs`、`allOf`/`anyOf`/`oneOf`/`not`、`uniqueItems`、元组 `items`、`patternProperties`、`propertyNames`、`format` | `art/notes/jsonschema-plan.md` |
 | S-02 | 沙箱运行器 | OPEN | P1 | 用 `-safe` 子进程 + 超时/内存/输出上限跑 AI 生成脚本 | `art/notes/todo.md` |
 
 ## 3. 以后 (LATER)
@@ -130,3 +129,9 @@
   `?` 参数个数预检，以及 `Init()` 打开 ODBC 连接并安装驱动的标识符引号
   （ORM RPC 在生成 SQL 前依赖它）；ODBC 测试补了大文本/大 BLOB 分块、
   空串与 NULL、事务隐式打开和无驱动时的稳定 SKIP 输出。
+- 2026-11-07：D-01 JSON Schema v0.x 完成。新增 `checkJson`/`checkFd` 与
+  `validJson`/`validFd` 文本入口，补齐同文档 `$ref`/`$defs`、
+  `allOf`/`anyOf`/`oneOf`/`not`、`uniqueItems`、元组 `items` +
+  `additionalItems`、`patternProperties`、`propertyNames`、`format`。
+  JSON schema 文本改为严格解析，非法数据返回 `parse` 错误；回归
+  `127/127` 不变，schema 用例从 45 条扩到 115 条断言。

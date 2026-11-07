@@ -14,6 +14,10 @@
 //     JsonSchema.valid(data, schema);            // -> true / false
 //     JsonSchema.assert(data, schema);           // raises on the first error
 //
+//     // text entry points: parse the data first, then validate
+//     JsonSchema.checkJson(jsonText, schema);
+//     JsonSchema.checkFd(fdText, schema);
+//
 // A schema may be an already parsed value (object), an FD document (the
 // default authoring format) or JSON text. parse() auto-detects the text
 // format: a leading '{' or '[' selects JSON, anything else selects FD.
@@ -50,12 +54,15 @@
 //     FD constants nil/true/false.
 //   - A value containing spaces (a regex, a description) must be quoted.
 //
-// Supported keywords (v0): type (string or list), properties, required,
-// additionalProperties (bool or schema), items (single schema), minItems,
-// maxItems, minimum, maximum, exclusiveMinimum, exclusiveMaximum, minLength,
-// maxLength, pattern (PCRE), enum, const. title / description / default /
-// $schema / $id / $comment / examples are ignored. Unknown keywords are
-// ignored unless opts.strict is true.
+// Supported keywords (v0.x): type (string or list), properties, required,
+// additionalProperties (bool or schema), items (single schema or tuple),
+// additionalItems, minItems, maxItems, uniqueItems, minimum, maximum,
+// exclusiveMinimum, exclusiveMaximum, minLength, maxLength, pattern (PCRE),
+// patternProperties, propertyNames, enum, const, allOf / anyOf / oneOf / not,
+// $ref / $defs / definitions (local JSON Pointers only), and format (email,
+// date, time, date-time, uri, uri-reference, uuid, ipv4, hostname, regex).
+// title / description / default / $schema / $id / $comment / examples are
+// ignored. Unknown keywords are ignored unless opts.strict is true.
 //
 // check() options: [maxErrors: 100, strict: false]. maxErrors caps the error
 // list (a value <= 0 restores the default); strict also reports unknown
@@ -64,8 +71,8 @@
 // Error objects carry path / keyword / message / expected / actual, where path
 // is a JSON Pointer (/user/name, /tags/0) with ~ and / escaped as ~0 and ~1.
 //
-// Not yet supported: $ref/$defs, allOf/anyOf/oneOf/not, tuple items,
-// patternProperties, propertyNames, dependencies, uniqueItems, format.
+// Not yet supported: external $ref (file/URL), dependencies, if/then/else,
+// contains, and boolean root schemas. Unknown formats are annotations and pass.
 //
 // minLength/maxLength count Unicode code points on UTF-8 and UTF-16 builds and
 // GBK characters on a GBK build, not the raw string length.
@@ -255,6 +262,115 @@ fun _numBounds(v, s, path, errs, limit)
   end if;
 end fun;
 
+// --- format checks --------------------------------------------------------
+
+fun _validDate(s)
+  if not (s =~ /^\d{4}-\d{2}-\d{2}$/) then return false; end if;
+  var y = s.substr(0, 4).toNum(0);
+  var m = s.substr(5, 2).toNum(0);
+  var d = s.substr(8, 2).toNum(0);
+  if m < 1 or m > 12 then return false; end if;
+  var days = [31,28,31,30,31,30,31,31,30,31,30,31];
+  var md = days[m - 1];
+  if m = 2 and ((y mod 4 = 0 and y mod 100 <> 0) or y mod 400 = 0) then md = 29; end if;
+  result = d >= 1 and d <= md;
+end fun;
+
+fun _validTime(s)
+  result = s =~ /^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:[Zz]|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
+end fun;
+
+fun _formatOk(fmt, s)
+  if fmt = 'email' then
+    result = s =~ /^[^@\s]+@[^@\s]+$/;
+  elsif fmt = 'date' then
+    result = _validDate(s);
+  elsif fmt = 'time' then
+    result = _validTime(s);
+  elsif fmt = 'date-time' then
+    var at = s.subpos('T');
+    if at < 0 then at = s.subpos('t'); end if;
+    if at <= 0 then
+      result = false;
+    else
+      result = _validDate(s.substr(0, at)) and _validTime(s.substr(at + 1, s.length()));
+    end if;
+  elsif fmt = 'uri' then
+    result = s =~ /^[A-Za-z][A-Za-z0-9+.-]*:\S*$/;
+  elsif fmt = 'uri-reference' then
+    result = s =~ /^\S*$/;
+  elsif fmt = 'uuid' then
+    result = s =~ /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  elsif fmt = 'ipv4' then
+    result = s =~ /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+  elsif fmt = 'hostname' then
+    result = s =~ /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+  elsif fmt = 'regex' then
+    try
+      // toRegex() alone defers PCRE compilation; matching forces it and
+      // surfaces a bad pattern as an exception.
+      var probe = '';
+      var ok = (probe =~ s.toRegex());
+      result = true;
+    except
+      result = false;
+    end try;
+  else
+    // Unknown formats are annotations in JSON Schema, so they pass.
+    result = true;
+  end if;
+end fun;
+
+// --- local $ref resolution ------------------------------------------------
+
+fun _ptrDecode(s)
+  // RFC 6901: ~1 is '/', ~0 is '~'. Decode ~1 first so ~01 becomes ~1,
+  // not '/'.
+  result = s.replace(/~1/g, '/').replace(/~0/g, '~');
+end fun;
+
+fun _resolveRef(root, ref)
+  if ref = '#' then return root; end if;
+  if ref.substr(0, 2) <> '#/' then return nil; end if;
+  var cur = root;
+  var ptr = ref.substr(2, ref.length());
+  while ptr <> '' do
+    var at = ptr.subpos('/');
+    var seg = '';
+    if at < 0 then
+      seg = ptr;
+      ptr = '';
+    else
+      seg = ptr.substr(0, at);
+      ptr = ptr.substr(at + 1, ptr.length());
+    end if;
+    var key = _ptrDecode(seg);
+    if not _isColl(cur) then return nil; end if;
+    if not cur.@has(key) then return nil; end if;
+    cur = cur[key];
+  end do;
+  result = cur;
+end fun;
+
+fun _stackHas(stack, key)
+  var found = false;
+  stack.@each((x){
+    if not found and x = key then found = true; end if;
+  });
+  result = found;
+end fun;
+
+fun _parseFailure(kind, message)
+  var e = new [
+    path: '',
+    keyword: 'parse',
+    message: message,
+    expected: kind,
+    actual: nil
+  ];
+  result = new [ok: false, errors: [e], first: e];
+end fun;
+
 // Keywords consumed by this module plus annotations that are deliberately
 // ignored. Anything else is unknown, and only strict mode reports it.
 var _known = [
@@ -263,8 +379,10 @@ var _known = [
   required: true,
   additionalProperties: true,
   items: true,
+  additionalItems: true,
   minItems: true,
   maxItems: true,
+  uniqueItems: true,
   minimum: true,
   maximum: true,
   exclusiveMinimum: true,
@@ -272,8 +390,18 @@ var _known = [
   minLength: true,
   maxLength: true,
   pattern: true,
+  patternProperties: true,
+  propertyNames: true,
   enum: true,
   const: true,
+  allOf: true,
+  anyOf: true,
+  oneOf: true,
+  'not': true,
+  '$ref': true,
+  '$defs': true,
+  definitions: true,
+  format: true,
   title: true,
   description: true,
   default: true,
@@ -283,9 +411,18 @@ var _known = [
   examples: true
 ];
 
-fun _validate(v, s, path, errs, limit, strict)
+fun _validate(v, s, path, errs, limit, strict, root, stack)
   if errs.@count() >= limit then return; end if;
+  if s = true then return; end if;
+  if s = false then
+    _addErr(errs, path, 'false', 'value is not allowed by a false schema', false, v, limit);
+    return;
+  end if;
   if not _isColl(s) then return; end if;
+  if _shape(s) <> 'object' then
+    _addErr(errs, path, 'schema', 'schema must be an object or boolean', 'object', _kind(s), limit);
+    return;
+  end if;
 
   if strict then
     s.@each((x, k){
@@ -293,6 +430,94 @@ fun _validate(v, s, path, errs, limit, strict)
         _addErr(errs, path, 'schema', 'unknown keyword: ' & k, nil, k, limit);
       end if;
     });
+  end if;
+
+  // $ref is resolved first; other keywords next to it are ignored, matching
+  // draft-07. Only same-document JSON Pointers are supported.
+  if s.@has('$ref') then
+    var ref = s['$ref'];
+    if _kind(ref) <> 'string' then
+      _addErr(errs, path, '$ref', '$ref must be a string', 'string', _kind(ref), limit);
+      return;
+    end if;
+    if not (ref =~ /^#/) then
+      _addErr(errs, path, '$ref', 'only local references are supported: ' & ref, '#/...', ref, limit);
+      return;
+    end if;
+    var target = _resolveRef(root, ref);
+    if target = nil then
+      _addErr(errs, path, '$ref', 'cannot resolve reference: ' & ref, ref, nil, limit);
+      return;
+    end if;
+    // A schema that refers to itself at the same data path would never
+    // terminate. The path is part of the key, so recursive schemas over
+    // recursive data still work.
+    var key = ref & '|' & path;
+    if _stackHas(stack, key) then return; end if;
+    if stack.@count() >= 256 then
+      _addErr(errs, path, '$ref', 'reference nesting too deep', 256, stack.@count(), limit);
+      return;
+    end if;
+    stack.@add(key);
+    _validate(v, target, path, errs, limit, strict, root, stack);
+    stack.@count(-1);
+    return;
+  end if;
+
+  if s.@has('allOf') then
+    var a = s['allOf'];
+    if _isColl(a) and _shape(a) = 'array' then
+      a.@each((sub){
+        _validate(v, sub, path, errs, limit, strict, root, stack);
+      });
+    else
+      _addErr(errs, path, 'allOf', 'allOf must be an array of schemas', 'array', _kind(a), limit);
+    end if;
+  end if;
+
+  if s.@has('anyOf') then
+    var a = s['anyOf'];
+    if _isColl(a) and _shape(a) = 'array' then
+      var passed = false;
+      a.@each((sub){
+        if not passed then
+          var tmp = new [];
+          _validate(v, sub, path, tmp, 1, strict, root, stack);
+          if tmp.@count() = 0 then passed = true; end if;
+        end if;
+      });
+      if not passed then
+        _addErr(errs, path, 'anyOf', 'value does not match any schema', a.@count(), _kind(v), limit);
+      end if;
+    else
+      _addErr(errs, path, 'anyOf', 'anyOf must be an array of schemas', 'array', _kind(a), limit);
+    end if;
+  end if;
+
+  if s.@has('oneOf') then
+    var a = s['oneOf'];
+    if _isColl(a) and _shape(a) = 'array' then
+      var hits = 0;
+      a.@each((sub){
+        var tmp = new [];
+        _validate(v, sub, path, tmp, 1, strict, root, stack);
+        if tmp.@count() = 0 then hits += 1; end if;
+      });
+      if hits <> 1 then
+        _addErr(errs, path, 'oneOf',
+          'value must match exactly one schema, matched ' & hits, 1, hits, limit);
+      end if;
+    else
+      _addErr(errs, path, 'oneOf', 'oneOf must be an array of schemas', 'array', _kind(a), limit);
+    end if;
+  end if;
+
+  if s.@has('not') then
+    var tmp = new [];
+    _validate(v, s['not'], path, tmp, 1, strict, root, stack);
+    if tmp.@count() = 0 then
+      _addErr(errs, path, 'not', 'value must not match the schema', false, true, limit);
+    end if;
   end if;
 
   if s.@has('enum') then
@@ -324,32 +549,71 @@ fun _validate(v, s, path, errs, limit, strict)
 
   if k = 'object' then
     if s.@has('required') then
-      s['required'].@each((name){
-        if not v.@has(name) then
-          _addErr(errs, path, 'required', 'missing required property: ' & name, name, nil, limit);
-        end if;
-      });
+      if _isColl(s['required']) and _shape(s['required']) = 'array' then
+        s['required'].@each((name){
+          if not v.@has(name) then
+            _addErr(errs, path, 'required', 'missing required property: ' & name, name, nil, limit);
+          end if;
+        });
+      else
+        _addErr(errs, path, 'required', 'required must be an array', 'array', _kind(s['required']), limit);
+      end if;
     end if;
 
     var props = nil;
     if _isColl(s['properties']) and _shape(s['properties']) = 'object' then
       props = s['properties'];
     end if;
+    var pats = new [];
+    if _isColl(s['patternProperties']) and _shape(s['patternProperties']) = 'object' then
+      s['patternProperties'].@each((ps, pat){
+        try
+          var re = pat.toRegex();
+          var probe = '';
+          var ok = (probe =~ re);
+          pats.@add(new [re: re, schema: ps, text: pat]);
+        except
+          _addErr(errs, path, 'patternProperties', 'invalid pattern: ' & pat, pat, nil, limit);
+        end try;
+      });
+    end if;
     var hasAp = s.@has('additionalProperties');
     var ap = nil;
     if hasAp then ap = s['additionalProperties']; end if;
 
-    // One pass over the value: known properties get their schema, unknown
-    // ones go through additionalProperties.
+    if s.@has('propertyNames') then
+      var pn = s['propertyNames'];
+      v.@each((cv, name){
+        var tmp = new [];
+        _validate('' & name, pn, _path(path, name), tmp, 1, strict, root, stack);
+        if tmp.@count() > 0 then
+          _addErr(errs, path, 'propertyNames',
+            'property name is not allowed: ' & name, pn, name, limit);
+        end if;
+      });
+    end if;
+
+    // One pass over the value. properties and every matching
+    // patternProperties schema both apply; additionalProperties only sees
+    // names that neither matched.
     v.@each((cv, name){
+      var matched = false;
       if props <> nil and props.@has(name) then
-        _validate(cv, props[name], _path(path, name), errs, limit, strict);
-      elsif hasAp then
+        _validate(cv, props[name], _path(path, name), errs, limit, strict, root, stack);
+        matched = true;
+      end if;
+      pats.@each((p){
+        if name =~ p['re'] then
+          _validate(cv, p['schema'], _path(path, name), errs, limit, strict, root, stack);
+          matched = true;
+        end if;
+      });
+      if not matched and hasAp then
         if ap = false then
           _addErr(errs, _path(path, name), 'additionalProperties',
             'property is not allowed', false, cv, limit);
-        elsif _isColl(ap) and _shape(ap) = 'object' then
-          _validate(cv, ap, _path(path, name), errs, limit, strict);
+        else
+          _validate(cv, ap, _path(path, name), errs, limit, strict, root, stack);
         end if;
       end if;
     });
@@ -359,12 +623,41 @@ fun _validate(v, s, path, errs, limit, strict)
     var n = v.@count();
     if s.@has('items') then
       var it = s['items'];
-      // A list here is the draft-4 tuple form; v0 only supports one schema.
-      if _isColl(it) and _shape(it) = 'object' then
+      if _isColl(it) and _shape(it) = 'array' then
+        var tn = it.@count();
         for i = 0 to n - 1 do
-          _validate(v[i], it, _path(path, i), errs, limit, strict);
+          if i < tn then
+            _validate(v[i], it[i], _path(path, i), errs, limit, strict, root, stack);
+          elsif s.@has('additionalItems') then
+            var ai = s['additionalItems'];
+            if ai = false then
+              _addErr(errs, _path(path, i), 'additionalItems',
+                'additional items are not allowed', false, v[i], limit);
+            else
+              _validate(v[i], ai, _path(path, i), errs, limit, strict, root, stack);
+            end if;
+          end if;
+        end do;
+      else
+        for i = 0 to n - 1 do
+          _validate(v[i], it, _path(path, i), errs, limit, strict, root, stack);
         end do;
       end if;
+    end if;
+    if s.@has('uniqueItems') and s['uniqueItems'] = true then
+      var dup = false;
+      for i = 0 to n - 1 do
+        if not dup and i + 1 < n then
+          for j = i + 1 to n - 1 do
+            if not dup and _deepEq(v[i], v[j]) then
+              dup = true;
+              _addErr(errs, path, 'uniqueItems',
+                'array items must be unique (duplicate at ' & i & ' and ' & j & ')',
+                true, false, limit);
+            end if;
+          end do;
+        end if;
+      end do;
     end if;
     _countBounds(n, s, 'minItems', 'maxItems', path, errs, limit);
   end if;
@@ -373,8 +666,18 @@ fun _validate(v, s, path, errs, limit, strict)
     var sv = v.toStr();
     _countBounds(_cpLen(sv), s, 'minLength', 'maxLength', path, errs, limit);
     if s.@has('pattern') then
-      if not (sv =~ s['pattern'].toRegex()) then
-        _addErr(errs, path, 'pattern', 'does not match pattern ' & s['pattern'], s['pattern'], sv, limit);
+      try
+        if not (sv =~ s['pattern'].toRegex()) then
+          _addErr(errs, path, 'pattern', 'does not match pattern ' & s['pattern'], s['pattern'], sv, limit);
+        end if;
+      except
+        _addErr(errs, path, 'pattern', 'invalid pattern: ' & s['pattern'], s['pattern'], sv, limit);
+      end try;
+    end if;
+    if s.@has('format') then
+      var fmt = s['format'];
+      if _kind(fmt) = 'string' and not _formatOk(fmt, sv) then
+        _addErr(errs, path, 'format', 'does not match format ' & fmt, fmt, sv, limit);
       end if;
     end if;
   end if;
@@ -390,12 +693,25 @@ class _JsonSchemaApi()
   fun parse(text)
     if text = nil then raise 'jsonschema: schema text is nil'; end if;
     var t = text.replace(/^\s++/, '');
-    if t.length() > 0 and (t[0] = '{' or t[0] = '[') then
-      result = text.getJson(json: true);
-    else
-      result = text.getJson(fd: true);
-    end if;
+    if t.length() = 0 then raise 'jsonschema: schema text is empty'; end if;
+    var isJson = t[0] = '{' or t[0] = '[';
+    try
+      if isJson then
+        result = text.getJson(json: 2);
+      else
+        result = text.getJson(json: 2, fd: true);
+      end if;
+    except
+      raise 'jsonschema: schema parse failed: ' & ('' & @);
+    end try;
     if result = nil then raise 'jsonschema: schema parse failed'; end if;
+    if not _isColl(result) or _shape(result) <> 'object' then
+      raise 'jsonschema: schema root must be an object';
+    end if;
+    // The FD strict parser reports some invalid documents as an empty tree.
+    if not isJson and result.@count() = 0 then
+      raise 'jsonschema: schema parse failed';
+    end if;
   end fun;
 
   fun check(data, schema, opts)
@@ -415,7 +731,7 @@ class _JsonSchemaApi()
     if limit <= 0 then limit = DEFAULT_MAX_ERRORS; end if;
 
     var errs = new [];
-    _validate(data, s, '', errs, limit, strict);
+    _validate(data, s, '', errs, limit, strict, s, new []);
     var first = nil;
     if errs.@count() > 0 then first = errs[0]; end if;
     result = new [ok: errs.@count() = 0, errors: errs, first: first];
@@ -423,6 +739,42 @@ class _JsonSchemaApi()
 
   fun valid(data, schema, opts)
     result = check(data, schema, opts)['ok'];
+  end fun;
+
+  fun checkJson(text, schema, opts)
+    if text = nil then return _parseFailure('json', 'data text is nil'); end if;
+    var v = nil;
+    try
+      // Parse through an object so a scalar root keeps its type instead of
+      // becoming the parser's one-element root array.
+      var w = ('{"__jsonschema_root__":' & text & '}').getJson(json: 2);
+      v = w['__jsonschema_root__'];
+    except
+      return _parseFailure('json', '' & @);
+    end try;
+    result = check(v, schema, opts);
+  end fun;
+
+  fun checkFd(text, schema, opts)
+    if text = nil then return _parseFailure('fd', 'data text is nil'); end if;
+    var v = nil;
+    try
+      v = text.getJson(json: 2, fd: true);
+    except
+      return _parseFailure('fd', '' & @);
+    end try;
+    if not _isColl(v) or v.@count() = 0 then
+      return _parseFailure('fd', 'no FD value');
+    end if;
+    result = check(v, schema, opts);
+  end fun;
+
+  fun validJson(text, schema, opts)
+    result = checkJson(text, schema, opts)['ok'];
+  end fun;
+
+  fun validFd(text, schema, opts)
+    result = checkFd(text, schema, opts)['ok'];
   end fun;
 
   fun assert(data, schema, opts)
