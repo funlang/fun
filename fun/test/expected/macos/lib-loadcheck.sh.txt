@@ -35,6 +35,7 @@ LOAD  lib-host
 FAIL  lib-icmp               fun/lib/lib-icmp.fun:7: getapi: cannot load library "icmp.dl
 LOAD  lib-jit
 LOAD  lib-jsasync
+LOAD  lib-jsbox
 LOAD  lib-json
 LOAD  lib-jsonrpc
 LOAD  lib-match
@@ -79,4 +80,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=74 failed=6
+loaded=75 failed=6

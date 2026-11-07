@@ -95,6 +95,13 @@ src/3rd/pcre-8/
 # Vendored Tiny C Compiler source (builds libtcc.so for lib-tcc.fun; not tracked)
 src/3rd/tcc/
 
+# Vendored QuickJS-ng source (builds fun/fun-jsbox on demand; not tracked)
+src/3rd/quickjs-ng/
+
+# fun-jsbox build outputs
+fun/fun-jsbox
+src/prj/fun/.jsbox-obj/
+
 # ---- OS ----
 .DS_Store
 Thumbs.db
