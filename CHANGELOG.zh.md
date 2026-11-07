@@ -6,6 +6,16 @@
 
 ## [Unreleased]
 
+- 新增 `fun-jsbox` 沙箱进程与 `fun/lib/lib-jsbox.fun` 桥接，用于运行机写
+  JavaScript。worker 是基于 QuickJS-ng v0.18.0 的独立一次性进程，不链接
+  `quickjs-libc`，因此脚本只有 JSON `input` 和 JSON 返回值，没有文件、网络、
+  进程、模块或 console API。`process.run` 负责硬超时；QuickJS 侧限制内存、
+  栈和输出，并固定 `Math.random` 种子与 `Date.now`。错误带稳定的
+  `kind` / `line` / `column` 字段。`src/prj/fun/build-jsbox.sh` 按需下载并
+  SHA256 校验引擎；`fun/test/run-jsbox-test.sh` 覆盖语法/运行时错误、超时、
+  OOM、输出上限、进程隔离、现代语法、Unicode 和选项处理。seccomp/bubblewrap
+  隔离与 Windows/macOS worker 限制尚未实现。
+
 - `jsonschema` 补齐 v0.x 关键字。`checkJson` / `checkFd`（以及布尔快捷
   `validJson` / `validFd`）先解析文本再校验；JSON 标量根保留原类型，非法
   JSON 作为普通结果返回（关键字 `parse`），schema 文本按严格模式解析。新增
