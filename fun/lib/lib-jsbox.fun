@@ -23,9 +23,9 @@
 //   2. fun-jsbox next to the running interpreter (0.arg())
 //   3. fun-jsbox on PATH, only when 0.arg() is unavailable
 //
-// This module needs an FFI-enabled interpreter because process.run uses
-// getapi. In a -safe build it returns a worker error instead of silently
-// degrading: the controller must stay a trusted normal build.
+// This module needs an FFI-enabled interpreter because process.run and
+// env.fun use getapi. A -safe build fails while loading env.fun/lib-host
+// (getapi is denied), so the controller must be a trusted normal build.
 //
 // Options (all optional):
 //   timeout  milliseconds, default 200, hard cap 10000
@@ -70,6 +70,8 @@ end fun;
 
 fun _jbClamp(v, lo, hi)
   if v.eq(nil) then result = lo; return; end if;
+  var t = v.type();
+  if not (t.eq(3) or t.eq(5)) then result = lo; return; end if;
   if v < lo then result = lo; return; end if;
   if v > hi then result = hi; return; end if;
   result = v;

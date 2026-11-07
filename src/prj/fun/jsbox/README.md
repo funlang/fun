@@ -57,10 +57,11 @@ In a service, set `FUN_JSBOX` to an absolute path in a directory that
 untrusted users cannot write to. The wrapper does not search `PATH` when the
 interpreter path is known.
 
-`lib-jsbox.fun` uses `process.run`, so the orchestrator must be an
-FFI-enabled normal build. A `-safe` build raises a clear error. The JS itself is
-untrusted; the Fun controller is trusted and should validate the JSON result
-before using it.
+`lib-jsbox.fun` uses `process.run` and `env.fun`, so the orchestrator must be an
+FFI-enabled normal build. A `-safe` build fails while loading `lib-host`
+(`getapi` is denied); it is not the intended controller for this module. The JS
+itself is untrusted; the Fun controller is trusted and should validate the JSON
+result before using it.
 
 ## JavaScript contract
 

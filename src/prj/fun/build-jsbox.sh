@@ -56,7 +56,9 @@ fetch_qjs() {
 
     echo "fetch   $QJS_URL"
     if command -v curl >/dev/null 2>&1; then
-        curl -fSL --retry 5 --retry-all-errors --retry-delay 5 -o "$archive" "$QJS_URL"
+        # --retry-all-errors is not available in older curl (e.g. CentOS 7);
+        # --retry still covers transient HTTP status failures.
+        curl -fsSL --retry 5 --retry-delay 5 -o "$archive" "$QJS_URL"
     elif command -v wget >/dev/null 2>&1; then
         wget --tries=5 --waitretry=5 -O "$archive" "$QJS_URL"
     else

@@ -231,6 +231,33 @@ static void cap_utf8(char **ps, size_t cap)
     *ps = t;
 }
 
+static char *shift_stack_lines(const char *s)
+{
+    if (!s)
+        return NULL;
+    const char *m = strstr(s, "<jsbox>:");
+    if (!m)
+        return xstrndup(s, strlen(s));
+
+    Buf b = {0};
+    const char *p = s;
+    while ((m = strstr(p, "<jsbox>:")) != NULL) {
+        size_t prefix = (size_t)(m - p) + strlen("<jsbox>:");
+        buf_append(&b, p, prefix);
+        p += prefix;
+        if (isdigit((unsigned char)*p)) {
+            char *end = NULL;
+            long l = strtol(p, &end, 10);
+            if (l > 1)
+                l--;
+            buf_printf(&b, "%ld", l);
+            p = end;
+        }
+    }
+    buf_puts(&b, p);
+    return b.data;
+}
+
 static void err_free(Err *e)
 {
     free(e->message);
@@ -342,8 +369,12 @@ static void capture_exception(JSContext *ctx, int phase, Deadline *dl, Err *e)
         stack = js_to_cstring(ctx, jstack, NULL);
     }
     JS_FreeValue(ctx, jstack);
-    if (stack)
+    if (stack) {
         cap_utf8(&stack, 8192);
+        char *shifted = shift_stack_lines(stack);
+        free(stack);
+        stack = shifted;
+    }
 
     const char *kind = "runtime";
     int retryable = 1;
@@ -361,8 +392,6 @@ static void capture_exception(JSContext *ctx, int phase, Deadline *dl, Err *e)
     e->stack = stack;
     e->retryable = retryable;
     parse_pos(stack, &e->line, &e->column);
-    if (e->line > 1)
-        e->line--; /* the worker adds one wrapper line before user code */
 
     JS_FreeValue(ctx, exc);
 }
