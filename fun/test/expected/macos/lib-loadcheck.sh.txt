@@ -6,6 +6,7 @@ LOAD  http-auth
 LOAD  http-bearer
 LOAD  http-client
 LOAD  http-cors
+LOAD  http-multipart
 LOAD  http-server
 LOAD  http-session
 LOAD  io
@@ -78,4 +79,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=73 failed=6
+loaded=74 failed=6
