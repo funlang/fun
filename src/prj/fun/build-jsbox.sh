@@ -96,22 +96,29 @@ if [ ! -f "$QJS_SRC/quickjs.c" ]; then
 fi
 
 mkdir -p "$OBJ"
-CFLAGS="-std=gnu11 -O2 -fPIE -D_GNU_SOURCE -I$QJS_SRC $EXTRA_CFLAGS"
+CFLAGS_BASE="-std=gnu11 -O2 -fPIE -D_GNU_SOURCE"
+STAMP="$OBJ/.buildflags"
+STAMP_VALUE="$CC|$QJS_SRC|$CFLAGS_BASE|$EXTRA_CFLAGS"
+if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP" 2>/dev/null)" != "$STAMP_VALUE" ]; then
+    rm -f "$OBJ"/*.o
+    printf '%s\n' "$STAMP_VALUE" > "$STAMP"
+fi
 
 echo "Building fun-jsbox from $QJS_SRC"
 for f in quickjs libregexp libunicode dtoa; do
     if [ ! -f "$OBJ/$f.o" ] || [ "$QJS_SRC/$f.c" -nt "$OBJ/$f.o" ]; then
         echo "  cc    $f.c"
-        $CC $CFLAGS -c "$QJS_SRC/$f.c" -o "$OBJ/$f.o"
+        $CC $CFLAGS_BASE $EXTRA_CFLAGS -I"$QJS_SRC" -c "$QJS_SRC/$f.c" -o "$OBJ/$f.o"
     fi
 done
 
 if [ ! -f "$OBJ/jsbox-main.o" ] || [ "$HERE/jsbox/main.c" -nt "$OBJ/jsbox-main.o" ]; then
     echo "  cc    jsbox/main.c"
-    $CC $CFLAGS -Wall -Wextra -c "$HERE/jsbox/main.c" -o "$OBJ/jsbox-main.o"
+    $CC $CFLAGS_BASE $EXTRA_CFLAGS -I"$QJS_SRC" -Wall -Wextra -c "$HERE/jsbox/main.c" -o "$OBJ/jsbox-main.o"
 fi
 
 echo "  link  $OUT"
+mkdir -p "$(dirname "$OUT")"
 $CC -pie -o "$OUT" \
     "$OBJ/quickjs.o" "$OBJ/libregexp.o" "$OBJ/libunicode.o" "$OBJ/dtoa.o" \
     "$OBJ/jsbox-main.o" $LDLIBS

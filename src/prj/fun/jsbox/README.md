@@ -91,10 +91,11 @@ Modern JavaScript is available because the engine is QuickJS-ng: `const`, `let`,
 arrow functions, classes, template literals, BigInt, Promise, and so on. Do not
 rely on timers, network, or the filesystem; those bindings do not exist.
 
-JSON numbers are IEEE-754 doubles. Fun `Int64` values above 2^53 lose precision
-at the JSON boundary (the same caveat as ROADMAP D-04). Pass large identifiers,
-money in minor units, and 64-bit hashes as decimal strings if the exact value
-matters.
+JSON numbers are IEEE-754 doubles. `NaN` and `Infinity` are serialized as
+`null` by `JSON.stringify`; return a string if the caller must distinguish
+them. Fun `Int64` values above 2^53 lose precision at the JSON boundary (the
+same caveat as ROADMAP D-04). Pass large identifiers, money in minor units, and
+64-bit hashes as decimal strings if the exact value matters.
 
 ## Protocol
 

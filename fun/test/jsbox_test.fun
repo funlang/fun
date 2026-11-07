@@ -98,11 +98,12 @@ if _have then
 
   test('jsbox: no host capabilities', {
     var r = jsb.run(
-      'return [typeof require, typeof process, typeof console, typeof std, typeof os, typeof print];',
+      'return [typeof require, typeof process, typeof console, typeof std, typeof os, ' &
+      'typeof print, typeof load, typeof gc, typeof setTimeout, typeof WebAssembly];',
       nil
     );
     assert.is_true(r.ok);
-    for i = 0 to 5 do assert.equal(r.value[i], 'undefined'); end do;
+    for i = 0 to 9 do assert.equal(r.value[i], 'undefined'); end do;
   });
 
   test('jsbox: JSON input and unicode output', {
