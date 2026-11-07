@@ -14,6 +14,7 @@ use 'fun/lib/lib-jsbox.fun' as jsb;
 use 'fun/lib/fs.fun';
 use 'fun/lib/lib-path.fun';
 use 'fun/lib/env.fun';
+use 'fun/lib/jsonschema.fun';
 
 fun _worker_path()
   var p = env.get('FUN_JSBOX');
@@ -135,6 +136,24 @@ if _have then
     assert.is_true(r.ok);
     assert.equal(r.value[0], 'v=2');
     assert.equal(r.value[1], 1);
+  });
+
+  test('jsbox: JS result can be schema-validated', {
+    var r = jsb.run(
+      'var total = 0;' &
+      'for (var i = 0; i < input.rows.length; i++) total += input.rows[i].amount;' &
+      'return {total: total, count: input.rows.length};',
+      [rows: [[amount: 10], [amount: 20]]]
+    );
+    assert.is_true(r.ok);
+    var schema = '{"type":"object","required":["total","count"],' &
+      '"properties":{"total":{"type":"integer","minimum":0},' &
+      '"count":{"type":"integer","minimum":0}}}';
+    assert.is_true(JsonSchema.valid(r.value, schema));
+
+    var bad = jsb.run('return {total: "oops", count: 1};', nil);
+    assert.is_true(bad.ok);
+    assert.is_false(JsonSchema.valid(bad.value, schema));
   });
 
   test('jsbox: one-shot process isolation', {
