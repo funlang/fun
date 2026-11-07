@@ -201,6 +201,7 @@ This is the MVP, not the final sandbox. Current properties:
 - source only; the worker never accepts bytecode
 - memory, timeout, output, stack, process, and fd limits
 - `RLIMIT_*` backstops
+- PIE with full RELRO, stack protector, and `_FORTIFY_SOURCE=2` on Linux
 
 Not done yet:
 

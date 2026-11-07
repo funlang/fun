@@ -35,9 +35,16 @@ EXTRA_CFLAGS="${EXTRA_CFLAGS:-}"
 
 OS="$(uname -s 2>/dev/null || echo unknown)"
 case "$OS" in
-    Darwin) LDLIBS="-lm -lpthread" ;;
-    *)      LDLIBS="-lm -ldl -lpthread" ;;
+    Darwin)
+        LDLIBS="-lm -lpthread"
+        HARDEN_LDFLAGS=""
+        ;;
+    *)
+        LDLIBS="-lm -ldl -lpthread"
+        HARDEN_LDFLAGS="-Wl,-z,relro -Wl,-z,now"
+        ;;
 esac
+HARDEN_CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
 
 sha256_of() {
     if command -v sha256sum >/dev/null 2>&1; then
@@ -96,7 +103,7 @@ if [ ! -f "$QJS_SRC/quickjs.c" ]; then
 fi
 
 mkdir -p "$OBJ"
-CFLAGS_BASE="-std=gnu11 -O2 -fPIE -D_GNU_SOURCE"
+CFLAGS_BASE="-std=gnu11 -O2 -fPIE -D_GNU_SOURCE $HARDEN_CFLAGS"
 STAMP="$OBJ/.buildflags"
 STAMP_VALUE="$CC|$QJS_SRC|$CFLAGS_BASE|$EXTRA_CFLAGS"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP" 2>/dev/null)" != "$STAMP_VALUE" ]; then
@@ -119,7 +126,7 @@ fi
 
 echo "  link  $OUT"
 mkdir -p "$(dirname "$OUT")"
-$CC -pie -o "$OUT" \
+$CC -pie $HARDEN_LDFLAGS -o "$OUT" \
     "$OBJ/quickjs.o" "$OBJ/libregexp.o" "$OBJ/libunicode.o" "$OBJ/dtoa.o" \
     "$OBJ/jsbox-main.o" $LDLIBS
 chmod +x "$OUT"
