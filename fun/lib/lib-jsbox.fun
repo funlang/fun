@@ -91,7 +91,12 @@ fun _jbError(kind, name, message, retryable)
       stack: '',
       retryable: retryable
     ],
-    usage: new []
+    usage: new [
+      wall_ms: 0,
+      timeout_ms: 0,
+      memory_bytes: 0,
+      output_bytes: 0
+    ]
   ];
 end fun;
 
