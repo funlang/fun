@@ -210,6 +210,7 @@ This is the MVP, not the final sandbox. Current properties:
 - memory, timeout, output, stack, process, and fd limits
 - `RLIMIT_*` backstops
 - PIE with full RELRO, stack protector, and `_FORTIFY_SOURCE=2` on Linux
+- Linux `PR_SET_NO_NEW_PRIVS` / non-dumpable, and inherited fds 3..31 closed
 
 Not done yet:
 

@@ -64,6 +64,7 @@ if _have then
     var r = jsb.run('while (true) {}', nil, [timeout: 100]);
     assert.is_false(r.ok);
     assert.equal(r.error.kind, 'timeout');
+    assert.equal(r.error.line, 0);
   });
 
   test('jsbox: memory limit', {

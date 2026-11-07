@@ -39,6 +39,9 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <unistd.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 #endif
 
 #include "quickjs.h"
@@ -393,6 +396,12 @@ static void capture_exception(JSContext *ctx, int phase, Deadline *dl, Err *e)
     e->stack = stack;
     e->retryable = retryable;
     parse_pos(stack, &e->line, &e->column);
+    if (dl && dl->timed_out) {
+        // The interrupt can fire inside the wrapper or eval frame; a line
+        // number there is misleading. The error kind carries the meaning.
+        e->line = 0;
+        e->column = 0;
+    }
 
     JS_FreeValue(ctx, exc);
 }
@@ -635,6 +644,17 @@ static void apply_rlimits(int64_t memory_bytes, int64_t timeout_ms, int64_t outp
     rl.rlim_cur = rl.rlim_max = 0;
     setrlimit(RLIMIT_NPROC, &rl);
 #endif
+
+#ifdef __linux__
+    // No setuid/setgid escalation and no ptrace/core attachment. The worker
+    // never needs either capability.
+    prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+#endif
+    // Only stdin/stdout/stderr are meaningful. Close anything inherited from
+    // the parent so a compromised engine cannot reuse an open descriptor.
+    for (int fd = 3; fd < 32; fd++)
+        close(fd);
 #else
     (void)memory_bytes;
     (void)timeout_ms;
