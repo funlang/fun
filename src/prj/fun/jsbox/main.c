@@ -803,6 +803,15 @@ int main(void)
         goto done;
     }
 
+    if (JS_IsPromise(ret)) {
+        err_set(&e, "runtime", "TypeError",
+                "return a plain JSON value, not a Promise", 1);
+        JS_FreeValue(ctx, ret);
+        JS_FreeContext(ctx);
+        JS_FreeRuntime(rt);
+        goto done;
+    }
+
     JSValue json = JS_UNDEFINED;
     if (!JS_IsUndefined(ret)) {
         json = JS_JSONStringify(ctx, ret, JS_UNDEFINED, JS_UNDEFINED);

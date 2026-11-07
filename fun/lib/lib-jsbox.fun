@@ -124,6 +124,9 @@ fun run(code, input, opts)
   if not code.type().eq(8) then
     raise 'jsbox: code must be a string';
   end if;
+  // `input` must be acyclic JSON data. Fun's serializer/set construction can
+  // overflow the native stack on nested cyclic collections; data parsed from
+  // JSON is safe, programmatically built cycles are not.
   if code.length() > _JB_MAX_CODE then
     result = _jbError('input_limit', 'RangeError', 'code exceeds the size limit', false);
     return;

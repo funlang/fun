@@ -97,6 +97,11 @@ them. Fun `Int64` values above 2^53 lose precision at the JSON boundary (the
 same caveat as ROADMAP D-04). Pass large identifiers, money in minor units, and
 64-bit hashes as decimal strings if the exact value matters.
 
+`input` must be acyclic JSON data. Fun's set construction and `@toJson` can
+overflow the native stack on nested cyclic collections; data parsed from JSON
+is safe, but programmatically built cycles are not. This is a core Fun
+limitation, not a jsbox protocol issue.
+
 ## Protocol
 
 Request (stdin, one JSON object):

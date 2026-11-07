@@ -189,6 +189,13 @@ if _have then
     assert.equal(u.error.kind, 'runtime');
   });
 
+  test('jsbox: Promise results are rejected', {
+    var r = jsb.run('return Promise.resolve(1)', nil);
+    assert.is_false(r.ok);
+    assert.equal(r.error.kind, 'runtime');
+    assert.contains(r.error.message, 'Promise');
+  });
+
   test('jsbox: thrown non-Error values', {
     var r = jsb.run('throw null', nil);
     assert.is_false(r.ok);
