@@ -91,6 +91,11 @@ Modern JavaScript is available because the engine is QuickJS-ng: `const`, `let`,
 arrow functions, classes, template literals, BigInt, Promise, and so on. Do not
 rely on timers, network, or the filesystem; those bindings do not exist.
 
+`JSON.stringify` semantics apply to the return value. Convert `Map`, `Set`, and
+class instances to plain objects or arrays explicitly; otherwise they serialize
+only their own enumerable properties, often `{}`. Promise results are rejected
+with a runtime error instead of being silently turned into `{}`.
+
 JSON numbers are IEEE-754 doubles. `NaN` and `Infinity` are serialized as
 `null` by `JSON.stringify`; return a string if the caller must distinguish
 them. Fun `Int64` values above 2^53 lose precision at the JSON boundary (the

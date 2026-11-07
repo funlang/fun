@@ -38,10 +38,12 @@ case "$OS" in
     Darwin)
         LDLIBS="-lm -lpthread"
         HARDEN_LDFLAGS=""
+        AS_NEEDED=""
         ;;
     *)
         LDLIBS="-lm -ldl -lpthread"
         HARDEN_LDFLAGS="-Wl,-z,relro -Wl,-z,now"
+        AS_NEEDED="-Wl,--as-needed"
         ;;
 esac
 HARDEN_CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
@@ -126,7 +128,7 @@ fi
 
 echo "  link  $OUT"
 mkdir -p "$(dirname "$OUT")"
-$CC -pie $HARDEN_LDFLAGS -o "$OUT" \
+$CC -pie $HARDEN_LDFLAGS $AS_NEEDED -o "$OUT" \
     "$OBJ/quickjs.o" "$OBJ/libregexp.o" "$OBJ/libunicode.o" "$OBJ/dtoa.o" \
     "$OBJ/jsbox-main.o" $LDLIBS
 chmod +x "$OUT"

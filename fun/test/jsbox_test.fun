@@ -106,6 +106,16 @@ if _have then
     for i = 0 to 9 do assert.equal(r.value[i], 'undefined'); end do;
   });
 
+  test('jsbox: eval and Function stay inside the sandbox', {
+    var r = jsb.run(
+      'return [eval("typeof require"), new Function("return typeof process")()];',
+      nil
+    );
+    assert.is_true(r.ok);
+    assert.equal(r.value[0], 'undefined');
+    assert.equal(r.value[1], 'undefined');
+  });
+
   test('jsbox: JSON input and unicode output', {
     var r = jsb.run('return {s: "你好😀", v: input.v, n: input.n};',
                     [v: '值', n: 7]);
