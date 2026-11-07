@@ -55,6 +55,7 @@
 #define DEFAULT_OUTPUT_BYTES ((int64_t)256 * 1024)
 
 #define HARD_INPUT_BYTES ((int64_t)16 * 1024 * 1024)
+#define HARD_DRAIN_BYTES ((int64_t)64 * 1024 * 1024)
 #define HARD_TIMEOUT_MS ((int64_t)10000)
 #define HARD_MEMORY_BYTES ((int64_t)64 * 1024 * 1024)
 #define HARD_OUTPUT_BYTES ((int64_t)4 * 1024 * 1024)
@@ -438,7 +439,14 @@ static char *read_stdin(size_t *out_len, int *too_large)
             if ((int64_t)cap >= HARD_INPUT_BYTES) {
                 *too_large = 1;
                 char tmp[65536];
-                while (fread(tmp, 1, sizeof(tmp), stdin) > 0) {
+                int64_t drained = 0;
+                size_t n;
+                // Drain a bounded amount so the parent can finish writing and
+                // read the error response, without hanging forever on an
+                // infinite stream such as /dev/zero.
+                while (drained < HARD_DRAIN_BYTES &&
+                       (n = fread(tmp, 1, sizeof(tmp), stdin)) > 0) {
+                    drained += (int64_t)n;
                 }
                 free(p);
                 return NULL;

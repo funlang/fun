@@ -184,6 +184,9 @@ Error response:
 | processes | 0 | 0 | `RLIMIT_NPROC` |
 | open files | 16 | 16 | `RLIMIT_NOFILE` |
 
+Oversized stdin is rejected with `input_limit` after a bounded drain (64 MiB),
+so an infinite stream such as `/dev/zero` cannot hang the worker.
+
 The worker also applies `RLIMIT_CPU`, `RLIMIT_FSIZE`, and disables core dumps.
 These are backstops. The parent `process.run` timeout is the hard kill for
 cases the engine cannot interrupt, such as a catastrophic regexp.

@@ -25,5 +25,13 @@ fi
 
 "$ROOT/src/prj/fun/build-jsbox.sh"
 
+# Oversized stdin must be rejected without draining an infinite stream forever.
+if [ -r /dev/zero ] && command -v timeout >/dev/null 2>&1; then
+    if ! timeout 5 "$ROOT/fun/fun-jsbox" < /dev/zero | grep -q '"kind":"input_limit"'; then
+        echo "run-jsbox-test: infinite stdin did not return input_limit" >&2
+        exit 1
+    fi
+fi
+
 cd "$ROOT"
 exec "$FUNCMD" fun/test/jsbox_test.fun
