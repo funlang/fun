@@ -1,0 +1,17 @@
+self isolated: True
+self source intact: True
+self cycle points at copy: True
+self json marks cycle: True
+nested value: True
+nested source intact: True
+nested cycle points at copy: True
+list cycle copied: True
+list copy isolated: True
+list cycle points at copy: True
+object value: True
+object source intact: True
+object cycle points at copy: True
+shared acyclic copied twice: True
+method clone isolated: True
+method cycle points at clone: True
+done

@@ -6,6 +6,17 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Cyclic Fun collections no longer overflow the native stack when deep-copied
+  by `new [...]` or `a.@clone()`. `CSet.clone` now owns the single cycle check
+  for both sets and objects, using a per-`CEnv` ancestor stack populated by
+  `CSet2.calc`/`@clone`; a cycle is kept inside the copy and shared acyclic
+  references are still copied separately. `@toJson` continues to emit
+  `"(Object)"` at a repeated node. `fun/test/clone-cycle-test.fun` covers
+  self/nested/list/object cycles, `@clone`, and shared references. The
+  clone/new benchmark (`fun/demos/benchmarks/clone-bench.md`) measures about
+  3% overhead versus the previous acyclic path; the first hash-based attempt
+  was about 2x slower and was replaced by the ancestor stack.
+
 - New `fun-jsbox` sandbox worker and `fun/lib/lib-jsbox.fun` bridge for
   machine-written JavaScript. The worker is a separate one-shot process built
   on QuickJS-ng v0.18.0 with no `quickjs-libc`, so scripts get JSON `input` and

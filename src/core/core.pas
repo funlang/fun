@@ -361,6 +361,7 @@ type
     destructor Destroy; override;
     procedure calc(env: CEnv); override;
     function clone(env: CEnv): CExp; override;
+    function cloneShell: CExp; virtual;
     function count: fun.int; override;
     function items: CExps;
     function parse(aexps: CExps): CNode;
@@ -385,15 +386,29 @@ type
   protected
     function fun: CFun;
   public
-    function clone(env: CEnv): CExp; override;
+    function cloneShell: CExp; override;
     procedure pop;
     function push: fun.bool;
+  end;
+
+  // A reference map that does not own its values. Used by @toJson to detect
+  // repeated collection nodes.
+  CRefHash = class(CHash)
+  protected
+    procedure FreeItem(p: fun.ptr); override;
   end;
   
   CEnv = class(CBase)
   public
     lastError: CNode;
     lastNode: CNode;
+    // Ancestor stack for the current clone operation. CSet2.calc saves and
+    // restores cloneBase/cloneDepth so nested `new` expressions do not see the
+    // outer clone's entries. A stack avoids a hash allocation on the hot path.
+    cloneSrc: array of CBase;
+    cloneDst: array of CExp;
+    cloneDepth: fun.int;
+    cloneBase: fun.int;
     {$IfDef FunTraceback}
     // Live dynamic call chain (innermost last) and a snapshot taken the first
     // time the pending error leaves a function frame. `calls` unwinds normally
@@ -1918,12 +1933,58 @@ begin
   end;
 end;
 
-function CSet.clone(env: CEnv): CExp;
+procedure CRefHash.FreeItem(p: fun.ptr);
+begin
+  // The map borrows its values; the caller owns them.
+end;
+
+function CSet.cloneShell: CExp;
 begin
   result := CNew.new(nil);
+end;
+
+function CSet.clone(env: CEnv): CExp;
+var
+  i, idx, n: fun.int;
+begin
+  // Look only at the current clone operation's ancestors. A cycle reference
+  // becomes a non-owning value reference; the clone stays owned by the child
+  // list, so the refcounted destructor can still unwind it.
+  if env.cloneDepth > env.cloneBase then
+  begin
+    for i := env.cloneDepth - 1 downto env.cloneBase do
+      if env.cloneSrc[i] = CBase(self) then
+      begin
+        result := CExp.new(nil);
+        result.assign(CBase(env.cloneDst[i]));
+        exit;
+      end;
+  end;
+
+  result := cloneShell;
   result.FRefCount := 0;
-  if exps <> nil then CSet(result).parse(exps.clone(env))
-                 else CSet(result).parse(CExps.create)
+
+  if env.cloneDepth >= Length(env.cloneSrc) then
+  begin
+    n := Length(env.cloneSrc);
+    if n = 0 then n := 32 else n := n * 2;
+    SetLength(env.cloneSrc, n);
+    SetLength(env.cloneDst, n);
+  end;
+
+  idx := env.cloneDepth;
+  env.cloneSrc[idx] := CBase(self);
+  env.cloneDst[idx] := result;
+  env.cloneDepth := idx + 1;
+
+  try
+    if exps <> nil then CSet(result).parse(exps.clone(env))
+                   else CSet(result).parse(CExps.create);
+  finally
+    // Pop this ancestor before returning. Any inner clone has already restored
+    // its own base/depth.
+    env.cloneDepth := idx;
+  end;
 end;
 
 function CSet.count: fun.int;
@@ -1968,8 +2029,18 @@ begin
 end;
 
 procedure CSet2.calc(env: CEnv);
+var
+  oldBase, oldDepth: fun.int;
 begin
-  assign( CNew( CSet(eset).clone(env) ) );
+  oldBase := env.cloneBase;
+  oldDepth := env.cloneDepth;
+  env.cloneBase := oldDepth;
+  try
+    assign( CNew( CSet(eset).clone(env) ) );
+  finally
+    env.cloneDepth := oldDepth;
+    env.cloneBase := oldBase;
+  end;
 end;
 
 function CSet2.parse(aset: CExp): CNode;
@@ -1979,12 +2050,9 @@ begin
 end;
 
 //==============================================================
-function CObj.clone(env: CEnv): CExp;
+function CObj.cloneShell: CExp;
 begin
   result := CObj.new(parent);
-  result.FRefCount := 0;
-  if exps <> nil then CSet(result).parse(exps.clone(env))
-                 else CSet(result).parse(CExps.create)
 end;
 
 function CObj.fun: CFun;

@@ -163,8 +163,18 @@ begin
 end;
 
 procedure _clone(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  oldBase, oldDepth: fun.int;
 begin
-  setObj(val, CSet(exp.asObj).clone(env), VarObjNew);
+  oldBase := env.cloneBase;
+  oldDepth := env.cloneDepth;
+  env.cloneBase := oldDepth;
+  try
+    setObj(val, CSet(exp.asObj).clone(env), VarObjNew);
+  finally
+    env.cloneDepth := oldDepth;
+    env.cloneBase := oldBase;
+  end;
 end;
 
 //==============================================================
@@ -303,8 +313,8 @@ begin
   ;
 end;
 
-function _asJson(hash: CHash; cs: CSet; lev: fun.int; format: fun.int = 0; json: fun.bool = False; isGbk: fun.bool = false; fd: fun.bool = false; kvd: fun.int = 32): fun.str; overload; forward;
-function _asJson(hash: CHash; e: CExp; lev: fun.int; format: fun.int = 0; json: fun.bool = False; isGbk: fun.bool = false): fun.str; overload;
+function _asJson(hash: CRefHash; cs: CSet; lev: fun.int; format: fun.int = 0; json: fun.bool = False; isGbk: fun.bool = false; fd: fun.bool = false; kvd: fun.int = 32): fun.str; overload; forward;
+function _asJson(hash: CRefHash; e: CExp; lev: fun.int; format: fun.int = 0; json: fun.bool = False; isGbk: fun.bool = false): fun.str; overload;
 begin
   if e.asObj is CSet then
     result := _asJson(hash, CSet(e.asObj), lev, format, json, isGbk)
@@ -337,7 +347,7 @@ begin
   end;
 end;
 
-function _asJson(hash: CHash; cs: CSet; lev: fun.int; format: fun.int = 0; json: fun.bool = False; isGbk: fun.bool = false; fd: fun.bool = false; kvd: fun.int = 32): fun.str; overload;
+function _asJson(hash: CRefHash; cs: CSet; lev: fun.int; format: fun.int = 0; json: fun.bool = False; isGbk: fun.bool = false; fd: fun.bool = false; kvd: fun.int = 32): fun.str; overload;
 
   procedure add(const s: fun.str);
   begin
@@ -434,23 +444,12 @@ begin
   ;
 end;
 
-type
-  CHash = class(base.CHash)
-  protected
-    procedure FreeItem(p: fun.ptr); override;
-  end;
-  
-  procedure CHash.FreeItem(p: fun.ptr);
-  begin
-    // No Action
-  end;
-
 // s.@toJson(format = 0, json = false, isGbk = false, fd = false, kvd = 32)
 procedure _toJson(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
-  hash: CHash;
+  hash: CRefHash;
 begin
-  hash := CHash.Create;
+  hash := CRefHash.Create;
   val^ := _asJson(hash, CSet(exp.asObj), 0, CExps.FindAsVal(exps, 'format', 0, 0), CExps.FindAsVal(exps, 'json', 1, False), CExps.FindAsVal(exps, 'isGbk', 2, False), CExps.FindAsVal(exps, 'fd', 3, False), CExps.FindAsVal(exps, 'kvd', 4, 32));
   hash.Free;
 end;

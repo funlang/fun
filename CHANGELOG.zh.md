@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+- 循环 Fun 集合经 `new [...]` 或 `a.@clone()` 深拷贝时不再栈溢出。
+  `CSet.clone` 现在统一处理 set 和 object 的循环判断，使用 `CSet2.calc` /
+  `@clone` 建立的每 `CEnv` 祖先栈；循环保留在副本内部，共享的无环引用仍按
+  原语义分别复制。`@toJson` 仍在重复节点输出 `"(Object)"`。
+  `fun/test/clone-cycle-test.fun` 覆盖自引用、嵌套、list、object、`@clone`
+  和共享引用。clone/new 基准（`fun/demos/benchmarks/clone-bench.md`）测得
+  约 3% 开销；最初的 hash 方案约慢 2 倍，已改为祖先栈。
+
 - 新增 `fun-jsbox` 沙箱进程与 `fun/lib/lib-jsbox.fun` 桥接，用于运行机写
   JavaScript。worker 是基于 QuickJS-ng v0.18.0 的独立一次性进程，不链接
   `quickjs-libc`，因此脚本只有 JSON `input` 和 JSON 返回值，没有文件、网络、

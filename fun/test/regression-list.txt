@@ -28,6 +28,7 @@ regex-adv.fun	demo/regex-adv.fun	snap
 scope.fun	demo/scope.fun	snap
 set.fun	demo/set.fun	snap
 set-clone.fun	demo/set-clone.fun	snap
+clone-cycle-test.fun	test/clone-cycle-test.fun	snap
 set-named.fun	demo/set-named.fun	snap
 try.fun	demo/try.fun	snap
 type.fun	demo/type.fun	snap
