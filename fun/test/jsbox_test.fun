@@ -115,6 +115,18 @@ if _have then
     assert.equal(r.value.n, 7);
   });
 
+  test('jsbox: modern JavaScript syntax', {
+    var r = jsb.run(
+      'const f = (x) => `v=${x}`;' &
+      'class A { constructor() { this.x = 1; } }' &
+      'return [f(2), new A().x];',
+      nil
+    );
+    assert.is_true(r.ok);
+    assert.equal(r.value[0], 'v=2');
+    assert.equal(r.value[1], 1);
+  });
+
   test('jsbox: one-shot process isolation', {
     var a = jsb.run('Object.prototype.x = 1; globalThis.y = 2; return 1;', nil);
     assert.is_true(a.ok);
@@ -137,6 +149,24 @@ if _have then
     var n = jsb.run('return null', nil);
     assert.is_true(n.ok);
     assert.is_nil(n.value);
+  });
+
+  test('jsbox: falsy JSON inputs are preserved', {
+    var n = jsb.run('return input', nil);
+    assert.is_true(n.ok);
+    assert.is_nil(n.value);
+    var f = jsb.run('return input', false);
+    assert.is_true(f.ok);
+    assert.is_false(f.value);
+    var z = jsb.run('return input', 0);
+    assert.is_true(z.ok);
+    assert.equal(z.value, 0);
+    var s = jsb.run('return input', '');
+    assert.is_true(s.ok);
+    assert.equal(s.value, '');
+    var a = jsb.run('return input', []);
+    assert.is_true(a.ok);
+    assert.equal(a.value.@count(), 0);
   });
 
   test('jsbox: input is a copy', {
