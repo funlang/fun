@@ -100,9 +100,14 @@ var execShow(fn, ps, dir) = exec(fn, ps, dir, 1);
 // execWait
 //==============================================================
 //Function Run(Command As String, [WindowStyle], [WaitOnReturn]) As Long
-var _sh = 'Wscript.Shell'.newobj();
+var _sh = nil;
 
 fun execWait(fn, ps, dir, show, noWait, timeout, pid)
+  // Create WScript.Shell on first use: importing lib-os must not require
+  // WSH to be registered (win64 CI, stripped/Server Core images).
+  if _sh = nil then
+    _sh = 'Wscript.Shell'.newobj();
+  end if;
   if dir <> '' then
     _sh.CurrentDirectory = dir; // must set as a local drive for fast speed !
   else

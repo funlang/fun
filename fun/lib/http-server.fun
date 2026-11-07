@@ -63,12 +63,14 @@
 // Request/response API:
 //   * req.query(k) and req.form() are URL-decoded; req.form() parses
 //     application/x-www-form-urlencoded bodies on demand.
+//   * req.multipart() parses multipart/form-data bodies on demand.
 //   * req.cookies / req.cookie(k) read the Cookie header.
 //   * res.cookie(name, value, opts) / res.clearCookie(name, opts) write
 //     Set-Cookie; res.addHeader(k, v) appends multi-value headers.
 
 use 'lib-winsock.fun';
 use 'lib-regex.fun';
+use 'http-multipart.fun';
 
 var _HTTP_APP = nil;
 
@@ -401,6 +403,7 @@ class HttpReq()
   var headS  = nil;      // set: lowercased header names
   var cookies = nil;     // set: request cookies
   var formS  = nil;      // set: urlencoded form, parsed on demand
+  var multipartS = nil;  // set: multipart/form-data, parsed on demand
 
   fun header(k)
     result = headS[k.lower()];
@@ -423,6 +426,13 @@ class HttpReq()
       end if;
     end if;
     result = formS;
+  end fun;
+
+  fun multipart()
+    if multipartS = nil then
+      multipartS = HttpMultipartParse(body, header('content-type'));
+    end if;
+    result = multipartS;
   end fun;
 
   fun param(k)
