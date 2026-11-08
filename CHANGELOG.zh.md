@@ -4,7 +4,7 @@
 
 **English**: [CHANGELOG.md](CHANGELOG.md) · **简体中文**（本文件）
 
-## [Unreleased]
+## [9.5.5] - 2026-11-08
 
 - 新增 `fun/lib/lib-hmac.fun`（`HmacSha1`、`HmacSha1Hex`）与
   `fun/lib/lib-url.fun`（`PercentEncode`、`UrlEncode`）。HMAC-SHA1 基于解释器

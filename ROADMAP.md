@@ -5,11 +5,11 @@
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
 > 最近更新：2026-11-08
-> 基线：Fun 9.5.4（tag `v9.5.4`）；9.5.5 发版准备中
+> 基线：Fun 9.5.5（tag `v9.5.5`）
 
 ## 0. 当前基线
 
-- **版本**：9.5.4，`src/core/version.inc` 的 `funRelease = '9.5.4'`。
+- **版本**：9.5.5，`src/core/version.inc` 的 `funRelease = '9.5.5'`。
 - **回归**：Linux `131/131`（`sh fun/test/run-linux-regression.sh`）。
 - **可加载性**：`77/83`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
@@ -74,7 +74,7 @@
 
 | ID | 事项 | 状态 | 说明 |
 |---|---|---|---|
-| S-04 | 站点 PHP 用 Fun 重写 | DONE | 站点页面与业务接口已全部迁到 Fun 服务；PHP-FPM 已停用，旧 URL 由 nginx 反代保持。迁移与部署细节见独立部署仓库。 |
+| S-04 | 站点 PHP 用 Fun 重写 | DONE | 站点页面与业务接口已全部迁到 Fun 服务；PHP-FPM 已停用，旧 URL 由 nginx 反代保持。验证时修复了 `match` 未命中判断导致的空 IP 500 与订单号校验问题。迁移与部署细节见独立部署仓库。 |
 | K-04 | 循环集合深拷贝递归溢出 | DONE | `CEnv` clone 祖先栈 + `CSet.clone` 统一 set/object；循环副本保留在自己的克隆内，`@clone` 同样有栈上下文。`fun/test/clone-cycle-test.fun`、`fun/demos/benchmarks/clone-bench.md` 覆盖。 |
 | P-05 | 第二数据库后端：unixODBC | DONE | MySQL/PostgreSQL 等经驱动管理器接入，unixODBC 与 P-11 同一交付。 |
 | P-11 | unixODBC 后端 | DONE | `lib-ado-unx` 按 `odbc:`/`DRIVER=`/`DSN=` 自动分派，参数、事务、OpenSchema（SQLTables/Columns/PrimaryKeys/ForeignKeys）齐全；CI 装 `unixodbc`+`libsqliteodbc` 并跑 `run-ado-odbc.sh`。 |
@@ -170,3 +170,7 @@
   Q-04 并入 X-08。P-10 关闭：Linux aarch64 交叉产物只用于开发验证，正式
   发布用 CI 原生 linux-arm64 构建。回归刷新为 `131/131`，加载检查
   `77/83`。
+- 2026-11-08：发布 9.5.5。新增 `fun-jsbox` 沙箱、JSON Schema v0.x 关键字、
+  unixODBC 后端、HMAC-SHA1/URL 编码、`process.run` 输出上限与 macOS/win64
+  运行时能力；修复循环集合深拷贝栈溢出；站点 PHP 已全部迁到 Fun，并在
+  验证中修复正则未命中判断。

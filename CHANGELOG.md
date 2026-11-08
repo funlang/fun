@@ -4,7 +4,7 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 **English** (this file) · [简体中文](CHANGELOG.zh.md)
 
-## [Unreleased]
+## [9.5.5] - 2026-11-08
 
 - New `fun/lib/lib-hmac.fun` (`HmacSha1`, `HmacSha1Hex`) and
   `fun/lib/lib-url.fun` (`PercentEncode`, `UrlEncode`). HMAC-SHA1 is built on

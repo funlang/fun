@@ -4,7 +4,7 @@ fun package()
     version: '0.1.0',
     bin: '',
     lib: 'src/lib.fun',
-    'fun': '9.5.4',
+    'fun': '9.5.5',
 
     dependencies: [],
 
