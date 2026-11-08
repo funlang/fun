@@ -545,7 +545,7 @@ jobs:
             src\prj\fun\funcmd.exe
             src\prj\fun\funcmd-safe.exe
             src\prj\fun\funcmd.flags.txt
-          key: funcmd-v7-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
+          key: funcmd-v8-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
 
       - name: Restore FPC cache (Windows)
         if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
@@ -968,7 +968,7 @@ jobs:
           # something fpc reads as a path plus a stray 'lib' source file.
           $argv = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs', '-Twin64',
                     '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx',
-                    '-dFunPack',
+                    '-dFunPack', '-dMD5',
                     "-Fu$((Resolve-Path '..\..\lib').Path)")
           # Keep the normal build's .ppu/.o/.obj out of the project directory:
           # the safe build uses units-safe, and stale normal units in the
@@ -1033,7 +1033,7 @@ jobs:
           Remove-Item (Join-Path $units '*.ppu'), (Join-Path $units '*.o'), `
                       (Join-Path $units '*.or') -Force -ErrorAction SilentlyContinue
           $argv = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs', '-Twin64',
-                    '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx', '-dFunPack') + $flags +
+                    '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx', '-dFunPack', '-dMD5') + $flags +
                   @('-dFunSafe', '-ofuncmd-safe.exe', "-FU$units",
                     "-Fu$((Resolve-Path '..\..\lib').Path)")
           Write-Host "safe argv: $(($argv | ForEach-Object { "[$_]" }) -join ' ')"
