@@ -5,16 +5,16 @@
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
 > 最近更新：2026-11-08
-> 基线：Fun 9.5.4（tag `v9.5.4`）
+> 基线：Fun 9.5.4（tag `v9.5.4`）；9.5.5 发版准备中
 
 ## 0. 当前基线
 
 - **版本**：9.5.4，`src/core/version.inc` 的 `funRelease = '9.5.4'`。
-- **回归**：Linux `129/129`（`sh fun/test/run-linux-regression.sh`）。
-- **可加载性**：`75/81`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
+- **回归**：Linux `131/131`（`sh fun/test/run-linux-regression.sh`）。
+- **可加载性**：`77/83`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
-- **标准库**：77 个模块（`fun/lib` 有 79 个基础 `.fun`，内部 `lib-base`/`lib-type`
-  与 `-unx`/`-lnx` 后端单元不计）。
+- **标准库**：83 个候选模块（`fun/lib` 共 111 个 `.fun`，内部 `lib-base`/`lib-type`
+  与 `-unx`/`-lnx` 后端单元不计），本机可加载 77 个。
 - **平台**：Linux x86_64 / arm64、macOS x64 / arm64、Windows x64（FPC）；
   Delphi/Win32 继续人工验证。
 - **CI**：GitHub Actions 的 `regression` 工作流覆盖 6 个构建作业（4 个 POSIX 平台 +
@@ -38,12 +38,11 @@
 
 | ID | 事项 | 状态 | 优先级 | 验收 | 关联 |
 |---|---|---|---|---|---|
-| S-03 | `#!fun` 经 tcc 编译 | OPEN | P2 | 先做数值/字符串/函数/控制流子集，再做模块导入 | `art/notes/todo.md` |
-| S-04 | 站点 PHP 用 Fun 重写 | OPEN | P3 | 去掉 PHP 依赖，保持现有站点行为 | `art/notes/todo.md` |
+| S-03 | `#!fun` 经 tcc 编译 | DEFERRED | P2 | 暂缓，不阻塞 9.5.5；先做数值/字符串/函数/控制流子集，再做模块导入 | `art/notes/todo.md` |
 | S-05 | create-fun-app 脚手架 | OPEN | P3 | Fun 后端 + z-data 前端 + 一体发布 | `art/notes/todo.md` |
 | S-06 | 用 fun-ui 重写 funide | OPEN | P3 | 新 IDE 替代旧 funide | `art/notes/todo.md` |
 | S-07 | funcally AI agent | OPEN | P3 | 基于沙箱、CLI、HTTP 的 agent | `art/notes/todo.md` |
-| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | `io.pipe` 交接给子进程、边跑边读写、进程树终止、Windows Unicode 命令行（`io.pipe`、`process.run` 和 `output` 上限已完成） | `README.zh.md` 的 io 一节 |
+| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | `io.pipe` 交接给子进程、边跑边读写、进程树终止、Windows Unicode 命令行（`io.pipe`、`process.run` 和 `output` 上限已完成）。与 S-02 保持独立：jsbox 走一次性 JSON，不需要流式 stdio | `README.zh.md` 的 io 一节 |
 
 ## 4. 技术债台账
 
@@ -52,7 +51,6 @@
 | K-01 | 内核 | P3 | OPEN | H-09 `_eval` 的 `$@@` 整体重扫 | 本地 hazards 清单 |
 | K-02 | 内核 | P2 | OPEN | H-05 `div/mod 0` 仍抛 RTL `EDivByZero`，脚本可捕获，按兼容保留 | 本地 hazards 清单 |
 | K-03 | 内核 | P2 | OPEN | H-06 Delphi/32 位与 Int64 极值边界未复测 | 本地 hazards 清单 |
-| K-04 | 内核 | P2 | DONE | 嵌套循环集合在 `@toJson` 或 `new [input: a]` 中递归溢出栈。已在 `CEnv` 加 clone 祖先栈，`CSet.clone` 统一处理 set/object，循环副本保留在自己的克隆内；`@clone` 也建立同样的栈上下文。 | `fun/test/clone-cycle-test.fun`、`fun/demos/benchmarks/clone-bench.md` |
 | D-02 | 数据 | P2 | OPEN | FD fixed-length binary 类型跨端会退化成文本 | `art/notes/data-format-alignment.md` |
 | D-03 | 数据 | P2 | OPEN | 日期/时间跨端约定未统一 | `art/notes/data-format-alignment.md` |
 | D-04 | 数据 | P2 | OPEN | Fun `Int64` 超过 2^53 传给 JS 会静默丢精度 | `art/notes/data-format-alignment.md` |
@@ -61,22 +59,32 @@
 | P-02 | 平台 | P2 | OPEN | `lib-os` 全量 host 分派器未做 | `art/notes/library-port-plan.md` |
 | P-03 | 平台 | P2 | OPEN | `lib-message`/`lib-async`/`lib-jsasync` 仍依赖消息泵或线程 | `art/notes/linux-capabilities.md` |
 | P-04 | 平台 | P3 | OPEN | `lib-icmp` raw socket 未做，需 root/CAP_NET_RAW | `art/notes/linux-capabilities.md` |
-| P-05 | 平台 | P3 | DONE | 第二数据库后端：unixODBC（P-11）已接，MySQL/PostgreSQL 等经驱动管理器接入 | `art/notes/linux-capabilities.md` |
 | P-06 | 平台 | P3 | OPEN | `lib-os` B 档（GetIPs/inotify 等）未做 | `art/notes/linux-capabilities.md` |
 | P-07 | 机器码 | P2 | OPEN | `asm-list` 的 x86-64 表覆盖不全 | `art/notes/arch-machine-code-plan.md` |
-| P-08 | macOS | P2 | OPEN | x64/arm64 的 `libtcc.dylib` 已接（arm64 用 ucontext + MAP_JIT 补丁，待 CI/真机复验）；arm64 真机验证、签名/公证未做 | `art/notes/macos-port.md` |
+| P-08 | macOS | P2 | OPEN | 真机复验（x64/arm64 回归）与分发收尾：`codesign`/公证、Apple TCC 隐私授权（Desktop/Documents/Downloads，原 P-12 并入）；构建与运行时接入见已完成 P-14 | `art/notes/macos-port.md` |
 | P-09 | 架构 | P3 | OPEN | LoongArch 工具链与编码器未做 | `art/notes/arch-machine-code-plan.md` |
-| P-10 | 架构 | P3 | OPEN | Linux aarch64 交叉产物仍缺 `-dRegex` 与 `-dLinuxFFI` | `README.zh.md` |
-| P-11 | 平台/数据库 | P3 | DONE | unixODBC 第二数据库后端已接：`lib-ado-unx` 按 `odbc:`/`DRIVER=`/`DSN=` 自动分派，参数、事务、OpenSchema（SQLTables/Columns/PrimaryKeys/ForeignKeys）齐全；CI 装 `unixodbc`+`libsqliteodbc` 并跑 `run-ado-odbc.sh` | `art/notes/linux-capabilities.md` |
-| P-12 | macOS | P2 | OPEN | Apple TCC（隐私权限）未处理：访问 Desktop/Documents/Downloads 会触发系统授权，签名/公证见 P-08；安装脚本只能清 quarantine，不能预授权 | `art/notes/macos-port.md` |
 | P-13 | Windows/ARM | P3 | OPEN | win-arm64 无构建：FPC 3.2.2 没有 win64/aarch64 target，`regression.yml` 的 windows-arm64 job 仍禁用，需更新 FPC 或交叉工具链 | `.github/workflows/regression.yml` |
-| Q-01 | 质量 | P2 | DONE | `lib-ado-schema.Filter` 丢外键 | `art/notes/linux-capabilities.md` |
-| Q-02 | 质量 | P2 | DONE | `lib-fd`/`lib-bnf` 仍有已知功能项（重名组已修） | `art/notes/port-decisions.md` |
-| Q-03 | 质量 | P3 | DONE | Windows `make-*.bat` 仍写 `-dRegexx` 拼写，实际不启用 regex | `src/prj/fun/make-win64.bat` |
-| Q-04 | 质量 | P3 | DEFERRED | `str.sha256()` 没有 Linux 内置 Pascal 实现，纯回退正确但慢；正常路径不会回退，见 X-08 | `art/notes/port-decisions.md` |
-| Q-05 | 质量 | P2 | DONE | safe 模式只接在 Linux 构建脚本，macOS/Windows 未接同一组宏 | `SAFETY.zh.md` |
 
-## 5. 接受 / 不做
+## 5. 接受 / 不做 / 已完成
+
+> 终态归档：DONE 表示已交付；WONTFIX / DEFERRED 表示明确不做或暂不做。
+> 开放中的事项只保留在第 1-4 节。
+
+### 5.1 已完成 (DONE)
+
+| ID | 事项 | 状态 | 说明 |
+|---|---|---|---|
+| S-04 | 站点 PHP 用 Fun 重写 | DONE | 站点页面与业务接口已全部迁到 Fun 服务；PHP-FPM 已停用，旧 URL 由 nginx 反代保持。迁移与部署细节见独立部署仓库。 |
+| K-04 | 循环集合深拷贝递归溢出 | DONE | `CEnv` clone 祖先栈 + `CSet.clone` 统一 set/object；循环副本保留在自己的克隆内，`@clone` 同样有栈上下文。`fun/test/clone-cycle-test.fun`、`fun/demos/benchmarks/clone-bench.md` 覆盖。 |
+| P-05 | 第二数据库后端：unixODBC | DONE | MySQL/PostgreSQL 等经驱动管理器接入，unixODBC 与 P-11 同一交付。 |
+| P-11 | unixODBC 后端 | DONE | `lib-ado-unx` 按 `odbc:`/`DRIVER=`/`DSN=` 自动分派，参数、事务、OpenSchema（SQLTables/Columns/PrimaryKeys/ForeignKeys）齐全；CI 装 `unixodbc`+`libsqliteodbc` 并跑 `run-ado-odbc.sh`。 |
+| P-14 | macOS 构建与运行时接入 | DONE | x64/arm64 引擎与 Fun 层可交叉构建；`lib-proc-darwin`、`MAP_JIT`、`libtcc.dylib` 接入与 arm64 ad-hoc 签名已完成，CI 有原生 macOS 回归。剩余真机复验与正式签名/公证并入 P-08。 |
+| Q-01 | `lib-ado-schema.Filter` 丢外键 | DONE | ORM `@Parent`/`@Children` 直接走 OpenSchema，Windows/Unix 均恢复外键。 |
+| Q-02 | `lib-fd`/`lib-bnf` 已知功能项 | DONE | 重名组问题已修，其余功能项已关闭。 |
+| Q-03 | Windows `make-*.bat` 的 `-dRegexx` | DONE | 改为 `-dRegex -dPCRE_WinDLL`，有 pcre3.dll 时真正启用 regex。 |
+| Q-05 | safe 模式只接 Linux 构建脚本 | DONE | `SAFE=...` 已覆盖 Linux aarch64、原生 macOS、darwin 交叉与 win64。 |
+
+### 5.2 接受 / 不做 (WONTFIX / DEFERRED)
 
 | ID | 事项 | 状态 | 说明 |
 |---|---|---|---|
@@ -87,7 +95,8 @@
 | X-05 | writer 15 位浮点输出 | WONTFIX | 可读性优先，接受细小往返差异 |
 | X-06 | 重复键 last-wins、孤立 surrogate 不额外拒绝 | WONTFIX | 与 RFC 8259 / JSON.parse 行为一致 |
 | X-07 | `compile(inline: true)` 是词法内联 | WONTFIX | 返回模块的 parent 是调用方，`m.x` 可读写调用方状态；需要隔离时用非 inline `compile()` 或传入状态容器。不要长期持有或返回 inline 模块。 |
-| X-08 | `str.sha256()` 的 Pascal 内置实现 | DEFERRED | 正常构建走 libcrypto（Linux）/CryptoAPI（Windows）/CommonCrypto（macOS），不会回退；只有缺 libcrypto 或 safe 构建（getapi 被拦）才走纯 Fun。纯实现已用多块向量验证正确，只是约 12 ms/KB；需要时再仿 `funhash.pas` 补内置。 |
+| X-08 | `str.sha256()` 的 Pascal 内置实现（原 Q-04 并入） | DEFERRED | 正常构建走 libcrypto（Linux）/CryptoAPI（Windows）/CommonCrypto（macOS），不会回退；只有缺 libcrypto 或 safe 构建（getapi 被拦）才走纯 Fun。纯实现已用多块向量验证正确，只是约 12 ms/KB；需要时再仿 `funhash.pas` 补内置。 |
+| P-10 | Linux aarch64 交叉产物补齐 `-dRegex`/`-dLinuxFFI` | WONTFIX | 交叉产物只是开发者在 x86_64 上验证核心解释器的工具；正式发布用 CI 原生 `linux-arm64` 构建，regex 与 FFI 都齐全，无需补齐。 |
 
 ## 6. 发版检查
 
@@ -153,3 +162,11 @@
   linux-webkitgtk、macos-wkwebview 全部通过。S-09 仍 OPEN：`io.pipe`、
   `process.run` 与输出上限已就绪，但把管道交给子进程并边跑边读写、进程树
   终止、Windows Unicode 命令行尚未实现。
+- 2026-11-08：9.5.5 发版准备。S-04 站点 PHP -> Fun 迁移完成并归档；
+  S-03 标记 DEFERRED；S-09 不并入 S-02（jsbox 是一次性 JSON，不依赖流式
+  stdio），继续独立跟踪。技术债台账的 DONE 项统一移到第 5 节
+  “接受 / 不做 / 已完成”，台账只留开放项；macOS 已完成的构建/运行时接入
+  记为 P-14，剩余真机复验、签名/公证与 TCC 合并为 P-08（原 P-12 并入）；
+  Q-04 并入 X-08。P-10 关闭：Linux aarch64 交叉产物只用于开发验证，正式
+  发布用 CI 原生 linux-arm64 构建。回归刷新为 `131/131`，加载检查
+  `77/83`。
