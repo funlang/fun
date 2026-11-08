@@ -6,6 +6,14 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- New `fun/lib/lib-hmac.fun` (`HmacSha1`, `HmacSha1Hex`) and
+  `fun/lib/lib-url.fun` (`PercentEncode`, `UrlEncode`). HMAC-SHA1 is built on
+  the interpreter's `str.sha1()` and the raw-digest conversion in `lib-utils`,
+  so it needs no native crypto library; `PercentEncode` follows RFC 3986's
+  unreserved set while `UrlEncode` reproduces PHP's `urlencode` (`+` for space,
+  `~` escaped). Covered by `fun/test/lib-hmac-test.fun` (RFC 2202 vectors) and
+  `fun/test/lib-url-test.fun`.
+
 - Cyclic Fun collections no longer overflow the native stack when deep-copied
   by `new [...]` or `a.@clone()`. `CSet.clone` now owns the single cycle check
   for both sets and objects, using a per-`CEnv` ancestor stack populated by

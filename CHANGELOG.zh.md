@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+- 新增 `fun/lib/lib-hmac.fun`（`HmacSha1`、`HmacSha1Hex`）与
+  `fun/lib/lib-url.fun`（`PercentEncode`、`UrlEncode`）。HMAC-SHA1 基于解释器
+  内置的 `str.sha1()` 与 `lib-utils` 的原始摘要转换实现，不依赖本机加密库；
+  `PercentEncode` 按 RFC 3986 的 unreserved 字符集编码，`UrlEncode` 复现
+  PHP `urlencode` 的行为（空格转 `+`，`~` 转义）。分别由
+  `fun/test/lib-hmac-test.fun`（RFC 2202 测试向量）与
+  `fun/test/lib-url-test.fun` 覆盖。
+
 - 循环 Fun 集合经 `new [...]` 或 `a.@clone()` 深拷贝时不再栈溢出。
   `CSet.clone` 现在统一处理 set 和 object 的循环判断，使用 `CSet2.calc` /
   `@clone` 建立的每 `CEnv` 祖先栈；循环保留在副本内部，共享的无环引用仍按

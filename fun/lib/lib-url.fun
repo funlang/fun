@@ -13,9 +13,11 @@
 //     PercentEncode('a b*~');   // a%20b%2A~
 //     UrlEncode('a b~');        // a+b%7E
 
-var _hex = '0123456789ABCDEF';
+// Module globals are shared across `use`d files, so keep this name specific:
+// uuid.fun also defines a module-level hex table.
+var _urlHex = '0123456789ABCDEF';
 
-fun _pct(s, spacePlus, tildeSafe)
+fun _urlPct(s, spacePlus, tildeSafe)
   result = '';
   for i = 0 to s.length() - 1 do
     var b = s.toByte(i);
@@ -28,15 +30,15 @@ fun _pct(s, spacePlus, tildeSafe)
     elsif b = 0x20 and spacePlus then
       result &= '+';
     else
-      result &= '%' & _hex[b >> 4] & _hex[b bit and 0x0f];
+      result &= '%' & _urlHex[b >> 4] & _urlHex[b bit and 0x0f];
     end if;
   end do;
 end fun;
 
 fun PercentEncode(s)
-  result = _pct(s, false, true);
+  result = _urlPct(s, false, true);
 end fun;
 
 fun UrlEncode(s)
-  result = _pct(s, true, false);
+  result = _urlPct(s, true, false);
 end fun;

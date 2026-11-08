@@ -31,6 +31,7 @@ LOAD  lib-dyns
 LOAD  lib-eval
 LOAD  lib-fd
 LOAD  lib-file
+LOAD  lib-hmac
 LOAD  lib-host
 FAIL  lib-icmp               fun/lib/lib-icmp.fun:7: getapi: cannot load library "icmp.dl
 LOAD  lib-jit
@@ -67,6 +68,7 @@ LOAD  lib-type
 LOAD  lib-ui-base
 LOAD  lib-ui
 LOAD  lib-unicode
+LOAD  lib-url
 LOAD  lib-utils
 LOAD  lib-winapi
 LOAD  lib-winole
@@ -80,4 +82,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=75 failed=6
+loaded=77 failed=6

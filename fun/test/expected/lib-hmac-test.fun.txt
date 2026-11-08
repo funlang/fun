@@ -1,0 +1,10 @@
+PASS short key, text data
+PASS text key
+PASS high-bit key and data
+PASS 25-byte key
+PASS truncation vector
+PASS long key hashed to a block
+PASS long key and multi-block data
+PASS raw digest length
+PASS raw and hex agree
+PASS empty key and message

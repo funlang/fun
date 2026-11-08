@@ -62,6 +62,8 @@ builtin-dispatch.fun	test/builtin-dispatch.fun	snap
 ptr-primitives.fun	test/ptr-primitives.fun	snap
 lib-func-check.fun	test/lib-func-check.fun	snap
 lib-hash-test.fun	test/lib-hash-test.fun	snap
+lib-hmac-test.fun	test/lib-hmac-test.fun	snap
+lib-url-test.fun	test/lib-url-test.fun	snap
 lib-http-test.fun	test/lib-http-test.fun	snap
 lib-http-bearer-test.fun	test/lib-http-bearer-test.fun	snap
 lib-http-cors-test.fun	test/lib-http-cors-test.fun	snap

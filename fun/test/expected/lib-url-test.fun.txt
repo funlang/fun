@@ -1,0 +1,16 @@
+PASS empty string
+PASS unreserved set
+PASS space is %20
+PASS tilde stays literal
+PASS reserved set
+PASS sub-delims and parens
+PASS UTF-8 text
+PASS url: empty string
+PASS url: tilde is escaped
+PASS url: space is +
+PASS url: reserved set
+PASS url: UTF-8 text
+PASS two-byte UTF-8
+PASS high-bit byte
+PASS hex table independent of uuid
+PASS uuid still loads after lib-url
