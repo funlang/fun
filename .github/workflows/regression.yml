@@ -1064,14 +1064,33 @@ jobs:
           # this runner; it avoids depending on the VS installation layout.
           $bash = (Get-Command bash -ErrorAction SilentlyContinue).Source
           if (-not $bash) { throw "no bash to run build-jsbox.sh" }
+          function Test-CC([string]$exe) {
+            if (-not (Test-Path $exe)) { return $false }
+            $o = Join-Path $env:RUNNER_TEMP 'jsbox-cctest.o'
+            Remove-Item -Force $o -ErrorAction SilentlyContinue
+            "#include <stdio.h>`n#include <windows.h>`nint main(void){return 0;}" |
+              & $exe -c -x c - -o $o 2>&1 | Out-Null
+            return (($LASTEXITCODE -eq 0) -and (Test-Path $o))
+          }
           $cands = @()
-          $onpath = Get-Command gcc -ErrorAction SilentlyContinue
-          if ($onpath) { $cands += $onpath.Source }
-          $cands += 'C:\mingw64\bin\gcc.exe'
-          $cands += 'C:\tools\mingw64\bin\gcc.exe'
+          foreach ($n in @('x86_64-w64-mingw32-gcc', 'gcc')) {
+            $c = Get-Command $n -ErrorAction SilentlyContinue
+            if ($c) { $cands += $c.Source }
+          }
+          $cands += 'C:\msys64\mingw64\bin\x86_64-w64-mingw32-gcc.exe'
           $cands += 'C:\msys64\mingw64\bin\gcc.exe'
-          $gcc = $cands | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $gcc) { throw "no MinGW gcc found" }
+          $cands += 'C:\mingw64\bin\x86_64-w64-mingw32-gcc.exe'
+          $cands += 'C:\mingw64\bin\gcc.exe'
+          $cands += 'C:\tools\mingw64\bin\x86_64-w64-mingw32-gcc.exe'
+          $cands += 'C:\tools\mingw64\bin\gcc.exe'
+          $gcc = $null
+          foreach ($c in ($cands | Select-Object -Unique)) {
+            if (Test-CC $c) { $gcc = $c; break }
+          }
+          if (-not $gcc) {
+            Write-Host "::error title=jsbox build (windows-x64)::no MinGW gcc with windows.h found; tried: $($cands -join ', ')"
+            exit 1
+          }
           # Git Bash wants a POSIX-looking path; forward slashes work too.
           $env:CC = $gcc.Replace('\', '/')
           Write-Host "gcc: $gcc target=$(& $gcc -dumpmachine)"
