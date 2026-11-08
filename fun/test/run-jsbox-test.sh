@@ -25,6 +25,22 @@ fi
 
 "$ROOT/src/prj/fun/build-jsbox.sh"
 
+# On Linux the worker must install its seccomp allowlist by default, and a
+# forbidden syscall must kill it. --selftest-seccomp performs openat after the
+# filter is active; 159 is 128+SIGSYS.
+if [ "$(uname -s 2>/dev/null)" = "Linux" ]; then
+    set +e
+    "$ROOT/fun/fun-jsbox" --selftest-seccomp >/dev/null 2>&1
+    SECCOMP_RC=$?
+    set -e
+    if [ "$SECCOMP_RC" -ne 159 ]; then
+        echo "run-jsbox-test: seccomp self-test failed (exit $SECCOMP_RC, expected 159)" >&2
+        exit 1
+    fi
+    FUN_JSBOX_EXPECT_SECCOMP=1
+    export FUN_JSBOX_EXPECT_SECCOMP
+fi
+
 # Oversized stdin must be rejected without draining an infinite stream forever.
 if [ -r /dev/zero ] && command -v timeout >/dev/null 2>&1; then
     if ! timeout 5 "$ROOT/fun/fun-jsbox" < /dev/zero | grep -q '"kind":"input_limit"'; then

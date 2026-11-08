@@ -152,6 +152,7 @@ Error response:
   "protocol": 1,
   "engine": "quickjs-ng",
   "engine_version": "0.18.0",
+  "sandbox": {"seccomp": true},
   "ok": false,
   "value": null,
   "error": {
@@ -168,7 +169,7 @@ Error response:
 ```
 
 `kind` is one of `syntax`, `runtime`, `timeout`, `oom`, `output_limit`,
-`input_limit`, `worker`, `protocol`, `internal`.
+`input_limit`, `worker`, `protocol`, `sandbox`, `internal`.
 
 ## Limits
 
@@ -182,6 +183,7 @@ Error response:
 | stack | memory/2 | 2 MiB | `JS_SetMaxStackSize` |
 | processes | 0 | 0 | `RLIMIT_NPROC` |
 | open files | 16 | 16 | `RLIMIT_NOFILE` |
+| syscalls | allowlist | allowlist | Linux seccomp-bpf, denied call kills the worker |
 
 Oversized stdin is rejected with `input_limit` after a bounded drain (64 MiB),
 so an infinite stream such as `/dev/zero` cannot hang the worker.
@@ -210,10 +212,32 @@ This is the MVP, not the final sandbox. Current properties:
 - `RLIMIT_*` backstops
 - PIE with full RELRO, stack protector, and `_FORTIFY_SOURCE=2` on Linux
 - Linux `PR_SET_NO_NEW_PRIVS` / non-dumpable, and inherited fds 3..31 closed
+- Linux seccomp-bpf allowlist installed before the script is evaluated
+
+### Linux seccomp
+
+On Linux x86-64 and arm64 the worker installs a seccomp-bpf allowlist after
+runtime setup and before `eval`. The filter permits only what the engine needs
+to finish: memory management (`brk`, `mmap`, `mprotect`, `munmap`, `mremap`,
+`madvise`), stdout/stderr (`write`, `writev`), basic stdio and signal
+housekeeping, `clock_gettime`/`gettimeofday`, `futex`, and `exit_group`.
+Everything else returns `SECCOMP_RET_KILL_PROCESS`, so a compromised engine
+cannot open a file, create a socket, or spawn a process even if it gains
+native code execution.
+
+The response reports `sandbox.seccomp`. If the filter cannot be installed the
+worker fails closed with `kind: "sandbox"`. For debugging only, pass
+`--no-seccomp` or set `FUN_JSBOX_SECCOMP=0`; never do that for untrusted code.
+
+Verify the filter enforces a denial:
+
+```sh
+fun/fun-jsbox --selftest-seccomp
+# killed by SIGSYS; shell exit status 159 (128 + SIGSYS)
+```
 
 Not done yet:
 
-- seccomp-bpf allowlist
 - `unshare`/bubblewrap/nsjail network and mount isolation
 - Windows Job Object limits and macOS sandbox profile
 - an output cap inside `process.run` (the worker caps itself, but a compromised
@@ -221,8 +245,9 @@ Not done yet:
 - bytecode cache (only useful for reviewed, trusted scripts; never for
   machine-written code)
 
-For adversarial input, add the process hardening before trusting the result as
-a security boundary.
+The Linux seccomp layer is a strong local boundary, but this is not yet a
+multi-tenant isolation boundary until namespace/mount isolation and the
+Windows/macOS platform limits land.
 
 ## Tests
 
@@ -234,4 +259,5 @@ This builds the worker and runs `fun/test/jsbox_test.fun`, covering the happy
 path, syntax/runtime errors, timeout, OOM, output limit, determinism, absent
 host APIs, Unicode, one-shot process isolation, falsy JSON results, input
 copying, non-JSON results, thrown non-Error values, seeds, and invalid option
-types.
+types. On Linux the runner also executes `--selftest-seccomp` and requires the
+forbidden `openat` call to kill the worker with `SIGSYS`.

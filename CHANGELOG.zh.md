@@ -21,8 +21,11 @@
   栈和输出，QuickJS 固定 `Math.random` 种子与 `Date.now`。错误带稳定的
   `kind` / `line` / `column` 字段。`src/prj/fun/build-jsbox.sh` 按需下载并
   SHA256 校验引擎；`fun/test/run-jsbox-test.sh` 覆盖语法/运行时错误、超时、
-  OOM、输出上限、进程隔离、现代语法、Unicode 和选项处理。seccomp/bubblewrap
-  隔离与 Windows/macOS worker 限制尚未实现。
+  OOM、输出上限、进程隔离、现代语法、Unicode 和选项处理。Linux x86-64/arm64
+  上 worker 在求值前安装 seccomp-bpf 白名单，越权系统调用会以 `SIGSYS`
+  终止，响应中报告 `sandbox.seccomp`；`--selftest-seccomp` 验证拒绝行为，
+  安装失败则拒绝运行。bubblewrap/nsjail 隔离与 Windows/macOS worker 限制
+  尚未实现。
 
 - `jsonschema` 补齐 v0.x 关键字。`checkJson` / `checkFd`（以及布尔快捷
   `validJson` / `validFd`）先解析文本再校验；JSON 标量根保留原类型，非法

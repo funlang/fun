@@ -4,7 +4,7 @@
 > 本文只维护当前基线、优先级、技术债和发版门槛。
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
-> 最近更新：2026-11-07
+> 最近更新：2026-11-08
 > 基线：Fun 9.5.4（tag `v9.5.4`）
 
 ## 0. 当前基线
@@ -24,13 +24,15 @@
 
 ## 1. 正在进行 (NOW)
 
-当前没有进行中的代码任务。下一项从 NEXT 选择，选定后在同一个提交里把它移到这里。
+| ID | 事项 | 状态 | 优先级 | 验收 | 关联 |
+|---|---|---|---|---|---|
+| S-02 | jsbox 沙箱运行器 | DOING | P1 | 沙箱边界只由 `fun-jsbox` 承担，不以 fun `-safe` 代替。Linux seccomp-bpf 白名单已完成并默认启用；剩余 bubblewrap/nsjail 网络与挂载隔离、Windows Job Object、macOS sandbox profile，以及 `process.run` 输出上限 | `src/prj/fun/jsbox/README.md` |
 
 ## 2. 下一步 (NEXT)
 
 | ID | 事项 | 状态 | 优先级 | 验收 | 关联 |
 |---|---|---|---|---|---|
-| S-02 | 沙箱运行器 | OPEN | P1 | 用 `-safe` 子进程 + 超时/内存/输出上限跑 AI 生成脚本 | `art/notes/todo.md` |
+| （空） | | | | | |
 
 ## 3. 以后 (LATER)
 
@@ -136,3 +138,10 @@
   `additionalItems`、`patternProperties`、`propertyNames`、`format`。
   JSON schema 文本改为严格解析，非法数据返回 `parse` 错误；回归
   `127/127` 不变，schema 用例从 45 条扩到 115 条断言。
+- 2026-11-08：S-02 明确以 `fun-jsbox` 为唯一沙箱边界，不以 fun `-safe`
+  代替。Linux x86-64/arm64 的 worker 在求值前安装 seccomp-bpf 白名单，
+  越权系统调用以 `SIGSYS` 终止；响应新增 `sandbox.seccomp`，
+  `--selftest-seccomp` 验证 `openat` 被拒绝（退出 159），过滤安装失败
+  时拒绝运行。`run-jsbox-test.sh` 增加该自检，`jsbox_test.fun` 增加沙箱
+  模式断言（25/25）。剩余：bubblewrap/nsjail、Windows Job Object、
+  macOS sandbox profile、`process.run` 输出上限。

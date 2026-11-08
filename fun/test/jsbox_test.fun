@@ -42,6 +42,17 @@ if _have then
     assert.is_true(r.usage.wall_ms >= 0);
   });
 
+  test('jsbox: reports the sandbox mode', {
+    var r = jsb.run('return 1', nil);
+    assert.is_true(r.ok);
+    assert.not_nil(r.sandbox);
+    assert.not_nil(r.sandbox.seccomp);
+    var expect = env.get('FUN_JSBOX_EXPECT_SECCOMP');
+    if not expect.eq(nil) and expect.eq('1') then
+      assert.is_true(r.sandbox.seccomp);
+    end if;
+  });
+
   test('jsbox: syntax error has line and column', {
     var r = jsb.run('var = ;', nil);
     assert.is_false(r.ok);

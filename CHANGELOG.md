@@ -27,8 +27,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
   stable `kind` / `line` / `column` fields. `src/prj/fun/build-jsbox.sh`
   fetches and SHA256-verifies the pinned engine; `fun/test/run-jsbox-test.sh`
   covers syntax/runtime errors, timeout, OOM, output limit, isolation, modern
-  syntax, Unicode, and option handling. seccomp/bubblewrap isolation and
-  Windows/macOS worker limits are still pending.
+  syntax, Unicode, and option handling. On Linux x86-64/arm64 the worker
+  installs a seccomp-bpf allowlist before evaluation; denied syscalls kill it
+  with `SIGSYS`, and the response reports `sandbox.seccomp`.
+  `--selftest-seccomp` proves the denial, and installation failure fails
+  closed. bubblewrap/nsjail isolation and Windows/macOS worker limits are
+  still pending.
 
 - `jsonschema` gains the v0.x keyword set. `checkJson` / `checkFd` (and the
   `validJson` / `validFd` shortcuts) parse text before validating; scalar JSON

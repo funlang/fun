@@ -27,6 +27,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <stddef.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -36,11 +37,17 @@
 #include <time.h>
 
 #ifndef _WIN32
+#include <signal.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <unistd.h>
 #ifdef __linux__
+#include <fcntl.h>
+#include <linux/audit.h>
+#include <linux/filter.h>
+#include <linux/seccomp.h>
 #include <sys/prctl.h>
+#include <sys/syscall.h>
 #endif
 #endif
 
@@ -65,6 +72,10 @@
 
 #define HOST_MEMORY_BYTES ((size_t)64 * 1024 * 1024)
 #define HOST_STACK_BYTES ((size_t)2 * 1024 * 1024)
+
+#ifndef SECCOMP_RET_KILL_PROCESS
+#define SECCOMP_RET_KILL_PROCESS SECCOMP_RET_KILL
+#endif
 
 typedef struct {
     char *data;
@@ -98,6 +109,8 @@ typedef struct {
     uint32_t seed;
     int64_t now_ms;
 } Request;
+
+static int g_seccomp_on = 0;
 
 static int64_t now_ms(void)
 {
@@ -662,6 +675,120 @@ static void apply_rlimits(int64_t memory_bytes, int64_t timeout_ms, int64_t outp
 #endif
 }
 
+#if defined(__linux__) && (defined(__x86_64__) || defined(__aarch64__))
+
+#if defined(__x86_64__)
+#define JSBOX_SECCOMP_ARCH AUDIT_ARCH_X86_64
+#elif defined(__aarch64__)
+#define JSBOX_SECCOMP_ARCH AUDIT_ARCH_AARCH64
+#endif
+
+// Allow one syscall number. Two instructions: if nr matches, fall through to
+// SECCOMP_RET_ALLOW; otherwise skip the allow and continue down the list.
+#define JSBOX_ALLOW(nr)                                                    \
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, (nr), 0, 1),                       \
+    BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW)
+
+/*
+ * The filter is the security boundary around the JavaScript engine. It is an
+ * allowlist: anything not listed here kills the worker. File, network,
+ * process, and module syscalls are deliberately absent, so even an engine
+ * escape cannot open a path, create a socket, or spawn a process.
+ *
+ * Only syscalls reachable after the filter is installed are listed. QuickJS
+ * setup (runtime/context creation) happens before installation. The runtime
+ * needs memory management, stdio writes, time, signals, and exit.
+ */
+static struct sock_filter jsbox_filter[] = {
+    BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, arch)),
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, JSBOX_SECCOMP_ARCH, 1, 0),
+    BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+
+    BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
+#ifdef __x86_64__
+    // Reject the x32 ABI, whose syscall numbers carry this bit.
+    BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0x40000000U, 0, 1),
+    BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+#endif
+
+    // Memory management (malloc/GC).
+    JSBOX_ALLOW(SYS_brk),
+    JSBOX_ALLOW(SYS_mmap),
+    JSBOX_ALLOW(SYS_mprotect),
+    JSBOX_ALLOW(SYS_munmap),
+    JSBOX_ALLOW(SYS_mremap),
+    JSBOX_ALLOW(SYS_madvise),
+
+    // Result channel and diagnostics. stdin is fully drained before this
+    // filter is installed; read remains for stdio edge cases.
+    JSBOX_ALLOW(SYS_read),
+    JSBOX_ALLOW(SYS_write),
+    JSBOX_ALLOW(SYS_writev),
+    JSBOX_ALLOW(SYS_close),
+    JSBOX_ALLOW(SYS_lseek),
+    JSBOX_ALLOW(SYS_fstat),
+    JSBOX_ALLOW(SYS_newfstatat),
+#ifdef SYS_statx
+    JSBOX_ALLOW(SYS_statx),
+#endif
+
+    // Signals. A denied syscall is killed with SIGSYS; these remain for libc
+    // and normal teardown paths.
+    JSBOX_ALLOW(SYS_rt_sigaction),
+    JSBOX_ALLOW(SYS_rt_sigprocmask),
+    JSBOX_ALLOW(SYS_rt_sigreturn),
+    JSBOX_ALLOW(SYS_tgkill),
+    JSBOX_ALLOW(SYS_getpid),
+    JSBOX_ALLOW(SYS_gettid),
+
+    // Time (Date) and futex (glibc's uncontended locks).
+    JSBOX_ALLOW(SYS_clock_gettime),
+    JSBOX_ALLOW(SYS_gettimeofday),
+    JSBOX_ALLOW(SYS_futex),
+
+    // Miscellaneous single-threaded runtime housekeeping.
+    JSBOX_ALLOW(SYS_sched_yield),
+    JSBOX_ALLOW(SYS_restart_syscall),
+#ifdef SYS_getrandom
+    JSBOX_ALLOW(SYS_getrandom),
+#endif
+#ifdef SYS_rseq
+    JSBOX_ALLOW(SYS_rseq),
+#endif
+#ifdef SYS_membarrier
+    JSBOX_ALLOW(SYS_membarrier),
+#endif
+
+    JSBOX_ALLOW(SYS_exit),
+    JSBOX_ALLOW(SYS_exit_group),
+
+    BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+};
+
+// Returns 0 when the filter is active, -1 when installation failed, and -2
+// when the platform or ABI is unsupported.
+static int install_seccomp(void)
+{
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0)
+        return -1;
+
+    struct sock_fprog prog;
+    prog.len = (unsigned short)(sizeof(jsbox_filter) / sizeof(jsbox_filter[0]));
+    prog.filter = jsbox_filter;
+    if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, (unsigned long)&prog) != 0)
+        return -1;
+    return 0;
+}
+
+#else
+
+static int install_seccomp(void)
+{
+    return -2;
+}
+
+#endif
+
 static int on_interrupt(JSContext *ctx, void *opaque)
 {
     (void)ctx;
@@ -682,6 +809,9 @@ static void emit_response(const char *value, size_t value_len, const Err *e,
     buf_puts(&b, ",\"engine\":\"quickjs-ng\",\"engine_version\":\"");
     buf_puts(&b, JSBOX_ENGINE_VERSION);
     buf_puts(&b, "\"");
+    buf_puts(&b, ",\"sandbox\":{\"seccomp\":");
+    buf_puts(&b, g_seccomp_on ? "true" : "false");
+    buf_puts(&b, "}");
     buf_puts(&b, ",\"ok\":");
     buf_puts(&b, e ? "false" : "true");
     buf_puts(&b, ",\"value\":");
@@ -736,9 +866,65 @@ static void emit_early_error(const char *kind, const char *message, int retryabl
     err_free(&e);
 }
 
-int main(void)
+static void usage(const char *argv0)
 {
+    fprintf(stderr,
+            "usage: %s [--no-seccomp] [--selftest-seccomp]\n"
+            "  --no-seccomp  do not install the Linux seccomp allowlist "
+            "(debugging only)\n"
+            "  --selftest-seccomp  install the filter, then verify that a "
+            "forbidden syscall is denied\n",
+            argv0);
+}
+
+int main(int argc, char **argv)
+{
+    int want_seccomp = 1;
+    int selftest_seccomp = 0;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--no-seccomp") == 0) {
+            want_seccomp = 0;
+        } else if (strcmp(argv[i], "--selftest-seccomp") == 0) {
+            selftest_seccomp = 1;
+        } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
+            usage(argv[0]);
+            return 0;
+        } else {
+            fprintf(stderr, "fun-jsbox: unknown option: %s\n", argv[i]);
+            usage(argv[0]);
+            return 2;
+        }
+    }
+#ifdef __linux__
+    const char *seccomp_env = getenv("FUN_JSBOX_SECCOMP");
+    if (seccomp_env && strcmp(seccomp_env, "0") == 0)
+        want_seccomp = 0;
+#endif
+
     int64_t start_ms = now_ms();
+
+    if (selftest_seccomp) {
+        int sc = install_seccomp();
+        if (sc == -2) {
+            fputs("fun-jsbox: seccomp is not supported on this platform\n", stderr);
+            return 2;
+        }
+        if (sc != 0) {
+            fputs("fun-jsbox: cannot install the seccomp filter\n", stderr);
+            return 3;
+        }
+        // `getpid` is allowlisted; `openat` is not. The kernel kills the
+        // process with SIGSYS, which the shell reports as 128+SIGSYS (159).
+        if (getpid() <= 0) {
+            fputs("fun-jsbox: seccomp self-test: allowlisted call failed\n", stderr);
+            return 4;
+        }
+        int fd = (int)syscall(SYS_openat, AT_FDCWD, "/dev/null", O_RDONLY);
+        fprintf(stderr,
+                "fun-jsbox: seccomp self-test failed: openat returned %d\n", fd);
+        return 5;
+    }
+
     size_t input_len = 0;
     int too_large = 0;
     char *input = read_stdin(&input_len, &too_large);
@@ -787,6 +973,19 @@ int main(void)
 
     Deadline dl = {now_ms() + req.timeout_ms, 0};
     JS_SetInterruptHandler(rt, on_interrupt, &dl);
+
+    if (want_seccomp) {
+        int sc = install_seccomp();
+        if (sc == 0) {
+            g_seccomp_on = 1;
+        } else if (sc != -2) {
+            err_set(&e, "sandbox", "SandboxError",
+                    "cannot install the seccomp syscall filter", 0);
+            JS_FreeContext(ctx);
+            JS_FreeRuntime(rt);
+            goto done;
+        }
+    }
 
     Buf src = {0};
     buf_puts(&src, "(function(input){\"use strict\";");

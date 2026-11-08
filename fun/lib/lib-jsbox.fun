@@ -175,6 +175,9 @@ fun run(code, input, opts)
   end if;
   if not r.ok then
     var why = r.stderr;
+    if r.exitCode.eq(159) then
+      why = 'worker was killed by the seccomp filter (forbidden system call)';
+    end if;
     if why.eq(nil) or why.eq('') then why = 'worker exited with code ' & ('' & r.exitCode); end if;
     result = _jbError('worker', 'WorkerError', why, false);
     return;
