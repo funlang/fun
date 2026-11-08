@@ -15,6 +15,17 @@ src/prj/fun/build-jsbox.sh
 # -> fun/fun-jsbox
 ```
 
+Windows builds use MSVC from a developer prompt (or the CI equivalent):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File src\prj\fun\build-jsbox.ps1
+# -> fun\fun-jsbox.exe
+```
+
+On Windows, run the script from a shell where `cl.exe` and `link.exe` are on
+`PATH` (`vcvars64.bat`). The POSIX script also accepts MinGW/MSYS and writes
+`fun/fun-jsbox.exe`.
+
 The script fetches QuickJS-ng v0.18.0 into `src/3rd/quickjs-ng` on demand and
 verifies the tarball SHA256. To use another checkout:
 
@@ -152,7 +163,7 @@ Error response:
   "protocol": 1,
   "engine": "quickjs-ng",
   "engine_version": "0.18.0",
-  "sandbox": {"seccomp": true},
+  "sandbox": {"kind": "seccomp", "seccomp": true},
   "ok": false,
   "value": null,
   "error": {
@@ -184,6 +195,7 @@ Error response:
 | processes | 0 | 0 | `RLIMIT_NPROC` |
 | open files | 16 | 16 | `RLIMIT_NOFILE` |
 | syscalls | allowlist | allowlist | Linux seccomp-bpf, denied call kills the worker |
+| platform | best effort | | Windows Job Object; macOS network/process sandbox |
 
 Oversized stdin is rejected with `input_limit` after a bounded drain (64 MiB),
 so an infinite stream such as `/dev/zero` cannot hang the worker.
@@ -213,8 +225,16 @@ This is the MVP, not the final sandbox. Current properties:
 - PIE with full RELRO, stack protector, and `_FORTIFY_SOURCE=2` on Linux
 - Linux `PR_SET_NO_NEW_PRIVS` / non-dumpable, and inherited fds 3..31 closed
 - Linux seccomp-bpf allowlist installed before the script is evaluated
+- Windows Job Object memory and single-process limits
+- macOS sandbox profile denying network and new processes
 
-### Linux seccomp
+### Platform sandbox
+
+`sandbox.kind` reports which layer is active: `seccomp` (Linux), `job`
+(Windows), `macos` (macOS sandbox profile), `limits` (macOS without
+`sandbox_init`), or `none` (disabled or unsupported).
+
+#### Linux seccomp
 
 On Linux x86-64 and arm64 the worker installs a seccomp-bpf allowlist after
 runtime setup and before `eval`. The filter permits only what the engine needs
@@ -225,9 +245,8 @@ Everything else returns `SECCOMP_RET_KILL_PROCESS`, so a compromised engine
 cannot open a file, create a socket, or spawn a process even if it gains
 native code execution.
 
-The response reports `sandbox.seccomp`. If the filter cannot be installed the
-worker fails closed with `kind: "sandbox"`. For debugging only, pass
-`--no-seccomp` or set `FUN_JSBOX_SECCOMP=0`; never do that for untrusted code.
+If the filter cannot be installed the worker fails closed with
+`kind: "sandbox"`.
 
 Verify the filter enforces a denial:
 
@@ -236,16 +255,35 @@ fun/fun-jsbox --selftest-seccomp
 # killed by SIGSYS; shell exit status 159 (128 + SIGSYS)
 ```
 
+#### Windows
+
+The worker assigns itself to a Job Object with a committed-memory cap matching
+the request, one active process, and kill-on-close. Windows has no seccomp
+equivalent usable without AppContainer packaging, so file and network
+isolation still rests on the runtime having no host bindings and on the
+trusted parent.
+
+#### macOS
+
+After runtime setup the worker calls `sandbox_init` with a profile that denies
+`network*`, `process-exec*`, and `process-fork`. `sandbox_init` is deprecated
+and may be unavailable in restricted runners; in that case the worker keeps
+the `RLIMIT_*` backstops and reports `kind: "limits"`.
+
+For debugging only, pass `--no-sandbox` (`--no-seccomp` is an alias) or set
+`FUN_JSBOX_SANDBOX=0` (`FUN_JSBOX_SECCOMP=0` also works); never do that for
+untrusted code.
+
 Not done yet:
 
 - `unshare`/bubblewrap/nsjail network and mount isolation
-- Windows Job Object limits and macOS sandbox profile
+- a stricter macOS profile that also denies file reads
 - bytecode cache (only useful for reviewed, trusted scripts; never for
   machine-written code)
 
 The Linux seccomp layer is a strong local boundary, but this is not yet a
-multi-tenant isolation boundary until namespace/mount isolation and the
-Windows/macOS platform limits land.
+multi-tenant isolation boundary until namespace/mount isolation lands and the
+Windows/macOS layers are validated on real hosts.
 
 ## Tests
 
@@ -259,3 +297,7 @@ host APIs, Unicode, one-shot process isolation, falsy JSON results, input
 copying, non-JSON results, thrown non-Error values, seeds, and invalid option
 types. On Linux the runner also executes `--selftest-seccomp` and requires the
 forbidden `openat` call to kill the worker with `SIGSYS`.
+
+On Windows CI builds `fun-jsbox.exe` with MSVC and runs the same
+`fun/test/jsbox_test.fun` with `FUN_JSBOX` set to the executable. Set
+`FUN_JSBOX_SKIP_BUILD=1` to reuse an existing worker.

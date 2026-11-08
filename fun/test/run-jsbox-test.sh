@@ -23,7 +23,9 @@ if [ ! -x "$FUNCMD" ]; then
     exit 1
 fi
 
-"$ROOT/src/prj/fun/build-jsbox.sh"
+if [ "${FUN_JSBOX_SKIP_BUILD:-0}" != "1" ]; then
+    "$ROOT/src/prj/fun/build-jsbox.sh"
+fi
 
 # On Linux the worker must install its seccomp allowlist by default, and a
 # forbidden syscall must kill it. --selftest-seccomp performs openat after the

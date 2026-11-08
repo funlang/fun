@@ -46,6 +46,7 @@
 use 'process.fun';
 use 'lib-path.fun';
 use 'env.fun';
+use 'fs.fun';
 
 var _JB_TIMEOUT = 200;
 var _JB_MEMORY = 4 * 1024 * 1024;
@@ -105,7 +106,10 @@ fun _jbWorker()
   if not p.eq(nil) and not p.eq('') then result = p; return; end if;
   var exe = 0.arg();
   if not exe.eq(nil) and not exe.eq('') then
-    result = PathJoin([PathDir(exe), 'fun-jsbox']);
+    var base = PathJoin([PathDir(exe), 'fun-jsbox']);
+    if fs.exists(base) then result = base; return; end if;
+    if fs.exists(base & '.exe') then result = base & '.exe'; return; end if;
+    result = base;
   else
     result = 'fun-jsbox';
   end if;

@@ -352,6 +352,9 @@ jobs:
             fi
           done
 
+      - name: jsbox sandbox regression
+        run: sh fun/test/run-jsbox-test.sh
+
       - name: Regression
         env:
           FUNREG_PLATFORM: ${{ matrix.platform }}
@@ -1053,6 +1056,39 @@ jobs:
             exit 1
           }
           Write-Host "::warning title=safe build (windows-x64) ok::funcmd-safe.exe=$((Get-Item 'funcmd-safe.exe').Length) bytes"
+
+      - name: Build fun-jsbox.exe (MSVC)
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * `
+                  -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+                  -property installationPath
+          if (-not $vs) { throw "Visual Studio C++ tools not found" }
+          $vcvars = Join-Path $vs "VC\Auxiliary\Build\vcvars64.bat"
+          cmd /c "call `"$vcvars`" >nul && powershell -NoProfile -ExecutionPolicy Bypass -File src\prj\fun\build-jsbox.ps1"
+          if ($LASTEXITCODE -ne 0) { throw "build-jsbox.ps1 failed: $LASTEXITCODE" }
+          if (-not (Test-Path 'fun\fun-jsbox.exe')) { throw "fun-jsbox.exe missing" }
+          Write-Host "::warning title=jsbox build::fun-jsbox.exe=$((Get-Item 'fun\fun-jsbox.exe').Length) bytes"
+
+      - name: jsbox sandbox regression (Windows)
+        shell: pwsh
+        run: |
+          $label = if (Test-Path 'src\prj\fun\funcmd.flags.txt') {
+            (Get-Content 'src\prj\fun\funcmd.flags.txt' -Raw).Trim()
+          } else { '' }
+          if ($label -notmatch 'WinFFI') {
+            Write-Host "::warning title=jsbox regression (windows-x64)::skipped: funcmd.exe has no WinFFI"
+            exit 0
+          }
+          $env:FUN_JSBOX = (Resolve-Path 'fun\fun-jsbox.exe').Path
+          $exe = "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe"
+          $out = & $exe 'fun\test\jsbox_test.fun' 2>&1
+          $out | Write-Host
+          if ($LASTEXITCODE -ne 0) { throw "jsbox tests exited $LASTEXITCODE" }
+          $sum = ($out | Select-String -Pattern '# tests:' | Select-Object -Last 1).Line
+          if (-not $sum -or $sum -notmatch 'failed: 0') { throw "jsbox tests did not pass: $sum" }
+          Write-Host "::warning title=jsbox regression (windows-x64)::$sum"
 
       - name: Capability probes
         shell: pwsh

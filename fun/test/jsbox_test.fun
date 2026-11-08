@@ -24,8 +24,16 @@ end fun;
 
 var _worker = _worker_path();
 var _have = fs.exists(_worker);
+if not _have and fs.exists(_worker & '.exe') then
+  _worker = _worker & '.exe';
+  _have = true;
+end if;
 if not _have and fs.exists('fun/fun-jsbox') then
   _worker = 'fun/fun-jsbox';
+  _have = true;
+end if;
+if not _have and fs.exists('fun/fun-jsbox.exe') then
+  _worker = 'fun/fun-jsbox.exe';
   _have = true;
 end if;
 

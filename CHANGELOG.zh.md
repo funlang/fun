@@ -24,8 +24,15 @@
   OOM、输出上限、进程隔离、现代语法、Unicode 和选项处理。Linux x86-64/arm64
   上 worker 在求值前安装 seccomp-bpf 白名单，越权系统调用会以 `SIGSYS`
   终止，响应中报告 `sandbox.seccomp`；`--selftest-seccomp` 验证拒绝行为，
-  安装失败则拒绝运行。bubblewrap/nsjail 隔离与 Windows/macOS worker 限制
-  尚未实现。
+  安装失败则拒绝运行。bubblewrap/nsjail 隔离尚未实现。
+
+- `fun-jsbox` 支持 Windows（MSVC，`src/prj/fun/build-jsbox.ps1`，输出 `.exe`）
+  与 macOS（`build-jsbox.sh` 链接 `-lsandbox`）。Windows 上 worker 把自己
+  加入带内存上限和单进程限制的 Job Object；macOS 上应用拒绝网络与新进程的
+  sandbox profile（`sandbox_init` 不可用时回退到 `RLIMIT_*` 并报告
+  `sandbox.kind = "limits"`）。响应新增 `sandbox.kind`；调试时可用
+  `--no-sandbox` / `FUN_JSBOX_SANDBOX=0` 关闭。CI 在 POSIX 矩阵与
+  Windows x64 上运行 jsbox 测试。
 
 - `process.run` 新增 `output` 选项：stdout 与 stderr 共用字节预算，超限会
   终止直接子进程并返回 `outputExceeded = true`、`ok = false`。jsbox 桥接

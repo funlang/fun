@@ -31,8 +31,17 @@ This project records notable changes in the style of [Keep a Changelog](https://
   installs a seccomp-bpf allowlist before evaluation; denied syscalls kill it
   with `SIGSYS`, and the response reports `sandbox.seccomp`.
   `--selftest-seccomp` proves the denial, and installation failure fails
-  closed. bubblewrap/nsjail isolation and Windows/macOS worker limits are
-  still pending.
+  closed. bubblewrap/nsjail isolation is still pending.
+
+- `fun-jsbox` is now buildable on Windows with MSVC
+  (`src/prj/fun/build-jsbox.ps1`, `.exe` output) and macOS
+  (`build-jsbox.sh` links `-lsandbox`). The worker assigns itself to a Windows
+  Job Object with a memory cap and one-process limit, and applies a macOS
+  sandbox profile denying network and new processes (falling back to
+  `RLIMIT_*` with `sandbox.kind = "limits"` when `sandbox_init` is
+  unavailable). The response reports `sandbox.kind`; `--no-sandbox` /
+  `FUN_JSBOX_SANDBOX=0` disable the layer for debugging. CI runs the jsbox
+  suite on the POSIX matrix and on Windows x64.
 
 - `process.run` gains an `output` option: stdout and stderr share a byte
   budget, and exceeding it terminates the direct child and returns

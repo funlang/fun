@@ -100,7 +100,9 @@ src/3rd/quickjs-ng/
 
 # fun-jsbox build outputs
 fun/fun-jsbox
+fun/fun-jsbox.exe
 src/prj/fun/.jsbox-obj/
+src/prj/fun/.jsbox-obj-win/
 
 # ---- OS ----
 .DS_Store

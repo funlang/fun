@@ -28,7 +28,6 @@ QJS_URL="https://github.com/quickjs-ng/quickjs/archive/refs/tags/${QJS_VERSION}.
 QJS_SHA256="28bcd89aa3683fd2a946537e5ce3f11cc46b5cbf3383c7561aaef3df5ff9f1dd"
 
 QJS_SRC="${QJS_SRC:-$THIRD/quickjs-ng}"
-OUT="${OUT:-$ROOT/fun/fun-jsbox}"
 OBJ="${OBJ:-$HERE/.jsbox-obj}"
 CC="${CC:-gcc}"
 EXTRA_CFLAGS="${EXTRA_CFLAGS:-}"
@@ -36,17 +35,35 @@ EXTRA_CFLAGS="${EXTRA_CFLAGS:-}"
 OS="$(uname -s 2>/dev/null || echo unknown)"
 case "$OS" in
     Darwin)
-        LDLIBS="-lm -lpthread"
+        LDLIBS="-lm -lpthread -lsandbox"
         HARDEN_LDFLAGS=""
         AS_NEEDED=""
+        PIE_CFLAGS="-fPIE"
+        PIE_LDFLAGS="-pie"
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        LDLIBS="-lm"
+        HARDEN_LDFLAGS="-Wl,--dynamicbase -Wl,--nxcompat"
+        AS_NEEDED=""
+        PIE_CFLAGS=""
+        PIE_LDFLAGS=""
         ;;
     *)
         LDLIBS="-lm -ldl -lpthread"
         HARDEN_LDFLAGS="-Wl,-z,relro -Wl,-z,now"
         AS_NEEDED="-Wl,--as-needed"
+        PIE_CFLAGS="-fPIE"
+        PIE_LDFLAGS="-pie"
         ;;
 esac
 HARDEN_CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
+
+if [ -z "${OUT:-}" ]; then
+    case "$OS" in
+        MINGW*|MSYS*|CYGWIN*) OUT="$ROOT/fun/fun-jsbox.exe" ;;
+        *) OUT="$ROOT/fun/fun-jsbox" ;;
+    esac
+fi
 
 sha256_of() {
     if command -v sha256sum >/dev/null 2>&1; then
@@ -105,7 +122,7 @@ if [ ! -f "$QJS_SRC/quickjs.c" ]; then
 fi
 
 mkdir -p "$OBJ"
-CFLAGS_BASE="-std=gnu11 -O2 -fPIE -D_GNU_SOURCE $HARDEN_CFLAGS"
+CFLAGS_BASE="-std=gnu11 -O2 $PIE_CFLAGS -D_GNU_SOURCE $HARDEN_CFLAGS"
 STAMP="$OBJ/.buildflags"
 STAMP_VALUE="$CC|$QJS_SRC|$CFLAGS_BASE|$EXTRA_CFLAGS"
 if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP" 2>/dev/null)" != "$STAMP_VALUE" ]; then
@@ -128,7 +145,7 @@ fi
 
 echo "  link  $OUT"
 mkdir -p "$(dirname "$OUT")"
-$CC -pie $HARDEN_LDFLAGS $AS_NEEDED -o "$OUT" \
+$CC $PIE_LDFLAGS $HARDEN_LDFLAGS $AS_NEEDED -o "$OUT" \
     "$OBJ/quickjs.o" "$OBJ/libregexp.o" "$OBJ/libunicode.o" "$OBJ/dtoa.o" \
     "$OBJ/jsbox-main.o" $LDLIBS
 chmod +x "$OUT"

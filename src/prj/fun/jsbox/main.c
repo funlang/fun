@@ -36,7 +36,12 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <fcntl.h>
+#include <io.h>
+#else
 #include <signal.h>
 #include <sys/resource.h>
 #include <sys/time.h>
@@ -48,6 +53,9 @@
 #include <linux/seccomp.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
+#endif
+#ifdef __APPLE__
+#include <sandbox.h>
 #endif
 #endif
 
@@ -111,11 +119,12 @@ typedef struct {
 } Request;
 
 static int g_seccomp_on = 0;
+static const char *g_sandbox_kind = "none";
 
 static int64_t now_ms(void)
 {
 #ifdef _WIN32
-    return (int64_t)clock() * 1000 / CLOCKS_PER_SEC;
+    return (int64_t)GetTickCount64();
 #else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -789,6 +798,74 @@ static int install_seccomp(void)
 
 #endif
 
+#ifdef _WIN32
+
+static HANDLE g_job = NULL;
+
+// A Job Object is the Windows equivalent of a lightweight process cage: it
+// caps committed memory and the number of processes, and keeps the worker
+// single-process. Windows has no seccomp equivalent that is usable without
+// AppContainer packaging, so file/network isolation remains the parent's job.
+static int install_windows_job(int64_t memory_bytes)
+{
+    HANDLE job = CreateJobObjectW(NULL, NULL);
+    if (!job)
+        return -1;
+
+    JOBOBJECT_EXTENDED_LIMIT_INFORMATION info;
+    memset(&info, 0, sizeof(info));
+    info.BasicLimitInformation.LimitFlags =
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE |
+        JOB_OBJECT_LIMIT_PROCESS_MEMORY |
+        JOB_OBJECT_LIMIT_JOB_MEMORY |
+        JOB_OBJECT_LIMIT_ACTIVE_PROCESS;
+    info.BasicLimitInformation.ActiveProcessLimit = 1;
+    SIZE_T limit = (SIZE_T)(memory_bytes + (int64_t)128 * 1024 * 1024);
+    info.ProcessMemoryLimit = limit;
+    info.JobMemoryLimit = limit;
+
+    if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation,
+                                 &info, sizeof(info))) {
+        CloseHandle(job);
+        return -1;
+    }
+    if (!AssignProcessToJobObject(job, GetCurrentProcess())) {
+        CloseHandle(job);
+        return -1;
+    }
+    g_job = job;
+    return 0;
+}
+
+#elif defined(__APPLE__)
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
+// Keep the sandbox compatible with inherited stdio and normal libc use, but
+// deny networking and new processes. File access is not exposed by the worker
+// runtime; a stricter profile would need to allow writes to pipes explicitly.
+static int install_macos_sandbox(void)
+{
+    static const char profile[] =
+        "(version 1)\n"
+        "(allow default)\n"
+        "(deny network*)\n"
+        "(deny process-exec*)\n"
+        "(deny process-fork)\n";
+    char *err = NULL;
+    if (sandbox_init(profile, 0, &err) != 0) {
+        if (err)
+            sandbox_free_error(err);
+        return -1;
+    }
+    return 0;
+}
+
+#pragma GCC diagnostic pop
+
+#endif
+
 static int on_interrupt(JSContext *ctx, void *opaque)
 {
     (void)ctx;
@@ -809,7 +886,9 @@ static void emit_response(const char *value, size_t value_len, const Err *e,
     buf_puts(&b, ",\"engine\":\"quickjs-ng\",\"engine_version\":\"");
     buf_puts(&b, JSBOX_ENGINE_VERSION);
     buf_puts(&b, "\"");
-    buf_puts(&b, ",\"sandbox\":{\"seccomp\":");
+    buf_puts(&b, ",\"sandbox\":{\"kind\":");
+    buf_json_string(&b, g_sandbox_kind, strlen(g_sandbox_kind));
+    buf_puts(&b, ",\"seccomp\":");
     buf_puts(&b, g_seccomp_on ? "true" : "false");
     buf_puts(&b, "}");
     buf_puts(&b, ",\"ok\":");
@@ -869,9 +948,9 @@ static void emit_early_error(const char *kind, const char *message, int retryabl
 static void usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s [--no-seccomp] [--selftest-seccomp]\n"
-            "  --no-seccomp  do not install the Linux seccomp allowlist "
-            "(debugging only)\n"
+            "usage: %s [--no-sandbox] [--selftest-seccomp]\n"
+            "  --no-sandbox  do not install the platform sandbox "
+            "(debugging only; --no-seccomp is an alias)\n"
             "  --selftest-seccomp  install the filter, then verify that a "
             "forbidden syscall is denied\n",
             argv0);
@@ -882,7 +961,8 @@ int main(int argc, char **argv)
     int want_seccomp = 1;
     int selftest_seccomp = 0;
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--no-seccomp") == 0) {
+        if (strcmp(argv[i], "--no-sandbox") == 0 ||
+            strcmp(argv[i], "--no-seccomp") == 0) {
             want_seccomp = 0;
         } else if (strcmp(argv[i], "--selftest-seccomp") == 0) {
             selftest_seccomp = 1;
@@ -900,10 +980,21 @@ int main(int argc, char **argv)
     if (seccomp_env && strcmp(seccomp_env, "0") == 0)
         want_seccomp = 0;
 #endif
+    const char *sandbox_env = getenv("FUN_JSBOX_SANDBOX");
+    if (sandbox_env && strcmp(sandbox_env, "0") == 0)
+        want_seccomp = 0;
+
+#ifdef _WIN32
+    // JSON is byte-oriented; keep the CRT from translating CRLF or ^Z.
+    _setmode(_fileno(stdin), _O_BINARY);
+    _setmode(_fileno(stdout), _O_BINARY);
+    _setmode(_fileno(stderr), _O_BINARY);
+#endif
 
     int64_t start_ms = now_ms();
 
     if (selftest_seccomp) {
+#if defined(__linux__) && (defined(__x86_64__) || defined(__aarch64__))
         int sc = install_seccomp();
         if (sc == -2) {
             fputs("fun-jsbox: seccomp is not supported on this platform\n", stderr);
@@ -923,6 +1014,10 @@ int main(int argc, char **argv)
         fprintf(stderr,
                 "fun-jsbox: seccomp self-test failed: openat returned %d\n", fd);
         return 5;
+#else
+        fputs("fun-jsbox: seccomp is not supported on this platform\n", stderr);
+        return 2;
+#endif
     }
 
     size_t input_len = 0;
@@ -975,12 +1070,31 @@ int main(int argc, char **argv)
     JS_SetInterruptHandler(rt, on_interrupt, &dl);
 
     if (want_seccomp) {
-        int sc = install_seccomp();
+        int sc;
+#if defined(_WIN32)
+        sc = install_windows_job(req.memory_bytes);
+        if (sc == 0)
+            g_sandbox_kind = "job";
+#elif defined(__APPLE__)
+        sc = install_macos_sandbox();
+        if (sc == 0) {
+            g_sandbox_kind = "macos";
+        } else {
+            // sandbox_init is deprecated and can be unavailable in restricted
+            // runners. Keep the RLIMIT backstops and report the weaker mode.
+            sc = -2;
+            g_sandbox_kind = "limits";
+        }
+#else
+        sc = install_seccomp();
         if (sc == 0) {
             g_seccomp_on = 1;
-        } else if (sc != -2) {
+            g_sandbox_kind = "seccomp";
+        }
+#endif
+        if (sc != 0 && sc != -2) {
             err_set(&e, "sandbox", "SandboxError",
-                    "cannot install the seccomp syscall filter", 0);
+                    "cannot install the platform sandbox", 0);
             JS_FreeContext(ctx);
             JS_FreeRuntime(rt);
             goto done;

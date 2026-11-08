@@ -10,8 +10,8 @@
 ## 0. 当前基线
 
 - **版本**：9.5.4，`src/core/version.inc` 的 `funRelease = '9.5.4'`。
-- **回归**：Linux `127/127`（`sh fun/test/run-linux-regression.sh`）。
-- **可加载性**：`73/79`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
+- **回归**：Linux `129/129`（`sh fun/test/run-linux-regression.sh`）。
+- **可加载性**：`75/81`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
 - **标准库**：77 个模块（`fun/lib` 有 79 个基础 `.fun`，内部 `lib-base`/`lib-type`
   与 `-unx`/`-lnx` 后端单元不计）。
@@ -26,7 +26,7 @@
 
 | ID | 事项 | 状态 | 优先级 | 验收 | 关联 |
 |---|---|---|---|---|---|
-| S-02 | jsbox 沙箱运行器 | DOING | P1 | 沙箱边界只由 `fun-jsbox` 承担，不以 fun `-safe` 代替。Linux seccomp-bpf 白名单与 `process.run` 输出上限已完成；剩余 bubblewrap/nsjail 网络与挂载隔离、Windows Job Object、macOS sandbox profile | `src/prj/fun/jsbox/README.md` |
+| S-02 | jsbox 沙箱运行器 | DOING | P1 | 沙箱边界只由 `fun-jsbox` 承担，不以 fun `-safe` 代替。Linux seccomp-bpf、`process.run` 输出上限、Windows Job Object、macOS sandbox profile 已实现（后两者待 CI/真机验证）；剩余 bubblewrap/nsjail 网络与挂载隔离 | `src/prj/fun/jsbox/README.md` |
 
 ## 2. 下一步 (NEXT)
 
@@ -144,5 +144,7 @@
   `--selftest-seccomp` 验证 `openat` 被拒绝（退出 159），过滤安装失败
   时拒绝运行。`run-jsbox-test.sh` 增加该自检，`jsbox_test.fun` 增加沙箱
   模式断言（25/25）。`process.run` 增加 `output` 字节预算并在超限时终止
-  子进程，jsbox 桥接用它限制失控 stdout。剩余：bubblewrap/nsjail、
-  Windows Job Object、macOS sandbox profile。
+  子进程，jsbox 桥接用它限制失控 stdout。worker 增加 Windows MSVC 构建与
+  Job Object 限制、macOS `sandbox_init`（网络/新进程拒绝），响应报告
+  `sandbox.kind`，CI 在 POSIX 矩阵和 Windows x64 上跑 jsbox 测试。剩余：
+  bubblewrap/nsjail 网络与挂载隔离，以及 Windows/macOS 真机复验。
