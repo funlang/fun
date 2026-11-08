@@ -54,7 +54,8 @@ if _have then
     var r = jsb.run('return 1', nil);
     assert.is_true(r.ok);
     assert.not_nil(r.sandbox);
-    assert.not_nil(r.sandbox.seccomp);
+    assert.is_true(r.sandbox.@has('kind'));
+    assert.is_true(r.sandbox.@has('seccomp'));
     var expect = env.get('FUN_JSBOX_EXPECT_SECCOMP');
     if not expect.eq(nil) and expect.eq('1') then
       assert.is_true(r.sandbox.seccomp);
