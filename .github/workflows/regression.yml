@@ -1125,7 +1125,16 @@ jobs:
           }
           $sum = ($out | Select-String -Pattern '# tests:' | Select-Object -Last 1).Line
           if (-not $sum -or $sum -notmatch 'failed: 0') {
-            Write-Host "::error title=jsbox regression (windows-x64)::no clean summary: $sum"
+            $lines = @($out)
+            $detail = @()
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+              if ($lines[$i] -match '^not ok ') {
+                $d = $lines[$i]
+                if ($i + 1 -lt $lines.Count) { $d += ' :: ' + $lines[$i + 1] }
+                $detail += $d
+              }
+            }
+            Write-Host "::error title=jsbox regression (windows-x64)::no clean summary: $sum :: $($detail -join ' | ')"
             exit 1
           }
           Write-Host "::warning title=jsbox regression (windows-x64)::$sum"
