@@ -298,6 +298,7 @@ copying, non-JSON results, thrown non-Error values, seeds, and invalid option
 types. On Linux the runner also executes `--selftest-seccomp` and requires the
 forbidden `openat` call to kill the worker with `SIGSYS`.
 
-On Windows CI builds `fun-jsbox.exe` with MSVC and runs the same
-`fun/test/jsbox_test.fun` with `FUN_JSBOX` set to the executable. Set
-`FUN_JSBOX_SKIP_BUILD=1` to reuse an existing worker.
+On Windows CI builds `fun-jsbox.exe` with MinGW-w64 and runs the same
+`fun/test/jsbox_test.fun` with `FUN_JSBOX` set to the executable; the MSVC
+script is the local alternative. Set `FUN_JSBOX_SKIP_BUILD=1` to reuse an
+existing worker.

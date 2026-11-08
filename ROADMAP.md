@@ -43,8 +43,7 @@
 | S-05 | create-fun-app 脚手架 | OPEN | P3 | Fun 后端 + z-data 前端 + 一体发布 | `art/notes/todo.md` |
 | S-06 | 用 fun-ui 重写 funide | OPEN | P3 | 新 IDE 替代旧 funide | `art/notes/todo.md` |
 | S-07 | funcally AI agent | OPEN | P3 | 基于沙箱、CLI、HTTP 的 agent | `art/notes/todo.md` |
-| S-08 | fun-ui 跨平台 | OPEN | P2 | Windows/Linux 收尾 | `art/notes/todo.md` |
-| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | `io.pipe` 交接给子进程、边跑边读写、输出上限、进程树终止、Windows Unicode 命令行 | `README.zh.md` 的 io 一节 |
+| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | `io.pipe` 交接给子进程、边跑边读写、进程树终止、Windows Unicode 命令行（`io.pipe`、`process.run` 和 `output` 上限已完成） | `README.zh.md` 的 io 一节 |
 
 ## 4. 技术债台账
 
@@ -148,3 +147,9 @@
   Job Object 限制、macOS `sandbox_init`（网络/新进程拒绝），响应报告
   `sandbox.kind`，CI 在 POSIX 矩阵和 Windows x64 上跑 jsbox 测试。剩余：
   bubblewrap/nsjail 网络与挂载隔离，以及 Windows/macOS 真机复验。
+- 2026-11-08：S-08 关闭。fun-ui 1.0.4 的 Windows WebView2 基线、Linux
+  GTK3/WebKit2GTK 原生宿主与 macOS AppKit/WKWebView 原生宿主均已完成，
+  README 状态表标记为已完成，`fun-ui` CI 的 linux-loopback、
+  linux-webkitgtk、macos-wkwebview 全部通过。S-09 仍 OPEN：`io.pipe`、
+  `process.run` 与输出上限已就绪，但把管道交给子进程并边跑边读写、进程树
+  终止、Windows Unicode 命令行尚未实现。
