@@ -17,6 +17,12 @@ rem so no bcc32 objects or MinGW CRT are needed. Without the DLL, skip it.
 set "REGEX="
 if exist pcre3.dll set "REGEX=-dRegex -dPCRE_WinDLL"
 
+rem -dMD5 enables the str.md5()/str.sha1() builtins. On Windows src/libmd5.inc
+rem wraps advapi32.dll (the 32-bit IDE build has always defined MD5 in
+rem funcmd.cfg/funcmd.dof); the ABI is unchanged on win64. lib-hmac.fun and the
+rem RFC 2202 vectors in lib-hmac-test.fun need sha1, so keep this on.
+set "HASH=-dMD5"
+
 rem getapi uses FPC's bundled libffi on win64 (lffi.pas), which needs ffi.dll
 rem next to funcmd.exe. Enable it only when the DLL is actually there; a bare
 rem -dWinFFI without the library fails to link. CI builds ffi.dll from MSYS2.
@@ -94,4 +100,4 @@ if /i not "%1"=="read" if /i not "%1"=="write" if /i not "%1"=="compile" (
 exit /b 0
 
 :build
-%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %REGEX% %FFI% %SAFE_FLAGS% %SAFE_OUT% %SAFE_UNITS% -Fu..\..\lib
+%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %HASH% %REGEX% %FFI% %SAFE_FLAGS% %SAFE_OUT% %SAFE_UNITS% -Fu..\..\lib
