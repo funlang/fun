@@ -179,7 +179,7 @@ Error response:
 | request size | 16 MiB | 16 MiB | worker stdin reader |
 | timeout | 200 ms | 10 s | QuickJS interrupt handler + `process.run` kill |
 | memory | 4 MiB | 64 MiB | `JS_SetMemoryLimit` + `RLIMIT_AS` |
-| output | 256 KiB | 4 MiB | worker JSON size check |
+| output | 256 KiB | 4 MiB | worker JSON size check + `process.run` byte budget |
 | stack | memory/2 | 2 MiB | `JS_SetMaxStackSize` |
 | processes | 0 | 0 | `RLIMIT_NPROC` |
 | open files | 16 | 16 | `RLIMIT_NOFILE` |
@@ -240,8 +240,6 @@ Not done yet:
 
 - `unshare`/bubblewrap/nsjail network and mount isolation
 - Windows Job Object limits and macOS sandbox profile
-- an output cap inside `process.run` (the worker caps itself, but a compromised
-  worker could still write a large stdout before exiting)
 - bytecode cache (only useful for reviewed, trusted scripts; never for
   machine-written code)
 

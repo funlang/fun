@@ -264,7 +264,7 @@ fun _pCheckOpts(opts)
     opts.@each((v, k){
       if k = nil or k = '' then
         listish = true;
-      elsif k <> 'stdin' and k <> 'cwd' and k <> 'timeout' then
+      elsif k <> 'stdin' and k <> 'cwd' and k <> 'timeout' and k <> 'output' then
         bad = k;
       end if;
     });
@@ -374,6 +374,23 @@ class _PUnix()
   var timedOut = false;
   var waitErr = -1;
   var startMs = 0;
+  var maxOut = 0;
+  var outBytes = 0;
+  var outputExceeded = false;
+
+  fun appendCapped(s, isErr)
+    if this.maxOut <= 0 then
+      if isErr then this.errText &= s; else this.outText &= s; end if;
+      return;
+    end if;
+    var n = _pByteData(s).length();
+    if this.outBytes + n > this.maxOut then
+      this.outputExceeded = true;
+      return;
+    end if;
+    if isErr then this.errText &= s; else this.outText &= s; end if;
+    this.outBytes += n;
+  end fun;
 
   fun close()
     if this.inFd >= 0 then _pUnixClose(this.inFd); this.inFd = -1; end if;
@@ -464,7 +481,7 @@ class _PUnix()
             if s.type() = 0 then
               _pUnixClose(this.outFd); this.outFd = -1; this.outOpen = false;
             else
-              this.outText &= s;
+              this.appendCapped(s, false);
             end if;
           end if;
           if this.revents(fds, 1) <> 0 and this.errOpen then
@@ -472,9 +489,15 @@ class _PUnix()
             if s.type() = 0 then
               _pUnixClose(this.errFd); this.errFd = -1; this.errOpen = false;
             else
-              this.errText &= s;
+              this.appendCapped(s, true);
             end if;
           end if;
+        end if;
+
+        if this.outputExceeded and not this.exited then
+          // The cap is a hard stop, not just a buffer limit: kill the child so
+          // it cannot keep producing output while we drain.
+          _pState.kill(this.pid, 9);
         end if;
 
         if not this.exited then
@@ -526,12 +549,12 @@ class _PUnix()
           if this.outOpen then
             var so = this.readChunk(this.outFd);
             if so.type() = 0 then _pUnixClose(this.outFd); this.outFd = -1; this.outOpen = false;
-            else this.outText &= so; end if;
+            else this.appendCapped(so, false); end if;
           end if;
           if this.errOpen then
             var se = this.readChunk(this.errFd);
             if se.type() = 0 then _pUnixClose(this.errFd); this.errFd = -1; this.errOpen = false;
-            else this.errText &= se; end if;
+            else this.appendCapped(se, true); end if;
           end if;
           grace += 1;
         end do;
@@ -554,10 +577,11 @@ class _PUnix()
   fun result()
     var r = _pUnixStatus(this.status);
     result = new [
-      ok: r.exitCode = 0 and not this.timedOut,
+      ok: r.exitCode = 0 and not this.timedOut and not this.outputExceeded,
       exitCode: r.exitCode,
       signal: r.signal,
       timedOut: this.timedOut,
+      outputExceeded: this.outputExceeded,
       stdout: this.outText,
       stderr: this.errText
     ];
@@ -578,6 +602,8 @@ fun _pRunUnix(name, args, opts)
   if cwd <> nil and cwd <> '' and cwd.subpos(0.toChar()) >= 0 then raise 'process: cwd must not contain NUL'; end if;
   var timeout = _pOpt(opts, 'timeout');
   if timeout = nil then timeout = 0; elsif timeout.type() <> 3 or timeout < 0 then raise 'process: timeout must be a non-negative integer'; end if;
+  var output = _pOpt(opts, 'output');
+  if output = nil then output = 0; elsif output.type() <> 3 or output < 0 then raise 'process: output must be a non-negative integer'; end if;
 
   var ps = _pUnixPipes();
   var pin = ps[0];
@@ -673,6 +699,7 @@ fun _pRunUnix(name, args, opts)
   p.outFd = pout[0];
   p.errFd = perr[0];
   p.inData = input;
+  p.maxOut = output;
   try
     p.pump(timeout);
     result = p.result();
@@ -856,6 +883,23 @@ class _PWin()
   var exitCode = 0;
   var timedOut = false;
   var startMs = 0;
+  var maxOut = 0;
+  var outBytes = 0;
+  var outputExceeded = false;
+
+  fun appendCapped(s, isErr)
+    if this.maxOut <= 0 then
+      if isErr then this.errText &= s; else this.outText &= s; end if;
+      return;
+    end if;
+    var n = _pByteData(s).length();
+    if this.outBytes + n > this.maxOut then
+      this.outputExceeded = true;
+      return;
+    end if;
+    if isErr then this.errText &= s; else this.outText &= s; end if;
+    this.outBytes += n;
+  end fun;
 
   fun close()
     if this.outH <> 0 then _pWinClose(this.outH); this.outH = 0; end if;
@@ -901,7 +945,7 @@ class _PWin()
           if so.type() = 0 then
             _pWinClose(this.outH); this.outH = 0; this.outOpen = false;
           elsif so <> '' then
-            this.outText &= so;
+            this.appendCapped(so, false);
             progress = true;
           end if;
         end if;
@@ -910,9 +954,13 @@ class _PWin()
           if se.type() = 0 then
             _pWinClose(this.errH); this.errH = 0; this.errOpen = false;
           elsif se <> '' then
-            this.errText &= se;
+            this.appendCapped(se, true);
             progress = true;
           end if;
+        end if;
+
+        if this.outputExceeded and not this.exited then
+          _pState.terminate(this.hProcess, 1);
         end if;
 
         var w = _pState.waitSingle(this.hProcess, 0);
@@ -977,12 +1025,12 @@ class _PWin()
           if this.outOpen then
             var so = this.readChunk(this.outH);
             if so.type() = 0 then _pWinClose(this.outH); this.outH = 0; this.outOpen = false;
-            else this.outText &= so; end if;
+            else this.appendCapped(so, false); end if;
           end if;
           if this.errOpen then
             var se = this.readChunk(this.errH);
             if se.type() = 0 then _pWinClose(this.errH); this.errH = 0; this.errOpen = false;
-            else this.errText &= se; end if;
+            else this.appendCapped(se, true); end if;
           end if;
           grace += 1;
         end do;
@@ -998,10 +1046,11 @@ class _PWin()
 
   fun result()
     result = new [
-      ok: this.exitCode = 0 and not this.timedOut,
+      ok: this.exitCode = 0 and not this.timedOut and not this.outputExceeded,
       exitCode: this.exitCode,
       signal: nil,
       timedOut: this.timedOut,
+      outputExceeded: this.outputExceeded,
       stdout: this.outText,
       stderr: this.errText
     ];
@@ -1016,6 +1065,8 @@ fun _pRunWin(name, args, opts)
   if cwd <> nil and cwd <> '' and cwd.subpos(0.toChar()) >= 0 then raise 'process: cwd must not contain NUL'; end if;
   var timeout = _pOpt(opts, 'timeout');
   if timeout = nil then timeout = 0; elsif timeout.type() <> 3 or timeout < 0 then raise 'process: timeout must be a non-negative integer'; end if;
+  var output = _pOpt(opts, 'output');
+  if output = nil then output = 0; elsif output.type() <> 3 or output < 0 then raise 'process: output must be a non-negative integer'; end if;
 
   var fin = _pWinStdinFile(input);
   var ps = nil;
@@ -1062,6 +1113,7 @@ fun _pRunWin(name, args, opts)
   p.hThread = 0;
   p.outH = pout[0];
   p.errH = perr[0];
+  p.maxOut = output;
   _pWinClose(fin); _pWinClose(pout[1]); _pWinClose(perr[1]);
   p.pump(timeout);
   result = p.result();

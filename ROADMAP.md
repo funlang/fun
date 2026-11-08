@@ -26,7 +26,7 @@
 
 | ID | 事项 | 状态 | 优先级 | 验收 | 关联 |
 |---|---|---|---|---|---|
-| S-02 | jsbox 沙箱运行器 | DOING | P1 | 沙箱边界只由 `fun-jsbox` 承担，不以 fun `-safe` 代替。Linux seccomp-bpf 白名单已完成并默认启用；剩余 bubblewrap/nsjail 网络与挂载隔离、Windows Job Object、macOS sandbox profile，以及 `process.run` 输出上限 | `src/prj/fun/jsbox/README.md` |
+| S-02 | jsbox 沙箱运行器 | DOING | P1 | 沙箱边界只由 `fun-jsbox` 承担，不以 fun `-safe` 代替。Linux seccomp-bpf 白名单与 `process.run` 输出上限已完成；剩余 bubblewrap/nsjail 网络与挂载隔离、Windows Job Object、macOS sandbox profile | `src/prj/fun/jsbox/README.md` |
 
 ## 2. 下一步 (NEXT)
 
@@ -143,5 +143,6 @@
   越权系统调用以 `SIGSYS` 终止；响应新增 `sandbox.seccomp`，
   `--selftest-seccomp` 验证 `openat` 被拒绝（退出 159），过滤安装失败
   时拒绝运行。`run-jsbox-test.sh` 增加该自检，`jsbox_test.fun` 增加沙箱
-  模式断言（25/25）。剩余：bubblewrap/nsjail、Windows Job Object、
-  macOS sandbox profile、`process.run` 输出上限。
+  模式断言（25/25）。`process.run` 增加 `output` 字节预算并在超限时终止
+  子进程，jsbox 桥接用它限制失控 stdout。剩余：bubblewrap/nsjail、
+  Windows Job Object、macOS sandbox profile。

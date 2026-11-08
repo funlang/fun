@@ -111,10 +111,12 @@ fun _jbWorker()
   end if;
 end fun;
 
-fun _jbRunProcess(text, timeout)
+fun _jbRunProcess(text, timeout, output)
   var p = _jbWorker();
   try
-    result = process.run(p, [], [stdin: text, timeout: timeout]);
+    // The worker caps its own JSON result. This parent-side cap also bounds
+    // stdout from a compromised worker before it exits.
+    result = process.run(p, [], [stdin: text, timeout: timeout, output: output]);
   except
     raise 'jsbox: cannot start ' & p & ' (' & ('' & @) & ')';
   end try;
@@ -163,7 +165,7 @@ fun run(code, input, opts)
 
   var r = nil;
   try
-    r = _jbRunProcess(text, timeout + 1000);
+    r = _jbRunProcess(text, timeout + 1000, output + 64 * 1024);
   except
     result = _jbError('worker', 'WorkerError', '' & @, false);
     return;
@@ -171,6 +173,10 @@ fun run(code, input, opts)
 
   if r.timedOut then
     result = _jbError('timeout', 'TimeoutError', 'worker exceeded the hard timeout', true);
+    return;
+  end if;
+  if r.outputExceeded then
+    result = _jbError('output_limit', 'RangeError', 'worker output exceeded the limit', true);
     return;
   end if;
   if not r.ok then

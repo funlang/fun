@@ -27,6 +27,11 @@
   安装失败则拒绝运行。bubblewrap/nsjail 隔离与 Windows/macOS worker 限制
   尚未实现。
 
+- `process.run` 新增 `output` 选项：stdout 与 stderr 共用字节预算，超限会
+  终止直接子进程并返回 `outputExceeded = true`、`ok = false`。jsbox 桥接
+  用它限制 worker 退出前的 stdout，补上被攻破的 worker 可以无限写出的缺口；
+  小结果行为不变。
+
 - `jsonschema` 补齐 v0.x 关键字。`checkJson` / `checkFd`（以及布尔快捷
   `validJson` / `validFd`）先解析文本再校验；JSON 标量根保留原类型，非法
   JSON 作为普通结果返回（关键字 `parse`），schema 文本按严格模式解析。新增

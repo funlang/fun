@@ -907,16 +907,20 @@ end if;
 
 `process.run(name[, args[, opts]])` 直接执行命令，不经过 shell；尾随参数可省略，
 没有参数时也可传 `nil` 或空列表。选项为 `stdin`（字符串，默认 `''`）、
-`cwd`（空表示继承当前目录）、`timeout`（毫秒；`nil`/`0` 表示不超时）。
-返回对象包含 `ok`、`exitCode`、`signal`、`timedOut`、`stdout`、`stderr`。
+`cwd`（空表示继承当前目录）、`timeout`（毫秒；`nil`/`0` 表示不超时）、
+`output`（字节；`nil`/`0` 表示不限）。
+返回对象包含 `ok`、`exitCode`、`signal`、`timedOut`、`outputExceeded`、
+`stdout`、`stderr`。
 非 0 退出码是正常结果；无法启动才 raise。Unix 上被信号终止时
 `exitCode` 为负信号值（例如 `-15`），同时给出信号编号；Windows 返回进程退出码，
 `signal` 为 `nil`。stdout/stderr 分开捕获为原始字节，不做编码或换行转换。
 
 调用会阻塞到子进程退出或超时。超时后终止直接子进程并等待，结果中
 `timedOut = true`、`ok = false`。实现使用单线程 stdio 泵，避免 stdout/stderr
-互相堵死；不创建语言级线程，不杀整个进程树，也暂不支持输出上限、流式或交互式
-stdio。需要 shell 语法时显式调用 `sh -c` / `cmd /c`。`process.run` 需要启用 FFI
+互相堵死；不创建语言级线程，也不杀整个进程树。设置 `output` 后 stdout 与
+stderr 共用同一字节预算，超限会终止直接子进程并置 `outputExceeded = true`、
+`ok = false`；流式/交互式 stdio 仍未支持。需要 shell 语法时显式调用
+`sh -c` / `cmd /c`。`process.run` 需要启用 FFI
 的构建。Windows v1 的 stdin 用临时文件承载（Unix 用管道），且 `CreateProcessA`
 的 ANSI 路径不能可靠处理非 ASCII 命令行/路径；32 位 Unicode/Delphi 仍需人工验证。
 如果直接子进程退出后孙进程仍持有 stdout/stderr，v1 可能在短暂宽限期后停止读取，

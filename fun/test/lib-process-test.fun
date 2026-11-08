@@ -180,3 +180,34 @@ except
   bad = ('' & @).subpos('unknown option') >= 0;
 end try;
 ?. bad;
+
+// output cap stops a runaway producer
+if win then
+  r = process.run('cmd.exe', ['/d', '/c', 'for /L %i in (1,1,20000) do @echo x'],
+                  [output: 1024]);
+else
+  r = process.run('/bin/dd', ['if=/dev/zero', 'bs=1024', 'count=200'],
+                  [output: 1024]);
+end if;
+?. r.ok = false;
+?. r.outputExceeded;
+?. r.stdout.length() <= 1024;
+
+// output cap does not affect results below the limit
+if win then
+  r = process.run('cmd.exe', ['/d', '/c', 'echo ok'], [output: 1024]);
+else
+  r = process.run('/bin/echo', ['ok'], [output: 1024]);
+end if;
+?. r.ok;
+?. r.outputExceeded = false;
+?. r.stdout.length() < 1024;
+
+// invalid output option
+bad = false;
+try
+  process.run('x', [], [output: -1]);
+except
+  bad = ('' & @).subpos('output must be') >= 0;
+end try;
+?. bad;

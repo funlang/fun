@@ -989,9 +989,10 @@ end if;
 shell. Trailing arguments are optional; pass `nil` or an empty list for no
 arguments. Options are `stdin` (a string; default `''`), `cwd` (empty
 inherits the current directory), and `timeout` in milliseconds (`nil`/`0`
-means no timeout).
-The returned object has `ok`, `exitCode`, `signal`, `timedOut`, `stdout`, and
-`stderr`. A non-zero exit is a normal result; a command that cannot start raises.
+means no timeout), and `output` in bytes (`nil`/`0` means unlimited).
+The returned object has `ok`, `exitCode`, `signal`, `timedOut`, `outputExceeded`,
+`stdout`, and `stderr`. A non-zero exit is a normal result; a command that
+cannot start raises.
 On Unix a signal exit reports a negative `exitCode` (for example `-15`) and the
 signal number; Windows reports the process exit code and `signal` is `nil`.
 stdout and stderr are captured separately as raw bytes; input/output are not
@@ -1001,9 +1002,11 @@ The call blocks until the child exits or the timeout expires. On timeout the
 direct child is terminated and waited for, and the result has `timedOut = true`
 and `ok = false`. The implementation uses a single-threaded stdio pump, so
 stdout and stderr cannot deadlock each other; it does not create language
-threads, does not kill the whole process tree, and does not cap output or
-provide streaming/interactive stdio yet. Use `sh -c` / `cmd /c` explicitly when
-shell syntax is required. `process.run` needs an FFI-enabled build. On Windows
+threads, does not kill the whole process tree, and does not provide streaming
+or interactive stdio yet. When `output` is set, stdout and
+stderr share one byte budget; exceeding it terminates the direct child and
+sets `outputExceeded = true` and `ok = false`. Use `sh -c` / `cmd /c` explicitly
+when shell syntax is required. `process.run` needs an FFI-enabled build. On Windows
 v1 stdin is backed by a temporary file (Unix uses a pipe), and the ANSI
 `CreateProcessA` path does not reliably handle non-ASCII command lines or paths;
 the 32-bit Unicode/Delphi path remains manual. If a descendant keeps

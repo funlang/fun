@@ -34,6 +34,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
   closed. bubblewrap/nsjail isolation and Windows/macOS worker limits are
   still pending.
 
+- `process.run` gains an `output` option: stdout and stderr share a byte
+  budget, and exceeding it terminates the direct child and returns
+  `outputExceeded = true` with `ok = false`. The jsbox bridge uses it to bound
+  worker stdout before exit, closing the gap where a compromised worker could
+  write an unlimited stream. Small results are unchanged.
+
 - `jsonschema` gains the v0.x keyword set. `checkJson` / `checkFd` (and the
   `validJson` / `validFd` shortcuts) parse text before validating; scalar JSON
   roots keep their type, malformed JSON returns a normal result with keyword
