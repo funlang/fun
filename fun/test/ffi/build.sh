@@ -37,10 +37,24 @@ case "$(uname -s 2>/dev/null)" in
     *)      OUT="$HERE/libffitest.so";    SHARED="-shared" ;;
 esac
 
-# Rebuild only when the source is newer than the artifact.
+# Rebuild when the source is newer than the artifact, or when the artifact was
+# built for another CPU. The latter happens after a cross/qemu regression run
+# (e.g. loongarch64) leaves its libffitest.so behind, and a later native run
+# would otherwise load the wrong-architecture library.
 if [ -f "$OUT" ] && [ ! "$SRC" -nt "$OUT" ]; then
-    echo "up to date: $OUT"
-    exit 0
+    host_arch=""
+    case "$(uname -m 2>/dev/null)" in
+        x86_64|amd64)        host_arch='x86-64|x86_64' ;;
+        aarch64|arm64)       host_arch='aarch64|arm64' ;;
+        loongarch64|loong64) host_arch='LoongArch' ;;
+        i?86)                host_arch='80386' ;;
+    esac
+    if [ -z "$host_arch" ] || ! command -v file >/dev/null 2>&1 || \
+       file "$OUT" | grep -qiE "$host_arch"; then
+        echo "up to date: $OUT"
+        exit 0
+    fi
+    echo "rebuilding $OUT for $(uname -m)"
 fi
 
 "$CC_BIN" -O2 -fPIC $SHARED -o "$OUT" "$SRC"
