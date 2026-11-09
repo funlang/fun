@@ -85,7 +85,10 @@ case "$HOSTOS" in
                 arm64|aarch64) PLATFORM=macos-aarch64 ;;
                 *)             PLATFORM=macos ;;
             esac ;;
-    linux)  PLATFORM=linux ;;
+    linux)  case "$(uname -m 2>/dev/null)" in
+                loongarch64|loong64) PLATFORM=linux-loongarch64 ;;
+                *)                   PLATFORM=linux ;;
+            esac ;;
     *)      PLATFORM="$HOSTOS" ;;
 esac
 PLATFORM="${FUNREG_PLATFORM:-$PLATFORM}"

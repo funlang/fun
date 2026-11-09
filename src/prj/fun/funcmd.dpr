@@ -84,7 +84,9 @@ uses
   host in '..\..\lib\host.pas',
   utils in '..\..\utils\utils.pas';
 
+{$IfNDef FunNoRes}
 {$R *.res}
+{$EndIf}
 
 type
   CFunParser = class(CParser)

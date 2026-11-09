@@ -1,0 +1,44 @@
+# Tests skipped on Linux LoongArch64 (loongarch64). run-linux-regression.sh
+# reads this when FUNREG_PLATFORM=linux-loongarch64 (set by the CI job or by a
+# native LoongArch host with uname -m = loongarch64). One per line:
+# name<TAB>reason. Blank lines and # lines are ignored.
+#
+# The core interpreter and the portable standard library run against the shared
+# expected/ snapshots. The entries below are capabilities the current
+# cross-build does not produce yet, not architecture miscompiles:
+#
+#   - lib-asm / lib-jit: only the x86 and aarch64 encoders exist.
+#   - lib-tcc: TinyCC has no LoongArch backend.
+#   - FFI: the cross toolchain has no loongarch64 libffi yet, so getapi() is
+#     not compiled in.
+#   - PCRE: the cross build cannot link the bundled C PCRE without a target
+#     libc; regex literals are therefore unavailable.
+#   - external services/libraries: curl, sqlite, libxml2, unixODBC, OpenSSL.
+
+# --- native code generation -------------------------------------------------
+lib-asm-lnx.fun	x86-64 assembly backend
+lib-asm-x64.fun	x86-64 assembly backend
+fractal-asm-x64.fun	x86-64 assembly backend
+lib-asm-a64.fun	aarch64 assembly backend, wrong cpu
+lib-jit-test.fun	JIT backend emits x86-64
+lib-tcc-test.fun	no TinyCC LoongArch backend
+
+# --- FFI (no loongarch64 libffi in the cross toolchain) ---------------------
+raw-address-getapi.fun	needs Linux FFI
+ffi-scalar.fun	no FFI in the cross build
+ffi-int64.fun	no FFI in the cross build
+ffi-float.fun	no FFI in the cross build
+ffi-float-cb.fun	no FFI in the cross build
+ffi-callbacks.fun	no FFI in the cross build
+
+# --- regex (PCRE needs a target libc) --------------------------------------
+regex-adv.fun	no PCRE in the cross build
+lib-regex-test.fun	no PCRE in the cross build
+lib-regex-replace.fun	no PCRE in the cross build
+lib-regex-cache.fun	no PCRE in the cross build
+lib-bnf-dedup.fun	depends on regex
+
+# --- external libraries / services -----------------------------------------
+lib-loadcheck.sh	module set/library availability
+lib-func-check.fun	module set/library availability
+run-benchmarks.sh	not a correctness test

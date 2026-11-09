@@ -62,7 +62,7 @@
 | P-06 | 平台 | P3 | OPEN | `lib-os` B 档（GetIPs/inotify 等）未做 | `art/notes/linux-capabilities.md` |
 | P-07 | 机器码 | P2 | OPEN | `asm-list` 的 x86-64 表覆盖不全 | `art/notes/arch-machine-code-plan.md` |
 | P-08 | macOS | P2 | OPEN | 真机复验（x64/arm64 回归）与分发收尾：`codesign`/公证、Apple TCC 隐私授权（Desktop/Documents/Downloads，原 P-12 并入）；构建与运行时接入见已完成 P-14 | `art/notes/macos-port.md` |
-| P-09 | 架构 | P3 | OPEN | LoongArch 工具链与编码器未做 | `art/notes/arch-machine-code-plan.md` |
+| P-09 | 架构 | P3 | OPEN | LoongArch 工具链与编码器未做；2026-11 spike 已用 FPC 3.3.1 trunk + GNU binutils 编出并跑通核心 funcmd（qemu），解释器+标准库约 2–3.5 人周，含汇编层 4–7 人周，TCC 无后端 | `art/notes/loongarch-port-assessment.md`、`art/notes/arch-machine-code-plan.md` |
 | P-13 | Windows/ARM | P3 | OPEN | win-arm64 无构建：FPC 3.2.2 没有 win64/aarch64 target，`regression.yml` 的 windows-arm64 job 仍禁用，需更新 FPC 或交叉工具链 | `.github/workflows/regression.yml` |
 
 ## 5. 接受 / 不做 / 已完成
