@@ -342,3 +342,152 @@ r.body = 'a=1&b=2';
 r.headS['content-type'] = 'application/x-www-form-urlencoded';
 ?. r.form()['a'] = '1';
 ?. r.form()['b'] = '2';
+
+// --- writer: basic fields, file and round-trip ---------------------------
+var w1 = HttpMultipartWriter([boundary: 'fun-w1']);
+?. w1.contentType() = 'multipart/form-data; boundary=fun-w1';
+w1.field('user', 'alice');
+w1.field('tag', 'one');
+w1.field('tag', 'two');
+w1.file('avatar', 'a.txt', 'hello', [contentType: 'text/plain']);
+var wb1 = w1.body();
+?. w1.body() = wb1;
+?. wb1.substr(0, ('--fun-w1' & CRLF).length()) = '--fun-w1' & CRLF;
+?. wb1.subpos('--fun-w1--' & CRLF) = wb1.length() - ('--fun-w1--' & CRLF).length();
+var wm1 = HttpMultipartParse(wb1, w1.contentType());
+?. wm1['ok'];
+?. wm1['parts'].@count() = 4;
+?. wm1['fields']['user'][0] = 'alice';
+?. wm1['fields']['tag'].@count() = 2;
+?. wm1['fields']['tag'][0] = 'one';
+?. wm1['fields']['tag'][1] = 'two';
+?. wm1['files']['avatar'][0]['filename'] = 'a.txt';
+?. wm1['files']['avatar'][0]['contentType'] = 'text/plain';
+?. wm1['files']['avatar'][0]['data'] = 'hello';
+?. wm1['parts'][0]['contentType'] = 'text/plain';
+
+// --- writer: file defaults, empty filename, empty writer -----------------
+var w2 = HttpMultipartWriter([boundary: 'fun-w2']);
+w2.file('f', 'x.bin', 'abc');
+var wm2 = HttpMultipartParse(w2.body(), w2.contentType());
+?. wm2['files']['f'][0]['contentType'] = 'application/octet-stream';
+
+var w3 = HttpMultipartWriter([boundary: 'fun-w3']);
+w3.file('empty', '', '');
+var wb3 = w3.body();
+?. wb3.subpos('filename=""') >= 0;
+var wm3 = HttpMultipartParse(wb3, w3.contentType());
+?. wm3['files']['empty'].@count() = 1;
+?. wm3['files']['empty'][0]['filename'].type() = 8;
+?. wm3['files']['empty'][0]['filename'].length() = 0;
+?. wm3['files']['empty'][0]['data'].length() = 0;
+
+var w4 = HttpMultipartWriter([boundary: 'fun-w4']);
+var wb4 = w4.body();
+?. wb4 = '--fun-w4--' & CRLF;
+var wm4 = HttpMultipartParse(wb4, w4.contentType());
+?. wm4['ok'];
+?. wm4['parts'].@count() = 0;
+
+// --- writer: binary, Unicode, embedded CRLF ------------------------------
+var wbytes = '';
+for i = 0 to 255 do wbytes &= i.toChar(); end do;
+var w5 = HttpMultipartWriter([boundary: 'fun-w5']);
+w5.field('bin', wbytes);
+w5.file('blob', 'b.bin', wbytes);
+var wm5 = HttpMultipartParse(w5.body(), w5.contentType());
+?. wm5['fields']['bin'][0].length() = 256;
+?. wm5['fields']['bin'][0].toByte(0) = 0;
+?. wm5['fields']['bin'][0].toByte(255) = 255;
+?. wm5['files']['blob'][0]['data'].length() = 256;
+?. wm5['files']['blob'][0]['data'].toByte(128) = 128;
+
+var w6 = HttpMultipartWriter([boundary: 'fun-w6']);
+w6.field('名字', '张三');
+w6.file('文件', '报告.txt', '内容');
+var wm6 = HttpMultipartParse(w6.body(), w6.contentType());
+?. wm6['fields']['名字'][0] = '张三';
+?. wm6['files']['文件'][0]['filename'] = '报告.txt';
+?. wm6['files']['文件'][0]['data'] = '内容';
+
+var w7 = HttpMultipartWriter([boundary: 'fun-w7']);
+w7.field('note', 'a' & CRLF & 'b' & CRLF & '--not-the-boundary');
+w7.file('raw', 'r.txt', 'x' & CRLF & '--other' & CRLF & 'y');
+var wm7 = HttpMultipartParse(w7.body(), w7.contentType());
+?. wm7['fields']['note'][0] = 'a' & CRLF & 'b' & CRLF & '--not-the-boundary';
+?. wm7['files']['raw'][0]['data'] = 'x' & CRLF & '--other' & CRLF & 'y';
+
+// --- writer: quoted names and quoted boundary ----------------------------
+var wbs = 92.toChar();
+var wq = 34.toChar();
+var w8 = HttpMultipartWriter([boundary: 'fun-w8']);
+w8.field('a' & wq & 'b', 'v');
+w8.file('c' & wbs & 'd', 'e' & wq & 'f.txt', 'x');
+var wm8 = HttpMultipartParse(w8.body(), w8.contentType());
+?. wm8['fields']['a' & wq & 'b'][0] = 'v';
+?. wm8['files']['c' & wbs & 'd'][0]['filename'] = 'e' & wq & 'f.txt';
+
+var w9 = HttpMultipartWriter([boundary: 'a b(c)']);
+?. w9.contentType() = 'multipart/form-data; boundary="a b(c)"';
+w9.field('x', 'y');
+var wm9 = HttpMultipartParse(w9.body(), w9.contentType());
+?. wm9['ok'];
+?. wm9['fields']['x'][0] = 'y';
+
+// --- writer: default boundary and locked boundary ------------------------
+var wbp = 'multipart/form-data; boundary=';
+var w10 = HttpMultipartWriter();
+var wct10 = w10.contentType();
+?. wct10.substr(0, wbp.length()) = wbp;
+var wbnd = wct10.substr(wbp.length());
+?. wbnd.substr(0, 4) = 'fun-';
+?. wbnd.length() = 40;
+w10.field('k', 'v');
+var wb10 = w10.body();
+?. wb10.substr(0, ('--' & wbnd & CRLF).length()) = '--' & wbnd & CRLF;
+var wm10 = HttpMultipartParse(wb10, wct10);
+?. wm10['ok'];
+?. wm10['fields']['k'][0] = 'v';
+
+var w11 = HttpMultipartWriter();
+var wct11 = w11.contentType();
+w11.field('k', 'v');
+?. w11.contentType() = wct11;
+
+// A boundary-looking prefix that is not a delimiter stays data.
+var w12 = HttpMultipartWriter([boundary: 'hit']);
+w12.field('a', '--hitz' & CRLF & 'ok');
+w12.field('b', 'x' & CRLF & '--hitz' & CRLF & 'y');
+var wm12 = HttpMultipartParse(w12.body(), w12.contentType());
+?. wm12['ok'];
+?. wm12['fields']['a'][0] = '--hitz' & CRLF & 'ok';
+?. wm12['fields']['b'][0] = 'x' & CRLF & '--hitz' & CRLF & 'y';
+
+// --- writer: invalid input raises ----------------------------------------
+fun mpwRaise(fn)
+  var bad = false;
+  try
+    fn();
+  except
+    bad = true;
+  end try;
+  result = bad;
+end fun;
+
+?. mpwRaise(((){ var wx = HttpMultipartWriter([boundary: 'bad' & wq & 'b']); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter([boundary: 'a'.x(71)]); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter([boundary: '']); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter([nope: 1]); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter('x'); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter(); wx.field('', 'v'); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter(); wx.field('a' & CRLF, 'v'); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter(); wx.field('a', 1); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter(); wx.file('a', 1, 'x'); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter(); wx.file('a', 'b', 1); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter(); wx.file('a', 'b', 'c', [contentType: 'text/plain' & CRLF]); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter(); wx.file('a', 'b', 'c', [nope: 1]); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter(); wx.field('a', 'b'); wx.body(); wx.field('c', 'd'); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter([boundary: 'hit']); wx.field('a', 'x' & CRLF & '--hit' & CRLF); wx.body(); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter([boundary: 'hit']); wx.field('a', '--hit' & CRLF); wx.body(); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter([boundary: 'hit']); wx.field('a', 'x' & CRLF & '--hit'); wx.body(); }));
+?. mpwRaise(((){ var wx = HttpMultipartWriter([boundary: 'hit']); wx.field('a', '--hit'); wx.body(); }));

@@ -1,16 +1,25 @@
 // Copyright (c) 2010-2026 Zhang Weidong <zwd@funlang.org>
 // SPDX-License-Identifier: MIT
 //
-// http-multipart: parse multipart/form-data bodies (RFC 7578 / RFC 2046).
+// http-multipart: parse and build multipart/form-data bodies (RFC 7578 / RFC 2046).
 //
+// Parse:
 //     var m = HttpMultipartParse(req.body, req.header('content-type'));
 //     if not m.ok then raise m.error; end if;
 //     var name = m.fields['name'][0];
 //     var file = m.files['avatar'][0];
 //
-// The body must already be in memory. Fields are strings; files are part
-// objects with filename/contentType/headers/data. Duplicate names stay as
-// arrays. Invalid input returns ok:false/error; it does not raise.
+// Build:
+//     var w = HttpMultipartWriter();
+//     w.field('user', 'alice');
+//     w.file('avatar', 'a.txt', data);
+//     var body = w.body();
+//     var ct = w.contentType();
+//
+// Bodies are built in memory. Fields are strings; files are part objects with
+// filename/contentType/headers/data. Duplicate names stay as arrays. Invalid
+// parse input returns ok:false/error; writer misuse raises.
+use 'uuid.fun';
 
 var _MP_CRLF = 13.toChar() & 10.toChar();
 var _MP_CRLF2 = _MP_CRLF & _MP_CRLF;
@@ -274,4 +283,249 @@ fun HttpMultipartParse(body, ct, opts)
     end if;
   end do;
   result = new [ok: true, error: nil, parts: parts, fields: fields, files: files];
+end fun;
+
+// --- writer ---------------------------------------------------------------
+
+var _MPW_BCHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz' & "'()+_,-./:=? ";
+var _MPW_TCHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&' & 39.toChar() & '*+-.^_`|~';
+
+fun _mpwString(v, label)
+  if v.type() <> 8 then raise 'http-multipart: ' & label & ' must be a string'; end if;
+  result = true;
+end fun;
+
+fun _mpwHeaderSafe(s, label)
+  if s.subpos(13.toChar()) >= 0 or s.subpos(10.toChar()) >= 0 or s.subpos(0.toChar()) >= 0 then
+    raise 'http-multipart: ' & label & ' must not contain CR, LF or NUL';
+  end if;
+  result = true;
+end fun;
+
+fun _mpwEscape(s)
+  var out = new [];
+  var i = 0;
+  while i < s.length() do
+    var c = s[i];
+    if c = 92.toChar() or c = 34.toChar() then out.@add(92.toChar()); end if;
+    out.@add(c);
+    i += 1;
+  end do;
+  result = out.@toJson(-1);
+end fun;
+
+fun _mpwBchar(c)
+  result = _MPW_BCHARS.subpos(c) >= 0;
+end fun;
+
+fun _mpwBoundaryValid(b)
+  var n = b.length();
+  if n < 1 or n > 70 then result = false; return; end if;
+  if b[n - 1] = ' ' then result = false; return; end if;
+  var i = 0;
+  while i < n do
+    if not _mpwBchar(b[i]) then result = false; return; end if;
+    i += 1;
+  end do;
+  result = true;
+end fun;
+
+fun _mpwNeedsQuote(b)
+  var i = 0;
+  while i < b.length() do
+    if _MPW_TCHARS.subpos(b[i]) < 0 then result = true; return; end if;
+    i += 1;
+  end do;
+  result = false;
+end fun;
+
+fun _mpwDelimiterAt(s, pos, b)
+  var d = '--' & b;
+  if pos + d.length() > s.length() then result = false; return; end if;
+  if s.substr(pos, d.length()) <> d then result = false; return; end if;
+  var q = _mpSkipHws(s, pos + d.length());
+  // The writer always appends CRLF after data, so a delimiter ending the data
+  // still becomes a real delimiter in the final body.
+  if q >= s.length() then result = true; return; end if;
+  var m = '';
+  if q + 2 <= s.length() then m = s.substr(q, 2); end if;
+  result = m = _MP_CRLF or m = '--';
+end fun;
+
+fun _mpwDataCollides(data, b)
+  if _mpwDelimiterAt(data, 0, b) then result = true; return; end if;
+  var mark = _MP_CRLF & '--' & b;
+  var base = 0;
+  var rest = data;
+  loop
+    var j = rest.subpos(mark);
+    if j < 0 then result = false; return; end if;
+    if _mpwDelimiterAt(data, base + j + _MP_CRLF.length(), b) then result = true; return; end if;
+    base += j + 1;
+    rest = data.substr(base);
+  end loop;
+end fun;
+
+class _MPW(o)
+  var parts = new [];
+  var boundaryValue = nil;
+  var custom = nil;
+  var finished = false;
+  var bodyText = '';
+
+  if o <> nil then
+    var bad = '';
+    var listish = false;
+    try
+      o.@each((v, k){
+        if k = nil or k = '' then
+          listish = true;
+        elsif k <> 'boundary' then
+          bad = k;
+        end if;
+      });
+    except
+      raise 'http-multipart: opts must be a set';
+    end try;
+    if listish then raise 'http-multipart: opts must be a set'; end if;
+    if bad <> '' then raise 'http-multipart: unknown option: ' & bad; end if;
+    if o.@has('boundary') then
+      var b = o['boundary'];
+      _mpwString(b, 'boundary');
+      if not _mpwBoundaryValid(b) then raise 'http-multipart: invalid boundary'; end if;
+      custom = b;
+    end if;
+  end if;
+
+  fun checkFileOpts(opts)
+    if opts = nil then result = true; return; end if;
+    var bad = '';
+    var listish = false;
+    try
+      opts.@each((v, k){
+        if k = nil or k = '' then
+          listish = true;
+        elsif k <> 'contentType' then
+          bad = k;
+        end if;
+      });
+    except
+      raise 'http-multipart: file opts must be a set';
+    end try;
+    if listish then raise 'http-multipart: file opts must be a set'; end if;
+    if bad <> '' then raise 'http-multipart: unknown option: ' & bad; end if;
+    result = true;
+  end fun;
+
+  fun fileContentType(opts)
+    result = 'application/octet-stream';
+    if opts = nil or not opts.@has('contentType') then return; end if;
+    var ct = opts['contentType'];
+    _mpwString(ct, 'contentType');
+    if ct.length() = 0 then raise 'http-multipart: contentType must not be empty'; end if;
+    _mpwHeaderSafe(ct, 'contentType');
+    result = ct;
+  end fun;
+
+  fun field(name, value)
+    if this.finished then raise 'http-multipart: writer is finished'; end if;
+    _mpwString(name, 'name');
+    if name.length() = 0 then raise 'http-multipart: name is required'; end if;
+    _mpwHeaderSafe(name, 'name');
+    _mpwString(value, 'field value');
+    var p = new [];
+    p.name = name;
+    p.isFile = false;
+    p.filename = nil;
+    p.contentType = nil;
+    p.data = value;
+    this.parts.@add(p);
+    result = true;
+  end fun;
+
+  fun file(name, filename, data, opts)
+    if this.finished then raise 'http-multipart: writer is finished'; end if;
+    _mpwString(name, 'name');
+    if name.length() = 0 then raise 'http-multipart: name is required'; end if;
+    _mpwHeaderSafe(name, 'name');
+    _mpwString(filename, 'filename');
+    _mpwHeaderSafe(filename, 'filename');
+    _mpwString(data, 'file data');
+    this.checkFileOpts(opts);
+    var ct = this.fileContentType(opts);
+    var p = new [];
+    p.name = name;
+    p.isFile = true;
+    p.filename = filename;
+    p.contentType = ct;
+    p.data = data;
+    this.parts.@add(p);
+    result = true;
+  end fun;
+
+  fun dataCollides(b)
+    var i = 0;
+    while i < this.parts.@count() do
+      if _mpwDataCollides(this.parts[i].data, b) then result = true; return; end if;
+      i += 1;
+    end do;
+    result = false;
+  end fun;
+
+  fun ensureBoundary()
+    if this.boundaryValue <> nil then result = true; return; end if;
+    if this.custom <> nil then
+      this.boundaryValue = this.custom;
+      result = true;
+      return;
+    end if;
+    var tries = 0;
+    loop
+      var b = 'fun-' & UUID();
+      if not this.dataCollides(b) then
+        this.boundaryValue = b;
+        exit;
+      end if;
+      tries += 1;
+      if tries >= 10 then raise 'http-multipart: cannot choose a boundary'; end if;
+    end loop;
+    result = true;
+  end fun;
+
+  fun contentType()
+    this.ensureBoundary();
+    var b = this.boundaryValue;
+    if _mpwNeedsQuote(b) then b = '"' & b & '"'; end if;
+    result = 'multipart/form-data; boundary=' & b;
+  end fun;
+
+  fun body()
+    if this.finished then result = this.bodyText; return; end if;
+    this.ensureBoundary();
+    if this.dataCollides(this.boundaryValue) then
+      raise 'http-multipart: boundary appears in data';
+    end if;
+    var out = new [];
+    var i = 0;
+    while i < this.parts.@count() do
+      var p = this.parts[i];
+      out.@add('--' & this.boundaryValue & _MP_CRLF);
+      var cd = 'Content-Disposition: form-data; name="' & _mpwEscape(p.name) & '"';
+      if p.isFile then cd &= '; filename="' & _mpwEscape(p.filename) & '"'; end if;
+      out.@add(cd & _MP_CRLF);
+      if p.isFile then out.@add('Content-Type: ' & p.contentType & _MP_CRLF); end if;
+      out.@add(_MP_CRLF);
+      out.@add(p.data);
+      out.@add(_MP_CRLF);
+      i += 1;
+    end do;
+    out.@add('--' & this.boundaryValue & '--' & _MP_CRLF);
+    this.bodyText = out.@toJson(-1);
+    this.finished = true;
+    result = this.bodyText;
+  end fun;
+end class;
+
+fun HttpMultipartWriter(opts)
+  result = _MPW(opts);
 end fun;

@@ -638,6 +638,20 @@ var name = m.fields['name'][0];
 var file = m.files['avatar'][0];
 ```
 
+客户端上传用 `HttpMultipartWriter` 生成同样的 body：
+
+```fun
+use 'http-multipart.fun';
+
+var w = HttpMultipartWriter();
+w.field('name', 'alice');
+w.file('avatar', 'a.txt', data, [contentType: 'text/plain']);
+var body = w.body();
+var ct = w.contentType();
+```
+
+把 `body` 和 `Content-Type: <ct>` 传给 `HttpClient` 即可发送。
+
 环境变量也可以直接读取，不需要自己写平台 FFI：
 
 ```fun
