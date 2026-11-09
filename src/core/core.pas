@@ -638,7 +638,7 @@ begin
       FTargetIsRE := False
     else
       Exit;
-    if exp is CId and not (exp is CId2) then
+    if (exp is CId) and not (exp is CId2) then
     begin
       s := CId(exp);
       s.find(false);
