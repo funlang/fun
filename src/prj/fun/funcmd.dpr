@@ -32,6 +32,9 @@ library funcmd;
 {$EndIf}
 
 // FunPack (full: create and run bundles) implies FunPackUser (run only).
+{$IfDef FPC_USE_LIBC}
+  {$linklib c}
+{$EndIf}
 {$IfDef FunPack}
   {$Define FunPackUser}
 {$EndIf}

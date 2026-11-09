@@ -1,0 +1,12 @@
+file rc=0 code=0
+file body=hello from fixture
+file html=hello from fixture
+saveas=hello from fixture
+abs=http://h/a/x/y
+root=http://h/z
+scheme=https://q/1
+bare=http://example.com
+dir=http://h/a/c
+err rc=7 msg=Could not connect to server html=nil
+nofile rc=37
+repeat ok=100

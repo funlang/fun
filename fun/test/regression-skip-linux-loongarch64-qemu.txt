@@ -1,0 +1,41 @@
+# Tests skipped on the Linux LoongArch64 qemu-user regression.
+#
+# These are emulation-host limits, not architecture failures:
+#   - lib-asm / lib-jit / lib-tcc: no LoongArch backend yet.
+#   - the lib-fun-pack/package/test/uuid shell tests invoke the target binary
+#     directly instead of through FUNCMD, so they cannot run under qemu-user.
+#   - run-ado-odbc.sh needs an ODBC driver; the Alpine sysroot only carries the
+#     runtime libraries used by the Fun stdlib.
+#   - lib-loadcheck / lib-func-check / run-benchmarks depend on the full host
+#     toolchain and module set.
+#
+# lib-ajax-lnx-test is NOT skipped: it has a linux-loongarch64-qemu snapshot
+# because Alpine's libcurl says "Could not connect" instead of "Couldn't
+# connect".
+
+# --- native code generation -------------------------------------------------
+lib-asm-lnx.fun	x86-64 assembly backend
+lib-asm-x64.fun	x86-64 assembly backend
+fractal-asm-x64.fun	x86-64 assembly backend
+lib-asm-a64.fun	aarch64 assembly backend, wrong cpu
+lib-jit-test.fun	JIT backend emits x86-64
+lib-tcc-test.fun	no TinyCC LoongArch backend
+
+# --- shell project tests that execute the target binary directly -----------
+lib-fun-pack-test.fun	invokes funcmd directly, not through FUNCMD
+lib-fun-package-test.fun	invokes funcmd directly, not through FUNCMD
+lib-fun-test-test.fun	invokes funcmd directly, not through FUNCMD
+lib-fun-uuid-test.fun	invokes funcmd directly, not through FUNCMD
+
+# --- qemu-user /proc differences -------------------------------------------
+# Under qemu-user /proc/<pid>/comm and /proc/<pid>/exe describe the host qemu
+# process, not the guest funcmd, so these two process-name assertions cannot
+# pass in emulation. They pass on native LoongArch hardware.
+lib-proc-test.fun	/proc/<pid>/exe names the qemu host process
+lib-os-lnx-test.fun	/proc/<pid>/comm names the qemu host process
+
+# --- host toolchain / services not in the emulated sysroot -----------------
+run-ado-odbc.sh	no ODBC driver in the emulated sysroot
+lib-loadcheck.sh	module set/library availability
+lib-func-check.fun	module set/library availability
+run-benchmarks.sh	not a correctness test

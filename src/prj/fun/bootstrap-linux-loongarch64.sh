@@ -33,6 +33,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 ROOT="${LOONG_FPC_ROOT:-$HOME/.fun/linux-loongarch64}"
 JOBS="${JOBS:-2}"
+FPC_USE_LIBC="${FPC_USE_LIBC:-0}"
 CPU=loongarch64
 
 FPC_BOOT="${FPC_BOOT:-}"
@@ -62,6 +63,10 @@ RANLIB_BIN="$(find_tool ranlib 2>/dev/null || command -v ranlib)" || true
 
 mkdir -p "$ROOT/bin" "$ROOT/units/$CPU-linux" "$ROOT/units-objpas/$CPU-linux" \
          "$ROOT/units-hash/$CPU-linux" "$ROOT/tools"
+if [ "$FPC_USE_LIBC" = "1" ]; then
+    mkdir -p "$ROOT/units-libc/$CPU-linux" "$ROOT/units-objpas-libc/$CPU-linux" \
+             "$ROOT/units-hash-libc/$CPU-linux" "$ROOT/units-ffi/$CPU-linux"
+fi
 
 # Private binutils names for FPC: <cpu>-<os>-as / -ld.
 for pair in "as:$AS_BIN" "ld:$LD_BIN" "ar:$AR_BIN" "ranlib:$RANLIB_BIN"; do
@@ -115,7 +120,57 @@ echo "=== install hash units"
           -FU"$ROOT/units-hash/$CPU-linux" -FE"$ROOT/units-hash/$CPU-linux"
   done )
 
+if [ "$FPC_USE_LIBC" = "1" ]; then
+    echo "=== rebuild RTL with libc startup"
+    ( cd "$FPC_SRC" && make -C compiler cycle CROSSINSTALL=1 \
+        CPU_TARGET="$CPU" OS_TARGET=linux \
+        CROSSBINDIR="$TOOLS" BINUTILSPREFIX="${CPU}-linux-" \
+        FPC="$FPC_SRC/compiler/ppcx64" PP="$FPC_SRC/compiler/ppcx64" \
+        RTLOPT="-dFPC_USE_LIBC" -j"$JOBS" )
+    cp -f "$FPC_SRC/rtl/units/${CPU}-linux/"*.ppu \
+          "$FPC_SRC/rtl/units/${CPU}-linux/"*.o \
+          "$ROOT/units-libc/${CPU}-linux/"
+
+    build_units_libc() {
+        src="$1"; out="$2"; shift 2
+        for u in "$@"; do
+            ( cd "$src" && "$ROOT/bin/ppcross${CPU}" "$u" -n -B -Tlinux \
+                -dFPC_USE_LIBC -XP"${CPU}-linux-" -FD"$TOOLS" \
+                -Fu"$ROOT/units-libc/${CPU}-linux" \
+                -Fu"$FPC_SRC/packages/rtl-objpas/src/inc" \
+                -Fu"$FPC_SRC/packages/rtl-objpas/src/common" \
+                -FU"$out" -FE"$out" )
+        done
+    }
+
+    echo "=== install rtl-objpas units (libc)"
+    build_units_libc "$FPC_SRC/packages/rtl-objpas/src/inc" \
+        "$ROOT/units-objpas-libc/$CPU-linux" \
+        variants.pp dateutils.pp strutils.pp
+
+    echo "=== install hash units (libc)"
+    ( cd "$FPC_SRC/packages/hash/src" && \
+      for u in md5 sha1; do
+          "$ROOT/bin/ppcross${CPU}" "$u.pp" -n -B -Tlinux \
+              -dFPC_USE_LIBC -XP"${CPU}-linux-" -FD"$TOOLS" \
+              -Fu"$ROOT/units-libc/${CPU}-linux" \
+              -FU"$ROOT/units-hash-libc/$CPU-linux" \
+              -FE"$ROOT/units-hash-libc/$CPU-linux"
+      done )
+
+    echo "=== install libffi binding (libc)"
+    ( cd "$FPC_SRC/packages/libffi/src" && \
+      "$ROOT/bin/ppcross${CPU}" ffi.pp -Mobjfpc -n -B -Tlinux \
+          -dFPC_USE_LIBC -XP"${CPU}-linux-" -FD"$TOOLS" \
+          -Fu"$ROOT/units-libc/${CPU}-linux" \
+          -FU"$ROOT/units-ffi/$CPU-linux" -FE"$ROOT/units-ffi/$CPU-linux" )
+fi
+
 echo
 echo "LoongArch64 cross FPC ready under: $ROOT"
 echo "Build the interpreter with:"
-echo "  LOONG_FPC_ROOT=$ROOT $HERE/make-linux-loongarch64.sh"
+if [ "$FPC_USE_LIBC" = "1" ]; then
+    echo "  FULL=1 LOONG_SYSROOT=<musl-sysroot> LOONG_FPC_ROOT=$ROOT $HERE/make-linux-loongarch64.sh"
+else
+    echo "  LOONG_FPC_ROOT=$ROOT $HERE/make-linux-loongarch64.sh"
+fi
