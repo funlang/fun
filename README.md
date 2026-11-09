@@ -679,6 +679,20 @@ var name = m.fields['name'][0];
 var file = m.files['avatar'][0];
 ```
 
+`HttpMultipartWriter` builds the same bodies for client uploads:
+
+```fun
+use 'http-multipart.fun';
+
+var w = HttpMultipartWriter();
+w.field('name', 'alice');
+w.file('avatar', 'a.txt', data, [contentType: 'text/plain']);
+var body = w.body();
+var ct = w.contentType();
+```
+
+Pass `body` and `Content-Type: <ct>` to `HttpClient` to send it.
+
 Environment variables are available without platform-specific FFI:
 
 ```fun
