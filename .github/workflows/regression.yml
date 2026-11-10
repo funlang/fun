@@ -357,9 +357,10 @@ jobs:
           done
 
       # fun-jsbox only depends on jsbox/main.c, build-jsbox.sh (which pins the
-      # QuickJS-ng version) and the toolchain. Rebuilding it costs ~25s on
-      # POSIX and ~45s on the Windows MinGW job, so cache the final binary by
-      # those inputs and skip the build on a hit.
+      # QuickJS-ng version) and the toolchain. Rebuilding it costs ~23-25s on
+      # POSIX and ~44s on the Windows MinGW job, so cache the final binary by
+      # those inputs and skip the build on a hit. The first run after this
+      # change built and saved five caches (4 POSIX + win64).
       - name: Compute jsbox input hash
         id: jsbox-hash
         run: echo "value=${{ hashFiles('src/prj/fun/jsbox/main.c', 'src/prj/fun/build-jsbox.sh') }}" >> "$GITHUB_OUTPUT"
