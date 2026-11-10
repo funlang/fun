@@ -71,6 +71,7 @@
 use 'lib-winsock.fun';
 use 'lib-regex.fun';
 use 'http-multipart.fun';
+use 'auth/util.fun';
 
 var _HTTP_APP = nil;
 
@@ -205,6 +206,56 @@ fun _checkAttr(v)
   if _hasCtl(s) or s.subpos(';') >= 0 then
     raise 'http-server: invalid cookie attribute';
   end if;
+end fun;
+
+fun _signedCookieKey(key)
+  if key = nil or key.type() <> 8 or key.length() = 0 then
+    raise 'http-server: signedCookie key must be a non-empty string';
+  end if;
+  result = true;
+end fun;
+
+fun _cookieSign(value, key)
+  var v = AuthB64UrlEncode(value);
+  result = v & '.' & AuthB64UrlEncode(AuthHmacSha256Raw(key, v));
+end fun;
+
+fun _cookieVerify(token, key)
+  var r = new [];
+  r.ok = false;
+  r.error = 'invalid signed cookie';
+  r.value = nil;
+  if token = nil or token = '' then
+    r.error = 'missing cookie';
+    result = r;
+    return;
+  end if;
+  var dot = token.subpos('.');
+  if dot < 0 or dot + 1 >= token.length() then
+    result = r;
+    return;
+  end if;
+  if token.substr(dot + 1).subpos('.') >= 0 then
+    result = r;
+    return;
+  end if;
+  var v = token.substr(0, dot);
+  var sig = token.substr(dot + 1);
+  try
+    if not AuthBytesEqual(AuthHmacSha256Raw(key, v), AuthB64UrlDecode(sig)) then
+      r.error = 'invalid signature';
+      result = r;
+      return;
+    end if;
+    r.value = AuthB64UrlDecode(v);
+    r.ok = true;
+    r.error = nil;
+  except
+    r.ok = false;
+    r.error = 'invalid signed cookie';
+    r.value = nil;
+  end try;
+  result = r;
 end fun;
 
 fun _cookieLine(name, value, opts, clear)
@@ -417,6 +468,11 @@ class HttpReq()
     result = cookies[k];
   end fun;
 
+  fun signedCookie(name, key)
+    _signedCookieKey(key);
+    result = _cookieVerify(cookie(name), key);
+  end fun;
+
   fun form()
     if formS = nil then
       formS = new [];
@@ -478,6 +534,15 @@ class HttpRes()
   fun cookie(name, value, opts)
     addHeader('Set-Cookie', _cookieLine(name, value, opts, false));
     result = this;
+  end fun;
+
+  fun signedCookie(name, value, key, opts)
+    _signedCookieKey(key);
+    if value = nil then value = ''; end if;
+    if value.type() <> 8 then
+      raise 'http-server: signedCookie value must be a string';
+    end if;
+    result = this.cookie(name, _cookieSign(value, key), opts);
   end fun;
 
   fun clearCookie(name, opts)
