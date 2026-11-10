@@ -19,6 +19,7 @@
 # Branch cases use the backend's `#byte-offset` spelling; the GNU assembler
 # takes a plain address/expression, so the '#' is stripped before assembling.
 set -u
+export LC_ALL=C
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../../.." && pwd)"

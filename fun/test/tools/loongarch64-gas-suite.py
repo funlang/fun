@@ -61,6 +61,7 @@ def main():
         sys.exit('objdump not found: ' + od_bin)
 
     tmp = tempfile.mkdtemp(prefix='la-gas-suite-')
+    env = dict(os.environ, LC_ALL='C')
     npass = nfail = nskip = nother = 0
     fails = []
     for s in sorted(f for f in os.listdir(suite) if f.endswith('.s')):
@@ -82,7 +83,7 @@ def main():
         obj = os.path.join(tmp, base + '.o')
         p = subprocess.run([as_bin, '-o', obj] + asopts + [os.path.join(suite, s)],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           universal_newlines=True)
+                           universal_newlines=True, env=env)
         if p.returncode != 0:
             # X.l marks an intentional assembler-error test
             if os.path.exists(os.path.join(suite, base + '.l')):
@@ -94,7 +95,7 @@ def main():
         odopts = d['objdump'].split() or ['-d']
         q = subprocess.run([od_bin] + odopts + [obj],
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                           universal_newlines=True)
+                           universal_newlines=True, env=env)
         got = instr_words(q.stdout)
         want = instr_words(open(dpath, encoding='utf-8', errors='replace').read())
         if not want:
