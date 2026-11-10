@@ -180,8 +180,12 @@ jobs:
       - name: Install unixODBC + SQLite ODBC driver (Linux)
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends unixodbc libsqliteodbc
+          # The hosted ubuntu image already carries package lists; only refresh
+          # them when the install actually fails (e.g. a stale/missing index).
+          sudo apt-get install -y --no-install-recommends unixodbc libsqliteodbc || {
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends unixodbc libsqliteodbc
+          }
 
       - name: Cache FPC installer dmg (macOS Intel)
         if: runner.os == 'macOS' && runner.arch == 'X64' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true'))
@@ -352,7 +356,24 @@ jobs:
             fi
           done
 
+      # fun-jsbox only depends on jsbox/main.c, build-jsbox.sh (which pins the
+      # QuickJS-ng version) and the toolchain. Rebuilding it costs ~25s on
+      # POSIX and ~45s on the Windows MinGW job, so cache the final binary by
+      # those inputs and skip the build on a hit.
+      - name: Compute jsbox input hash
+        id: jsbox-hash
+        run: echo "value=${{ hashFiles('src/prj/fun/jsbox/main.c', 'src/prj/fun/build-jsbox.sh') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore fun-jsbox
+        id: cache-jsbox
+        uses: actions/cache@v4
+        with:
+          path: fun/fun-jsbox
+          key: jsbox-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.jsbox-hash.outputs.value }}
+
       - name: jsbox sandbox regression
+        env:
+          FUN_JSBOX_SKIP_BUILD: ${{ steps.cache-jsbox.outputs.cache-hit == 'true' && '1' || '0' }}
         run: sh fun/test/run-jsbox-test.sh
 
       - name: Regression
@@ -523,6 +544,7 @@ jobs:
         run: |
           "value=${{ hashFiles('src/**') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "dlls=${{ hashFiles('src/prj/fun/pcre3.dll', 'src/prj/fun/ffi.dll') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "jsbox=${{ hashFiles('src/prj/fun/jsbox/main.c', 'src/prj/fun/build-jsbox.sh') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       # 64-bit libtcc.dll / zlib.dll. They are loaded by name from next to
       # funcmd.exe, so the archive can only ship them if this job builds them
@@ -1057,7 +1079,15 @@ jobs:
           }
           Write-Host "::warning title=safe build (windows-x64) ok::funcmd-safe.exe=$((Get-Item 'funcmd-safe.exe').Length) bytes"
 
+      - name: Restore fun-jsbox.exe (MinGW)
+        id: cache-jsbox-win
+        uses: actions/cache@v4
+        with:
+          path: fun\fun-jsbox.exe
+          key: jsbox-win-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.src-hash.outputs.jsbox }}
+
       - name: Build fun-jsbox.exe (MinGW)
+        if: steps.cache-jsbox-win.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           # Reuse the MinGW toolchain that build-win64-deps.sh already uses on

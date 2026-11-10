@@ -62,7 +62,7 @@
 | P-06 | 平台 | P3 | OPEN | `lib-os` B 档（GetIPs/inotify 等）未做 | `art/notes/linux-capabilities.md` |
 | P-07 | 机器码 | P2 | OPEN | `asm-list` 的 x86-64 表覆盖不全 | `art/notes/arch-machine-code-plan.md` |
 | P-15 | macOS 分发收尾 | P2 | OPEN | P-08 拆分后的未完成部分：正式 `codesign`/公证（需 Developer 证书）、Apple TCC 隐私授权（Desktop/Documents/Downloads，原 P-12）、物理机抽查 | `art/notes/macos-port.md` |
-| P-09 | 架构 | P3 | OPEN | LoongArch：解释器/标准库已在 qemu musl 环境跑通（FFI、PCRE 无 JIT、SQLite 等）；**`lib-asm-loongarch64` 编码器已落地**（binutils 生成表；164 curated + 361 全表 + 1083 随机差分与 GNU as 一致，QEMU 独立编码验证；live 执行待 qemu/真机）。剩余：TCC 无后端策略、CI 接入、真机验收 | `art/notes/loongarch-port-assessment.md`、`art/notes/arch-machine-code-plan.md` |
+| P-16 | LoongArch 发布与真机 | P3 | OPEN | P-09 拆分后的未完成部分：`lib-asm` live 执行在 qemu/真机验收、CI 增加 loongarch 作业、`package.py`/capabilities 发布包、TCC 无后端策略（显式报错或 cc 回退）、真机验收 | `art/notes/loongarch-port-assessment.md`、`art/notes/arch-machine-code-plan.md` |
 | P-13 | Windows/ARM | P3 | OPEN | win-arm64 无构建：FPC 3.2.2 没有 win64/aarch64 target，`regression.yml` 的 windows-arm64 job 仍禁用，需更新 FPC 或交叉工具链 | `.github/workflows/regression.yml` |
 
 ## 5. 接受 / 不做 / 已完成
@@ -78,6 +78,7 @@
 | K-04 | 循环集合深拷贝递归溢出 | DONE | `CEnv` clone 祖先栈 + `CSet.clone` 统一 set/object；循环副本保留在自己的克隆内，`@clone` 同样有栈上下文。`fun/test/clone-cycle-test.fun`、`fun/demos/benchmarks/clone-bench.md` 覆盖。 |
 | P-05 | 第二数据库后端：unixODBC | DONE | MySQL/PostgreSQL 等经驱动管理器接入，unixODBC 与 P-11 同一交付。 |
 | P-11 | unixODBC 后端 | DONE | `lib-ado-unx` 按 `odbc:`/`DRIVER=`/`DSN=` 自动分派，参数、事务、OpenSchema（SQLTables/Columns/PrimaryKeys/ForeignKeys）齐全；CI 装 `unixodbc`+`libsqliteodbc` 并跑 `run-ado-odbc.sh`。 |
+| P-09 | LoongArch 交叉构建、解释器/标准库与汇编后端 | DONE | `src/prj/fun/bootstrap-linux-loongarch64.sh`、`src/prj/fun/make-linux-loongarch64.sh` + GNU binutils 产出 funcmd；musl sysroot 跑通 FFI、PCRE（无 JIT）、zlib、OpenSSL、curl、SQLite、XML，回归 115/115；`lib-asm-loongarch64` 编码器（binutils 生成表；164 curated + 361 全表 + 1083 随机差分与 GNU as 一致，QEMU 独立编码验证）；`install.sh` 与回归平台识别已接入。未进发布矩阵，收尾见 P-16。 |
 | P-08 | macOS 运行时复验（x64/arm64） | DONE | 由 CI 原生 macOS runner 覆盖：`macos-x64`（`macos-15-intel`）与 `macos-arm64`（`macos-latest`，Apple Silicon）跑完整 macOS 套件，含 `MAP_JIT`、`sys_icache_invalidate`、FFI 回调；2026-11-10 六项回归全绿。分发签名/TCC 拆分到 P-15。 |
 | P-14 | macOS 构建与运行时接入 | DONE | x64/arm64 引擎与 Fun 层可交叉构建；`lib-proc-darwin`、`MAP_JIT`、`libtcc.dylib` 接入与 arm64 ad-hoc 签名已完成，CI 有原生 macOS 回归。剩余签名/公证与 TCC 归入 P-15（原 P-08 拆分）。 |
 | Q-01 | `lib-ado-schema.Filter` 丢外键 | DONE | ORM `@Parent`/`@Children` 直接走 OpenSchema，Windows/Unix 均恢复外键。 |
@@ -178,5 +179,7 @@
 - 2026-11-10：LoongArch `lib-asm-loongarch64` 编码器落地（binutils 生成的
   指令表、与 GNU as 逐字节/随机差分、QEMU 独立交叉验证；live 执行待 qemu/真机）。
   macOS 的 P-08 拆分：x64/arm64 运行时复验由 CI 原生 macOS runner 覆盖并标记
-  DONE，正式签名/公证与 TCC 独立为 P-15。回归刷新为 `133/133`，加载检查
-  `78/84`。
+  DONE，正式签名/公证与 TCC 独立为 P-15。LoongArch 同样拆分：已完成部分记为
+  P-09 DONE，发布/CI/真机收尾独立为 P-16。CI 增加 fun-jsbox 二进制缓存
+  （按 jsbox/main.c + build-jsbox.sh 哈希），并去掉 unixODBC 安装前无条件的
+  `apt-get update`（失败时回退）。回归刷新为 `133/133`，加载检查 `78/84`。
