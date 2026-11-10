@@ -4,17 +4,17 @@
 > 本文只维护当前基线、优先级、技术债和发版门槛。
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
-> 最近更新：2026-11-08
+> 最近更新：2026-11-10
 > 基线：Fun 9.5.5（tag `v9.5.5`）
 
 ## 0. 当前基线
 
 - **版本**：9.5.5，`src/core/version.inc` 的 `funRelease = '9.5.5'`。
-- **回归**：Linux `131/131`（`sh fun/test/run-linux-regression.sh`）。
-- **可加载性**：`77/83`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
+- **回归**：Linux `133/133`（`sh fun/test/run-linux-regression.sh`）。
+- **可加载性**：`78/84`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
-- **标准库**：83 个候选模块（`fun/lib` 共 111 个 `.fun`，内部 `lib-base`/`lib-type`
-  与 `-unx`/`-lnx` 后端单元不计），本机可加载 77 个。
+- **标准库**：84 个候选模块（`fun/lib` 共 112 个 `.fun`，内部 `lib-base`/`lib-type`
+  与 `-unx`/`-lnx` 后端单元不计），本机可加载 78 个。
 - **平台**：Linux x86_64 / arm64、macOS x64 / arm64、Windows x64（FPC）；
   Delphi/Win32 继续人工验证。
 - **CI**：GitHub Actions 的 `regression` 工作流覆盖 6 个构建作业（4 个 POSIX 平台 +
@@ -61,8 +61,8 @@
 | P-04 | 平台 | P3 | OPEN | `lib-icmp` raw socket 未做，需 root/CAP_NET_RAW | `art/notes/linux-capabilities.md` |
 | P-06 | 平台 | P3 | OPEN | `lib-os` B 档（GetIPs/inotify 等）未做 | `art/notes/linux-capabilities.md` |
 | P-07 | 机器码 | P2 | OPEN | `asm-list` 的 x86-64 表覆盖不全 | `art/notes/arch-machine-code-plan.md` |
-| P-08 | macOS | P2 | OPEN | 真机复验（x64/arm64 回归）与分发收尾：`codesign`/公证、Apple TCC 隐私授权（Desktop/Documents/Downloads，原 P-12 并入）；构建与运行时接入见已完成 P-14 | `art/notes/macos-port.md` |
-| P-09 | 架构 | P3 | OPEN | LoongArch：2026-11 已用 FPC 3.3.1 trunk + GNU binutils 编出并跑通核心 funcmd（qemu）；**`lib-asm-loongarch64` 编码器已落地**（表由 binutils 生成 + 159 例逐字节对拍，qemu/真机 live 执行待验）。剩余：PCRE 目标链接、TCC 策略（无后端）、CI 与真机 | `art/notes/loongarch-port-assessment.md`、`art/notes/arch-machine-code-plan.md` |
+| P-15 | macOS 分发收尾 | P2 | OPEN | P-08 拆分后的未完成部分：正式 `codesign`/公证（需 Developer 证书）、Apple TCC 隐私授权（Desktop/Documents/Downloads，原 P-12）、物理机抽查 | `art/notes/macos-port.md` |
+| P-09 | 架构 | P3 | OPEN | LoongArch：解释器/标准库已在 qemu musl 环境跑通（FFI、PCRE 无 JIT、SQLite 等）；**`lib-asm-loongarch64` 编码器已落地**（binutils 生成表；164 curated + 361 全表 + 1083 随机差分与 GNU as 一致，QEMU 独立编码验证；live 执行待 qemu/真机）。剩余：TCC 无后端策略、CI 接入、真机验收 | `art/notes/loongarch-port-assessment.md`、`art/notes/arch-machine-code-plan.md` |
 | P-13 | Windows/ARM | P3 | OPEN | win-arm64 无构建：FPC 3.2.2 没有 win64/aarch64 target，`regression.yml` 的 windows-arm64 job 仍禁用，需更新 FPC 或交叉工具链 | `.github/workflows/regression.yml` |
 
 ## 5. 接受 / 不做 / 已完成
@@ -78,7 +78,8 @@
 | K-04 | 循环集合深拷贝递归溢出 | DONE | `CEnv` clone 祖先栈 + `CSet.clone` 统一 set/object；循环副本保留在自己的克隆内，`@clone` 同样有栈上下文。`fun/test/clone-cycle-test.fun`、`fun/demos/benchmarks/clone-bench.md` 覆盖。 |
 | P-05 | 第二数据库后端：unixODBC | DONE | MySQL/PostgreSQL 等经驱动管理器接入，unixODBC 与 P-11 同一交付。 |
 | P-11 | unixODBC 后端 | DONE | `lib-ado-unx` 按 `odbc:`/`DRIVER=`/`DSN=` 自动分派，参数、事务、OpenSchema（SQLTables/Columns/PrimaryKeys/ForeignKeys）齐全；CI 装 `unixodbc`+`libsqliteodbc` 并跑 `run-ado-odbc.sh`。 |
-| P-14 | macOS 构建与运行时接入 | DONE | x64/arm64 引擎与 Fun 层可交叉构建；`lib-proc-darwin`、`MAP_JIT`、`libtcc.dylib` 接入与 arm64 ad-hoc 签名已完成，CI 有原生 macOS 回归。剩余真机复验与正式签名/公证并入 P-08。 |
+| P-08 | macOS 运行时复验（x64/arm64） | DONE | 由 CI 原生 macOS runner 覆盖：`macos-x64`（`macos-15-intel`）与 `macos-arm64`（`macos-latest`，Apple Silicon）跑完整 macOS 套件，含 `MAP_JIT`、`sys_icache_invalidate`、FFI 回调；2026-11-10 六项回归全绿。分发签名/TCC 拆分到 P-15。 |
+| P-14 | macOS 构建与运行时接入 | DONE | x64/arm64 引擎与 Fun 层可交叉构建；`lib-proc-darwin`、`MAP_JIT`、`libtcc.dylib` 接入与 arm64 ad-hoc 签名已完成，CI 有原生 macOS 回归。剩余签名/公证与 TCC 归入 P-15（原 P-08 拆分）。 |
 | Q-01 | `lib-ado-schema.Filter` 丢外键 | DONE | ORM `@Parent`/`@Children` 直接走 OpenSchema，Windows/Unix 均恢复外键。 |
 | Q-02 | `lib-fd`/`lib-bnf` 已知功能项 | DONE | 重名组问题已修，其余功能项已关闭。 |
 | Q-03 | Windows `make-*.bat` 的 `-dRegexx` | DONE | 改为 `-dRegex -dPCRE_WinDLL`，有 pcre3.dll 时真正启用 regex。 |
@@ -174,3 +175,8 @@
   unixODBC 后端、HMAC-SHA1/URL 编码、`process.run` 输出上限与 macOS/win64
   运行时能力；修复循环集合深拷贝栈溢出；站点 PHP 已全部迁到 Fun，并在
   验证中修复正则未命中判断。
+- 2026-11-10：LoongArch `lib-asm-loongarch64` 编码器落地（binutils 生成的
+  指令表、与 GNU as 逐字节/随机差分、QEMU 独立交叉验证；live 执行待 qemu/真机）。
+  macOS 的 P-08 拆分：x64/arm64 运行时复验由 CI 原生 macOS runner 覆盖并标记
+  DONE，正式签名/公证与 TCC 独立为 P-15。回归刷新为 `133/133`，加载检查
+  `78/84`。
