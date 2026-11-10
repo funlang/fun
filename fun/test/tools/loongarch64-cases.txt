@@ -1,0 +1,163 @@
+# loongarch64-cases: one instruction (or pseudo-instruction) per line.
+# Consumed by fun/test/tools/loongarch64-encode.fun and
+# fun/test/tools/asm-loongarch64-diff.sh. Blank lines and '#' comments are
+# skipped. Numeric branch operands are signed byte offsets from the branch.
+add.d $a0, $a1, $a2
+add.w $a0, $a1, $a2
+sub.d $a0, $a1, $a2
+sub.w $a0, $a1, $a2
+addi.d $a0, $a1, 1
+addi.d $a0, $a1, -1
+addi.d $a0, $a1, 2047
+addi.d $a0, $a1, -2048
+addi.w $a0, $a1, 2047
+addi.w $a0, $a1, -2048
+and $a0, $a1, $a2
+or $a0, $a1, $a2
+xor $a0, $a1, $a2
+nor $a0, $a1, $a2
+andn $a0, $a1, $a2
+orn $a0, $a1, $a2
+andi $a0, $a1, 0xfff
+ori $a0, $a1, 0xabc
+xori $a0, $a1, 0x123
+sll.d $a0, $a1, $a2
+srl.d $a0, $a1, $a2
+sra.d $a0, $a1, $a2
+sll.w $a0, $a1, $a2
+srl.w $a0, $a1, $a2
+sra.w $a0, $a1, $a2
+slli.d $a0, $a1, 63
+slli.w $a0, $a1, 31
+srli.d $a0, $a1, 17
+srai.d $a0, $a1, 3
+rotri.d $a0, $a1, 8
+mul.d $a0, $a1, $a2
+mul.w $a0, $a1, $a2
+mulh.d $a0, $a1, $a2
+mulh.du $a0, $a1, $a2
+div.d $a0, $a1, $a2
+div.du $a0, $a1, $a2
+mod.d $a0, $a1, $a2
+mod.du $a0, $a1, $a2
+lu12i.w $a0, 0x12345
+lu32i.d $a0, 0x54321
+lu52i.d $a0, $a1, 0x7ab
+pcaddu12i $a0, 0x12345
+pcalau12i $a0, 0x12345
+slt $a0, $a1, $a2
+sltu $a0, $a1, $a2
+slti $a0, $a1, 42
+sltui $a0, $a1, 42
+maskeqz $a0, $a1, $a2
+masknez $a0, $a1, $a2
+bstrins.d $a0, $a1, 31, 8
+bstrpick.d $a0, $a1, 31, 8
+bstrins.w $a0, $a1, 15, 4
+ext.w.b $a0, $a1
+ext.w.h $a0, $a1
+clz.d $a0, $a1
+ctz.d $a0, $a1
+revb.2h $a0, $a1
+revb.4h $a0, $a1
+revb.2w $a0, $a1
+revb.d $a0, $a1
+ld.b $a0, $sp, 0
+ld.bu $a0, $sp, 1
+ld.h $a0, $sp, 2
+ld.hu $a0, $sp, 4
+ld.w $a0, $sp, 8
+ld.wu $a0, $sp, 16
+ld.d $a0, $sp, -8
+ld.d $a0, $sp, 2047
+ld.d $a0, $sp, -2048
+st.b $a0, $sp, 0
+st.h $a0, $sp, 2
+st.w $a0, $sp, 4
+st.d $a0, $sp, 8
+st.d $a0, $sp, -16
+ldx.b $a0, $a1, $a2
+ldx.h $a0, $a1, $a2
+ldx.w $a0, $a1, $a2
+ldx.d $a0, $a1, $a2
+stx.b $a0, $a1, $a2
+stx.d $a0, $a1, $a2
+ldptr.w $a0, $a1, 4
+ldptr.d $a0, $a1, 8
+stptr.w $a0, $a1, 4
+stptr.d $a0, $a1, 8
+fadd.s $f0, $f1, $f2
+fadd.d $f0, $f1, $f2
+fsub.s $f0, $f1, $f2
+fsub.d $f0, $f1, $f2
+fmul.s $f0, $f1, $f2
+fmul.d $f0, $f1, $f2
+fdiv.s $f0, $f1, $f2
+fdiv.d $f0, $f1, $f2
+fmin.d $f0, $f1, $f2
+fmax.d $f0, $f1, $f2
+fneg.d $f0, $f1
+fabs.d $f0, $f1
+fmov.d $f0, $f1
+fcvt.s.d $f0, $f1
+fcvt.d.s $f0, $f1
+fsqrt.d $f0, $f1
+frint.d $f0, $f1
+fmadd.d $f0, $f1, $f2, $f3
+fmsub.d $f0, $f1, $f2, $f3
+fcmp.caf.d $fcc0, $f1, $f2
+fcmp.slt.d $fcc0, $f1, $f2
+fcmp.sgt.d $fcc0, $f1, $f2
+fcmp.ceq.d $fcc1, $f1, $f2
+fcmp.sne.d $fcc7, $f1, $f2
+fsel $f0, $f1, $f2, $fcc0
+fld.s $f0, $sp, 0
+fld.d $f0, $sp, 8
+fst.s $f0, $sp, 4
+fst.d $f0, $sp, -8
+fldx.d $f0, $a0, $a1
+fstx.d $f0, $a0, $a1
+movgr2fr.d $f0, $a0
+movfr2gr.d $a0, $f0
+movfr2cf $fcc0, $f0
+movcf2fr $f0, $fcc0
+move $a0, $a1
+move $sp, $a0
+nop
+ret
+jr $ra
+jr $a0
+jirl $a0, $a1, -4
+b #8
+b #-4
+bl #8
+bl #-12
+beq $a0, $a1, #8
+beq $a0, $a1, #-8
+bne $a0, $a1, #16
+blt $a0, $a1, #-16
+bge $a0, $a1, #24
+bltu $a0, $a1, #-24
+bgeu $a0, $a1, #32
+beqz $a0, #8
+beqz $a0, #-8
+bnez $a0, #64
+bnez $a0, #-64
+bceqz $fcc0, #8
+bcnez $fcc1, #-8
+bltz $a0, #8
+bgtz $a0, #-8
+bgez $a0, #8
+blez $a0, #-8
+li.w $a0, 0
+li.w $a0, 1
+li.w $a0, 2047
+li.w $a0, -2048
+li.w $a0, 0x12345
+li.w $a0, 0x12345678
+li.w $a0, -1
+li.d $a0, 0
+li.d $a0, 0x12345
+li.d $a0, 0x12345678
+li.d $a0, -1
+li.d $a0, 0x80000000

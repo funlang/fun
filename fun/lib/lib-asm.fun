@@ -28,9 +28,10 @@ else
 end if;
 
 // Instruction-cache flush hook, nil by default. x86 has coherent I/D caches so
-// no flush is needed; aarch64 does NOT, and the aarch64 backend binds libc
-// __clear_cache here (see lib-asm-a64.fun). Load() calls it with the real code
-// length after the bytes are copied and before the callable pointer is built.
+// no flush is needed; aarch64 and loongarch64 do NOT, and those backends bind
+// __clear_cache here (see lib-asm-a64.fun, lib-asm-loongarch64.fun). Load()
+// calls it with the real code length after the bytes are copied and before the
+// callable pointer is built.
 var _asm_flush = nil;
 
 // Darwin MAP_JIT write-protect toggle, nil by default: Load() calls it with 0
@@ -102,13 +103,15 @@ class AssemblyBase(args, code, names)
   var call  = -> Run();
   var del   = -> Delete();
 
-  // Instruction set this backend emits: 'x86' (lib-asm-pro) or 'arch64'
-  // (lib-asm-a64). '' means arch-neutral. Load() refuses to run a backend on a
-  // cpu it does not target, so a mis-selected Assembly cannot silently execute
-  // foreign machine code (the pre-aarch64 failure mode was SIGILL).
+  // Instruction set this backend emits: 'x86' (lib-asm-pro), 'arch64'
+  // (lib-asm-a64) or 'loongarch64' (lib-asm-loongarch64). '' means
+  // arch-neutral. Load() refuses to run a backend on a cpu it does not target,
+  // so a mis-selected Assembly cannot silently execute foreign machine code
+  // (the pre-aarch64 failure mode was SIGILL).
   var arch    = '';
   // Plain-return tail appended by Load when the body does not end in one. x86
-  // Linux: C3 (ret). aarch64: C0035FD6 (ret, a full 4-byte instruction).
+  // Linux: C3 (ret). aarch64: C0035FD6 (ret). loongarch64: 2000004C (ret,
+  // jirl $r0, $r1, 0). All are little-endian byte sequences.
   var ret_hex = 'C3';
 
   fun New(n)
