@@ -2,32 +2,41 @@
 # Copyright (c) 2010-2026 Zhang Weidong <zwd@funlang.org>
 # SPDX-License-Identifier: MIT
 #
-# loongarch64-qemu-crosscheck: verify our instruction table against QEMU's
-# independent LoongArch decoder.
+# loongarch64-qemu-crosscheck: verify our instruction table and encoder against
+# QEMU's independent LoongArch decoder.
 #
 #   curl -O https://raw.githubusercontent.com/qemu/qemu/v8.2.0/target/loongarch/insns.decode
 #   python3 fun/test/tools/loongarch64-qemu-crosscheck.py insns.decode
+#   python3 fun/test/tools/loongarch64-qemu-crosscheck.py --fun ./fun/funcmd insns.decode
 #
 # Why this exists: asm-list-loongarch64.fd and the GNU assembler both come from
 # binutils' opcodes/loongarch-opc.c, so asm-loongarch64-diff.sh alone cannot
 # catch an error that is present in that source table. QEMU carries a separate
 # decode table written from the LoongArch manual, which makes it a genuinely
-# independent oracle for the base word and bit-field placement.
+# independent oracle.
+#
+# Two checks:
+#   1. table metadata: base word and bit-field placement for every entry the
+#      two tables share.
+#   2. --fun: generate a concrete instruction for each shared entry, compute
+#      the expected word from QEMU's fields, run the Fun encoder over them, and
+#      compare. This validates the encoder itself with no binutils in the loop.
 #
 # The comparison ignores textual operand order: QEMU and gas name the two
-# source operands of the atomic am* instructions in opposite order (the encoded
-# bit positions agree, which is what matters here; gas compatibility is covered
-# by asm-loongarch64-diff.sh). Immediates are compared by position, width,
-# signedness and scale.
+# source operands of the atomic am* instructions in opposite order (bit
+# positions agree). Those are excluded from check 2 because the *textual*
+# spelling differs; gas compatibility is covered by asm-loongarch64-diff.sh.
 #
-# Exit code is non-zero on any mismatch, so it can be used in a release check
-# when a QEMU tree is available.
+# Exit code is non-zero on any mismatch.
 
 import os
 import re
+import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.normpath(os.path.join(HERE, '..', '..', '..'))
 DEFAULT_FD = os.path.normpath(os.path.join(HERE, '..', '..', 'lib',
                                            'asm-list-loongarch64.fd'))
 
@@ -59,7 +68,7 @@ def load_formats(path):
 
 
 def parse_format(fmt, formats):
-    toks, args, over = formats[fmt]
+    toks, args, _ = formats[fmt]
     bits, fields, offset = [], {}, 0
     for t in toks:
         if ':' in t:
@@ -106,15 +115,35 @@ def slot_key(sl):
     return (kind, int(pos), int(wid or 5), int(sh or 0))
 
 
+def operand_value(arg, i):
+    if arg in ('rd', 'rj', 'rk'):
+        return 'r', (i % 20) + 4
+    if arg in ('fd', 'fj', 'fk', 'fa'):
+        return 'f', (i % 28) + 1
+    if arg in ('cd', 'cj', 'ca'):
+        return 'c', 0
+    if arg == 'imm':
+        return '#', 0
+    return None, None
+
+
 def main():
-    if len(sys.argv) < 2:
-        sys.exit('usage: loongarch64-qemu-crosscheck.py <insns.decode> [table.fd]')
-    qpath = sys.argv[1]
-    fdpath = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_FD
+    argv = sys.argv[1:]
+    funcmd = None
+    if '--fun' in argv:
+        k = argv.index('--fun')
+        funcmd = argv[k + 1]
+        del argv[k:k + 2]
+    if not argv:
+        sys.exit('usage: loongarch64-qemu-crosscheck.py [--fun FUNCMD] '
+                 '<insns.decode> [table.fd]')
+    qpath = argv[0]
+    fdpath = argv[1] if len(argv) > 1 else DEFAULT_FD
     formats = load_formats(qpath)
     table = load_table(fdpath)
 
     checked = mismatch = skipped = 0
+    cases = []  # (asm line, expected word) for --fun
     for line in open(qpath, encoding='utf-8'):
         line = line.split('#')[0].strip()
         if not line:
@@ -132,31 +161,30 @@ def main():
             skipped += 1
             continue
         shape, slots = [], []
+        encode_ok = not mn.startswith('am')
         unsupported = False
         for i, an in enumerate(args):
-            if an in ('rd', 'rj', 'rk'):
-                pos = fields[an][0]
-                shape.append('r')
-                slots.append('r%d@%d' % (i, pos))
-            elif an in ('fd', 'fj', 'fk'):
-                pos = fields[an][0]
-                shape.append('f')
-                slots.append('f%d@%d' % (i, pos))
-            elif an in ('cd', 'cj'):
-                pos = fields[an][0]
+            kind, val = operand_value(an, i)
+            if kind is None:
+                unsupported = True
+                break
+            if kind == 'c':
+                # fcc fields use a 3-bit field, not the default 5
+                pos, wid, _ = fields[an]
                 shape.append('c')
                 slots.append('c%d@%d' % (i, pos))
-            elif an == 'imm':
+            elif kind == '#':
                 if 'imm' not in fields:
                     unsupported = True
                     break
                 pos, wid, signed = fields['imm']
                 shape.append('#')
-                slots.append(('%s%d@%d:%d' % ('y' if signed else 'v', i, pos, wid)))
+                slots.append('%s%d@%d:%d' % ('y' if signed else 'v', i, pos, wid))
             else:
-                # offs/fcond/hint/sa/ms/ls/csr/cop/... are not table slots
-                unsupported = True
-                break
+                pos = fields[an][0]
+                # fp args use 'f', integer args 'r'
+                shape.append(kind)
+                slots.append('%s%d@%d' % (kind, i, pos))
         if unsupported:
             skipped += 1
             continue
@@ -177,8 +205,65 @@ def main():
                   % (mn, ','.join(shape), sorted(map(slot_key, slots)),
                      sorted(map(slot_key, got_slots))))
             mismatch += 1
+            continue
+        if encode_ok:
+            text = [mn]
+            exp = want_base
+            for i, an in enumerate(args):
+                kind, val = operand_value(an, i)
+                if kind == 'r':
+                    text.append('$r%d' % val)
+                elif kind == 'f':
+                    text.append('$f%d' % val)
+                elif kind == 'c':
+                    text.append('$fcc0')
+                else:
+                    text.append('0')
+                pos, wid, _ = fields.get(an, (0, 5, False))
+                exp |= (val & ((1 << wid) - 1)) << pos
+            cases.append((', '.join([text[0]]) + ' ' + ', '.join(text[1:])
+                          if len(text) > 1 else text[0], exp))
+
     print('qemu-crosscheck: %d checked, %d mismatches, %d skipped'
           % (checked, mismatch, skipped))
+
+    if funcmd:
+        with tempfile.NamedTemporaryFile('w', suffix='.txt', delete=False) as f:
+            for text, _ in cases:
+                f.write(text + '\n')
+            cpath = f.name
+        try:
+            p = subprocess.run([funcmd, 'fun/test/tools/loongarch64-encode.fun', cpath],
+                               cwd=REPO, stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE, universal_newlines=True,
+                               env=dict(os.environ, LC_ALL='C'))
+        finally:
+            os.unlink(cpath)
+        if p.returncode != 0:
+            print('qemu-encode: funcmd failed: ' + (p.stderr or '').strip())
+            return 1
+        got = []
+        for line in p.stdout.splitlines():
+            if '\t' not in line:
+                continue
+            _, hx = line.split('\t', 1)
+            hx = hx.strip().upper()
+            words = []
+            for i in range(0, len(hx), 8):
+                c = hx[i:i + 8]
+                words.append(int(c[6:8] + c[4:6] + c[2:4] + c[0:2], 16))
+            got.append(words)
+        enc_bad = 0
+        for i, (text, exp) in enumerate(cases):
+            g = got[i] if i < len(got) else []
+            if g != [exp]:
+                if enc_bad < 10:
+                    print('ENCODE %s qemu=%08X fun=%s'
+                          % (text, exp, ' '.join('%08X' % w for w in g)))
+                enc_bad += 1
+        print('qemu-encode: %d checked, %d mismatches' % (len(cases), enc_bad))
+        mismatch += enc_bad
+
     return 1 if mismatch else 0
 
 
