@@ -118,6 +118,11 @@ fun _la_gprnum(s)
     if n > 31 then return -1; end if;
     return n;
   end if;
+  // Only identifier-shaped names may index the ABI map: Fun map lookup coerces
+  // a numeric string to a positional index, so _LA_GPR['4'] would return the
+  // fifth value (4) and classify the immediate "4" as GPR 4 before any named
+  // register has been looked up.
+  if s.match(/^[a-z][a-z0-9]*$/).@@() = '' then return -1; end if;
   var v = _LA_GPR[s];
   if v <> nil then return v; end if;
   result = -1;

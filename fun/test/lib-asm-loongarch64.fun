@@ -60,6 +60,18 @@ done:
 ret
 `, '8404C002A5FCFF02BFF8FF4785080058000400502000004C') then bad += 1; end if;
 
+// Immediate in the first operand position: regression for Fun's map lookup
+// coercing the numeric string "1" to a positional index and classifying it as
+// a GPR. These must encode as v-slots, not registers.
+if not chk('imm_first', `#!asm
+break 1
+syscall 2
+dbar 0
+ibar 0
+preld 0, $sp, 0
+rdtime.d $a0, $a1
+`, '01002A0002002B0000007238008072386000C02AA4680000') then bad += 1; end if;
+
 // Out-of-range / misaligned operands must raise (gas rejects these too).
 var rejected = 0;
 for b in ['addi.d $a0, $a1, 2048', 'andi $a0, $a1, 0x1000',

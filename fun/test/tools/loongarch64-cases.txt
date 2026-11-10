@@ -2,6 +2,14 @@
 # Consumed by fun/test/tools/loongarch64-encode.fun and
 # fun/test/tools/asm-loongarch64-diff.sh. Blank lines and '#' comments are
 # skipped. Numeric branch operands are signed byte offsets from the branch.
+# Immediate-first instructions lead the file on purpose: Fun map lookup turns a
+# numeric string into a positional index, so a missing identifier guard would
+# classify "1" as a GPR before any named register lookup happens.
+break 1
+syscall 2
+dbar 0
+ibar 0
+preld 0, $sp, 0
 add.d $a0, $a1, $a2
 add.w $a0, $a1, $a2
 sub.d $a0, $a1, $a2

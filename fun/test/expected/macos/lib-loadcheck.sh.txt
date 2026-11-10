@@ -15,6 +15,7 @@ LOAD  lib-ado-schema
 LOAD  lib-ado
 LOAD  lib-ajax
 LOAD  lib-asm-a64
+LOAD  lib-asm-loongarch64
 LOAD  lib-asm-pro
 LOAD  lib-asm
 LOAD  lib-async
@@ -82,4 +83,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=77 failed=6
+loaded=78 failed=6
