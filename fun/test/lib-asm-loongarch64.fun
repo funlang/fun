@@ -77,15 +77,16 @@ var rejected = 0;
 for b in ['addi.d $a0, $a1, 2048', 'andi $a0, $a1, 0x1000',
           'slli.d $a0, $a1, 64', 'ld.d $a0, $sp, 2048',
           'beq $a0, $a1, #7', 'lu52i.d $a0, $a1, 0x800',
-          'li.d $a0, 0x123456789', 'lu12i.w $a0, 0x80000'] do
+          'li.d $a0, 0x123456789', 'lu12i.w $a0, 0x80000',
+          'amadd.w $a0, $a0, $a1'] do
   try
     enc.Compile('#!asm' & 10.toChar() & b);
   except
     rejected += 1;
   end try;
 end do;
-?. 'range checks rejected: ' & rejected & '/8';
-if rejected <> 8 then bad += 1; end if;
+?. 'range checks rejected: ' & rejected & '/9';
+if rejected <> 9 then bad += 1; end if;
 
 // A raw <name> in a 32-bit immediate must be rejected, not silently encoded
 // as zero; a JIT snippet builds the address explicitly.

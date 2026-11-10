@@ -118,12 +118,10 @@ fun _la_gprnum(s)
     if n > 31 then return -1; end if;
     return n;
   end if;
-  // Only identifier-shaped names may index the ABI map: Fun map lookup coerces
-  // a numeric string to a positional index, so _LA_GPR['4'] would return the
-  // fifth value (4) and classify the immediate "4" as GPR 4 before any named
-  // register has been looked up.
-  if s.match(/^[a-z][a-z0-9]*$/).@@() = '' then return -1; end if;
-  var v = _LA_GPR[s];
+  // `.[key]` forces a string-key lookup. Plain `_LA_GPR[s]` treats a numeric
+  // string as a positional index, so "4" would return the fifth value (4) and
+  // classify an immediate as GPR 4.
+  var v = _LA_GPR.[s];
   if v <> nil then return v; end if;
   result = -1;
 end fun;
@@ -385,6 +383,18 @@ fun _la_encode_line(line, words, fixups, names)
   if (mn = 'li.w' or mn = 'li.d') and info.@count() = 2 then
     _la_li(words, info[0].num, info[1], mn = 'li.d', names);
     return;
+  end if;
+
+  // gas enforces this for every AMO (amswap/amadd/amand/amor/amxor/ammax/
+  // ammin and their _db forms): rd may not alias the base or the source
+  // register, because the read-modify-write would lose the old value. $r0 is
+  // exempt (it discards the old value). Match gas instead of emitting code
+  // the reference assembler rejects.
+  if mn.substr(0, 2) = 'am' and info.@count() = 3
+     and info[0].typ = 'r' and info[0].num <> 0 then
+    if info[0].num = info[1].num or info[0].num = info[2].num then
+      raise 'AMO requires rd <> base and rd <> rt unless rd is $r0: $line'.eval();
+    end if;
   end if;
 
   var key = mn;
