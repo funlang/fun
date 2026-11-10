@@ -693,6 +693,14 @@ var ct = w.contentType();
 
 Pass `body` and `Content-Type: <ct>` to `HttpClient` to send it.
 
+Cookies can be signed so tampering is rejected:
+
+```fun
+res.signedCookie('uid', 'u1', secret, [path: '/', httpOnly: true]);
+var r = req.signedCookie('uid', secret);
+if r.ok then ?. r.value; end if;
+```
+
 Environment variables are available without platform-specific FFI:
 
 ```fun

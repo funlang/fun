@@ -652,6 +652,14 @@ var ct = w.contentType();
 
 把 `body` 和 `Content-Type: <ct>` 传给 `HttpClient` 即可发送。
 
+cookie 可以签名，篡改会被拒绝：
+
+```fun
+res.signedCookie('uid', 'u1', secret, [path: '/', httpOnly: true]);
+var r = req.signedCookie('uid', secret);
+if r.ok then ?. r.value; end if;
+```
+
 环境变量也可以直接读取，不需要自己写平台 FFI：
 
 ```fun
