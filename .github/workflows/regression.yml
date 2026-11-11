@@ -220,7 +220,7 @@ jobs:
             echo "installing cached .debs from $cache"
             # --refuse-downgrade: a cache left over from an older image must
             # not replace newer libraries with the versions it downloaded.
-            if sudo dpkg --refuse-downgrade -i "$cache"/*.deb; then
+            if sudo timeout 120 dpkg --refuse-downgrade -i "$cache"/*.deb; then
               echo "installed from cache; no network needed"
               installed=1
             else
@@ -230,14 +230,14 @@ jobs:
           if [ "$installed" -eq 0 ]; then
             # The hosted image carries package lists; retry transient mirror
             # failures. Keep the archives so they can be cached below.
-            if ! sudo apt-get install -y --no-install-recommends \
+            if ! sudo timeout 120 apt-get install -y --no-install-recommends \
               -o Acquire::Retries=2 \
               -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 \
               -o APT::Keep-Downloaded-Packages=true \
               unixodbc libsqliteodbc; then
-              sudo apt-get update -o Acquire::Retries=2 \
+              sudo timeout 60 apt-get update -o Acquire::Retries=2 \
                 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 || true
-              sudo apt-get install -y --no-install-recommends \
+              sudo timeout 120 apt-get install -y --no-install-recommends \
                 -o Acquire::Retries=2 \
                 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 \
                 -o APT::Keep-Downloaded-Packages=true \
