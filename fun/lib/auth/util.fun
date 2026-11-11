@@ -37,7 +37,11 @@ end fun;
 
 fun _authHashHex(msg, alg)
   if alg = 'sha256' then result = SHA256(msg); return; end if;
-  if 'host'.arg().getJson(fd: true).os = 'windows' then
+  // CNG is the win64 path only: win64 getapi() uses the libffi backend, where
+  // a 'p' argument is a raw pointer value. 32-bit Windows uses winapi.pas,
+  // whose 'p' means "address of this value", so keep it on CryptoAPI below.
+  var host = 'host'.arg().getJson(fd: true);
+  if host.os = 'windows' and host.bits >= 64 then
     result = _authCngHashHex(msg, alg);
     return;
   end if;
@@ -67,25 +71,47 @@ fun _authCngName(name)
     out &= name[i] & 0.toChar();
     i += 1;
   end do;
-  result = out & 0.toChar();
+  result = out & 0.toChar() & 0.toChar();
+end fun;
+
+// Pointer-width little-endian read: Fun's >> is 32-bit and win64 addresses
+// live above 4GB. Same idiom as lib-ado-unx.fun's _zr.
+fun _authCngReadPtr(s)
+  result = 0;
+  var m = 1;
+  var i = 0;
+  while i < 8 do
+    result += s.toByte(i) * m;
+    m *= 256;
+    i += 1;
+  end do;
 end fun;
 
 fun _authCngHashHex(msg, alg)
   if _authCngOpen = nil then
-    _authCngOpen  = 'bcrypt.dll'.getapi('BCryptOpenAlgorithmProvider', 'pspi:i');
-    _authCngClose = 'bcrypt.dll'.getapi('BCryptCloseAlgorithmProvider', 'ii:i');
-    _authCngHash  = 'bcrypt.dll'.getapi('BCryptHash', 'ipipipi:i');
+    _authCngOpen  = 'bcrypt.dll'.getapi('BCryptOpenAlgorithmProvider', 'pppi:i');
+    _authCngClose = 'bcrypt.dll'.getapi('BCryptCloseAlgorithmProvider', 'pi:i');
+    _authCngHash  = 'bcrypt.dll'.getapi('BCryptHash', 'ppipipi:i');
   end if;
   var name = 'SHA384';
   var len = 48;
   if alg = 'sha512' then name = 'SHA512'; len = 64; end if;
   var wn = _authCngName(name);
-  var h = 0;
-  var st = _authCngOpen(var h, wn, 0, 0);
+  // An OUT handle needs a writable buffer: lffi passes a 'p' argument's value,
+  // so `var h` would hand CNG a NULL phAlgorithm and it returns
+  // STATUS_INVALID_PARAMETER (0xC000000D).
+  var hbuf = 0.toChar().x(8);
+  var st = _authCngOpen(hbuf.toNum(-1), wn.toNum(-1), 0, 0);
   if st <> 0 then raise 'auth: CNG open failed (' & st & ')'; end if;
+  var h = _authCngReadPtr(hbuf);
   try
     var buf = ' '.x(len);
-    st = _authCngHash(h, 0, 0, msg.toNum(-1), msg.length(), buf.toNum(-1), len);
+    // CNG rejects a NULL input pointer even for a zero-length message, so
+    // hash one harmless byte when msg is empty.
+    var empty = 0.toChar();
+    var mptr = msg.toNum(-1);
+    if msg.length() = 0 then mptr = empty.toNum(-1); end if;
+    st = _authCngHash(h, 0, 0, mptr, msg.length(), buf.toNum(-1), len);
     if st <> 0 then raise 'auth: CNG hash failed (' & st & ')'; end if;
     var raw = 0.toChar().x(len);
     var i = 0;
