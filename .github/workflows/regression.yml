@@ -176,16 +176,66 @@ jobs:
 
       # lib-ado-unx keeps SQLite embedded by default; the unixODBC backend and
       # run-ado-odbc.sh are exercised when a driver manager plus a SQLite ODBC
-      # driver are present.
+      # driver are present. Neither is in the hosted image, so the first run
+      # on a new image downloads the .deb closure; later runs install straight
+      # from the cache and do not depend on the archive being reachable.
+      - name: Read Linux runner image version
+        id: image-version
+        if: runner.os == 'Linux'
+        run: echo "value=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
+      - name: Restore unixODBC .debs
+        id: cache-odbc-debs
+        if: runner.os == 'Linux'
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/fun-odbc-debs
+          key: odbc-debs-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.image-version.outputs.value }}
+
       - name: Install unixODBC + SQLite ODBC driver (Linux)
         if: runner.os == 'Linux'
         run: |
-          # The hosted ubuntu image already carries package lists; only refresh
-          # them when the install actually fails (e.g. a stale/missing index).
-          sudo apt-get install -y --no-install-recommends unixodbc libsqliteodbc || {
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends unixodbc libsqliteodbc
+          set -eu
+          if dpkg -s unixodbc libsqliteodbc >/dev/null 2>&1; then
+            echo "unixODBC + libsqliteodbc already installed"
+            exit 0
+          fi
+          cache="$HOME/.cache/fun-odbc-debs"
+          mkdir -p "$cache"
+          if ls "$cache"/*.deb >/dev/null 2>&1; then
+            echo "installing cached .debs from $cache"
+            # --refuse-downgrade: a cache left over from an older image must
+            # not replace newer libraries with the versions it downloaded.
+            if sudo dpkg --refuse-downgrade -i "$cache"/*.deb; then
+              echo "installed from cache; no network needed"
+              exit 0
+            fi
+            echo "cached .debs did not install cleanly; falling back to apt"
+          fi
+          # The hosted image carries package lists; retry transient mirror
+          # failures instead of failing the whole job. Keep the downloaded
+          # archives so they can be copied into the cache below.
+          sudo apt-get install -y --no-install-recommends \
+            -o Acquire::Retries=5 -o APT::Keep-Downloaded-Packages=true \
+            unixodbc libsqliteodbc || {
+            sudo apt-get update -o Acquire::Retries=5
+            sudo apt-get install -y --no-install-recommends \
+              -o Acquire::Retries=5 -o APT::Keep-Downloaded-Packages=true \
+              unixodbc libsqliteodbc
           }
+          # Keep the exact archives apt used (dependencies included) so the
+          # next run on this image installs offline.
+          sudo find /var/cache/apt/archives -maxdepth 1 -name '*.deb' \
+            -exec cp -f {} "$cache"/ \;
+          ls -l "$cache"
+
+      - name: Save unixODBC .debs
+        if: runner.os == 'Linux' && steps.cache-odbc-debs.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/fun-odbc-debs
+          key: odbc-debs-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.image-version.outputs.value }}
 
       - name: Cache FPC installer dmg (macOS Intel)
         if: runner.os == 'macOS' && runner.arch == 'X64' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true'))
