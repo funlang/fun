@@ -29,9 +29,35 @@ name: release
 
 on:
   schedule:
-    # GitHub's busiest slots are on the hour. :37 also keeps a delayed run in
-    # the same Beijing night instead of racing the next day's.
+    # GitHub's scheduler is best-effort and can start a scheduled run hours
+    # late (the release gate below logs the actual start time). A single
+    # 04:37 entry therefore tends to publish in the late morning instead of
+    # the middle of the night. Several entries spread over the early morning
+    # absorb that jitter: a run that starts before 04:37 Beijing exits
+    # immediately, so whichever entry first starts at or after 04:37 does the
+    # publishing. Later entries are no-ops: the gate stops after one nightly
+    # per calendar day, and a repeated commit has no code changes. The
+    # `concurrency` group serialises them so two cannot create a release for
+    # the same commit.
+    #
+    # The offsets stay at :37: GitHub's busiest slots are on the hour, and
+    # :37 keeps a delayed run in the same Beijing night instead of racing the
+    # next day's.
+    - cron: '37 0 * * *'
+      timezone: 'Asia/Shanghai'
+    - cron: '37 1 * * *'
+      timezone: 'Asia/Shanghai'
+    - cron: '37 2 * * *'
+      timezone: 'Asia/Shanghai'
+    - cron: '37 3 * * *'
+      timezone: 'Asia/Shanghai'
     - cron: '37 4 * * *'
+      timezone: 'Asia/Shanghai'
+    - cron: '37 5 * * *'
+      timezone: 'Asia/Shanghai'
+    - cron: '37 6 * * *'
+      timezone: 'Asia/Shanghai'
+    - cron: '37 7 * * *'
       timezone: 'Asia/Shanghai'
   workflow_dispatch:
     inputs:
@@ -125,6 +151,24 @@ jobs:
           FORCE="${INPUT_FORCE:-false}"
           out channel "$CHANNEL"
 
+          # --- nightly window ---------------------------------------------
+          # The early schedule entries exist to absorb GitHub's scheduler
+          # jitter (see `on.schedule`). Only the first scheduled run that
+          # actually starts at or after 04:37 Asia/Shanghai should publish;
+          # earlier entries exit here. The runner clock decides *whether to
+          # act now*; the tag date still comes from the commit timestamp
+          # below, so a delayed run never changes the release date.
+          # Manual dispatch is never gated.
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+            NOW_HM=$((10#$(TZ='Asia/Shanghai' date +%H%M)))
+            if [ "$NOW_HM" -lt 437 ]; then
+              out should_release false
+              out reason "scheduled before 04:37 Asia/Shanghai; a later entry will publish"
+              echo "::notice::before the 04:37 nightly window; nothing to do"
+              exit 0
+            fi
+          fi
+
           SHA=$(git rev-parse HEAD)
           out sha "$SHA"
 
@@ -212,6 +256,25 @@ jobs:
             fi
             if [ -z "$PREV" ] || ! git rev-parse -q --verify "$PREV^{commit}" >/dev/null; then
               PREV=$(git rev-list --max-parents=0 HEAD | tail -1)
+            fi
+
+            # One scheduled nightly per calendar day. Without this, a
+            # late-starting entry could pick up a commit made later the same
+            # morning and publish a second nightly (.2) for what is still the
+            # same night's schedule. Manual dispatch (force) is not gated, so
+            # an intentional extra nightly is still possible.
+            if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
+              last_nightly_at=$(gh release list --limit 100 \
+                --json isPrerelease,createdAt \
+                --jq '[.[] | select(.isPrerelease)][0].createdAt // empty')
+              if [ -n "$last_nightly_at" ] \
+                 && [ "$(TZ='Asia/Shanghai' date -d "$last_nightly_at" +%Y%m%d)" \
+                      = "$(TZ='Asia/Shanghai' date +%Y%m%d)" ]; then
+                out should_release false
+                out reason "a nightly was already published today"
+                echo "::notice::nightly already published today; nothing to do"
+                exit 0
+              fi
             fi
 
             # Code paths only. README, docs and workflow edits do not warrant a

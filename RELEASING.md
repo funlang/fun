@@ -61,8 +61,14 @@ fails instead of publishing untested binaries.
 
 ## 4. Nightly prereleases (automatic)
 
-`.github/workflows/release.yml` also runs every night at 04:37
-Asia/Shanghai. It is a delivery channel, not a release event:
+`.github/workflows/release.yml` publishes the nightly in the 04:37
+Asia/Shanghai window. It is a delivery channel, not a release event.
+GitHub's scheduler is best-effort and can start a scheduled run hours late, so
+the workflow has several entries between 00:37 and 07:37; entries that start
+before 04:37 exit immediately and the first one that starts at or after 04:37
+publishes. A scheduled run is capped at one nightly per calendar day, and the
+extra entries are no-ops once that nightly exists. Manual dispatch is not
+time-gated.
 
 - A nightly is published only when code changed (`src/`, `fun/lib`,
   `fun/test`, `fun/demos`, `fun/demo`) since the previous nightly. Docs and
@@ -80,8 +86,9 @@ Asia/Shanghai. It is a delivery channel, not a release event:
   runs never modify `version.inc`, README, ROADMAP or CHANGELOG and never
   create a commit.
 - The tag is created on the existing HEAD with `gh release create --target`.
-  If a run is repeated for the same commit it reuses that tag; if a second
-  commit lands the same day it uses `.2`, `.3`, and so on.
+  If a run is repeated for the same commit it reuses that tag. Manual runs can
+  add `.2`, `.3`, ... for another commit the same day; scheduled runs stop
+  after the day's first nightly.
 - Every nightly is a GitHub **prerelease**, so `releases/latest` keeps
   pointing at the stable release. Only the newest 14 nightlies are kept.
 

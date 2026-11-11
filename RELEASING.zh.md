@@ -60,8 +60,11 @@ git push origin vX.Y.Z
 
 ## 4. 夜间预发布（自动）
 
-`.github/workflows/release.yml` 每晚北京时间 04:37 运行。它是交付通道，不是
-发版事件：
+`.github/workflows/release.yml` 在北京时间 04:37 的窗口内发布 nightly。它是
+交付通道，不是发版事件。GitHub 的 schedule 是尽力而为的，可能晚几个小时才
+启动，所以工作流在 00:37 到 07:37 之间设置了多个入口：04:37 之前启动的运行
+直接退出，第一个在 04:37 或之后启动的运行负责发布。定时运行每个自然日最多
+发布一个 nightly，之后的入口都是空操作。手动触发不受时间窗口限制。
 
 - 只有自上一个 nightly 以来 `src/`、`fun/lib`、`fun/test`、`fun/demos`、
   `fun/demo` 发生代码变更时才发布。纯文档/CI 改动不发；当天没有任何提交也
@@ -76,7 +79,8 @@ git push origin vX.Y.Z
   `v9.5.5-nightly.20261104`。按 SemVer 它低于 `v9.5.5`。nightly 不修改
   `version.inc`、README、ROADMAP、CHANGELOG，也不产生任何提交。
 - tag 用 `gh release create --target` 打在现有 HEAD 上。同一 commit 重跑会复用
-  该 tag；同一天又有新提交则依次使用 `.2`、`.3`。
+  该 tag。手动运行可以为同一天的新提交追加 `.2`、`.3`；定时运行在当天第一个
+  nightly 之后不再发布。
 - nightly 一律是 GitHub **prerelease**，`releases/latest` 继续指向稳定版。
   仅保留最近 14 个 nightly。
 
