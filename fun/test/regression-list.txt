@@ -54,6 +54,7 @@ lib-csv-test.fun	test/lib-csv-test.fun	snap
 lib-path-test.fun	test/lib-path-test.fun	snap
 lib-logging-test.fun	test/lib-logging-test.fun	snap
 lib-jsonschema-test.fun	test/lib-jsonschema-test.fun	snap
+lib-jwt-test.fun	test/lib-jwt-test.fun	snap
 lib-cmdline-linux.fun	test/lib-cmdline-linux.fun	snap
 lib-loadcheck.sh	test/lib-loadcheck.sh	shell
 run-benchmarks.sh	test/run-benchmarks.sh	shell
@@ -90,6 +91,7 @@ ffi-int64.fun	test/ffi/ffi-int64.fun	snap
 ffi-float.fun	test/ffi/ffi-float.fun	snap
 ffi-float-cb.fun	test/ffi/ffi-float-cb.fun	snap
 ffi-callbacks.fun	test/ffi/ffi-callbacks.fun	snap
+ffi-var-ref.fun	test/ffi/ffi-var-ref.fun	snap
 lib-zlib-test.fun	test/lib-zlib-test.fun	snap
 lib-crypt-lnx.fun	test/lib-crypt-lnx.fun	snap
 lib-cmdline-lnx-test.fun	test/lib-cmdline-lnx-test.fun	snap

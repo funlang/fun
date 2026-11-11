@@ -72,4 +72,6 @@ src/prj/fun/funcmd fun/test/ffi/ffi-float-cb.fun   # float cb, void cb, nested c
 - Struct / array args and C `long double` / complex returns are not covered.
 - The `p` pointer parameter type is passed to Fun as a raw numeric address
   (no automatic dereference); use `ptr=true` on `@toCallback` to hand C a raw
-  address instead of a managed closure when needed.
+  address instead of a managed closure when needed. A bare `var x` argument is
+  the exception: it passes the address of a pointer-width cell and copies the
+  result back into `x`, matching win32 `getapi` (`ffi-var-ref.fun` covers it).

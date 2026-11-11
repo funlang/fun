@@ -236,6 +236,8 @@ var
   at: array of Pffi_type;
   av: array of Pointer;
   slots: array of QWord;
+  refs: array of QWord;
+  byref: array of Boolean;
   strs: array of AnsiString;
   ch, rt: Char;
   ret: QWord;
@@ -249,6 +251,7 @@ begin
 
   n := CExps.count(exps);
   SetLength(at, n); SetLength(av, n); SetLength(slots, n);
+  SetLength(refs, n); SetLength(byref, n);
   SetLength(strs, n);
 
   // Build one 8-byte slot per argument; libffi reads from it. Integer/pointer
@@ -262,6 +265,19 @@ begin
     av[i] := @slots[i];
     e := CExp(exps.Item[i]);
     ch := flag[i + 1];
+    // A bare `var x` with a pointer type is an OUT/INOUT parameter. win32's
+    // winapi.pas passes the address of the value for 'p'; do the same through
+    // a pointer-width scratch cell and copy the result back after the call.
+    // Without this, lffi sent x's value (often 0 = NULL) and the callee
+    // reported STATUS_INVALID_PARAMETER (e.g. BCryptOpenAlgorithmProvider).
+    byref[i] := (e is CRef) and (ch = 'p')
+                and not isStr(e.value) and (e.asObj = nil);
+    if byref[i] then
+    begin
+      if isNum(e.value) then refs[i] := QWord(e.value^) else refs[i] := 0;
+      slots[i] := QWord(fun.uintptr(@refs[i]));
+      Continue;
+    end;
     case ch of
       's', 'a', 'w':
         // 'w' degrades to narrow char* on Linux (wchar_t is 4-byte UTF-32, not
@@ -331,6 +347,11 @@ begin
   ret := 0;
   if rt = 'v' then ffi_call(@cif, TFnProc(hfun), nil, @av[0])
   else ffi_call(@cif, TFnProc(hfun), @ret, @av[0]); // 8-byte resp buffer holds f/d too
+
+  // Write pointer-sized OUT/INOUT values back into their `var` targets.
+  for i := 0 to n - 1 do
+    if byref[i] then
+      CRef(CExp(exps.Item[i])).value^ := Int64(refs[i]);
 
   case rt of
     'f': p_val^ := PSingle(@ret)^;

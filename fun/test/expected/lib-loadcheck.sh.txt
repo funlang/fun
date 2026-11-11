@@ -11,6 +11,7 @@ LOAD  http-server
 LOAD  http-session
 LOAD  io
 LOAD  jsonschema
+LOAD  jwt
 LOAD  lib-ado-schema
 LOAD  lib-ado
 LOAD  lib-ajax
@@ -83,4 +84,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=78 failed=6
+loaded=79 failed=6

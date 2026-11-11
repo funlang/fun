@@ -119,7 +119,7 @@ rem ffi-*.fun load fun/test/ffi/libffitest.(so|dylib|dll) (built on demand, see
 rem fun/test/ffi/build.sh / the CI) and call it through getapi(). On Windows
 rem getapi needs -dWinFFI plus ffi.dll next to funcmd.exe. Probe getapi
 rem unconditionally: the stdio/pipe snaps need only getapi, not libffitest.dll.
-set "FFITESTS= ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun "
+set "FFITESTS= ffi-int64.fun ffi-float.fun ffi-float-cb.fun ffi-callbacks.fun ffi-var-ref.fun "
 set "NATIVEIOTESTS= lib-io-stdio-out.fun lib-io-stdio-err.fun lib-io-pipe-test.fun lib-process-test.fun "
 set "GETAPIOK=0"
 set "PROBEFILE=fun\test\.getapi-probe.fun"

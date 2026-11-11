@@ -53,3 +53,7 @@ float fc(float x, float(*cb)(float)){ return cb(x); }
 /* zero-arg callbacks */
 int fire0i(int(*cb)(void)){ return cb(); }
 void fire0(void(*cb)(void)){ cb(); }
+
+/* ---- OUT / INOUT pointer args ('p' with a bare `var`) ------------------- */
+int setout(int *p, int v){ if(!p) return -1; *p = v; return 0; }
+int addout(int *p, int v){ if(!p) return -2; *p += v; return 0; }
