@@ -11,6 +11,7 @@ LOAD  http-server
 LOAD  http-session
 LOAD  io
 LOAD  jsonschema
+LOAD  jwt
 LOAD  lib-ado-schema
 LOAD  lib-ado
 LOAD  lib-ajax

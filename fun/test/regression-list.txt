@@ -54,6 +54,7 @@ lib-csv-test.fun	test/lib-csv-test.fun	snap
 lib-path-test.fun	test/lib-path-test.fun	snap
 lib-logging-test.fun	test/lib-logging-test.fun	snap
 lib-jsonschema-test.fun	test/lib-jsonschema-test.fun	snap
+lib-jwt-test.fun	test/lib-jwt-test.fun	snap
 lib-cmdline-linux.fun	test/lib-cmdline-linux.fun	snap
 lib-loadcheck.sh	test/lib-loadcheck.sh	shell
 run-benchmarks.sh	test/run-benchmarks.sh	shell
