@@ -193,44 +193,73 @@ jobs:
           key: odbc-debs-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.image-version.outputs.value }}
 
       - name: Install unixODBC + SQLite ODBC driver (Linux)
+        id: install-odbc
         if: runner.os == 'Linux'
+        # The backend is optional at runtime: run-ado-odbc.sh reports SKIP when
+        # no driver is present. A stalled mirror must not consume the job's
+        # 20-minute budget or turn a network outage into a red regression run,
+        # so bound every connection and the whole step, and warn instead of
+        # failing when the packages cannot be obtained.
+        continue-on-error: true
+        timeout-minutes: 6
         run: |
-          set -eu
+          set -u
           if dpkg -s unixodbc libsqliteodbc >/dev/null 2>&1; then
             echo "unixODBC + libsqliteodbc already installed"
+            if ls "$HOME/.cache/fun-odbc-debs"/*.deb >/dev/null 2>&1; then
+              echo "hasdebs=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "hasdebs=false" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
           cache="$HOME/.cache/fun-odbc-debs"
           mkdir -p "$cache"
+          installed=0
           if ls "$cache"/*.deb >/dev/null 2>&1; then
             echo "installing cached .debs from $cache"
             # --refuse-downgrade: a cache left over from an older image must
             # not replace newer libraries with the versions it downloaded.
             if sudo dpkg --refuse-downgrade -i "$cache"/*.deb; then
               echo "installed from cache; no network needed"
-              exit 0
+              installed=1
+            else
+              echo "cached .debs did not install cleanly; falling back to apt"
             fi
-            echo "cached .debs did not install cleanly; falling back to apt"
           fi
-          # The hosted image carries package lists; retry transient mirror
-          # failures instead of failing the whole job. Keep the downloaded
-          # archives so they can be copied into the cache below.
-          sudo apt-get install -y --no-install-recommends \
-            -o Acquire::Retries=5 -o APT::Keep-Downloaded-Packages=true \
-            unixodbc libsqliteodbc || {
-            sudo apt-get update -o Acquire::Retries=5
-            sudo apt-get install -y --no-install-recommends \
-              -o Acquire::Retries=5 -o APT::Keep-Downloaded-Packages=true \
-              unixodbc libsqliteodbc
-          }
-          # Keep the exact archives apt used (dependencies included) so the
-          # next run on this image installs offline.
-          sudo find /var/cache/apt/archives -maxdepth 1 -name '*.deb' \
-            -exec cp -f {} "$cache"/ \;
-          ls -l "$cache"
+          if [ "$installed" -eq 0 ]; then
+            # The hosted image carries package lists; retry transient mirror
+            # failures. Keep the archives so they can be cached below.
+            if ! sudo apt-get install -y --no-install-recommends \
+              -o Acquire::Retries=2 \
+              -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 \
+              -o APT::Keep-Downloaded-Packages=true \
+              unixodbc libsqliteodbc; then
+              sudo apt-get update -o Acquire::Retries=2 \
+                -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 || true
+              sudo apt-get install -y --no-install-recommends \
+                -o Acquire::Retries=2 \
+                -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 \
+                -o APT::Keep-Downloaded-Packages=true \
+                unixodbc libsqliteodbc || true
+            fi
+            if dpkg -s unixodbc libsqliteodbc >/dev/null 2>&1; then
+              # Keep the exact archives apt used (dependencies included) so
+              # the next run on this image installs offline.
+              sudo find /var/cache/apt/archives -maxdepth 1 -name '*.deb' \
+                -exec cp -f {} "$cache"/ \; || true
+            fi
+          fi
+          if ls "$cache"/*.deb >/dev/null 2>&1; then
+            echo "hasdebs=true" >> "$GITHUB_OUTPUT"
+            ls -l "$cache"
+          else
+            echo "hasdebs=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=ODBC::unixODBC/libsqliteodbc unavailable; the ODBC regression test will SKIP"
+          fi
 
       - name: Save unixODBC .debs
-        if: runner.os == 'Linux' && steps.cache-odbc-debs.outputs.cache-hit != 'true'
+        if: runner.os == 'Linux' && steps.cache-odbc-debs.outputs.cache-hit != 'true' && steps.install-odbc.outputs.hasdebs == 'true'
         continue-on-error: true
         uses: actions/cache/save@v4
         with:
