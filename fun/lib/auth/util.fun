@@ -47,7 +47,59 @@ fun _authHashHex(msg, alg)
   end if;
 end fun;
 
+var _authCngOpen = nil;
+var _authCngClose = nil;
+var _authCngHash = nil;
+
+fun _authCngName(name)
+  var host = 'host'.arg().getJson(fd: true);
+  if host.chars = 2 then
+    result = name & 0.toChar();
+    return;
+  end if;
+  var out = '';
+  var i = 0;
+  while i < name.length() do
+    out &= name[i] & 0.toChar();
+    i += 1;
+  end do;
+  result = out & 0.toChar();
+end fun;
+
+fun _authCngHmac(key, msg, alg)
+  if _authCngOpen = nil then
+    _authCngOpen  = 'bcrypt.dll'.getapi('BCryptOpenAlgorithmProvider', 'pppi:i');
+    _authCngClose = 'bcrypt.dll'.getapi('BCryptCloseAlgorithmProvider', 'pi:i');
+    _authCngHash  = 'bcrypt.dll'.getapi('BCryptHash', 'ppipipi:i');
+  end if;
+  var name = 'SHA384';
+  var len = 48;
+  if alg = 'sha512' then name = 'SHA512'; len = 64; end if;
+  var wn = _authCngName(name);
+  var h = 0;
+  var st = _authCngOpen(var h, wn.toNum(-1), 0, 8);
+  if st <> 0 then raise 'auth: CNG open failed (' & st & ')'; end if;
+  try
+    var buf = ' '.x(len);
+    st = _authCngHash(h, key.toNum(-1), key.length(), msg.toNum(-1), msg.length(), buf.toNum(-1), len);
+    if st <> 0 then raise 'auth: CNG hash failed (' & st & ')'; end if;
+    var raw = 0.toChar().x(len);
+    var i = 0;
+    while i < len do
+      raw.fromByte(i, buf.toByte(i));
+      i += 1;
+    end do;
+    result = raw;
+  finally
+    _authCngClose(h, 0);
+  end try;
+end fun;
+
 fun AuthHmacRaw(key, msg, alg)
+  if alg <> 'sha256' and 'host'.arg().getJson(fd: true).os = 'windows' then
+    result = _authCngHmac(key, msg, alg);
+    return;
+  end if;
   var block = 64;
   if alg = 'sha384' or alg = 'sha512' then block = 128; end if;
   if key.length() > block then key = hex2str(_authHashHex(key, alg)); end if;

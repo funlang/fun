@@ -84,4 +84,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=78 failed=6
+loaded=79 failed=6
