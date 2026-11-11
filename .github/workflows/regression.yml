@@ -515,12 +515,21 @@ jobs:
           path: src\prj\fun\ffi.dll
           key: win64-ffi-fpc-3.2.2-v1
 
+      # The helper's exports are part of the test interface: hash the source so
+      # adding a function (ffi-var-ref's setout/addout) rebuilds the DLL
+      # instead of restoring one that cannot resolve the new symbol.
+      - name: Compute libffitest input hash (win64)
+        id: ffitest-hash
+        shell: pwsh
+        run: |
+          "value=${{ hashFiles('fun/test/ffi/libffitest.c') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
       - name: Restore libffitest.dll (win64)
         id: cache-libffitest-win
         uses: actions/cache/restore@v4
         with:
           path: fun\test\ffi\libffitest.dll
-          key: win64-libffitest-v1
+          key: win64-libffitest-v1-${{ steps.ffitest-hash.outputs.value }}
 
       - name: Mark cached win64 helper DLLs
         shell: pwsh
@@ -834,7 +843,7 @@ jobs:
             # is readable from outside (the job log is not)
             $need = 'big64','passll','addll','applyll','summ','ident','addi','five','fsum',
                     'fdbl','dfromf','mixsum','apply1','dapply','sumvia','cb2','twice_cb',
-                    'walk','acc','fc','fire0i','fire0'
+                    'walk','acc','fc','fire0i','fire0','setout','addout'
             $objdump = Join-Path (Split-Path $gcc) 'objdump.exe'
             $sym = @()
             if (Test-Path $objdump) {
@@ -876,7 +885,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: fun\test\ffi\libffitest.dll
-          key: win64-libffitest-v1
+          key: win64-libffitest-v1-${{ steps.ffitest-hash.outputs.value }}
 
       - name: Build win64 runtime DLLs (tcc + zlib, best effort)
         if: steps.cache-win64-runtime.outputs.cache-hit != 'true'
