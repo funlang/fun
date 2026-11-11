@@ -423,6 +423,8 @@ The signature encodes each argument's type, then `:`, then the return type (`i` 
 
 `getapi` is per-platform: `winapi.pas` on 32-bit Windows, and `lffi.pas` - backed by FPC's bundled libffi - on Linux, macOS and win64 (there it resolves against `ffi.dll`).
 
+A bare `var x` argument for a `p` parameter is an OUT/INOUT pointer on both backends: the engine passes a pointer-width cell and copies the result back into `x`. For explicit control (or for a caller-owned buffer) pass the address yourself with `buf.toNum(-1)`.
+
 ---
 
 ## Keyword aliasing

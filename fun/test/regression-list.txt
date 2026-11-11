@@ -91,6 +91,7 @@ ffi-int64.fun	test/ffi/ffi-int64.fun	snap
 ffi-float.fun	test/ffi/ffi-float.fun	snap
 ffi-float-cb.fun	test/ffi/ffi-float-cb.fun	snap
 ffi-callbacks.fun	test/ffi/ffi-callbacks.fun	snap
+ffi-var-ref.fun	test/ffi/ffi-var-ref.fun	snap
 lib-zlib-test.fun	test/lib-zlib-test.fun	snap
 lib-crypt-lnx.fun	test/lib-crypt-lnx.fun	snap
 lib-cmdline-lnx-test.fun	test/lib-cmdline-lnx-test.fun	snap
