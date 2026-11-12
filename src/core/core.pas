@@ -433,7 +433,7 @@ type
     {$IfDef FunTraceback}
     // Live call-site ring. callsTop is an absolute depth; the slot is
     // callsTop and (MaxCallFrames - 1), so push/pop stay an index write.
-    calls: array[0..MaxCallFrames - 1] of CCallFrame;
+    calls: array of CCallFrame;
     callsTop: fun.int;
     // Frozen location and frames for the pending error. Error point and stack
     // are filled at the first try/except (or function unwind); lastError stays
@@ -934,6 +934,7 @@ begin
   // line is deferred to traceBack/runtime queries, so the hot path only pays
   // for one pointer write. Frame bookkeeping rides on the existing
   // try/finally; error unwinding freezes the ring before pop.
+  if Length(env.calls) = 0 then SetLength(env.calls, MaxCallFrames);
   site := env.lastNode;
   {$EndIf}
   if isClass then
