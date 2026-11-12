@@ -39,15 +39,15 @@ fun _runtimeAddPath(frame)
   frame['path'] = _runtimeShort(frame['file']);
 end fun;
 
-// 'runtime'.frame() / 'runtime'.lastError() below call engine builtins. The
-// leading string is a namespace token, not a value: a non-object receiver is
-// how Fun routes a call to the builtin registry without adding a global name
-// (the same idiom as 'host'.arg() and 'kernel32'.getapi()).
+// The calls below reach the engine's reflection builtin. The receiver selects
+// the target ('depth', 'frame' or 'lastError') and 'reflect' groups the
+// runtime-introspection code; a non-object receiver is how Fun routes a call
+// to the builtin registry without adding a global name.
 class _RuntimeApi()
   fun source(depth, mode)
     if depth = nil then depth = 0; end if;
     if mode = nil then mode = 1; end if;
-    var s = 'runtime'.frame(depth, mode);
+    var s = 'frame'.reflect(depth, mode);
     if s = nil then result = nil; return; end if;
     _runtimeAddPath(s);
     result = s;
@@ -58,11 +58,11 @@ class _RuntimeApi()
     if max.type() = 0 then max = 32; end if;
     if max < 0 then raise 'runtime: max must be >= 0'; end if;
     var ls = new [];
-    var n = 'runtime'.frame();
+    var n = 'depth'.reflect();
     // Index 0 is runtime.stack itself; the caller chain starts at 1.
     var i = 1;
     while i < n and ls.@count() < max do
-      var fr = 'runtime'.frame(i, 2);
+      var fr = 'frame'.reflect(i, 2);
       if fr <> nil then
         _runtimeAddPath(fr);
         ls.@add(fr);
@@ -73,7 +73,7 @@ class _RuntimeApi()
   end fun;
 
   fun lastError()
-    var e = 'runtime'.lastError();
+    var e = 'lastError'.reflect();
     if e = nil then result = nil; return; end if;
     _runtimeAddPath(e);
     var st = e['stack'];

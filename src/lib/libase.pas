@@ -1871,7 +1871,7 @@ begin
 end;
 {$EndIf}
 
-procedure _rtFrame(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+procedure _rtFrame(env: CEnv; exps: CExps; val: PValue);
 var
   depth: fun.int;
   {$IfDef FunTraceback}
@@ -1882,20 +1882,11 @@ var
   e: CExp;
 begin
   val^ := NullValue;
-  // The receiver is a namespace token, like 'host'.arg() or
-  // 'kernel32'.getapi(): a non-object receiver routes the call to this
-  // builtin. Check it so 'anything'.frame() does not silently work.
-  if (exp = nil) or (exp.asStr <> 'runtime') then
-    raise EBase.Create('runtime: frame() must be called as ''runtime''.frame()');
+  // 'frame'.reflect(i, mode): i is the frame index, innermost = 0.
   e := CExps.Find(exps, '', 0);
-  if e = nil then
-  begin
-    // frame() is the live depth; frame(i) is a frame.
-    val^ := env.callDepth;
-    exit;
-  end;
+  if e = nil then exit;
   depth := e.asInt;
-  if depth < 0 then raise EBase.Create('runtime: depth must be >= 0');
+  if depth < 0 then raise EBase.Create('reflect: depth must be >= 0');
   {$IfDef FunTraceback}
   if not env.frameAt(depth, f) then exit;
   mode := 2;
@@ -1907,7 +1898,7 @@ begin
   {$EndIf}
 end;
 
-procedure _rtLastError(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+procedure _rtLastError(env: CEnv; exps: CExps; val: PValue);
 var
   {$IfDef FunTraceback}
   i: fun.int;
@@ -1918,10 +1909,7 @@ var
   e: CExp;
 begin
   val^ := NullValue;
-  // Namespace token; see _rtFrame.
-  if (exp = nil) or (exp.asStr <> 'runtime') then
-    raise EBase.Create('runtime: lastError() must be called as ''runtime''.lastError()');
-  // lastError() reads; lastError(true) clears.
+  // 'lastError'.reflect(clear): reads, or clears when clear is true.
   e := CExps.Find(exps, '', 0);
   if (e <> nil) and e.asBool then
   begin
@@ -1955,6 +1943,29 @@ begin
   {$EndIf}
 end;
 
+// Reflection entry point. The receiver selects the target, so depth/frame/
+// error introspection lives under one builtin name instead of looking like
+// unrelated namespace-token calls:
+//   'depth'.reflect()          current call depth
+//   'frame'.reflect(i, mode)   frame i, innermost = 0
+//   'lastError'.reflect(clear) pending/last caught error
+procedure _rtReflect(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  target: fun.str;
+begin
+  val^ := NullValue;
+  if exp = nil then exit;
+  target := exp.asStr;
+  if target = 'depth' then
+    val^ := env.callDepth
+  else if target = 'frame' then
+    _rtFrame(env, exps, val)
+  else if target = 'lastError' then
+    _rtLastError(env, exps, val)
+  else
+    raise EBase.Create('reflect: unknown target "' + target + '"');
+end;
+
 //==============================================================
 constructor CLbase.Create;
 begin
@@ -1986,9 +1997,8 @@ begin
   ids['format']  := CExp.new(nil).parse(Int64(fun.uintptr(@_format)));
   ids['eval']    := CExp.new(nil).parse(Int64(fun.uintptr(@_eval)));
 
-  // Raw runtime frame access (wrapped by fun/lib/runtime.fun).
-  ids['frame']     := CExp.new(nil).parse(Int64(fun.uintptr(@_rtFrame)));
-  ids['lastError'] := CExp.new(nil).parse(Int64(fun.uintptr(@_rtLastError)));
+  // Runtime reflection (wrapped by fun/lib/runtime.fun).
+  ids['reflect'] := CExp.new(nil).parse(Int64(fun.uintptr(@_rtReflect)));
   
   // Time
   ids['time']    := CExp.new(nil).parse(Int64(fun.uintptr(@_time)));

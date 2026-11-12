@@ -148,7 +148,7 @@ except
   // still work.
 end try;
 // Capability probes are internal; do not let them appear as a user lastError.
-var _hostClearError = 'runtime'.lastError(true);
+var _hostClearError = 'lastError'.reflect(true);
 
 //--------------------------------------------------------------
 // command line
