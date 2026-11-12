@@ -39,6 +39,10 @@ fun _runtimeAddPath(frame)
   frame['path'] = _runtimeShort(frame['file']);
 end fun;
 
+// 'runtime'.frame() / 'runtime'.lastError() below call engine builtins. The
+// leading string is a namespace token, not a value: a non-object receiver is
+// how Fun routes a call to the builtin registry without adding a global name
+// (the same idiom as 'host'.arg() and 'kernel32'.getapi()).
 class _RuntimeApi()
   fun source(depth, mode)
     if depth = nil then depth = 0; end if;

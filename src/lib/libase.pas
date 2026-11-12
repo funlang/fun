@@ -1882,6 +1882,11 @@ var
   e: CExp;
 begin
   val^ := NullValue;
+  // The receiver is a namespace token, like 'host'.arg() or
+  // 'kernel32'.getapi(): a non-object receiver routes the call to this
+  // builtin. Check it so 'anything'.frame() does not silently work.
+  if (exp = nil) or (exp.asStr <> 'runtime') then
+    raise EBase.Create('runtime: frame() must be called as ''runtime''.frame()');
   e := CExps.Find(exps, '', 0);
   if e = nil then
   begin
@@ -1913,6 +1918,9 @@ var
   e: CExp;
 begin
   val^ := NullValue;
+  // Namespace token; see _rtFrame.
+  if (exp = nil) or (exp.asStr <> 'runtime') then
+    raise EBase.Create('runtime: lastError() must be called as ''runtime''.lastError()');
   // lastError() reads; lastError(true) clears.
   e := CExps.Find(exps, '', 0);
   if (e <> nil) and e.asBool then
