@@ -1881,7 +1881,7 @@ begin
   e := CExps.Find(exps, '', 0);
   if e = nil then
   begin
-    // __frame() is the live depth; __frame(i) is a frame.
+    // frame() is the live depth; frame(i) is a frame.
     val^ := env.callDepth;
     exit;
   end;
@@ -1905,7 +1905,7 @@ var
   e: CExp;
 begin
   val^ := NullValue;
-  // __lastError() reads; __lastError(true) clears.
+  // lastError() reads; lastError(true) clears.
   e := CExps.Find(exps, '', 0);
   if (e <> nil) and e.asBool then
   begin
