@@ -1079,7 +1079,7 @@ jobs:
           # something fpc reads as a path plus a stray 'lib' source file.
           $argv = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs', '-Twin64',
                     '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx',
-                    '-dFunPack', '-dMD5',
+                    '-dFunPack', '-dMD5', '-dFunTraceback',
                     "-Fu$((Resolve-Path '..\..\lib').Path)")
           # Keep the normal build's .ppu/.o/.obj out of the project directory:
           # the safe build uses units-safe, and stale normal units in the
@@ -1144,7 +1144,7 @@ jobs:
           Remove-Item (Join-Path $units '*.ppu'), (Join-Path $units '*.o'), `
                       (Join-Path $units '*.or') -Force -ErrorAction SilentlyContinue
           $argv = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs', '-Twin64',
-                    '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx', '-dFunPack', '-dMD5') + $flags +
+                    '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx', '-dFunPack', '-dMD5', '-dFunTraceback') + $flags +
                   @('-dFunSafe', '-ofuncmd-safe.exe', "-FU$units",
                     "-Fu$((Resolve-Path '..\..\lib').Path)")
           Write-Host "safe argv: $(($argv | ForEach-Object { "[$_]" }) -join ' ')"
