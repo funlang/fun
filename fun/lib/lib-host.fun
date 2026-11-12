@@ -123,25 +123,30 @@ var _hostSetEnvW;       // Windows: SetEnvironmentVariableW
 var _hostGetLastError;  // Windows: GetLastError
 var _hostSetLastError;  // Windows: SetLastError
 
-if _isUnix then
-  _hostGetCwd  = LibC().getapi('getcwd',  'pi:p');
-  _hostGetenv  = LibC().getapi('getenv',  's:p');
-  _hostSetenv  = LibC().getapi('setenv',  'ssi:i');
-  _hostUnsetenv = LibC().getapi('unsetenv', 's:i');
-  _hostStrlen  = LibC().getapi('strlen',  'p:i');
-else
-  _hostSep = '\';
-  _hostGetCmdLine  = 'kernel32'.getapi('GetCommandLine',       ':s');
-  _hostGetCurrPath = 'kernel32'.getapi('GetCurrentDirectory', 'ip:i');
-  _hostGetTempPath = 'kernel32'.getapi('GetTempPath',         'ip:i');
-  _hostGetFullPath = 'kernel32'.getapi('GetFullPathName',     'sipp:i');
-  _hostGetEnvA     = 'kernel32'.getapi('GetEnvironmentVariableA', 'spi:i');
-  _hostGetEnvW     = 'kernel32'.getapi('GetEnvironmentVariableW', 'spi:i');
-  _hostSetEnvA     = 'kernel32'.getapi('SetEnvironmentVariableA', 'ss:i');
-  _hostSetEnvW     = 'kernel32'.getapi('SetEnvironmentVariableW', 'ss:i');
-  _hostGetLastError = 'kernel32'.getapi('GetLastError', ':i');
-  _hostSetLastError = 'kernel32'.getapi('SetLastError', 'i:');
-end if;
+if not _isUnix then _hostSep = '\'; end if;
+try
+  if _isUnix then
+    _hostGetCwd  = LibC().getapi('getcwd',  'pi:p');
+    _hostGetenv  = LibC().getapi('getenv',  's:p');
+    _hostSetenv  = LibC().getapi('setenv',  'ssi:i');
+    _hostUnsetenv = LibC().getapi('unsetenv', 's:i');
+    _hostStrlen  = LibC().getapi('strlen',  'p:i');
+  else
+    _hostGetCmdLine  = 'kernel32'.getapi('GetCommandLine',       ':s');
+    _hostGetCurrPath = 'kernel32'.getapi('GetCurrentDirectory', 'ip:i');
+    _hostGetTempPath = 'kernel32'.getapi('GetTempPath',         'ip:i');
+    _hostGetFullPath = 'kernel32'.getapi('GetFullPathName',     'sipp:i');
+    _hostGetEnvA     = 'kernel32'.getapi('GetEnvironmentVariableA', 'spi:i');
+    _hostGetEnvW     = 'kernel32'.getapi('GetEnvironmentVariableW', 'spi:i');
+    _hostSetEnvA     = 'kernel32'.getapi('SetEnvironmentVariableA', 'ss:i');
+    _hostSetEnvW     = 'kernel32'.getapi('SetEnvironmentVariableW', 'ss:i');
+    _hostGetLastError = 'kernel32'.getapi('GetLastError', ':i');
+    _hostSetLastError = 'kernel32'.getapi('SetLastError', 'i:');
+  end if;
+except
+  // Safe builds and hosts without FFI keep native handles nil; lexical helpers
+  // still work.
+end try;
 
 //--------------------------------------------------------------
 // command line
@@ -175,6 +180,7 @@ end fun;
 //--------------------------------------------------------------
 fun HostCurrPath()
   if _isUnix then
+    if _hostGetCwd = nil then result = ''; return; end if;
     var buf = ' '.x(4097);
     var p = _hostGetCwd(buf.toNum(-1), 4096);
     if p = nil then
@@ -183,6 +189,7 @@ fun HostCurrPath()
       result = buf.substr(len: _hostStrlen(buf.toNum(-1)));
     end if;
   else
+    if _hostGetCurrPath = nil then result = ''; return; end if;
     result = ' '.x(_HOST_MAX_PATH + 1);
     var ln = _hostGetCurrPath(_HOST_MAX_PATH, result);
     result = result.substr(len: ln);
@@ -250,6 +257,7 @@ fun HostFullPath(f)
     end do;
     if result = '' then result = '/'; end if;
   else
+    if _hostGetFullPath = nil then result = f; return; end if;
     result = ' '.x(_HOST_MAX_PATH + 1);
     var r = '';
     var ln = _hostGetFullPath(f, _HOST_MAX_PATH, result, r);
