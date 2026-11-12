@@ -420,7 +420,9 @@ begin
       on e: EBase do
       begin
         // Capture before the surrounding finally can overwrite lastNode.
+        {$IfDef FunTraceback}
         env.beginError(e);
+        {$EndIf}
         if nexcept <> nil then
         begin
           env.traceErrorNode(e.message, e.ClassName);
@@ -428,7 +430,9 @@ begin
           if evar = nil then evar := CVar.new(nexcept, _AT);
           evar.assign(e.message);
           nexcept.run(env);
+          {$IfDef FunTraceback}
           env.endError(e);
+          {$EndIf}
         end
         else
         begin

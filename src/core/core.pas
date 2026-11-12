@@ -409,6 +409,7 @@ type
     site: CNode;
   end;
 
+  {$IfDef FunTraceback}
   // Frozen error stack: only pointers. All names and locations are resolved
   // on demand by the runtime builtins or the driver's traceBack.
   CErrorFrames = array of CCallFrame;
@@ -418,6 +419,7 @@ type
     node: CNode;
     frames: CErrorFrames;
   end;
+  {$EndIf}
 
   CEnv = class(CBase)
   public
@@ -457,6 +459,7 @@ type
     procedure echo(const s: fun.str); virtual;
     function isCase: fun.bool;
     function lastErrorFun: fun.str;
+    {$IfDef FunTraceback}
     // Call chain of the pending error, innermost first, one
     // `  in <name>() (file:line)` line per function/class frame. Used by the
     // command-line driver to append a traceback to a runtime error.
@@ -471,6 +474,7 @@ type
     procedure resetTrace;
     procedure resetLastError;
     procedure resetCallStack;
+    {$EndIf}
     // 0 = innermost frame. Used by the runtime source/stack builtins.
     function callDepth: fun.int;
     function frameAt(index: fun.int; out frame: CCallFrame): fun.bool;
@@ -479,6 +483,7 @@ type
     procedure traceErrorNode(const msg: fun.str = ''; const cls: fun.str = '');
   end;
 
+{$IfDef FunTraceback}
 // Resolve raw frame pointers on demand. Kept here so the runtime builtins and
 // the driver share one implementation without storing strings per frame.
 function EnclosingFun(n: CNode): CFun;
@@ -486,6 +491,7 @@ function EnclosingClass(n: CNode): CFun;
 function NodeRow(n: CNode): fun.int;
 function FrameFileName(const f: CCallFrame): fun.str;
 function FrameLine(const f: CCallFrame): fun.int;
+{$EndIf}
 
 // for OLE lib - PropertyGet or Set
 var _ENV: CEnv;
@@ -2167,6 +2173,7 @@ begin
   end;
 end;
 
+{$IfDef FunTraceback}
 function EnclosingFun(n: CNode): CFun;
 begin
   result := nil;
@@ -2226,7 +2233,9 @@ begin
   else if f.callee <> nil then result := f.callee.row
   else result := 0;
 end;
+{$EndIf}
 
+{$IfDef FunTraceback}
 function CEnv.traceBack: fun.str;
 var
   i, n, idx: fun.int;
@@ -2256,7 +2265,6 @@ var
     ;
   end;
 begin
-  {$IfDef FunTraceback}
   result := '';
   // Innermost first. errorFrames is stored oldest -> newest.
   for i := Length(errorFrames) - 1 downto 0 do
@@ -2281,16 +2289,14 @@ begin
       result := result + FrameOf(f);
     end;
   end;
-  {$Else}
-  result := '';
-  {$EndIf}
 end;
+{$EndIf}
 
+{$IfDef FunTraceback}
 procedure CEnv.captureFrames(out frames: CErrorFrames);
 var
   i, n, idx: fun.int;
 begin
-  {$IfDef FunTraceback}
   n := callsTop;
   if n > MaxCallFrames then n := MaxCallFrames;
   SetLength(frames, n);
@@ -2299,29 +2305,27 @@ begin
     idx := (callsTop - n + i) and (MaxCallFrames - 1);
     frames[i] := calls[idx];
   end;
-  {$Else}
-  frames := nil;
-  {$EndIf}
 end;
+{$EndIf}
 
+{$IfDef FunTraceback}
 procedure CEnv.snapshotError;
 begin
-  {$IfDef FunTraceback}
   // Only the first (deepest) frame records, so outer finally blocks do not
   // overwrite the stack while the exception unwinds.
   if errorCaptured then exit;
   errorCaptured := true;
   if errorNode = nil then errorNode := lastNode;
   captureFrames(errorFrames);
-  {$EndIf}
 end;
+{$EndIf}
 
+{$IfDef FunTraceback}
 procedure CEnv.beginError(e: TObject);
 var
   n: fun.int;
   state: CErrorState;
 begin
-  {$IfDef FunTraceback}
   n := errorStateTop;
   if (n > 0) and (errorStates[n - 1].exc = e) then exit;
   if n >= MaxErrorStates then exit;
@@ -2341,14 +2345,14 @@ begin
 
   errorStates[n] := state;
   Inc(errorStateTop);
-  {$EndIf}
 end;
+{$EndIf}
 
+{$IfDef FunTraceback}
 procedure CEnv.endError(e: TObject);
 var
   n: fun.int;
 begin
-  {$IfDef FunTraceback}
   n := errorStateTop;
   if (n > 0) and (errorStates[n - 1].exc = e) then
   begin
@@ -2357,47 +2361,47 @@ begin
     errorStates[n - 1].node := nil;
     Dec(errorStateTop);
   end;
-  {$EndIf}
 end;
+{$EndIf}
 
+{$IfDef FunTraceback}
 function CEnv.displayErrorNode: CNode;
 var
   n: fun.int;
 begin
-  {$IfDef FunTraceback}
   n := errorStateTop;
   if n > 0 then
     result := errorStates[n - 1].node
   else
     result := errorNode;
-  {$EndIf}
   if result = nil then result := lastNode;
 end;
+{$EndIf}
 
+{$IfDef FunTraceback}
 procedure CEnv.resetTrace;
 begin
-  {$IfDef FunTraceback}
   errorFrames := nil;
   errorNode := nil;
   errorCaptured := false;
-  {$EndIf}
 end;
+{$EndIf}
 
+{$IfDef FunTraceback}
 procedure CEnv.resetLastError;
 begin
-  {$IfDef FunTraceback}
   lastErrorValid := false;
   lastErrorMessage := '';
   lastErrorClassName := '';
   lastErrorFrames := nil;
-  {$EndIf}
 end;
+{$EndIf}
 
+{$IfDef FunTraceback}
 procedure CEnv.resetCallStack;
 var
   i: fun.int;
 begin
-  {$IfDef FunTraceback}
   callsTop := 0;
   errorStateTop := 0;
   for i := 0 to MaxErrorStates - 1 do
@@ -2406,8 +2410,8 @@ begin
     errorStates[i].node := nil;
     errorStates[i].frames := nil;
   end;
-  {$EndIf}
 end;
+{$EndIf}
 
 function CEnv.callDepth: fun.int;
 begin
@@ -2419,8 +2423,10 @@ begin
 end;
 
 function CEnv.frameAt(index: fun.int; out frame: CCallFrame): fun.bool;
+{$IfDef FunTraceback}
 var
   idx: fun.int;
+{$EndIf}
 begin
   {$IfDef FunTraceback}
   result := false;
@@ -2444,8 +2450,10 @@ begin
 end;
 
 procedure CEnv.traceErrorNode(const msg: fun.str; const cls: fun.str);
+{$IfDef FunTraceback}
 var
   si: fun.int;
+{$EndIf}
 begin
   {$IfDef FunTraceback}
   // The error is being handled by a script try/except. Prefer the state for

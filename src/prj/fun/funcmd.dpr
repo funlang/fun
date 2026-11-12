@@ -118,7 +118,11 @@ var
 begin
   result := '';
   if _ENV = nil then exit;
+  {$IfDef FunTraceback}
   n := _ENV.displayErrorNode;
+  {$Else}
+  n := _ENV.lastNode;
+  {$EndIf}
   if n = nil then exit;
   if n.root is CModu then m := CModu(n.root) else m := nil;
   if (m <> nil) and (m.fileName <> '') and (n is CRune) then
@@ -132,17 +136,21 @@ end;
 // `file:line:` prefix and a function traceback; parse errors keep their
 // existing `... @ row,col` form (the parser has no module trace yet).
 procedure PrintErr(const s: fun.str);
+{$IfDef FunTraceback}
 var
   t: fun.str;
+{$EndIf}
 begin
   try
     if not isLog then exit;
     WriteErr(ErrPos + s + sLineBreak);
+    {$IfDef FunTraceback}
     if _ENV <> nil then
     begin
       t := _ENV.traceBack;
       if t <> '' then WriteErr(t);
     end;
+    {$EndIf}
   except
   end;
 end;
@@ -274,9 +282,11 @@ begin
       r := CFunRunner.Create;
       _ENV := r;
     end;
+    {$IfDef FunTraceback}
     r.resetTrace;
     r.resetCallStack;
     r.resetLastError;
+    {$EndIf}
     try
       CRun(p).run(r);
     except
@@ -458,9 +468,11 @@ _Run:
   {$EndIf}
   r := CFunRunner.Create;
   _ENV := r;
+  {$IfDef FunTraceback}
   r.resetTrace;
   r.resetCallStack;
   r.resetLastError;
+  {$EndIf}
   {$IfDef FunStartupTiming}
   TimeMark('env-ready');
   {$EndIf}

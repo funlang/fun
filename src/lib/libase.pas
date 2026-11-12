@@ -1824,6 +1824,7 @@ begin
   s.items.add(e);
 end;
 
+{$IfDef FunTraceback}
 function _rtNodeFile(n: CNode): fun.str;
 var
   m: CModu;
@@ -1868,14 +1869,17 @@ begin
     _rtStr(result, 'calleeClass', cls);
   end;
 end;
+{$EndIf}
 
 procedure _rtFrame(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   depth: fun.int;
+  {$IfDef FunTraceback}
   f: CCallFrame;
   s: CNew;
-  e: CExp;
   mode: fun.int;
+  {$EndIf}
+  e: CExp;
 begin
   val^ := NullValue;
   e := CExps.Find(exps, '', 0);
@@ -1887,6 +1891,7 @@ begin
   end;
   depth := e.asInt;
   if depth < 0 then raise EBase.Create('runtime: depth must be >= 0');
+  {$IfDef FunTraceback}
   if not env.frameAt(depth, f) then exit;
   mode := 2;
   e := CExps.Find(exps, '', 1);
@@ -1894,14 +1899,17 @@ begin
   s := _rtFrameSet(f, mode);
   setObj(val, s, VarObjNew);
   del(s);
+  {$EndIf}
 end;
 
 procedure _rtLastError(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
+  {$IfDef FunTraceback}
   i: fun.int;
   n: CNode;
   owner: CFun;
   s, st: CNew;
+  {$EndIf}
   e: CExp;
 begin
   val^ := NullValue;
@@ -1909,7 +1917,9 @@ begin
   e := CExps.Find(exps, '', 0);
   if (e <> nil) and e.asBool then
   begin
+    {$IfDef FunTraceback}
     env.resetLastError;
+    {$EndIf}
     exit;
   end;
   {$IfDef FunTraceback}
