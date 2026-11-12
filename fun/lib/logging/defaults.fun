@@ -6,8 +6,8 @@ use 'formatter.fun';
 use 'sink.fun';
 use 'handler.fun';
 
-fun _defaultFormatter()
-  result = _TextFormatter([]);
+fun _defaultFormatter(opts)
+  result = _TextFormatter(opts);
 end fun;
 
 fun _defaultHandlers()
@@ -28,9 +28,18 @@ fun _configWith(opts)
   var cfg = _defaultLogConfig();
   if opts <> nil then
     for k: v in opts do cfg[k] = v; end do;
+    // sourcePath applies to the built-in formatter; a user formatter owns its
+    // own options.
+    if opts.@has('sourcePath') and opts['sourcePath'] <> nil and not opts.@has('formatter') then
+      cfg['formatter'] = _defaultFormatter([sourcePath: opts['sourcePath']]);
+    end if;
   end if;
   if cfg['level'] = nil then cfg['level'] = 'info'; end if;
-  if cfg['formatter'] = nil then cfg['formatter'] = _defaultFormatter(); end if;
+  if cfg['formatter'] = nil then
+    var fmtOpts = nil;
+    if cfg['sourcePath'] <> nil then fmtOpts = [sourcePath: cfg['sourcePath']]; end if;
+    cfg['formatter'] = _defaultFormatter(fmtOpts);
+  end if;
   if cfg['handlers'] = nil then cfg['handlers'] = _defaultHandlers(); end if;
   result = cfg;
 end fun;

@@ -13,6 +13,7 @@ failure exits 1: True
 crash marked FAIL: True
 custom message shown: True
 diagnostic shown: True
+failure source shown: True
 assert.fail shown: True
 matcher failure shown: True
 passing test quiet: True

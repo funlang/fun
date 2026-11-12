@@ -108,9 +108,9 @@ var
   isLog: fun.bool;
   hadError: fun.bool;
 
-// `file:line: ` prefix for the command currently executing, taken from the
-// environment's last traced node (see CRuns.run / CEnv.trace). Empty during
-// parsing (nothing has run yet) and when the source file is unknown.
+// `file:line: ` prefix for the failing command, taken from the first captured
+// error point (or the last traced node). Empty during parsing and when the
+// source file is unknown.
 function ErrPos: fun.str;
 var
   n: CNode;
@@ -118,7 +118,7 @@ var
 begin
   result := '';
   if _ENV = nil then exit;
-  n := _ENV.lastNode;
+  n := _ENV.displayErrorNode;
   if n = nil then exit;
   if n.root is CModu then m := CModu(n.root) else m := nil;
   if (m <> nil) and (m.fileName <> '') and (n is CRune) then
@@ -274,6 +274,9 @@ begin
       r := CFunRunner.Create;
       _ENV := r;
     end;
+    r.resetTrace;
+    r.resetCallStack;
+    r.resetLastError;
     try
       CRun(p).run(r);
     except
@@ -456,6 +459,8 @@ _Run:
   r := CFunRunner.Create;
   _ENV := r;
   r.resetTrace;
+  r.resetCallStack;
+  r.resetLastError;
   {$IfDef FunStartupTiming}
   TimeMark('env-ready');
   {$EndIf}

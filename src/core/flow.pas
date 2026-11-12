@@ -419,17 +419,20 @@ begin
     except
       on e: EBase do
       begin
+        // Capture before the surrounding finally can overwrite lastNode.
+        env.beginError(e);
         if nexcept <> nil then
         begin
-          env.traceErrorNode();
+          env.traceErrorNode(e.message, e.ClassName);
           /// var exception
           if evar = nil then evar := CVar.new(nexcept, _AT);
           evar.assign(e.message);
           nexcept.run(env);
+          env.endError(e);
         end
         else
         begin
-          raise EBase.Create(e.message);
+          raise;
         end;
       end;
     end;

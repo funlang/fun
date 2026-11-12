@@ -1786,6 +1786,187 @@ end;
 {$EndIf}
 
 //==============================================================
+// Runtime source/stack/lastError builtins. The public Fun API lives in
+// fun/lib/runtime.fun; these only expose the core frame ring.
+
+function _rtNewSet: CNew;
+begin
+  result := CNew(CNew.new(nil).parse(CExps.Create()));
+end;
+
+procedure _rtStr(s: CNew; const name, value: fun.str);
+var
+  e: CExp;
+begin
+  e := CExp.new(nil);
+  e.name := name;
+  e.parse(value);
+  s.items.add(e);
+end;
+
+procedure _rtObj(s: CNew; const name: fun.str; obj: CExp);
+var
+  e: CExp;
+begin
+  e := CExp.new(nil);
+  e.name := name;
+  e.assign(obj);
+  s.items.add(e);
+end;
+
+procedure _rtInt(s: CNew; const name: fun.str; value: fun.int);
+var
+  e: CExp;
+begin
+  e := CExp.new(nil);
+  e.name := name;
+  e.parse(Int64(value));
+  s.items.add(e);
+end;
+
+function _rtIntArg(exps: CExps; index: fun.int; def: fun.int): fun.int;
+var
+  e: CExp;
+begin
+  result := def;
+  e := CExps.Find(exps, '', index);
+  if e <> nil then
+  begin
+    if not isNum(e.value, true) then
+      raise EBase.Create('runtime: argument must be an integer');
+    result := e.asInt;
+  end;
+end;
+
+function _rtFileOf(site: CFunc): fun.str;
+var
+  m: CModu;
+begin
+  result := '';
+  if site = nil then exit;
+  if site.root is CModu then
+  begin
+    m := CModu(site.root);
+    result := m.fileName;
+  end;
+end;
+
+function _rtLineOf(site: CFunc): fun.int;
+begin
+  if site = nil then result := 0 else result := site.row;
+end;
+
+procedure _rtSource(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  depth: fun.int;
+  f: CCallFrame;
+  caller, callerClass: CFun;
+  s: CNew;
+  cls: fun.str;
+begin
+  val^ := NullValue;
+  depth := _rtIntArg(exps, 0, 0);
+  if depth < 0 then raise EBase.Create('runtime: depth must be >= 0');
+  if not env.frameAt(depth, f) then exit;
+
+  s := _rtNewSet;
+  _rtStr(s, 'file', _rtFileOf(f.site));
+  _rtInt(s, 'line', _rtLineOf(f.site));
+  caller := env.frameCaller(depth);
+  if caller <> nil then
+    _rtStr(s, 'function', caller.displayName)
+  else
+    _rtStr(s, 'function', '');
+  callerClass := env.frameCallerClass(depth);
+  if callerClass <> nil then cls := callerClass.displayName else cls := '';
+  _rtStr(s, 'className', cls);
+  setObj(val, s, VarObjNew);
+  del(s);
+end;
+
+procedure _rtStack(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  maxf, i: fun.int;
+  f: CCallFrame;
+  caller, callerClass, callee, calleeClass: CFun;
+  s, fr: CNew;
+  cls: fun.str;
+begin
+  val^ := NullValue;
+  maxf := _rtIntArg(exps, 0, MaxCallFrames);
+  if maxf < 0 then raise EBase.Create('runtime: max must be >= 0');
+  if maxf > MaxCallFrames then maxf := MaxCallFrames;
+
+  s := _rtNewSet;
+  // Index 0 is runtime.stack itself; the caller chain starts at 1.
+  i := 1;
+  while (i < env.callDepth) and (s.items.count < maxf) do
+  begin
+    if env.frameAt(i, f) then
+    begin
+      fr := _rtNewSet;
+      _rtStr(fr, 'file', _rtFileOf(f.site));
+      _rtInt(fr, 'line', _rtLineOf(f.site));
+      caller := env.frameCaller(i);
+      if caller <> nil then
+        _rtStr(fr, 'function', caller.displayName)
+      else
+        _rtStr(fr, 'function', '');
+      callerClass := env.frameCallerClass(i);
+      if callerClass <> nil then cls := callerClass.displayName else cls := '';
+      _rtStr(fr, 'className', cls);
+      callee := f.callee;
+      if callee <> nil then
+        _rtStr(fr, 'callee', callee.displayName)
+      else
+        _rtStr(fr, 'callee', '');
+      calleeClass := env.frameCalleeClass(i);
+      if calleeClass <> nil then cls := calleeClass.displayName else cls := '';
+      _rtStr(fr, 'calleeClass', cls);
+      s.items.add(fr);
+    end;
+    Inc(i);
+  end;
+  setObj(val, s, VarObjNew);
+  del(s);
+end;
+
+procedure _rtLastError(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  i: fun.int;
+  s, fr, st: CNew;
+  f: CErrorFrame;
+  cls: fun.str;
+begin
+  val^ := NullValue;
+  if not env.lastErrorValid then exit;
+
+  s := _rtNewSet;
+  _rtStr(s, 'message', env.lastErrorMessage);
+  _rtStr(s, 'file', env.lastErrorFile);
+  _rtInt(s, 'line', env.lastErrorLine);
+  _rtStr(s, 'function', env.lastErrorFunc);
+  _rtStr(s, 'className', env.lastErrorOwnerClass);
+
+  st := _rtNewSet;
+  for i := Length(env.lastErrorFrames) - 1 downto 0 do
+  begin
+    f := env.lastErrorFrames[i];
+    fr := _rtNewSet;
+    _rtStr(fr, 'file', f.fileName);
+    _rtInt(fr, 'line', f.line);
+    _rtStr(fr, 'function', f.callerName);
+    _rtStr(fr, 'className', f.callerClass);
+    _rtStr(fr, 'callee', f.funcName);
+    _rtStr(fr, 'calleeClass', f.calleeClass);
+    st.items.add(fr);
+  end;
+  _rtObj(s, 'stack', st);
+  setObj(val, s, VarObjNew);
+  del(s);
+end;
+
+//==============================================================
 constructor CLbase.Create;
 begin
   inherited Create;
@@ -1815,6 +1996,11 @@ begin
   ids['escape']  := CExp.new(nil).parse(Int64(fun.uintptr(@_escape)));
   ids['format']  := CExp.new(nil).parse(Int64(fun.uintptr(@_format)));
   ids['eval']    := CExp.new(nil).parse(Int64(fun.uintptr(@_eval)));
+
+  // Runtime source/stack/lastError (wrapped by fun/lib/runtime.fun).
+  ids['__source']    := CExp.new(nil).parse(Int64(fun.uintptr(@_rtSource)));
+  ids['__stack']     := CExp.new(nil).parse(Int64(fun.uintptr(@_rtStack)));
+  ids['__lastError'] := CExp.new(nil).parse(Int64(fun.uintptr(@_rtLastError)));
   
   // Time
   ids['time']    := CExp.new(nil).parse(Int64(fun.uintptr(@_time)));

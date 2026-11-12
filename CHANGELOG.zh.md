@@ -4,6 +4,15 @@
 
 **English**: [CHANGELOG.md](CHANGELOG.md) · **简体中文**（本文件）
 
+## [Unreleased]
+
+- 默认构建的运行时错误现在会带调用点 traceback（不再需要
+  `-dFunTraceback` 开关）。每帧记录调用方源码行和被调函数，使用固定 32 帧
+  环。新增 `fun/lib/runtime.fun`，提供 `source()`、`stack()`、`lastError()`
+  与 `root()`；logging 自动填充 `LogRecord.source`（文本默认显示短路径，
+  `sourcePath` 可选 short/full/base），`fun test` 在断言失败时输出用户测试
+  文件行号。`lib-path.fun` 新增 `PathRel()`。
+
 ## [9.5.5] - 2026-11-08
 
 - 新增 `fun/lib/lib-hmac.fun`（`HmacSha1`、`HmacSha1Hex`）与

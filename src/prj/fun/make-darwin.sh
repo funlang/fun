@@ -30,7 +30,7 @@
 #   CPU=x86_64 ./make-darwin.sh          # Intel Mac
 #   CPU=all ./make-darwin.sh             # both
 #   DARWIN_FPC_ROOT=/opt/darwin ./make-darwin.sh
-#   ./make-darwin.sh -dFunTraceback ...  # extra FPC switches are appended
+#   ./make-darwin.sh -dMyFlag ...  # extra FPC switches are appended
 # ============================================================
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"

@@ -3,14 +3,16 @@
 //
 // logging/formatter: turn a LogRecord into one line of text or JSON.
 use 'levels.fun';
+use '../lib-path.fun';
 
-var _formatterDefaultShow = ['time', 'level', 'name', 'message', 'fields'];
+var _formatterDefaultTextShow = ['time', 'level', 'name', 'source', 'message', 'fields'];
+var _formatterDefaultJsonShow = ['time', 'level', 'name', 'message', 'fields'];
 var _formatterDefaultTime = 'yyyy-mm-dd hh:nn:ss:zzz';
 
-fun _fmtShow(show)
+fun _fmtShow(show, def)
   result = new [];
   var xs = show;
-  if xs = nil then xs = _formatterDefaultShow; end if;
+  if xs = nil then xs = def; end if;
   for i = 0 to xs.@count() - 1 do
     result.@add(xs[i]);
   end do;
@@ -28,10 +30,21 @@ fun _fmtTime(rec, format)
   if rec.time = nil then result = ''; else result = rec.time.format(format); end if;
 end fun;
 
-fun _fmtSource(src)
+fun _fmtSource(src, mode)
   if src = nil then result = ''; return; end if;
   if src.type() = 8 then result = '' & src; return; end if;
-  result = (src['file'] or '') & ':' & (src['line'] or '');
+  var file = src['file'] or '';
+  var path = src['path'];
+  var s = '';
+  if mode = 'full' then
+    s = file;
+  elsif mode = 'base' then
+    s = PathBase(file);
+  else
+    s = path or file;
+  end if;
+  if s = '' then s = file; end if;
+  result = s & ':' & (src['line'] or '');
 end fun;
 
 fun _fmtOneLine(s)
@@ -93,13 +106,17 @@ fun _fmtFieldsText(fields)
 end fun;
 
 class _TextFormatter(opts)
-  var show = _formatterDefaultShow;
+  var show = _formatterDefaultTextShow;
   var timeFormat = _formatterDefaultTime;
+  var sourcePath = 'short';
 
   if opts <> nil then
-    if opts.@has('show') then show = _fmtShow(opts['show']); end if;
+    if opts.@has('show') then show = _fmtShow(opts['show'], _formatterDefaultTextShow); end if;
     if opts.@has('timeFormat') and opts['timeFormat'] <> nil then
       timeFormat = opts['timeFormat'];
+    end if;
+    if opts.@has('sourcePath') and opts['sourcePath'] <> nil then
+      sourcePath = opts['sourcePath'];
     end if;
   end if;
 
@@ -115,7 +132,7 @@ class _TextFormatter(opts)
       elsif part = 'name' then
         if rec.name = '' then s = 'root'; else s = rec.name; end if;
       elsif part = 'source' then
-        s = _fmtSource(rec.source);
+        s = _fmtSource(rec.source, sourcePath);
       elsif part = 'message' then
         s = _fmtOneLine(rec.message);
       elsif part = 'fields' then
@@ -130,13 +147,17 @@ class _TextFormatter(opts)
 end class;
 
 class _JsonFormatter(opts)
-  var show = _formatterDefaultShow;
+  var show = _formatterDefaultJsonShow;
   var timeFormat = _formatterDefaultTime;
+  var sourcePath = 'short';
 
   if opts <> nil then
-    if opts.@has('show') then show = _fmtShow(opts['show']); end if;
+    if opts.@has('show') then show = _fmtShow(opts['show'], _formatterDefaultJsonShow); end if;
     if opts.@has('timeFormat') and opts['timeFormat'] <> nil then
       timeFormat = opts['timeFormat'];
+    end if;
+    if opts.@has('sourcePath') and opts['sourcePath'] <> nil then
+      sourcePath = opts['sourcePath'];
     end if;
   end if;
 
@@ -149,7 +170,7 @@ class _JsonFormatter(opts)
       if rec.name = '' then obj['name'] = 'root'; else obj['name'] = rec.name; end if;
     end if;
     if want['source'] then
-      var src = _fmtSource(rec.source);
+      var src = _fmtSource(rec.source, sourcePath);
       if src <> '' then obj['source'] = src; end if;
     end if;
     if want['message'] then obj['message'] = rec.message; end if;

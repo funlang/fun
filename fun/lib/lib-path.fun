@@ -222,6 +222,88 @@ fun PathIsAbs(p)
   end if;
 end fun;
 
+// Split a cleaned path body into non-empty components.
+fun _pathParts(s)
+  var parts = new [];
+  var cur = '';
+  var i = 0;
+  while i <= s.length() do
+    var ch = '';
+    if i < s.length() then ch = s.substr(i, 1); end if;
+    if i = s.length() or _pathIsSep(ch) then
+      if cur <> '' then parts.@add(cur); end if;
+      cur = '';
+    else
+      cur &= ch;
+    end if;
+    i += 1;
+  end do;
+  result = parts;
+end fun;
+
+// Relative path from base to target, following Go filepath.Rel closely.
+// Returns nil when one path is absolute and the other is not, or when the
+// Windows volumes (drive or UNC share) differ. Components are compared
+// literally; windows volume names are compared case-insensitively.
+fun PathRel(base, target)
+  if base = nil or target = nil then result = nil; return; end if;
+  var b = PathClean('' & base);
+  var t = PathClean('' & target);
+  var vb = _pathVolume(b);
+  var vt = _pathVolume(t);
+  if _pathWin then
+    if vb.lower() <> vt.lower() then result = nil; return; end if;
+  else
+    if vb <> vt then result = nil; return; end if;
+  end if;
+
+  var rb = false;
+  var rt = false;
+  if vb.length() > 0 then rb = _pathIsSep(vb.substr(vb.length() - 1, 1)); end if;
+  if vt.length() > 0 then rt = _pathIsSep(vt.substr(vt.length() - 1, 1)); end if;
+  if rb <> rt then result = nil; return; end if;
+
+  var sb = b.substr(vb.length());
+  var st = t.substr(vt.length());
+  while sb.length() > 0 and _pathIsSep(sb.substr(0, 1)) do sb = sb.substr(1); end do;
+  while st.length() > 0 and _pathIsSep(st.substr(0, 1)) do st = st.substr(1); end do;
+
+  var pb = _pathParts(sb);
+  var pt = _pathParts(st);
+  var common = 0;
+  var more = common < pb.@count() and common < pt.@count();
+  while more do
+    if _pathWin then
+      more = pb[common].lower() = pt[common].lower();
+    else
+      more = pb[common] = pt[common];
+    end if;
+    if more then common += 1; end if;
+    more = more and common < pb.@count() and common < pt.@count();
+  end do;
+
+  var out = new [];
+  var i = common;
+  while i < pb.@count() do
+    out.@add('..');
+    i += 1;
+  end do;
+  i = common;
+  while i < pt.@count() do
+    out.@add(pt[i]);
+    i += 1;
+  end do;
+
+  if out.@count() = 0 then
+    result = '.';
+  else
+    result = out[0];
+    for i = 1 to out.@count() - 1 do
+      result &= _pathSep & out[i];
+    end do;
+  end if;
+end fun;
+
 // Convert every '\' to '/', for internal paths and URLs.
 fun PathToSlash(p)
   if p = nil then result = ''; return; end if;

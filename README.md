@@ -40,7 +40,7 @@
 In one sentence: **Fun is a scripting language that goes all the way from JSON to machine code.**
 
 - One runtime spans the whole spectrum, from high-level data work (JSON/FD) down to low-level system programming (FFI, C at runtime, JIT, machine code);
-- 79 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
+- 80 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
 - in AI-agent and domestic-IT scenarios, it is the lightweight glue connecting OSes, databases, chips, and business logic.
 
 Fun is designed around a simple premise: **data and code should be equally first-class, and a script should be able to reach down to the machine without leaving the language.**
@@ -71,7 +71,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
 - **Cross-platform** — Windows (32/64-bit), Linux, ARM, and Windows CE.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
-- **Self-hosted standard library** — 79 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
+- **Self-hosted standard library** — 80 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
 ---
 
@@ -469,7 +469,7 @@ fun/
 │   ├── utils/         # Utility functions
 │   └── prj/fun/       # Projects & build scripts (funcmd.dpr, Delphi/FPC)
 ├── fun/
-│   ├── lib/           # Standard library (pure Fun, 79 modules)
+│   ├── lib/           # Standard library (pure Fun, 80 modules)
 │   ├── demo/          # Language syntax demos
 │   ├── demos/         # Full applications & benchmarks
 │   └── key_*.ini      # Keyword alias packs (CN / FR / PUA)
@@ -643,15 +643,15 @@ and the Windows job builds and runs the same strict capability test. The
 
 ## Standard library
 
-The standard library in [`fun/lib`](fun/lib) is written in pure Fun (79 modules):
+The standard library in [`fun/lib`](fun/lib) is written in pure Fun (80 modules):
 
-> In total roughly 6,000 lines of logical code (excluding comments) — all 79 modules written in Fun itself.
+> In total roughly 6,000 lines of logical code (excluding comments) — all 80 modules written in Fun itself.
 
 - **Data**: `lib-json`, `csv`, `toml`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`, `lib-hmac`, `lib-url`
 - **Utility**: `uuid`
 - **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`
 - **Text**: `lib-string`, `lib-regex`, `lib-match`, `lib-unicode`
-- **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `env`, `cli`, `fs`, `io`, `process`, `logging`, `lib-time`, `lib-cmdline`, `lib-proc`
+- **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `env`, `cli`, `fs`, `io`, `process`, `logging`, `runtime`, `lib-time`, `lib-cmdline`, `lib-proc`
 - **Network**: `lib-winsock`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`, `http-multipart`, `http-session`, `jwt`
 - **Databases**: `lib-orm`, `lib-orm-pro`, `lib-orm-gen`, `lib-orm-rpc`, `lib-orm-cte`, `lib-ado`, `lib-ado-schema`
 - **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`
@@ -669,9 +669,28 @@ var logger = logging.getLogger('http');
 logger.info('request', [path: '/users']);
 ```
 
-The default is stderr + info + text. `logging.config` can replace handlers and
-formatters; `logging.newLogger` creates an independent logger for tests or a
-dedicated sink.
+The default is stderr + info + text, and the text line includes the call-site
+source. `logging.config` can replace handlers and formatters; `logging.newLogger`
+creates an independent logger for tests or a dedicated sink. Set
+`sourcePath: 'short' | 'full' | 'base'` on a formatter to choose relative,
+absolute, or basename paths.
+
+Runtime errors include the failing statement and a call-site traceback. Scripts
+can inspect the same information directly:
+
+```fun
+use 'runtime.fun';
+
+var s = runtime.source();   // [file, path, line, function, className]
+var st = runtime.stack();   // innermost-first frames
+runtime.root('/app');       // root for the short path, default is startup cwd
+
+try
+  risky();
+except
+  var e = runtime.lastError(); // message, file, path, line, function, stack
+end try;
+```
 
 Uploaded forms are read from the request directly:
 

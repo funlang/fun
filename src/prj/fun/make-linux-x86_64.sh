@@ -54,9 +54,8 @@
 # the CalcOpt-gated ones (useful for differential benchmarking; string concat
 # and scalar assignment stay optimized). Extra FPC switches can still be
 # appended:
-#   ./make-linux-x86_64.sh -dFunTraceback  # opt-in: append a function traceback to
-#                                         # runtime errors (a small per-call cost;
-#                                         # the default build reports only file:line)
+#   ./make-linux-x86_64.sh -dFunTraceback  # legacy flag: traceback is always on
+#                                         # (accepted for compatibility)
 #   ./make-linux-x86_64.sh -dUseCThreads   # opt-in: link FPC's thread-safe heap
 #                                         # (cthreads). Only needed when a C
 #                                         # library calls a @toCallback closure

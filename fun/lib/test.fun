@@ -12,6 +12,8 @@
 // (substring), greater, less, is_nil, not_nil, raises, fail; each takes an
 // optional trailing message.
 // The runner calls `runTests()`; each test file runs in its own process.
+use 'runtime.fun';
+
 var _tests = new [];
 var _current = '';
 var _nl = 10.toChar();
@@ -25,6 +27,14 @@ fun test(name, body)
   var t = new [];
   t.@add(name);
   t.@add(body);
+  var src = runtime.source(1);
+  if src = nil then
+    t.@add(nil);
+    t.@add(nil);
+  else
+    t[4] = src['file'];
+    t[5] = src['line'];
+  end if;
   _tests.@add(t);
 end fun;
 
@@ -63,6 +73,11 @@ fun _test_todo(name, body, reason)
   t.@add(body);
   t.@add(true);
   t.@add(why);
+  var src = runtime.source(1);
+  if src <> nil then
+    t[4] = src['file'];
+    t[5] = src['line'];
+  end if;
   _tests.@add(t);
 end fun;
 
@@ -225,6 +240,25 @@ fun runTests()
       failed += 1;
       ?. 'not ok ' & _current;
       if err <> '' then ?. '  ' & err; end if;
+      var loc = '';
+      var le = runtime.lastError();
+      if le <> nil then
+        var ef = le['file'];
+        if ef <> nil and t[4] <> nil and ef = t[4] then
+          loc = (le['path'] or ef) & ':' & le['line'];
+        end if;
+        if loc = '' then
+          var st = le['stack'];
+          if st <> nil and t[4] <> nil and st.@count() > 0 then
+            for j = 0 to st.@count() - 1 do
+              if loc = '' and st[j]['file'] = t[4] then
+                loc = (st[j]['path'] or st[j]['file']) & ':' & st[j]['line'];
+              end if;
+            end do;
+          end if;
+        end if;
+      end if;
+      if loc <> '' then ?. '  at ' & loc; end if;
     end if;
     i += 1;
   end do;

@@ -4,6 +4,16 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 **English** (this file) · [简体中文](CHANGELOG.zh.md)
 
+## [Unreleased]
+
+- Runtime errors now carry a call-site traceback in the default build (the old
+  `-dFunTraceback` opt-in is no longer needed). Each frame records the caller
+  source line and the callee, with a fixed 32-frame ring. New
+  `fun/lib/runtime.fun` exposes `source()`, `stack()`, `lastError()` and
+  `root()`; logging fills `LogRecord.source` (text output shows a short path by
+  default, `sourcePath` selects short/full/base), and `fun test` reports the
+  user test line on assertion failures. `lib-path.fun` gains `PathRel()`.
+
 ## [9.5.5] - 2026-11-08
 
 - New `fun/lib/lib-hmac.fun` (`HmacSha1`, `HmacSha1Hex`) and

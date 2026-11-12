@@ -35,6 +35,11 @@ var B = 92.toChar();
 ?. PathIsAbs(HostFullPath('.')) = true;
 ?. PathIsAbs('a') = false;
 
+?. PathRel('/a/b', '/a/b/c') = 'c';
+?. PathRel('/a/b', '/a/x') = '..' & S & 'x';
+?. PathRel('/a', '/b') = '..' & S & 'b';
+?. PathRel('/a/b', '/a/b') = '.';
+
 ?. PathToSlash('a' & B & 'b') = 'a/b';
 ?. PathFromSlash('a/b') = 'a' & S & 'b';
 
@@ -52,7 +57,13 @@ if IsWindows() then
   ?. PathIsAbs(B & 'a') = false;
   ?. PathToSlash('C:' & S & 'a') = 'C:/a';
   ?. PathFromSlash('C:/a') = 'C:' & S & 'a';
+  ?. PathRel('C:/a/b', 'C:/a/c') = '..' & S & 'c';
+  ?. PathRel('C:/a', 'c:/a/b') = 'b';
+  ?. PathRel('C:/a', 'D:/b') = nil;
 else
+  ?. true;
+  ?. true;
+  ?. true;
   ?. true;
   ?. true;
   ?. true;

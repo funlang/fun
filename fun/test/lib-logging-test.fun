@@ -50,7 +50,9 @@ l.info('hello', [a: 1]);
 ?. m.records[0].levelName = 'INFO';
 ?. m.records[0].name = 'unit';
 ?. m.records[0].fields['a'] = 1;
-?. m.records[0].source = nil;
+?. m.records[0].source <> nil;
+?. m.records[0].source['line'] > 0;
+?. m.records[0].source['path'] <> nil;
 
 l.debug('filtered');
 ?. m.records.@count() = 1;
@@ -199,6 +201,19 @@ var tf = logging.TextFormatter([show: ['level', 'name', 'message', 'fields']]);
 
 var sf = logging.TextFormatter([show: ['message', 'source']]);
 ?. sf.format(rec) = 'hello';
+
+rec['source'] = [file: '/tmp/app.fun', path: 'app.fun', line: 12];
+var df = logging.TextFormatter([]);
+?. df.format(rec).subpos('app.fun:12') >= 0;
+var ff = logging.TextFormatter([sourcePath: 'full']);
+?. ff.format(rec).subpos('/tmp/app.fun:12') >= 0;
+var bf = logging.TextFormatter([sourcePath: 'base']);
+?. bf.format(rec).subpos('app.fun:12') >= 0;
+var dj = logging.JsonFormatter([]);
+?. dj.format(rec).subpos('source') < 0;
+var jfs = logging.JsonFormatter([show: ['message', 'source']]);
+?. jfs.format(rec).subpos('app.fun:12') >= 0;
+rec['source'] = nil;
 
 rec['message'] = 'a' & 10.toChar() & 'b';
 ?. tf.format(rec) = 'INFO fmt a' & 92.toChar() & 'nb a=1 b="two words"';

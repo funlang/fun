@@ -20,7 +20,7 @@
 # Usage:
 #   ./make-linux-loongarch64.sh
 #   LOONG_FPC_ROOT=/opt/loong ./make-linux-loongarch64.sh
-#   ./make-linux-loongarch64.sh -dFunTraceback ...   # extra FPC switches
+#   ./make-linux-loongarch64.sh -dMyFlag ...   # extra FPC switches
 #
 # Needs: bootstrap-linux-loongarch64.sh run first (or LOONG_FPC_ROOT pointing
 # at its output).

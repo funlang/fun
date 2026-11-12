@@ -257,6 +257,7 @@ check('failure exits 1', f1 = 1);
 check('crash marked FAIL', has(fo, 'crash_test.fun') and has(fo, 'boom at load'));
 check('custom message shown', has(fo, 'not ok custom message') and has(fo, 'math is broken'));
 check('diagnostic shown', has(fo, 'expected 3, got 2'));
+check('failure source shown', has(fo, '  at ') and has(fo, 'math_test.fun:'));
 check('assert.fail shown', has(fo, 'not ok explicit fail') and has(fo, 'unexpected state'));
 check('matcher failure shown', has(fo, 'not ok matcher failure') and has(fo, 'must match'));
 check('passing test quiet', not has(fo, 'ok passing'));

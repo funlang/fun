@@ -6,6 +6,7 @@ use 'levels.fun';
 use 'defaults.fun';
 use 'handler.fun';
 use 'formatter.fun';
+use '../runtime.fun';
 
 fun _logNow()
   result = 1.time();
@@ -31,7 +32,7 @@ class _LogRecord(tm, lv, nm, msg, flds)
   var name = nm or '';
   var message = msg or '';
   var fields = flds;
-  var source = nil;   // reserved for the runtime call site (v2)
+  var source = nil;   // runtime call site, filled by the logger entry points
   if fields = nil then fields = new []; end if;
 end class;
 
@@ -57,12 +58,20 @@ class _Logger(mgr, nm, lvl, hdl, flds, grp)
     end if;
   end fun;
 
-  fun log(lv, msg, flds)
+  fun log(lv, msg, flds, src)
     var n = _levelValue(lv);
     if not this.enabled(n) then return; end if;
+    if src = nil then
+      try
+        src = runtime.source(1);
+      except
+        src = nil;
+      end try;
+    end if;
     var all = _logCloneFields(fields);
     _logMergeFields(all, flds, group);
     var rec = _LogRecord(_logNow(), n, name, '' & (msg or ''), all);
+    rec.source = src;
     if not _handlerPass(filters, rec) then return; end if;
     if manager <> nil then
       manager.emit(rec);
@@ -75,35 +84,43 @@ class _Logger(mgr, nm, lvl, hdl, flds, grp)
   end fun;
 
   fun trace(msg, flds)
-    this.log(_LOG_TRACE, msg, flds);
+    if not this.enabled(_LOG_TRACE) then return; end if;
+    this.log(_LOG_TRACE, msg, flds, runtime.source(1));
   end fun;
 
   fun debug(msg, flds)
-    this.log(_LOG_DEBUG, msg, flds);
+    if not this.enabled(_LOG_DEBUG) then return; end if;
+    this.log(_LOG_DEBUG, msg, flds, runtime.source(1));
   end fun;
 
   fun info(msg, flds)
-    this.log(_LOG_INFO, msg, flds);
+    if not this.enabled(_LOG_INFO) then return; end if;
+    this.log(_LOG_INFO, msg, flds, runtime.source(1));
   end fun;
 
   fun warning(msg, flds)
-    this.log(_LOG_WARNING, msg, flds);
+    if not this.enabled(_LOG_WARNING) then return; end if;
+    this.log(_LOG_WARNING, msg, flds, runtime.source(1));
   end fun;
 
   fun warn(msg, flds)
-    this.log(_LOG_WARNING, msg, flds);
+    if not this.enabled(_LOG_WARNING) then return; end if;
+    this.log(_LOG_WARNING, msg, flds, runtime.source(1));
   end fun;
 
   fun error(msg, flds)
-    this.log(_LOG_ERROR, msg, flds);
+    if not this.enabled(_LOG_ERROR) then return; end if;
+    this.log(_LOG_ERROR, msg, flds, runtime.source(1));
   end fun;
 
   fun critical(msg, flds)
-    this.log(_LOG_CRITICAL, msg, flds);
+    if not this.enabled(_LOG_CRITICAL) then return; end if;
+    this.log(_LOG_CRITICAL, msg, flds, runtime.source(1));
   end fun;
 
   fun fatal(msg, flds)
-    this.log(_LOG_CRITICAL, msg, flds);
+    if not this.enabled(_LOG_CRITICAL) then return; end if;
+    this.log(_LOG_CRITICAL, msg, flds, runtime.source(1));
   end fun;
 
   fun with(flds)

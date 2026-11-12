@@ -19,7 +19,7 @@
 # Usage:
 #   ./make-linux-aarch64.sh
 #   A64_FPC_ROOT=/opt/a64 ./make-linux-aarch64.sh
-#   ./make-linux-aarch64.sh -dFunTraceback ...   # extra FPC switches appended
+#   ./make-linux-aarch64.sh -dMyFlag ...   # extra FPC switches appended
 #
 # Needs: bootstrap-linux-aarch64.sh run first (or A64_FPC_ROOT pointing at it).
 # ============================================================
