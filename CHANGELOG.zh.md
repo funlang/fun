@@ -13,6 +13,11 @@
   `sourcePath` 可选 short/full/base），`fun test` 在断言失败时输出用户测试
   文件行号。`lib-path.fun` 新增 `PathRel()`。
 
+- 新增 `fun/lib/cron.fun`：Vixie/POSIX 5 字段 cron 表达式、可选的
+  秒优先 6 字段表达式（`withSeconds: true`）、固定间隔任务，以及阻塞式
+  单线程 run/stop 循环。Quartz/AWS 扩展（`?`、`L`、`W`、`#`、年字段）直接
+  拒绝，不做猜测。
+
 ## [9.5.5] - 2026-11-08
 
 - 新增 `fun/lib/lib-hmac.fun`（`HmacSha1`、`HmacSha1Hex`）与

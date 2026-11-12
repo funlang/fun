@@ -1,4 +1,5 @@
 LOAD  cli
+LOAD  cron
 LOAD  csv
 LOAD  env
 LOAD  fs
@@ -85,4 +86,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=80 failed=6
+loaded=81 failed=6

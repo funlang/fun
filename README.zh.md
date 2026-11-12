@@ -40,7 +40,7 @@
 一句话定位：**Fun 是一门从 JSON 一路写到机器码的脚本语言。**
 
 - 用同一个运行时，覆盖从高层数据处理（JSON/FD）到底层系统编程（FFI、运行时 C、JIT、机器码）的全谱系；
-- 自带 80 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
+- 自带 81 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
 - 在信创与 AI Agent 场景中，作为连接国产 OS、数据库、芯片与业务逻辑的轻量级胶水。
 
 Fun 的设计出发点很简单：**数据与代码都应该是头等公民，而且一段脚本应该能在不离开语言的情况下一路触达机器底层。**
@@ -71,7 +71,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
 - **跨平台** —— Windows（32/64 位）、Linux、ARM 与 Windows CE。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
-- **自托管的标准库** —— 80 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
+- **自托管的标准库** —— 81 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
 ---
 
@@ -447,7 +447,7 @@ fun/
 │   ├── utils/         # 工具函数
 │   └── prj/fun/       # 工程与构建脚本（funcmd.dpr，Delphi/FPC）
 ├── fun/
-│   ├── lib/           # 标准库（纯 Fun 编写，80 个模块）
+│   ├── lib/           # 标准库（纯 Fun 编写，81 个模块）
 │   ├── demo/          # 语言语法演示
 │   ├── demos/         # 完整应用与基准测试
 │   └── key_*.ini      # 关键字别名包（CN / FR / PUA）
@@ -601,15 +601,15 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 
 ## 标准库
 
-标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（80 个模块）：
+标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（81 个模块）：
 
-> 总代码量约 6,000 行逻辑代码（不含注释）——80 个模块全部用 Fun 自身写成。
+> 总代码量约 6,000 行逻辑代码（不含注释）——81 个模块全部用 Fun 自身写成。
 
 - **数据**：`lib-json`、`csv`、`toml`、`jsonschema`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`、`lib-hmac`、`lib-url`
 - **工具**：`uuid`
 - **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`
 - **文本**：`lib-string`、`lib-regex`、`lib-match`、`lib-unicode`
-- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`cli`、`fs`、`io`、`process`、`logging`、`runtime`、`lib-time`、`lib-cmdline`、`lib-proc`
+- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`cli`、`fs`、`io`、`process`、`logging`、`runtime`、`cron`、`lib-time`、`lib-cmdline`、`lib-proc`
 - **网络**：`lib-winsock`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-multipart`、`http-session`、`jwt`
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
 - **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`
@@ -646,6 +646,27 @@ except
   var e = runtime.lastError(); // message、file、path、line、function、stack
 end try;
 ```
+
+定时任务使用同一套单线程阻塞模型：
+
+```fun
+use 'cron.fun';
+
+cron.addJob('0 3 * * *', cleanup);                    // 5 字段 Vixie/POSIX
+cron.addJob('0-30 * * * * *', cleanup, [withSeconds: true]); // 第一段是秒
+cron.every('1s', refresh);                            // 固定间隔
+
+cron.run();
+```
+
+`cron.addJob` 支持标准 `*`、范围、列表、步长和 `@hourly`/`@daily` 宏。
+6 字段表达式必须显式传 `withSeconds: true`；Quartz/AWS 的 `?`、`L`、`W`、
+`#` 和年字段会直接报错，不做猜测。
+
+v1 的调度器占用阻塞循环，适合独立脚本/daemon，暂不能和
+`HttpServer.run` 共用线程。它使用本地时间，轮询粒度约 50ms；暂不提供时区/
+DST 控制、任务删除、下次执行查询或错误回调。回调异常会被隔离、不停止循环，
+但调度器不会上报；在错误回调加入前，请在回调内部处理预期错误。
 
 上传表单直接从请求读取，无需额外引入：
 
