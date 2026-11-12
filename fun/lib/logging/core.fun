@@ -85,42 +85,42 @@ class _Logger(mgr, nm, lvl, hdl, flds, grp)
 
   fun trace(msg, flds)
     if not this.enabled(_LOG_TRACE) then return; end if;
-    this.log(_LOG_TRACE, msg, flds, runtime.source(1));
+    this.log(_LOG_TRACE, msg, flds, runtime.source(1, 0));
   end fun;
 
   fun debug(msg, flds)
     if not this.enabled(_LOG_DEBUG) then return; end if;
-    this.log(_LOG_DEBUG, msg, flds, runtime.source(1));
+    this.log(_LOG_DEBUG, msg, flds, runtime.source(1, 0));
   end fun;
 
   fun info(msg, flds)
     if not this.enabled(_LOG_INFO) then return; end if;
-    this.log(_LOG_INFO, msg, flds, runtime.source(1));
+    this.log(_LOG_INFO, msg, flds, runtime.source(1, 0));
   end fun;
 
   fun warning(msg, flds)
     if not this.enabled(_LOG_WARNING) then return; end if;
-    this.log(_LOG_WARNING, msg, flds, runtime.source(1));
+    this.log(_LOG_WARNING, msg, flds, runtime.source(1, 0));
   end fun;
 
   fun warn(msg, flds)
     if not this.enabled(_LOG_WARNING) then return; end if;
-    this.log(_LOG_WARNING, msg, flds, runtime.source(1));
+    this.log(_LOG_WARNING, msg, flds, runtime.source(1, 0));
   end fun;
 
   fun error(msg, flds)
     if not this.enabled(_LOG_ERROR) then return; end if;
-    this.log(_LOG_ERROR, msg, flds, runtime.source(1));
+    this.log(_LOG_ERROR, msg, flds, runtime.source(1, 0));
   end fun;
 
   fun critical(msg, flds)
     if not this.enabled(_LOG_CRITICAL) then return; end if;
-    this.log(_LOG_CRITICAL, msg, flds, runtime.source(1));
+    this.log(_LOG_CRITICAL, msg, flds, runtime.source(1, 0));
   end fun;
 
   fun fatal(msg, flds)
     if not this.enabled(_LOG_CRITICAL) then return; end if;
-    this.log(_LOG_CRITICAL, msg, flds, runtime.source(1));
+    this.log(_LOG_CRITICAL, msg, flds, runtime.source(1, 0));
   end fun;
 
   fun with(flds)

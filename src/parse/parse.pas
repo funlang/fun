@@ -741,15 +741,11 @@ end;
 function CParser.CreateDotAny(const a1, a0, exp, op, exp2: YYSType): YYSType;
 var
   es: CExps;
-  f: core.CFunc;
 begin
   DoLog(a1, a0, result);
   es := CExps.Create();
   es.add(exp2.node);
-  f := core.CFunc.new(Curr);
-  f.parse(CId2.new(Curr).parse(Copy(op.text, 2, MaxInt), exp.node), es);
-  f.row := op.row;
-  result.node := f;
+  result.node := core.CFunc.new(Curr).parse(CId2.new(Curr).parse(Copy(op.text, 2, MaxInt), exp.node), es);
 end;
 
 function CParser.CreateExp(const a1, a0, exp: YYSType): YYSType;
@@ -782,16 +778,9 @@ begin
 end;
 
 function CParser.CreateFunExp(const a1, a0, exp, values: YYSType): YYSType;
-var
-  f: core.CFunc;
 begin
   DoLog(a1, a0, result);
-  f := core.CFunc.new(Curr);
-  f.parse(exp.node, values.node);
-  // a0 is the call operator / right-hand call expression; keep the callee row
-  // as a fallback for actions where the closing token has no position.
-  if a0.row >= 0 then f.row := a0.row else f.row := a1.row;
-  result.node := f;
+  result.node := core.CFunc.new(Curr).parse(exp.node, values.node);
 end;
 
 function CParser.CreateFunFun(const a1, a0, exp: YYSType): YYSType;

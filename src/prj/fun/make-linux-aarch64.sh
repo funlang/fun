@@ -67,6 +67,13 @@ else
   FEATURES="-dFunPack"
 fi
 FEATURES="$FEATURES $FUN_SAFE_FLAGS"
+# Call-site traceback and the runtime frame ring are on by default. Set
+# FUN_TRACEBACK=0 to build without the bookkeeping.
+if [ "${FUN_TRACEBACK:-1}" = "0" ]; then
+  echo "FUN_TRACEBACK=0 - building without the call ring."
+else
+  FEATURES="$FEATURES -dFunTraceback"
+fi
 if [ -f "$UNITS_HASH/md5.ppu" ] && [ -f "$UNITS_HASH/sha1.ppu" ]; then
   FEATURES="$FEATURES -dMD5"
   FU_EXTRA="$FU_EXTRA -Fu$UNITS_HASH"

@@ -1824,109 +1824,74 @@ begin
   s.items.add(e);
 end;
 
-function _rtIntArg(exps: CExps; index: fun.int; def: fun.int): fun.int;
-var
-  e: CExp;
-begin
-  result := def;
-  e := CExps.Find(exps, '', index);
-  if e <> nil then
-  begin
-    if not isNum(e.value, true) then
-      raise EBase.Create('runtime: argument must be an integer');
-    result := e.asInt;
-  end;
-end;
-
-function _rtFileOf(site: CFunc): fun.str;
+function _rtNodeFile(n: CNode): fun.str;
 var
   m: CModu;
 begin
   result := '';
-  if site = nil then exit;
-  if site.root is CModu then
+  if n = nil then exit;
+  if n.root is CModu then
   begin
-    m := CModu(site.root);
+    m := CModu(n.root);
     result := m.fileName;
   end;
 end;
 
-function _rtLineOf(site: CFunc): fun.int;
+// mode 0: file/line; 1: + caller function/class; 2: + callee/calleeClass.
+function _rtFrameSet(const f: CCallFrame; mode: fun.int): CNew;
+var
+  caller, callerClass, calleeClass: CFun;
+  cls: fun.str;
 begin
-  if site = nil then result := 0 else result := site.row;
+  result := _rtNewSet;
+  _rtStr(result, 'file', FrameFileName(f));
+  _rtInt(result, 'line', FrameLine(f));
+  if mode >= 1 then
+  begin
+    caller := EnclosingFun(f.site);
+    if caller <> nil then
+      _rtStr(result, 'function', caller.displayName)
+    else
+      _rtStr(result, 'function', '');
+    callerClass := EnclosingClass(f.site);
+    if callerClass <> nil then cls := callerClass.displayName else cls := '';
+    _rtStr(result, 'className', cls);
+  end;
+  if mode >= 2 then
+  begin
+    if f.callee <> nil then
+      _rtStr(result, 'callee', f.callee.displayName)
+    else
+      _rtStr(result, 'callee', '');
+    calleeClass := EnclosingClass(f.callee);
+    if calleeClass <> nil then cls := calleeClass.displayName else cls := '';
+    _rtStr(result, 'calleeClass', cls);
+  end;
 end;
 
-procedure _rtSource(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+procedure _rtFrame(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   depth: fun.int;
   f: CCallFrame;
-  caller, callerClass: CFun;
   s: CNew;
-  cls: fun.str;
+  e: CExp;
+  mode: fun.int;
 begin
   val^ := NullValue;
-  depth := _rtIntArg(exps, 0, 0);
+  e := CExps.Find(exps, '', 0);
+  if e = nil then
+  begin
+    // __frame() is the live depth; __frame(i) is a frame.
+    val^ := env.callDepth;
+    exit;
+  end;
+  depth := e.asInt;
   if depth < 0 then raise EBase.Create('runtime: depth must be >= 0');
   if not env.frameAt(depth, f) then exit;
-
-  s := _rtNewSet;
-  _rtStr(s, 'file', _rtFileOf(f.site));
-  _rtInt(s, 'line', _rtLineOf(f.site));
-  caller := env.frameCaller(depth);
-  if caller <> nil then
-    _rtStr(s, 'function', caller.displayName)
-  else
-    _rtStr(s, 'function', '');
-  callerClass := env.frameCallerClass(depth);
-  if callerClass <> nil then cls := callerClass.displayName else cls := '';
-  _rtStr(s, 'className', cls);
-  setObj(val, s, VarObjNew);
-  del(s);
-end;
-
-procedure _rtStack(env: CEnv; exp: CExp; exps: CExps; val: PValue);
-var
-  maxf, i: fun.int;
-  f: CCallFrame;
-  caller, callerClass, callee, calleeClass: CFun;
-  s, fr: CNew;
-  cls: fun.str;
-begin
-  val^ := NullValue;
-  maxf := _rtIntArg(exps, 0, MaxCallFrames);
-  if maxf < 0 then raise EBase.Create('runtime: max must be >= 0');
-  if maxf > MaxCallFrames then maxf := MaxCallFrames;
-
-  s := _rtNewSet;
-  // Index 0 is runtime.stack itself; the caller chain starts at 1.
-  i := 1;
-  while (i < env.callDepth) and (s.items.count < maxf) do
-  begin
-    if env.frameAt(i, f) then
-    begin
-      fr := _rtNewSet;
-      _rtStr(fr, 'file', _rtFileOf(f.site));
-      _rtInt(fr, 'line', _rtLineOf(f.site));
-      caller := env.frameCaller(i);
-      if caller <> nil then
-        _rtStr(fr, 'function', caller.displayName)
-      else
-        _rtStr(fr, 'function', '');
-      callerClass := env.frameCallerClass(i);
-      if callerClass <> nil then cls := callerClass.displayName else cls := '';
-      _rtStr(fr, 'className', cls);
-      callee := f.callee;
-      if callee <> nil then
-        _rtStr(fr, 'callee', callee.displayName)
-      else
-        _rtStr(fr, 'callee', '');
-      calleeClass := env.frameCalleeClass(i);
-      if calleeClass <> nil then cls := calleeClass.displayName else cls := '';
-      _rtStr(fr, 'calleeClass', cls);
-      s.items.add(fr);
-    end;
-    Inc(i);
-  end;
+  mode := 2;
+  e := CExps.Find(exps, '', 1);
+  if e <> nil then mode := e.asInt;
+  s := _rtFrameSet(f, mode);
   setObj(val, s, VarObjNew);
   del(s);
 end;
@@ -1934,36 +1899,42 @@ end;
 procedure _rtLastError(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   i: fun.int;
-  s, fr, st: CNew;
-  f: CErrorFrame;
-  cls: fun.str;
+  n: CNode;
+  owner: CFun;
+  s, st: CNew;
+  e: CExp;
 begin
   val^ := NullValue;
+  // __lastError() reads; __lastError(true) clears.
+  e := CExps.Find(exps, '', 0);
+  if (e <> nil) and e.asBool then
+  begin
+    env.resetLastError;
+    exit;
+  end;
+  {$IfDef FunTraceback}
   if not env.lastErrorValid then exit;
 
   s := _rtNewSet;
   _rtStr(s, 'message', env.lastErrorMessage);
-  _rtStr(s, 'file', env.lastErrorFile);
-  _rtInt(s, 'line', env.lastErrorLine);
-  _rtStr(s, 'function', env.lastErrorFunc);
-  _rtStr(s, 'className', env.lastErrorOwnerClass);
+  n := env.lastError;
+  _rtStr(s, 'file', _rtNodeFile(n));
+  if n <> nil then _rtInt(s, 'line', NodeRow(n)) else _rtInt(s, 'line', 0);
+  owner := EnclosingFun(n);
+  if owner <> nil then _rtStr(s, 'function', owner.displayName)
+  else _rtStr(s, 'function', '');
+  owner := EnclosingClass(n);
+  if owner <> nil then _rtStr(s, 'className', owner.displayName)
+  else _rtStr(s, 'className', '');
+  _rtStr(s, 'errorClass', env.lastErrorClassName);
 
   st := _rtNewSet;
   for i := Length(env.lastErrorFrames) - 1 downto 0 do
-  begin
-    f := env.lastErrorFrames[i];
-    fr := _rtNewSet;
-    _rtStr(fr, 'file', f.fileName);
-    _rtInt(fr, 'line', f.line);
-    _rtStr(fr, 'function', f.callerName);
-    _rtStr(fr, 'className', f.callerClass);
-    _rtStr(fr, 'callee', f.funcName);
-    _rtStr(fr, 'calleeClass', f.calleeClass);
-    st.items.add(fr);
-  end;
+    st.items.add(_rtFrameSet(env.lastErrorFrames[i], 2));
   _rtObj(s, 'stack', st);
   setObj(val, s, VarObjNew);
   del(s);
+  {$EndIf}
 end;
 
 //==============================================================
@@ -1997,10 +1968,9 @@ begin
   ids['format']  := CExp.new(nil).parse(Int64(fun.uintptr(@_format)));
   ids['eval']    := CExp.new(nil).parse(Int64(fun.uintptr(@_eval)));
 
-  // Runtime source/stack/lastError (wrapped by fun/lib/runtime.fun).
-  ids['__source']    := CExp.new(nil).parse(Int64(fun.uintptr(@_rtSource)));
-  ids['__stack']     := CExp.new(nil).parse(Int64(fun.uintptr(@_rtStack)));
-  ids['__lastError'] := CExp.new(nil).parse(Int64(fun.uintptr(@_rtLastError)));
+  // Raw runtime frame access (wrapped by fun/lib/runtime.fun).
+  ids['frame']     := CExp.new(nil).parse(Int64(fun.uintptr(@_rtFrame)));
+  ids['lastError'] := CExp.new(nil).parse(Int64(fun.uintptr(@_rtLastError)));
   
   // Time
   ids['time']    := CExp.new(nil).parse(Int64(fun.uintptr(@_time)));

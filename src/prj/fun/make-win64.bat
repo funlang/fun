@@ -23,6 +23,11 @@ rem funcmd.cfg/funcmd.dof); the ABI is unchanged on win64. lib-hmac.fun and the
 rem RFC 2202 vectors in lib-hmac-test.fun need sha1, so keep this on.
 set "HASH=-dMD5"
 
+rem -dFunTraceback records the runtime call ring (default). Set
+rem FUN_TRACEBACK=0 to build without the bookkeeping.
+set "TRACEBACK=-dFunTraceback"
+if /i "%FUN_TRACEBACK%"=="0" set "TRACEBACK="
+
 rem getapi uses FPC's bundled libffi on win64 (lffi.pas), which needs ffi.dll
 rem next to funcmd.exe. Enable it only when the DLL is actually there; a bare
 rem -dWinFFI without the library fails to link. CI builds ffi.dll from MSYS2.
@@ -100,4 +105,4 @@ if /i not "%1"=="read" if /i not "%1"=="write" if /i not "%1"=="compile" (
 exit /b 0
 
 :build
-%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %HASH% %REGEX% %FFI% %SAFE_FLAGS% %SAFE_OUT% %SAFE_UNITS% -Fu..\..\lib
+%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %HASH% %TRACEBACK% %REGEX% %FFI% %SAFE_FLAGS% %SAFE_OUT% %SAFE_UNITS% -Fu..\..\lib

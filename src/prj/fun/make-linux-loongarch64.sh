@@ -74,6 +74,13 @@ else
     FEATURES="-dFunPack"
 fi
 FEATURES="$FEATURES $FUN_SAFE_FLAGS"
+# Call-site traceback and the runtime frame ring are on by default. Set
+# FUN_TRACEBACK=0 to build without the bookkeeping.
+if [ "${FUN_TRACEBACK:-1}" = "0" ]; then
+    echo "FUN_TRACEBACK=0 - building without the call ring."
+else
+    FEATURES="$FEATURES -dFunTraceback"
+fi
 if [ "$FULL" = "1" ]; then
     FEATURES="$FEATURES -dRegex -dLinuxFFI -dFPC_USE_LIBC"
 fi

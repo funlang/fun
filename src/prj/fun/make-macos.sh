@@ -155,6 +155,13 @@ if [ "${FUNPACK:-}" = "user" ]; then
     PACK_FLAGS="-dFunPackUser"
     echo "FUNPACK=user - building only the bundled-app consumer."
 fi
+# Call-site traceback and the runtime frame ring are on by default. Set
+# FUN_TRACEBACK=0 to build without the bookkeeping.
+TRACEBACK_FLAGS="-dFunTraceback"
+if [ "${FUN_TRACEBACK:-1}" = "0" ]; then
+    TRACEBACK_FLAGS=""
+    echo "FUN_TRACEBACK=0 - building without the call ring."
+fi
 # Keep the two modes' .ppu/.o files apart, exactly like make-linux-x86_64.sh:
 # FPC otherwise reuses units compiled with the other define set.
 if [ -n "$FUN_SAFE_LEVEL" ]; then
@@ -168,7 +175,7 @@ mkdir -p "$UNITS"
 UNIT_FLAGS="-FU$UNITS"
 rm -f "$UNITS"/*.ppu "$UNITS"/*.o "$UNITS"/*.or 2>/dev/null || true
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -dMD5 $PACK_FLAGS $FUN_SAFE_FLAGS $SAFE_OUT $UNIT_FLAGS $PCRE_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -dMD5 $PACK_FLAGS $TRACEBACK_FLAGS $FUN_SAFE_FLAGS $SAFE_OUT $UNIT_FLAGS $PCRE_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) ---------------------
 ROOT="$(cd "$HERE/../../.." && pwd)"

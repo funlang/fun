@@ -147,6 +147,8 @@ except
   // Safe builds and hosts without FFI keep native handles nil; lexical helpers
   // still work.
 end try;
+// Capability probes are internal; do not let them appear as a user lastError.
+var _hostClearError = 'runtime'.lastError(true);
 
 //--------------------------------------------------------------
 // command line

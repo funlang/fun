@@ -230,6 +230,13 @@ if [ "${FUNPACK:-}" = "user" ]; then
     PACK_FLAGS="-dFunPackUser"
     echo "FUNPACK=user - building only the bundled-app consumer."
 fi
+# Call-site traceback and the runtime frame ring are on by default. Set
+# FUN_TRACEBACK=0 to build without the bookkeeping.
+TRACEBACK_FLAGS="-dFunTraceback"
+if [ "${FUN_TRACEBACK:-1}" = "0" ]; then
+    TRACEBACK_FLAGS=""
+    echo "FUN_TRACEBACK=0 - building without the call ring."
+fi
 # SAFE=... is shared with the macOS/aarch64 scripts (see safe-flags.sh).
 . "$HERE/safe-flags.sh"
 fun_safe_parse || exit 2
@@ -256,7 +263,7 @@ UNIT_FLAGS="-FU$UNITS"
 # build is about a second.
 rm -f "$UNITS"/*.ppu "$UNITS"/*.o "$UNITS"/*.or 2>/dev/null || true
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $SAFE_FLAGS $SAFE_OUT $UNIT_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $TRACEBACK_FLAGS $SAFE_FLAGS $SAFE_OUT $UNIT_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) -------------
 # Refresh fun/funcmd on every build, so a run from the repo root is just

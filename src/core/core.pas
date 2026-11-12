@@ -39,6 +39,7 @@ const
   CPropertySet = $04;
   // Fixed-size call ring: bounds memory and makes deep recursion cheap.
   MaxCallFrames = 32;
+  MaxErrorStates = 8;
 
 type
   CEnv  = class;
@@ -200,7 +201,6 @@ type
     function call(env: CEnv; exps: CExps): PValue; overload; override;
     function parse(const id: fun.str; aps: CExps; aupClass: CFun = nil; aisClass: fun.bool = false): CNode;
     function displayName: fun.str;
-    function displayIsClass: fun.bool;
     function UID(const n: fun.str): CVar; override;
   end;
   
@@ -349,9 +349,6 @@ type
     fun2: fun.bool;
     ps: CExps;
   public
-    // Source row of the call expression, set by the parser. Used for call-site
-    // frames; it is deliberately separate from lastNode.
-    row: fun.int;
     destructor Destroy; override;
     procedure calc(env: CEnv); override;
     function call(env: CEnv; exps: CExps): PValue; overload; override;
@@ -407,23 +404,14 @@ type
 
   CCallFrame = record
     callee: CFun;
-    site: CFunc;
+    // Call-site node, captured from env.lastNode when the callee is entered.
+    // Resolved to file/line only when a traceback or runtime query needs it.
+    site: CNode;
   end;
 
-  // Frozen frame: file/line are the call site, funcName/isClass describe the
-  // callee. Strings keep the snapshot valid if the AST is released later.
-  CErrorFrame = record
-    fileName: fun.str;
-    line: fun.int;
-    funcName: fun.str;
-    isClass: fun.bool;
-    calleeClass: fun.str;
-    callerName: fun.str;
-    callerIsClass: fun.bool;
-    callerClass: fun.str;
-  end;
-
-  CErrorFrames = array of CErrorFrame;
+  // Frozen error stack: only pointers. All names and locations are resolved
+  // on demand by the runtime builtins or the driver's traceBack.
+  CErrorFrames = array of CCallFrame;
 
   CErrorState = record
     exc: TObject;
@@ -442,13 +430,11 @@ type
     cloneDst: array of CExp;
     cloneDepth: fun.int;
     cloneBase: fun.int;
+    {$IfDef FunTraceback}
     // Live call-site ring. callsTop is an absolute depth; the slot is
     // callsTop and (MaxCallFrames - 1), so push/pop stay an index write.
     calls: array[0..MaxCallFrames - 1] of CCallFrame;
     callsTop: fun.int;
-    // The call expression currently being dispatched. CFunc.calc sets it just
-    // before the call; CFun.call consumes it into the ring.
-    currentSite: CFunc;
     // Frozen location and frames for the pending error. Error point and stack
     // are filled at the first try/except (or function unwind); lastError stays
     // the AST node used by $@@.
@@ -457,20 +443,15 @@ type
     errorCaptured: fun.bool;
     // Caught errors in nested handlers/finally blocks. The exception object is
     // the identity; the top state is the one currently being handled.
-    errorStates: array of CErrorState;
+    errorStates: array[0..MaxErrorStates - 1] of CErrorState;
+    errorStateTop: fun.int;
     // Last error handled by a script try/except. Kept separately from the
     // pending snapshots so runtime.lastError() still works after the handler.
     lastErrorValid: fun.bool;
     lastErrorMessage: fun.str;
     lastErrorClassName: fun.str;
-    lastErrorFile: fun.str;
-    lastErrorLine: fun.int;
-    lastErrorFunc: fun.str;
-    lastErrorIsClass: fun.bool;
-    lastErrorOwnerClass: fun.str;
-    // Frozen $@@ text: function[/row], so a dynamic-compile AST can be freed.
-    lastErrorFunText: fun.str;
     lastErrorFrames: CErrorFrames;
+    {$EndIf}
     function call(exp: CExp; const id: fun.str; exps: CExps; val: PValue; ct: fun.byte = CDoMethod): fun.bool; virtual;
     function clone: CEnv; virtual;
     procedure echo(const s: fun.str); virtual;
@@ -493,14 +474,18 @@ type
     // 0 = innermost frame. Used by the runtime source/stack builtins.
     function callDepth: fun.int;
     function frameAt(index: fun.int; out frame: CCallFrame): fun.bool;
-    function frameCaller(index: fun.int): CFun;
-    function frameCallerClass(index: fun.int): CFun;
-    function frameCalleeClass(index: fun.int): CFun;
     procedure trace(n: CNode); virtual;
     procedure traced(n: CNode; tracing: fun.bool = false); virtual;
     procedure traceErrorNode(const msg: fun.str = ''; const cls: fun.str = '');
   end;
-  
+
+// Resolve raw frame pointers on demand. Kept here so the runtime builtins and
+// the driver share one implementation without storing strings per frame.
+function EnclosingFun(n: CNode): CFun;
+function EnclosingClass(n: CNode): CFun;
+function NodeRow(n: CNode): fun.int;
+function FrameFileName(const f: CCallFrame): fun.str;
+function FrameLine(const f: CCallFrame): fun.int;
 
 // for OLE lib - PropertyGet or Set
 var _ENV: CEnv;
@@ -934,24 +919,23 @@ begin
   result := id;
 end;
 
-function CFun.displayIsClass: fun.bool;
-begin
-  result := isClass;
-end;
-
 function CFun.call(env: CEnv; exps: CExps): PValue;
 var
   o: CObj;
+  {$IfDef FunTraceback}
   ok: fun.bool;
-  site: CFunc;
+  site: CNode;
   idx: fun.int;
+  {$EndIf}
 begin
   //env.trace(self);
-  // The call expression is consumed here, before the callee body runs, so
-  // nested calls each record their own site. Frame bookkeeping rides on the
-  // existing try/finally; error unwinding freezes the ring before pop.
-  site := env.currentSite;
-  env.currentSite := nil;
+  {$IfDef FunTraceback}
+  // Capture the call site lazily as a node pointer. Resolving it to a file and
+  // line is deferred to traceBack/runtime queries, so the hot path only pays
+  // for one pointer write. Frame bookkeeping rides on the existing
+  // try/finally; error unwinding freezes the ring before pop.
+  site := env.lastNode;
+  {$EndIf}
   if isClass then
   begin
     o := newObj;
@@ -960,37 +944,49 @@ begin
     result := evar.value;
 
     pushObj(o);
+    {$IfDef FunTraceback}
     idx := env.callsTop and (MaxCallFrames - 1);
     env.calls[idx].callee := self;
     env.calls[idx].site := site;
     Inc(env.callsTop);
     ok := false;
+    {$EndIf}
     try
       doCall(env, exps);
+      {$IfDef FunTraceback}
       ok := true;
+      {$EndIf}
     finally
       popObj;
+      {$IfDef FunTraceback}
       if not ok then env.snapshotError;
       if env.callsTop > 0 then Dec(env.callsTop);
+      {$EndIf}
     end;
   end
   else
   begin
     stack.Push;
+    {$IfDef FunTraceback}
     idx := env.callsTop and (MaxCallFrames - 1);
     env.calls[idx].callee := self;
     env.calls[idx].site := site;
     Inc(env.callsTop);
     ok := false;
+    {$EndIf}
     try
       if params <> nil then params.assign(exps);
       all.run(env);
       result := evar.value;
+      {$IfDef FunTraceback}
       ok := true;
+      {$EndIf}
     finally
       stack.Pop;
+      {$IfDef FunTraceback}
       if not ok then env.snapshotError;
       if env.callsTop > 0 then Dec(env.callsTop);
+      {$EndIf}
     end;
   end;
 
@@ -1926,10 +1922,8 @@ begin
 
   if not fun2 then
   begin
-    env.currentSite := self;
     p_val^ := NullValue;
     assign(exp.call(env, ps));
-    env.currentSite := nil;
   end
   else
   begin
@@ -1951,11 +1945,7 @@ begin
     // legacy silent Null via inherited (CNode.call); diagnostics come later.
     calc(env);
     if asObj is CNode then
-    begin
-      env.currentSite := self;
-      result := CNode(asObj).call(env, exps);
-      env.currentSite := nil;
-    end
+      result := CNode(asObj).call(env, exps)
     else
       result := inherited call(env, exps)
     ;
@@ -1967,9 +1957,7 @@ begin
   ps2.append(ps);
   ps2.append(exps);
   try
-    env.currentSite := self;
     result := exp.call(env, ps2);
-    env.currentSite := nil;
   finally
     del(ps2);
   end;
@@ -2163,11 +2151,6 @@ function CEnv.lastErrorFun: fun.str;
 var
   n: CNode;
 begin
-  if lastErrorValid then
-  begin
-    result := lastErrorFunText;
-    exit;
-  end;
   result := '';
   n := lastError;
   while n <> nil do
@@ -2178,6 +2161,7 @@ begin
       if lastError is CRune then result := result + '/' + IntToStr(CRune(lastError).row);
       exit;
     end;
+    if n is CModu then exit;
     n := n.parent;
   end;
 end;
@@ -2215,34 +2199,63 @@ end;
 function NodeRow(n: CNode): fun.int;
 begin
   result := 0;
-  if n is CRune then result := CRune(n).row
-  else if n is CFunc then result := CFunc(n).row
-  ;
+  if n is CRune then result := CRune(n).row;
+end;
+
+function FrameFileName(const f: CCallFrame): fun.str;
+var
+  m: CModu;
+begin
+  result := '';
+  if (f.site <> nil) and (f.site.root is CModu) then
+  begin
+    m := CModu(f.site.root);
+    result := m.fileName;
+  end
+  else if (f.callee <> nil) and (f.callee.root is CModu) then
+  begin
+    m := CModu(f.callee.root);
+    result := m.fileName;
+  end;
+end;
+
+function FrameLine(const f: CCallFrame): fun.int;
+begin
+  if f.site <> nil then result := NodeRow(f.site)
+  else if f.callee <> nil then result := f.callee.row
+  else result := 0;
 end;
 
 function CEnv.traceBack: fun.str;
 var
   i, n, idx: fun.int;
   f: CCallFrame;
-  m: CModu;
   s, name: fun.str;
 
-  function FrameOf(const fr: CErrorFrame): fun.str;
+  function FrameOf(const fr: CCallFrame): fun.str;
   begin
-    if fr.fileName <> '' then
-      s := fr.fileName + ':' + IntToStr(fr.line)
+    if fr.site <> nil then
+    begin
+      s := FrameFileName(fr);
+      if s <> '' then s := s + ':' + IntToStr(FrameLine(fr))
+      else s := 'line ' + IntToStr(FrameLine(fr));
+    end
+    else if fr.callee <> nil then
+      s := 'line ' + IntToStr(fr.callee.row)
     else
       s := 'native'
     ;
-    name := fr.funcName;
+    if fr.callee = nil then name := ''
+    else name := fr.callee.id;
     if name = '' then name := '<anonymous>';
-    if fr.isClass then
+    if (fr.callee <> nil) and fr.callee.isClass then
       result := '  in class ' + name + ' (' + s + ')' + #10
     else
       result := '  in ' + name + '() (' + s + ')' + #10
     ;
   end;
 begin
+  {$IfDef FunTraceback}
   result := '';
   // Innermost first. errorFrames is stored oldest -> newest.
   for i := Length(errorFrames) - 1 downto 0 do
@@ -2264,86 +2277,42 @@ begin
     begin
       idx := (callsTop - 1 - i) and (MaxCallFrames - 1);
       f := calls[idx];
-      if (f.site <> nil) and (f.site.root is CModu) then
-        m := CModu(f.site.root)
-      else
-        m := nil
-      ;
-      if (m <> nil) and (m.fileName <> '') then
-        s := m.fileName + ':' + IntToStr(f.site.row)
-      else
-        s := 'native'
-      ;
-      if f.callee = nil then name := '<anonymous>'
-      else if f.callee.id <> '' then name := f.callee.id
-      else name := '<anonymous>'
-      ;
-      if (f.callee <> nil) and f.callee.isClass then
-        result := result + '  in class ' + name + ' (' + s + ')' + #10
-      else
-        result := result + '  in ' + name + '() (' + s + ')' + #10
-      ;
+      result := result + FrameOf(f);
     end;
   end;
+  {$Else}
+  result := '';
+  {$EndIf}
 end;
 
 procedure CEnv.captureFrames(out frames: CErrorFrames);
 var
   i, n, idx: fun.int;
-  f: CCallFrame;
-  m: CModu;
-  owner: CFun;
 begin
+  {$IfDef FunTraceback}
   n := callsTop;
   if n > MaxCallFrames then n := MaxCallFrames;
   SetLength(frames, n);
   for i := 0 to n - 1 do
   begin
     idx := (callsTop - n + i) and (MaxCallFrames - 1);
-    f := calls[idx];
-    frames[i].funcName := '';
-    frames[i].isClass := false;
-    frames[i].calleeClass := '';
-    frames[i].fileName := '';
-    frames[i].line := 0;
-    frames[i].callerName := '';
-    frames[i].callerIsClass := false;
-    frames[i].callerClass := '';
-    if f.callee <> nil then
-    begin
-      frames[i].funcName := f.callee.id;
-      frames[i].isClass := f.callee.isClass;
-      owner := EnclosingClass(f.callee);
-      if owner <> nil then frames[i].calleeClass := owner.id;
-    end;
-    if f.site <> nil then
-    begin
-      frames[i].line := f.site.row;
-      if f.site.root is CModu then
-      begin
-        m := CModu(f.site.root);
-        frames[i].fileName := m.fileName;
-      end;
-      owner := EnclosingFun(f.site);
-      if owner <> nil then
-      begin
-        frames[i].callerName := owner.id;
-        frames[i].callerIsClass := owner.isClass;
-      end;
-      owner := EnclosingClass(f.site);
-      if owner <> nil then frames[i].callerClass := owner.id;
-    end;
+    frames[i] := calls[idx];
   end;
+  {$Else}
+  frames := nil;
+  {$EndIf}
 end;
 
 procedure CEnv.snapshotError;
 begin
+  {$IfDef FunTraceback}
   // Only the first (deepest) frame records, so outer finally blocks do not
   // overwrite the stack while the exception unwinds.
   if errorCaptured then exit;
   errorCaptured := true;
   if errorNode = nil then errorNode := lastNode;
   captureFrames(errorFrames);
+  {$EndIf}
 end;
 
 procedure CEnv.beginError(e: TObject);
@@ -2351,8 +2320,10 @@ var
   n: fun.int;
   state: CErrorState;
 begin
-  n := Length(errorStates);
+  {$IfDef FunTraceback}
+  n := errorStateTop;
   if (n > 0) and (errorStates[n - 1].exc = e) then exit;
+  if n >= MaxErrorStates then exit;
 
   state.exc := e;
   state.node := lastNode;
@@ -2367,100 +2338,98 @@ begin
   else
     captureFrames(state.frames);
 
-  SetLength(errorStates, n + 1);
   errorStates[n] := state;
+  Inc(errorStateTop);
+  {$EndIf}
 end;
 
 procedure CEnv.endError(e: TObject);
 var
   n: fun.int;
 begin
-  n := Length(errorStates);
+  {$IfDef FunTraceback}
+  n := errorStateTop;
   if (n > 0) and (errorStates[n - 1].exc = e) then
-    SetLength(errorStates, n - 1);
+  begin
+    errorStates[n - 1].frames := nil;
+    errorStates[n - 1].exc := nil;
+    errorStates[n - 1].node := nil;
+    Dec(errorStateTop);
+  end;
+  {$EndIf}
 end;
 
 function CEnv.displayErrorNode: CNode;
 var
   n: fun.int;
 begin
-  n := Length(errorStates);
+  {$IfDef FunTraceback}
+  n := errorStateTop;
   if n > 0 then
     result := errorStates[n - 1].node
   else
     result := errorNode;
+  {$EndIf}
   if result = nil then result := lastNode;
 end;
 
 procedure CEnv.resetTrace;
 begin
+  {$IfDef FunTraceback}
   errorFrames := nil;
   errorNode := nil;
   errorCaptured := false;
+  {$EndIf}
 end;
 
 procedure CEnv.resetLastError;
 begin
+  {$IfDef FunTraceback}
   lastErrorValid := false;
   lastErrorMessage := '';
   lastErrorClassName := '';
-  lastErrorFile := '';
-  lastErrorLine := 0;
-  lastErrorFunc := '';
-  lastErrorIsClass := false;
-  lastErrorOwnerClass := '';
-  lastErrorFunText := '';
   lastErrorFrames := nil;
+  {$EndIf}
 end;
 
 procedure CEnv.resetCallStack;
+var
+  i: fun.int;
 begin
+  {$IfDef FunTraceback}
   callsTop := 0;
-  currentSite := nil;
-  errorStates := nil;
+  errorStateTop := 0;
+  for i := 0 to MaxErrorStates - 1 do
+  begin
+    errorStates[i].exc := nil;
+    errorStates[i].node := nil;
+    errorStates[i].frames := nil;
+  end;
+  {$EndIf}
 end;
 
 function CEnv.callDepth: fun.int;
 begin
+  {$IfDef FunTraceback}
   if callsTop > MaxCallFrames then result := MaxCallFrames else result := callsTop;
+  {$Else}
+  result := 0;
+  {$EndIf}
 end;
 
 function CEnv.frameAt(index: fun.int; out frame: CCallFrame): fun.bool;
 var
   idx: fun.int;
 begin
+  {$IfDef FunTraceback}
   result := false;
   if (index < 0) or (index >= callDepth) then exit;
   idx := (callsTop - 1 - index) and (MaxCallFrames - 1);
   frame := calls[idx];
   result := true;
-end;
-
-function CEnv.frameCaller(index: fun.int): CFun;
-var
-  frame: CCallFrame;
-begin
-  result := nil;
-  if frameAt(index, frame) and (frame.site <> nil) then
-    result := EnclosingFun(frame.site);
-end;
-
-function CEnv.frameCallerClass(index: fun.int): CFun;
-var
-  frame: CCallFrame;
-begin
-  result := nil;
-  if frameAt(index, frame) and (frame.site <> nil) then
-    result := EnclosingClass(frame.site);
-end;
-
-function CEnv.frameCalleeClass(index: fun.int): CFun;
-var
-  frame: CCallFrame;
-begin
-  result := nil;
-  if frameAt(index, frame) and (frame.callee <> nil) then
-    result := EnclosingClass(frame.callee);
+  {$Else}
+  result := false;
+  {$EndIf}
 end;
 
 procedure CEnv.trace(n: CNode);
@@ -2475,67 +2444,36 @@ end;
 
 procedure CEnv.traceErrorNode(const msg: fun.str; const cls: fun.str);
 var
-  n: CNode;
-  m: CModu;
-  owner: CFun;
-  i, si: fun.int;
+  si: fun.int;
 begin
+  {$IfDef FunTraceback}
   // The error is being handled by a script try/except. Prefer the state for
   // the current exception, then the pre-finally pending snapshot.
-  si := Length(errorStates) - 1;
+  si := errorStateTop - 1;
   if si >= 0 then
+  begin
     lastError := errorStates[si].node
+    ; lastErrorFrames := errorStates[si].frames;
+  end
   else if errorNode <> nil then
+  begin
     lastError := errorNode
+    ; lastErrorFrames := errorFrames;
+  end
   else
+  begin
     lastError := lastNode;
+    lastErrorFrames := errorFrames;
+  end;
 
   lastErrorValid := true;
   lastErrorMessage := msg;
   lastErrorClassName := cls;
-  lastErrorFile := '';
-  lastErrorLine := 0;
-  lastErrorFunc := '';
-  lastErrorIsClass := false;
-  lastErrorOwnerClass := '';
-  lastErrorFunText := '';
-
-  n := lastError;
-  if n <> nil then
-  begin
-    lastErrorLine := NodeRow(n);
-    if n.root is CModu then
-    begin
-      m := CModu(n.root);
-      lastErrorFile := m.fileName;
-    end;
-    owner := EnclosingFun(n);
-    if owner <> nil then
-    begin
-      lastErrorFunc := owner.id;
-      lastErrorIsClass := owner.isClass;
-      lastErrorFunText := owner.id;
-      if lastError is CRune then
-        lastErrorFunText := lastErrorFunText + '/' + IntToStr(CRune(lastError).row);
-    end;
-    owner := EnclosingClass(n);
-    if owner <> nil then lastErrorOwnerClass := owner.id;
-  end;
-
-  if si >= 0 then
-  begin
-    SetLength(lastErrorFrames, Length(errorStates[si].frames));
-    for i := 0 to Length(errorStates[si].frames) - 1 do
-      lastErrorFrames[i] := errorStates[si].frames[i];
-  end
-  else
-  begin
-    SetLength(lastErrorFrames, Length(errorFrames));
-    for i := 0 to Length(errorFrames) - 1 do
-      lastErrorFrames[i] := errorFrames[i];
-  end;
 
   resetTrace;
+  {$Else}
+  lastError := lastNode;
+  {$EndIf}
 end;
 
 end.
