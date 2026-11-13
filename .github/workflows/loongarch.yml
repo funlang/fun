@@ -62,7 +62,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
-            build-essential fpc libncurses-dev \
+            build-essential fpc libncurses-dev python3 \
             binutils-loongarch64-linux-gnu qemu-user-static curl xz-utils
 
       - name: Resolve the FPC source revision
@@ -161,7 +161,7 @@ jobs:
           FUNCMD: ${{ github.workspace }}/fun/funcmd-linux-loongarch64-musl
         run: |
           set -euo pipefail
-          ZIG="$ZIG_ROOT/zig" ./fun/test/run-loongarch64-qemu.sh
+          ZIG="$ZIG_ROOT/zig" timeout 1500 ./fun/test/run-loongarch64-qemu.sh
 
       # Release artifacts are built only from a green run. release.yml looks
       # up this artifact by commit on nightly runs; a missing or failed run

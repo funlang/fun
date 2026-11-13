@@ -21,11 +21,30 @@ lib-asm-a64.fun	aarch64 assembly backend, wrong cpu
 lib-jit-test.fun	JIT backend emits x86-64
 lib-tcc-test.fun	no TinyCC LoongArch backend
 
+# --- libffi closures under qemu-user ---------------------------------------
+# @toCallback(..., ptr: true) executes a libffi closure trampoline. qemu-user
+# 7.2/8.2 can hang on the generated code instead of returning, so the test
+# cannot complete in emulation. It passes on native LoongArch hardware.
+raw-address-getapi.fun	libffi closure trampoline hangs under qemu-user
+
+# The FFI helper library is built by Zig for loongarch64-musl. qemu-user
+# aborts when a helper entry point uses the floating-point ABI (summ,
+# callbacks), although plain libc calls and the capability probe work.
+# Run these six on real hardware.
+ffi-scalar.fun	qemu-user aborts in the Zig-built FFI helper
+ffi-int64.fun	qemu-user aborts in the Zig-built FFI helper
+ffi-float.fun	qemu-user aborts in the Zig-built FFI helper
+ffi-float-cb.fun	qemu-user aborts in the Zig-built FFI helper
+ffi-callbacks.fun	qemu-user aborts in the Zig-built FFI helper
+ffi-var-ref.fun	qemu-user aborts in the Zig-built FFI helper
+
 # --- shell project tests that execute the target binary directly -----------
 lib-fun-pack-test.fun	invokes funcmd directly, not through FUNCMD
 lib-fun-package-test.fun	invokes funcmd directly, not through FUNCMD
 lib-fun-test-test.fun	invokes funcmd directly, not through FUNCMD
 lib-fun-uuid-test.fun	invokes funcmd directly, not through FUNCMD
+lib-cli-stdin-test.sh	invokes funcmd directly, not through FUNCMD
+lib-io-stdio-test.sh	invokes funcmd directly, not through FUNCMD
 
 # --- qemu-user /proc differences -------------------------------------------
 # Under qemu-user /proc/<pid>/comm and /proc/<pid>/exe describe the host qemu

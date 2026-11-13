@@ -554,7 +554,7 @@ FULL=1 ./make-linux-loongarch64.sh      # -> fun/funcmd-linux-loongarch64-musl
 
 - **Build machine requirements**: Linux x86_64, host FPC 3.2.x, `make`, `curl` or `wget`, `tar`, and ~2 GB free disk. Zig is fetched by the bootstrap (pinned to 0.13; 0.14 panics on older glibc). No macOS host, Apple SDK, or `osxcross` is required — Zig ships a libSystem stub.
 - `bootstrap-linux-aarch64.sh` reuses the `ppcrossa64` and Zig from the darwin toolchain: an FPC compiler binary is CPU-specific but can target any OS it has units for.
-- The LoongArch64 path needs `binutils-loongarch64-linux-gnu` and an FPC main snapshot. It cross-builds against an Alpine musl sysroot, so regex, FFI and the `-lnx` backends are available; TinyCC and `lib-asm` are not. `.github/workflows/loongarch.yml` runs this build on pushes to main and uploads the stage used by nightly prereleases.
+- The LoongArch64 path needs `binutils-loongarch64-linux-gnu` 2.42 or newer and an FPC main snapshot. It cross-builds against an Alpine musl sysroot, so regex, FFI and the `-lnx` backends are available; TinyCC and `lib-asm` are not. `.github/workflows/loongarch.yml` runs this build on pushes to main and uploads the stage used by nightly prereleases.
 - Optional features degrade as usual: no PCRE -> no regex, no libffi unit/stub -> no `getapi` (the win64 CI supplies both, `pcre3.dll` and `ffi.dll`). The cross-built Linux aarch64 artifact is the core interpreter (its `-dRegex` and `-dLinuxFFI` need a libc / libffi that are not cross-built yet); a native Linux arm64 build, as in CI, has both.
 - Porting details: [`art/notes/macos-port.md`](art/notes/macos-port.md).
 

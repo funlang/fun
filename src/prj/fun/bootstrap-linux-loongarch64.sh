@@ -11,6 +11,8 @@
 # GNU binutils for loongarch64 is required. On Debian/Ubuntu install
 # binutils-loongarch64-linux-gnu; otherwise point CROSSBINDIR at a directory
 # containing loongarch64-linux-{as,ld,ar,ranlib} or the -gnu- prefixed forms.
+# binutils 2.42 or newer is recommended: 2.41's assembler rejects the
+# .debug_frame emitted by the current FPC RTL (sysutils).
 #
 # Usage:
 #   FPC_BOOT=/path/to/fpc-3.2.2/bin/ppcx64 \
@@ -61,11 +63,41 @@ LD_BIN="$(find_tool ld)" || { echo "bootstrap: loongarch64 linker not found (set
 AR_BIN="$(find_tool ar 2>/dev/null || command -v ar)" || true
 RANLIB_BIN="$(find_tool ranlib 2>/dev/null || command -v ranlib)" || true
 
+AS_VER="$("$AS_BIN" --version 2>/dev/null | sed -n '1s/.* //p')"
+if [ -n "$AS_VER" ] && [ "$(printf '%s\n2.42\n' "$AS_VER" | sort -V | head -n 1)" != "2.42" ]; then
+    echo "bootstrap: warning: binutils $AS_VER may fail on the FPC RTL; 2.42+ is recommended" >&2
+fi
+
 mkdir -p "$ROOT/bin" "$ROOT/units/$CPU-linux" "$ROOT/units-objpas/$CPU-linux" \
          "$ROOT/units-hash/$CPU-linux" "$ROOT/tools"
 if [ "$FPC_USE_LIBC" = "1" ]; then
     mkdir -p "$ROOT/units-libc/$CPU-linux" "$ROOT/units-objpas-libc/$CPU-linux" \
              "$ROOT/units-hash-libc/$CPU-linux" "$ROOT/units-ffi/$CPU-linux"
+fi
+
+if [ "$FPC_USE_LIBC" = "1" ]; then
+    # musl does not export rawmemchr. The libc RTL calls it for IndexByte
+    # with an unbounded length, so provide the routine in Pascal instead of
+    # linking against the missing libc symbol. The replacement is idempotent:
+    # a source tree that is already patched no longer contains the external
+    # declaration.
+    python3 - "$FPC_SRC/rtl/inc/cgeneric.inc" <<'PY'
+import sys
+
+path = sys.argv[1]
+src = open(path, encoding="utf-8").read()
+old = "function rawmemchr(const buf; b: cint): pointer; cdecl; external clib;"
+new = """function rawmemchr(const buf; b: cint): pointer; cdecl;
+var p: PByte;
+begin
+  p := @buf;
+  while p^ <> byte(b) do
+    inc(p);
+  rawmemchr := pointer(p);
+end;"""
+if old in src:
+    open(path, "w", encoding="utf-8").write(src.replace(old, new, 1))
+PY
 fi
 
 # Private binutils names for FPC: <cpu>-<os>-as / -ld.
@@ -90,6 +122,17 @@ echo "=== bootstrap $CPU-linux cross compiler and RTL"
 PPCROSS="$FPC_SRC/compiler/ppcross${CPU}"
 [ -x "$PPCROSS" ] || { echo "bootstrap: $PPCROSS was not produced" >&2; exit 1; }
 cp -f "$PPCROSS" "$ROOT/bin/ppcross${CPU}"
+
+echo "=== build $CPU RTL units"
+# `cycle CROSSINSTALL=1` builds only the cross compiler; the target RTL is
+# installed by the top-level build. Build it here so a fresh FPC checkout
+# works, using the same binutils shims as the compiler.
+( cd "$FPC_SRC" && make -C rtl units \
+    CPU_TARGET="$CPU" OS_TARGET=linux \
+    CROSSBINDIR="$TOOLS" BINUTILSPREFIX="${CPU}-linux-" \
+    PP="$ROOT/bin/ppcross${CPU}" -j"$JOBS" )
+[ -f "$FPC_SRC/rtl/units/${CPU}-linux/system.ppu" ] || {
+    echo "bootstrap: $CPU RTL units were not produced" >&2; exit 1; }
 
 echo "=== install RTL units"
 cp -f "$FPC_SRC/rtl/units/${CPU}-linux/"*.ppu \
@@ -122,11 +165,14 @@ echo "=== install hash units"
 
 if [ "$FPC_USE_LIBC" = "1" ]; then
     echo "=== rebuild RTL with libc startup"
-    ( cd "$FPC_SRC" && make -C compiler cycle CROSSINSTALL=1 \
+    ( cd "$FPC_SRC" && make -C rtl clean \
         CPU_TARGET="$CPU" OS_TARGET=linux \
         CROSSBINDIR="$TOOLS" BINUTILSPREFIX="${CPU}-linux-" \
-        FPC="$FPC_SRC/compiler/ppcx64" PP="$FPC_SRC/compiler/ppcx64" \
-        RTLOPT="-dFPC_USE_LIBC" -j"$JOBS" )
+        PP="$ROOT/bin/ppcross${CPU}" )
+    ( cd "$FPC_SRC" && make -C rtl units \
+        CPU_TARGET="$CPU" OS_TARGET=linux \
+        CROSSBINDIR="$TOOLS" BINUTILSPREFIX="${CPU}-linux-" \
+        PP="$ROOT/bin/ppcross${CPU}" OPT="-dFPC_USE_LIBC" -j"$JOBS" )
     cp -f "$FPC_SRC/rtl/units/${CPU}-linux/"*.ppu \
           "$FPC_SRC/rtl/units/${CPU}-linux/"*.o \
           "$ROOT/units-libc/${CPU}-linux/"
