@@ -45,6 +45,7 @@ lib-fun-test-test.fun	invokes funcmd directly, not through FUNCMD
 lib-fun-uuid-test.fun	invokes funcmd directly, not through FUNCMD
 lib-cli-stdin-test.sh	invokes funcmd directly, not through FUNCMD
 lib-io-stdio-test.sh	invokes funcmd directly, not through FUNCMD
+input-console.sh	invokes funcmd directly, not through FUNCMD
 
 # --- qemu-user /proc differences -------------------------------------------
 # Under qemu-user /proc/<pid>/comm and /proc/<pid>/exe describe the host qemu
