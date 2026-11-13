@@ -21,8 +21,9 @@
 {$IfDef UNIX}
 // Portable MD5/SHA1 from FPC's bundled hash units. The Windows branch below
 // wraps advapi32.dll (MD5Init/A_SHAInit), which does not exist on Linux, so
-// the shared library could not even be linked there. Linux-only: Windows keeps
-// the original implementation unchanged.
+// the shared library could not even be linked there. On Windows those entry
+// points are resolved at runtime so the executable can still start on systems
+// whose advapi32.dll does not export them (e.g. Windows 98).
 function MD5(const Buffer; Size: LongWord): string;
 begin
   result := FunMD5(Buffer, Size);
@@ -57,8 +58,47 @@ type
     function  ToString: string;
     procedure Init;                                 stdcall;
     procedure Update(const Buffer; Size: LongWord); stdcall;
-    procedure Final (const Digest);                 stdcall;
+    procedure Final (const DigestOut);              stdcall;
   end;
+
+  TMD5InitProc   = procedure;                                stdcall;
+  TMD5UpdateProc = procedure(Data: Pointer; Count: LongWord); stdcall;
+  TMD5FinalProc  = procedure;                                stdcall;
+  TSHAInitProc   = procedure;                                stdcall;
+  TSHAUpdateProc = procedure(Data: Pointer; Count: LongWord); stdcall;
+  TSHAFinalProc  = procedure(DigestOut: Pointer);             stdcall;
+
+var
+  AdvApiLib    : fun.uint;
+  AdvApiLoaded : fun.bool;
+  _MD5Init     : TMD5InitProc;
+  _MD5Update   : TMD5UpdateProc;
+  _MD5Final    : TMD5FinalProc;
+  _SHAInit     : TSHAInitProc;
+  _SHAUpdate   : TSHAUpdateProc;
+  _SHAFinal    : TSHAFinalProc;
+
+// advapi32 is loaded on first use instead of importing MD5Init/A_SHAInit
+// statically: Windows 98's advapi32.dll does not export them, and a static
+// import would prevent the executable from starting at all.
+procedure LoadAdvApi;
+begin
+  if AdvApiLoaded then exit;
+  AdvApiLib := LoadLib('advapi32.dll');
+  try
+    @_MD5Init   := GetProc(AdvApiLib, 'MD5Init');
+    @_MD5Update := GetProc(AdvApiLib, 'MD5Update');
+    @_MD5Final  := GetProc(AdvApiLib, 'MD5Final');
+    @_SHAInit   := GetProc(AdvApiLib, 'A_SHAInit');
+    @_SHAUpdate := GetProc(AdvApiLib, 'A_SHAUpdate');
+    @_SHAFinal  := GetProc(AdvApiLib, 'A_SHAFinal');
+  except
+    // GetProc unloads the library before raising; forget the stale handle.
+    AdvApiLib := 0;
+    raise;
+  end;
+  AdvApiLoaded := true;
+end;
 
 function MD5(const Buffer; Size: LongWord): string;
 var
@@ -119,13 +159,40 @@ begin
   Result := GetString(@Digest, 20);
 end;
 
-const AdvApi32 = 'advapi32.dll';
-//const AdvApi32 = 'cryptdll.dll'; // No SHA
-procedure TAdv32MD5.Init;                                 external AdvApi32 name 'MD5Init';
-procedure TAdv32MD5.Update(const Buffer; Size: LongWord); external AdvApi32 name 'MD5Update';
-procedure TAdv32MD5.Final;                                external AdvApi32 name 'MD5Final';
-procedure TAdv32SHA.Init;                                 external AdvApi32 name 'A_SHAInit';
-procedure TAdv32SHA.Update(const Buffer; Size: LongWord); external AdvApi32 name 'A_SHAUpdate';
-procedure TAdv32SHA.Final (const Digest);                 external AdvApi32 name 'A_SHAFinal';
+procedure TAdv32MD5.Init;                                 stdcall;
+begin
+  LoadAdvApi;
+  _MD5Init();
+end;
+
+procedure TAdv32MD5.Update(const Buffer; Size: LongWord); stdcall;
+begin
+  LoadAdvApi;
+  _MD5Update(@Buffer, Size);
+end;
+
+procedure TAdv32MD5.Final;                                stdcall;
+begin
+  LoadAdvApi;
+  _MD5Final();
+end;
+
+procedure TAdv32SHA.Init;                                 stdcall;
+begin
+  LoadAdvApi;
+  _SHAInit();
+end;
+
+procedure TAdv32SHA.Update(const Buffer; Size: LongWord); stdcall;
+begin
+  LoadAdvApi;
+  _SHAUpdate(@Buffer, Size);
+end;
+
+procedure TAdv32SHA.Final (const DigestOut);              stdcall;
+begin
+  LoadAdvApi;
+  _SHAFinal(@DigestOut);
+end;
 
 {$EndIf}
