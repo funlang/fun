@@ -1,7 +1,10 @@
 # Tests skipped on the Linux LoongArch64 qemu-user regression.
 #
 # These are emulation-host limits, not architecture failures:
-#   - lib-asm / lib-jit / lib-tcc: no LoongArch backend yet.
+#   - tests for the x86-64/aarch64 asm backends, lib-jit's x86 emitter and
+#     lib-tcc: those backends do not exist for LoongArch64. The LoongArch
+#     backend itself (lib-asm-loongarch64.fun) is not skipped and runs its
+#     live JIT call under qemu when the sysroot provides libgcc_s.
 #   - the lib-fun-pack/package/test/uuid shell tests invoke the target binary
 #     directly instead of through FUNCMD, so they cannot run under qemu-user.
 #   - run-ado-odbc.sh needs an ODBC driver; the Alpine sysroot only carries the

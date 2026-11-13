@@ -21,8 +21,13 @@
 - Linux LoongArch64（龙芯）构建现在作为 **nightly 预发布**资产发布。新增
   独立的 `loongarch` 工作流，用 FPC 主线快照与 Alpine musl sysroot 交叉
   构建解释器、跑 qemu 回归并上传 stage；在 FPC 提供稳定 loongarch64 后端
-  之前，正式版有意不包含该目标。该构建含正则与 FFI，但没有 TinyCC 和原生
-  汇编后端。
+  之前，正式版有意不包含该目标。该构建含正则、FFI 与原生汇编后端，但没有
+  TinyCC。
+- 机器码（asm）能力现在实测而非假定：`release/probe.sh` 对每个 POSIX 产物都用
+  目标自身的后端 JIT 一个单行叶函数。龙芯的 Alpine sysroot 现在随带
+  `libgcc_s`（提供 `__clear_cache`），因此 qemu 回归会真正执行
+  `lib-asm-loongarch64` 的 live 调用，`capabilities.json` 报告 `asm: true`；
+  TinyCC 仍不可用。README、包内说明与能力矩阵已同步更正。
 
 ## [9.5.5] - 2026-11-08
 

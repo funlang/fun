@@ -10,6 +10,8 @@
 #   - PCRE 8 (regex)
 #   - zlib, OpenSSL, libcurl, SQLite, libxml2 (the -lnx standard-library
 #     backends)
+#   - libgcc_s (__clear_cache, used by lib-asm-loongarch64 to flush the
+#     instruction cache after writing JIT code; musl's libc does not export it)
 #
 # It extracts Alpine's prebuilt loongarch64 packages into a plain directory,
 # so no root, no chroot and no package manager are needed on the host.
@@ -42,7 +44,7 @@ IDX="$DL/APKINDEX"
 PACKAGES="musl musl-dev libffi libffi-dev pcre pcre-dev \
           zlib libcrypto3 libssl3 sqlite-libs libxml2 xz-libs \
           libcurl brotli-libs c-ares nghttp2-libs libpsl zstd-libs \
-          libidn2 libunistring"
+          libidn2 libunistring libgcc"
 
 fetch() {
     url="$1"; out="$2"

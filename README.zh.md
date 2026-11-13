@@ -83,8 +83,8 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 
 - Linux x64 / arm64：`.tar.gz`，内含 `libtcc.so` 与标准库 `lib/`；
 - Linux LoongArch64：`.tar.gz`，在 FPC 龙芯后端仍位于主线期间**只随
-  nightly 预发布**。完整构建含正则与 `getapi`/FFI，但没有 `libtcc`
-  （运行时 C）和原生汇编后端。正式版不包含该包；
+  nightly 预发布**。完整构建含正则、`getapi`/FFI 与原生汇编后端
+  （`lib-asm-loongarch64`），但没有 `libtcc`（运行时 C）。正式版不包含该包；
 - macOS x64 / arm64：`.zip`。两个包都内含 `libtcc.dylib`。构建
   **未签名、未公证**；请使用包内 `install.sh`
   `--local`（curl 下载不会设置隔离属性），或解压后执行
@@ -491,7 +491,7 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | 平台          | regex | FFI | 运行时 C (tcc) | asm | safe 构建 |
 | ------------- | ----- | --- | -------------- | --- | --------- |
 | linux-arm64   | yes   | yes | yes            | yes | yes       |
-| linux-loongarch64 | yes | yes | no           | no  | yes       |
+| linux-loongarch64 | yes | yes | no           | yes | yes       |
 | linux-x64     | yes   | yes | yes            | yes | yes       |
 | macos-arm64   | yes   | yes | yes            | yes | yes       |
 | macos-x64     | yes   | yes | yes            | yes | yes       |
@@ -526,7 +526,7 @@ FULL=1 ./make-linux-loongarch64.sh      # -> fun/funcmd-linux-loongarch64-musl
 
 - **构建机要求**：Linux x86_64、宿主 FPC 3.2.x、`make`、`curl` 或 `wget`、`tar`，约 2 GB 空闲磁盘。Zig 由 bootstrap 下载（钉在 0.13；0.14 在较旧的 glibc 上会 panic）。**不需要** macOS 真机、Apple SDK 或 `osxcross`——Zig 自带 libSystem stub。
 - `bootstrap-linux-aarch64.sh` 复用 darwin 工具链的 `ppcrossa64` 与 Zig：FPC 编译器二进制与 CPU 绑定，但只要目标 OS 的单元齐备，就能编译该 OS。
-- 龙芯路径需要 `binutils-loongarch64-linux-gnu` 2.42 或更新版本与 FPC 主线快照；它针对 Alpine musl sysroot 交叉构建，因此正则、FFI 与 `-lnx` 后端可用，TinyCC 与 `lib-asm` 不可用。`.github/workflows/loongarch.yml` 在 main 推送时执行该构建，并上传供 nightly 预发布使用的 stage。
+- 龙芯路径需要 `binutils-loongarch64-linux-gnu` 2.42 或更新版本与 FPC 主线快照；它针对 Alpine musl sysroot 交叉构建，因此正则、FFI、`-lnx` 后端与 `lib-asm-loongarch64` 都可用（sysroot 随带 `libgcc_s`，提供 `__clear_cache`），仅 TinyCC 不可用。`.github/workflows/loongarch.yml` 在 main 推送时执行该构建，并上传供 nightly 预发布使用的 stage。
 - 可选特性照例降级：缺 PCRE → 无正则；缺 libffi 单元/stub → 无 `getapi`（win64 的 CI 两者都会备好：`pcre3.dll` 与 `ffi.dll`）。Linux aarch64 交叉产物是核心解释器（其 `-dRegex` 与 `-dLinuxFFI` 需要 libc / libffi，尚未交叉构建）；而原生 Linux arm64 构建（CI 即如此）两者都有。
 - 移植细节见 [`art/notes/macos-port.md`](art/notes/macos-port.md)。
 

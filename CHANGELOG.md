@@ -23,8 +23,15 @@ This project records notable changes in the style of [Keep a Changelog](https://
   asset. A separate `loongarch` workflow cross-builds the interpreter with an
   FPC main snapshot and an Alpine musl sysroot, runs the qemu regression, and
   stages the result; stable releases deliberately omit the target until FPC
-  ships a stable loongarch64 backend. The build has regex and FFI but no
-  TinyCC or native asm backend.
+  ships a stable loongarch64 backend. The build has regex, FFI and the native
+  asm backend, but no TinyCC.
+- The machine-code (asm) capability is now measured instead of assumed:
+  `release/probe.sh` JITs a one-line leaf function on the target's own backend
+  for every POSIX artifact. For LoongArch64 the Alpine sysroot now ships
+  `libgcc_s` (`__clear_cache`), so the qemu regression exercises the live
+  `lib-asm-loongarch64` call and `capabilities.json` reports `asm: true`;
+  TinyCC remains unavailable. README/package notes and the capability matrix
+  were corrected accordingly.
 
 ## [9.5.5] - 2026-11-08
 

@@ -195,7 +195,7 @@ jobs:
 
           src/prj/fun/release/probe.sh \
             linux-loongarch64 "$stage/build-env.json" \
-            "$wrap" "$safe" "" false
+            "$wrap" "$safe" ""
 
       - name: Upload release stage
         uses: actions/upload-artifact@v4

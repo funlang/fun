@@ -62,7 +62,7 @@
 | P-06 | 平台 | P3 | OPEN | `lib-os` B 档（GetIPs/inotify 等）未做 | `art/notes/linux-capabilities.md` |
 | P-07 | 机器码 | P2 | OPEN | `asm-list` 的 x86-64 表覆盖不全 | `art/notes/arch-machine-code-plan.md` |
 | P-15 | macOS 分发收尾 | P2 | OPEN | P-08 拆分后的未完成部分：正式 `codesign`/公证（需 Developer 证书）、Apple TCC 隐私授权（Desktop/Documents/Downloads，原 P-12）、物理机抽查 | `art/notes/macos-port.md` |
-| P-16 | LoongArch 发布与真机 | P3 | OPEN | P-09 拆分后的未完成部分。已完成：独立 `loongarch` CI 作业（交叉构建 + qemu 回归 + stage）、`package.py`/capabilities 支持、nightly 预发布资产（正式版不含龙芯）。剩余：`lib-asm` live 执行在真机验收、TCC 无后端策略（显式报错或 cc 回退）、真机验收 | `art/notes/loongarch-port-assessment.md`、`art/notes/arch-machine-code-plan.md` |
+| P-16 | LoongArch 发布与真机 | P3 | OPEN | P-09 拆分后的未完成部分。已完成：独立 `loongarch` CI 作业（交叉构建 + qemu 回归 + stage）、`package.py`/capabilities 支持、nightly 预发布资产（正式版不含龙芯）、`lib-asm-loongarch64` live 执行在 qemu 验收（sysroot 随带 `libgcc_s` 提供 `__clear_cache`，probe 实测 asm=true）。剩余：TCC 无后端策略（显式报错或 cc 回退）、整包真机验收 | `art/notes/loongarch-port-assessment.md`、`art/notes/arch-machine-code-plan.md` |
 | P-13 | Windows/ARM | P3 | OPEN | win-arm64 无构建：FPC 3.2.2 没有 win64/aarch64 target，`regression.yml` 的 windows-arm64 job 仍禁用，需更新 FPC 或交叉工具链 | `.github/workflows/regression.yml` |
 
 ## 5. 接受 / 不做 / 已完成

@@ -5,8 +5,9 @@
 #
 # This is the emulated counterpart of run-linux-regression.sh. It builds the
 # FFI helper library for loongarch64, wraps funcmd in qemu, and uses the
-# linux-loongarch64-qemu skip list (native code generation, ODBC, and the
-# shell-based project tests that invoke the target binary directly).
+# linux-loongarch64-qemu skip list (the x86-64/aarch64 asm backends, ODBC, and
+# the shell-based project tests that invoke the target binary directly). The
+# LoongArch asm backend itself runs, including its live JIT call.
 #
 # Usage:
 #   LOONG_SYSROOT=~/.fun/linux-loongarch64-sysroot ./run-loongarch64-qemu.sh

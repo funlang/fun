@@ -8,14 +8,17 @@
 #
 # Usage:
 #   src/prj/fun/release/probe.sh <platform> <out.json> \
-#       <funcmd> <funcmd-safe> [libtcc] [asm]
+#       <funcmd> <funcmd-safe> [libtcc]
 #
 # Example:
 #   src/prj/fun/release/probe.sh linux-x64 build-env.json \
 #       fun/funcmd fun/funcmd-safe fun/libtcc.so
 #
-# `asm` defaults to true. Pass false for a target whose backend is known to be
-# absent (linux-loongarch64), so the published capabilities match the build.
+# Every capability is measured by running the binary, including the machine-code
+# (asm) backend: the matching lib-asm backend is asked to JIT a one-line leaf
+# function and the result is compared. A target with no backend, or one whose
+# icache-flush symbol is missing, reports asm=false instead of inheriting an
+# assumption from the build script.
 #
 # The probes are deliberately small and self-contained; a missing optional
 # dependency is a fact to report, never a failure of this script.
@@ -27,7 +30,6 @@ OUT=${2:?output json}
 FUNCMD=${3:?funcmd path}
 SAFE=${4:-}
 LIBTCC=${5:-}
-ASM=${6:-true}
 
 COMMIT=${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/fun-probe-XXXXXX") || exit 1
@@ -96,6 +98,80 @@ EOF
     if [ "$tcc_out" = "7" ]; then TCC=true; fi
 fi
 
+# --- machine-code backend via lib-asm -----------------------------------
+# JIT one leaf function on the target's own backend: f(n) = n + 1. The module
+# is found next to the executable (fun/lib), like lib-tcc above. A wrong or
+# missing backend raises in Load(), and a missing __clear_cache raises too
+# (lib-asm-loongarch64 refuses to run unflushed code), so both report false.
+ASM=false
+case "$PLATFORM" in
+    *-x64|*-x86_64|*-amd64)     asm_arch=x64 ;;
+    *-arm64|*-aarch64)          asm_arch=a64 ;;
+    *-loongarch64|*-loong64)    asm_arch=loongarch64 ;;
+    *)                          asm_arch= ;;
+esac
+if [ -n "$asm_arch" ]; then
+    asm_out=""
+    case "$asm_arch" in
+    x64)
+        cat > "$TMP/asm.fun" <<'EOF'
+use 'lib-asm-pro.fun';
+try
+  var f = Assembly('i:i', `#!asm
+mov rax, rdi
+inc rax
+ret
+`);
+  f.Load();
+  var r = f.Run(41);
+  f.Delete();
+  ?. r;
+except
+  ?. 'off';
+end try;
+EOF
+        ;;
+    a64)
+        cat > "$TMP/asm.fun" <<'EOF'
+use 'lib-asm-a64.fun';
+try
+  Assembly = AssemblyA64;
+  var f = Assembly('i:i', `#!asm
+add x0, x0, #1
+ret
+`);
+  f.Load();
+  var r = f.Run(41);
+  f.Delete();
+  ?. r;
+except
+  ?. 'off';
+end try;
+EOF
+        ;;
+    loongarch64)
+        cat > "$TMP/asm.fun" <<'EOF'
+use 'lib-asm-loongarch64.fun';
+try
+  Assembly = AssemblyLoongArch64;
+  var f = Assembly('i:i', `#!asm
+addi.d $a0, $a0, 1
+ret
+`);
+  f.Load();
+  var r = f.Run(41);
+  f.Delete();
+  ?. r;
+except
+  ?. 'off';
+end try;
+EOF
+        ;;
+    esac
+    asm_out=$(run_probe "$TMP/asm.fun")
+    if [ "$asm_out" = "42" ]; then ASM=true; fi
+fi
+
 # --- presence facts ------------------------------------------------------
 LIBTCC_PRESENT=false
 [ -n "$LIBTCC" ] && [ -f "$LIBTCC" ] && LIBTCC_PRESENT=true
@@ -140,4 +216,4 @@ cat > "$OUT" <<EOF
 }
 EOF
 
-echo "probe: $PLATFORM regex=$REGEX ffi=$FFI tcc=$TCC safe=$SAFE_PRESENT"
+echo "probe: $PLATFORM regex=$REGEX ffi=$FFI tcc=$TCC asm=$ASM safe=$SAFE_PRESENT"

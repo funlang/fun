@@ -9,11 +9,15 @@
 #
 # Current capability boundary (same as the aarch64 cross artifact):
 #   - core interpreter + portable standard library: yes
-#   - regex: no. The bundled PCRE is C and needs a target libc; the aarch64
-#     cross build has the same limitation.
-#   - FFI (getapi): no. Needs a loongarch64 libffi.
+#   - regex: no in the default build. The bundled PCRE is C and needs a target
+#     libc; FULL=1 with the Alpine sysroot provides it.
+#   - FFI (getapi): no in the default build. Needs a loongarch64 libffi;
+#     FULL=1 provides it.
 #   - TinyCC / #!c: no. TinyCC has no LoongArch backend.
-#   - lib-asm / #!asm: no. Only the x86 and aarch64 encoders exist.
+#   - lib-asm / #!asm: yes in a FULL build (lib-asm-loongarch64 is pure Fun on
+#     top of getapi/mmap). It needs libgcc_s's __clear_cache at runtime and
+#     refuses to run rather than execute unflushed code. The syscall-only
+#     default build has no getapi, so assembly is unavailable there.
 # The build is still useful for running the language, demos and the portable
 # stdlib under qemu or on real LoongArch hardware.
 #
