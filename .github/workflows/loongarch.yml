@@ -160,8 +160,16 @@ jobs:
           LOONG_LD: ${{ env.TOOLCHAIN_ROOT }}/tools/loongarch64-linux-ld
           FUNCMD: ${{ github.workspace }}/fun/funcmd-linux-loongarch64-musl
         run: |
-          set -euo pipefail
-          ZIG="$ZIG_ROOT/zig" timeout 1500 ./fun/test/run-loongarch64-qemu.sh
+          set -uo pipefail
+          log="$RUNNER_TEMP/qemu.log"
+          if ZIG="$ZIG_ROOT/zig" timeout 1500 ./fun/test/run-loongarch64-qemu.sh 2>&1 | tee "$log"; then
+            exit 0
+          fi
+          # The full log needs a signed-in viewer; put the failing tests in
+          # the run annotation so a public run still explains itself.
+          summary=$(grep -E "FAIL|failed:|::error" "$log" | tail -n 20 | tr '\n' ';')
+          echo "::error title=qemu regression failed::$summary"
+          exit 1
 
       # Release artifacts are built only from a green run. release.yml looks
       # up this artifact by commit on nightly runs; a missing or failed run
