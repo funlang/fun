@@ -615,7 +615,9 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 
 标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（81 个模块）：
 
-> 总代码量约 16,500 行逻辑代码（不含注释）——81 个模块全部用 Fun 自身写成。
+> 81 个可加载模块合计约 15,100 行逻辑代码（不含注释）。`fun/lib` 共
+> 131 个 `.fun` 文件（含平台变体与内部辅助模块），合计约 22,800 行逻辑
+> 代码。
 
 - **数据**：`lib-json`、`csv`、`toml`、`jsonschema`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`、`lib-hmac`、`lib-url`
 - **工具**：`uuid`

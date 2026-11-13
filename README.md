@@ -658,8 +658,10 @@ and the Windows job builds and runs the same strict capability test. The
 
 The standard library in [`fun/lib`](fun/lib) is written in pure Fun (81 modules):
 
-> In total roughly 16,500 lines of logical code (excluding comments) — all 81
-> modules written in Fun itself.
+> The 81 modules that load on this platform total roughly 15,100 lines of
+> logical code (excluding comments). `fun/lib` contains 131 `.fun` files in
+> total, including platform variants and internal helpers — about 22,800
+> logical lines.
 
 - **Data**: `lib-json`, `csv`, `toml`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`, `lib-hmac`, `lib-url`
 - **Utility**: `uuid`

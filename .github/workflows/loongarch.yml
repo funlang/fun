@@ -12,22 +12,15 @@
 # normal five-platform release gate. The nightly packager skips the target
 # when no successful run exists for the commit.
 #
-# It is also not a PR gate. It runs on pushes to main, so the stage exists by
-# the time the nightly window opens, and on manual dispatch for bring-up.
+# It is also not a PR gate. It runs on every push to main (including docs-only
+# commits) so the exact SHA the nightly publishes always has a matching stage,
+# and on manual dispatch for bring-up.
 # ============================================================
 name: loongarch
 
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'src/**'
-      - 'fun/lib/**'
-      - 'fun/test/**'
-      - 'fun/demos/**'
-      - 'fun/demo/**'
-      - 'src/prj/fun/*loongarch*'
-      - '.github/workflows/loongarch.yml'
   workflow_dispatch:
 
 permissions:
