@@ -32,6 +32,10 @@ This project records notable changes in the style of [Keep a Changelog](https://
   `lib-asm-loongarch64` call and `capabilities.json` reports `asm: true`;
   TinyCC remains unavailable. README/package notes and the capability matrix
   were corrected accordingly.
+- `fun package tidy` now self-heals a dependency cache entry that exists but
+  is not a usable git repository. If the cached checkout cannot report `HEAD`
+  (seen on Windows when a clone move is disturbed), the entry is dropped and
+  re-cloned instead of failing with `git cat-file -p HEAD failed`.
 
 ## [9.5.5] - 2026-11-08
 

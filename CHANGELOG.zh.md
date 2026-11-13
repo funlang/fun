@@ -28,6 +28,9 @@
   `libgcc_s`（提供 `__clear_cache`），因此 qemu 回归会真正执行
   `lib-asm-loongarch64` 的 live 调用，`capabilities.json` 报告 `asm: true`；
   TinyCC 仍不可用。README、包内说明与能力矩阵已同步更正。
+- `fun package tidy` 现在会自愈“目录存在但不是可用 git 仓库”的依赖缓存：
+  缓存的 checkout 无法读出 `HEAD` 时（Windows 上克隆目录移动被打断时出现过），
+  删除该条目并重新克隆，而不是以 `git cat-file -p HEAD failed` 失败。
 
 ## [9.5.5] - 2026-11-08
 

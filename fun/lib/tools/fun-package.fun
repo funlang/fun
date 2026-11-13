@@ -370,24 +370,41 @@ fun fetchGit(name, src, ver)
   var dir = '';
   if pinned <> '' then dir = cacheDirFor(src, pinned); end if;
   if pinned <> '' and UtilIsDir(dir) then
-    var tree = hashOfTree(dir, _rsLog);
-    var at = commitDate(dir, _rsLog);
-    var hash = 'git-tree:' & tree;
-    if pin.hash <> nil and (pin.hash or '') <> '' and (pin.hash or '') <> hash then
-      raise "package: cache for '" & name & "' is corrupted; remove " & dir & ' and run tidy again';
-    end if;
-    result = rsAdd(name, src, ver, pinned, hash, at, dir, readLib(dir, name));
-    return;
+    // A cache entry can exist without being a usable repository: a Windows
+    // MoveFile of the clone can be cut short by AV/indexing, and the checkout
+    // may then lack .git. Reusing it would fail with "not a valid object name
+    // HEAD", so treat any error here as a corrupt entry: drop it and re-clone.
+    var usable = false;
+    try
+      var tree = hashOfTree(dir, _rsLog);
+      var at = commitDate(dir, _rsLog);
+      var hash = 'git-tree:' & tree;
+      if pin.hash = nil or (pin.hash or '') = '' or (pin.hash or '') = hash then
+        result = rsAdd(name, src, ver, pinned, hash, at, dir, readLib(dir, name));
+        usable = true;
+      end if;
+    except
+      usable = false;
+    end try;
+    if usable then return; end if;
+    if UtilIsDir(dir) then UtilRemoveTree(dir); end if;
   end if;
 
   if pinned = '' then
     var cached = findCached(src, ver);
     if cached <> '' then
-      var ccommit = gitOut(cached, 'rev-parse HEAD', _rsLog);
-      var ctree = hashOfTree(cached, _rsLog);
-      var cat = commitDate(cached, _rsLog);
-      result = rsAdd(name, src, ver, ccommit, 'git-tree:' & ctree, cat, cached, readLib(cached, name));
-      return;
+      var usable = false;
+      try
+        var ccommit = gitOut(cached, 'rev-parse HEAD', _rsLog);
+        var ctree = hashOfTree(cached, _rsLog);
+        var cat = commitDate(cached, _rsLog);
+        result = rsAdd(name, src, ver, ccommit, 'git-tree:' & ctree, cat, cached, readLib(cached, name));
+        usable = true;
+      except
+        usable = false;
+      end try;
+      if usable then return; end if;
+      if UtilIsDir(cached) then UtilRemoveTree(cached); end if;
     end if;
   end if;
 
