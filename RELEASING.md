@@ -91,6 +91,11 @@ time-gated.
   after the day's first nightly.
 - Every nightly is a GitHub **prerelease**, so `releases/latest` keeps
   pointing at the stable release. Only the newest 14 nightlies are kept.
+- LoongArch64 is a **prerelease-only** target. `.github/workflows/loongarch.yml`
+  cross-builds it on pushes to main and uploads `fun-stage-linux-loongarch64`;
+  the nightly packager attaches that asset when the run for the same commit
+  succeeded, and otherwise publishes the night without it. Stable packages
+  never download the LoongArch64 stage.
 
 Manual runs: Actions -> **release** -> Run workflow. Choose `nightly` and tick
 `force` to publish the current commit even when it has no new code changes.

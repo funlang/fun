@@ -1,0 +1,200 @@
+# ============================================================
+# loongarch.yml -- cross-build the LoongArch64 Linux interpreter.
+#
+# LoongArch64 is a prerelease target: FPC has no stable loongarch64 target
+# yet, so this job bootstraps the compiler from FPC main and needs a pinned
+# GNU binutils cross assembler/linker. The result is uploaded as a regular
+# stage (fun-stage-linux-loongarch64); release.yml attaches it to nightly
+# prereleases only. Stable releases never include it.
+#
+# This workflow is deliberately separate from regression.yml: a broken FPC
+# main snapshot or a missing loongarch runner package must not block the
+# normal five-platform release gate. The nightly packager skips the target
+# when no successful run exists for the commit.
+#
+# It is also not a PR gate. It runs on pushes to main, so the stage exists by
+# the time the nightly window opens, and on manual dispatch for bring-up.
+# ============================================================
+name: loongarch
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'fun/lib/**'
+      - 'fun/test/**'
+      - 'fun/demos/**'
+      - 'fun/demo/**'
+      - 'src/prj/fun/*loongarch*'
+      - '.github/workflows/loongarch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: loongarch-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # FPC main is the only branch with a loongarch64 backend. Bump this to a
+  # known-good commit when main regresses; the toolchain cache key follows.
+  FPC_REF: main
+  ZIG_VERSION: 0.13.0
+  TOOLCHAIN_ROOT: ${{ github.workspace }}/.loong/linux-loongarch64
+  SYSROOT: ${{ github.workspace }}/.loong/linux-loongarch64-sysroot
+  ZIG_ROOT: ${{ github.workspace }}/.loong/zig
+
+jobs:
+  cross:
+    name: linux-loongarch64
+    runs-on: ubuntu-24.04
+    # FPC main bootstraps the native compiler, the cross compiler and the
+    # libc RTL. A cold run takes 25-45 minutes; the caches make later runs
+    # take the build + qemu suite only.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build, binutils and qemu dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            build-essential fpc libncurses-dev \
+            binutils-loongarch64-linux-gnu qemu-user-static curl xz-utils
+
+      - name: Resolve the FPC source revision
+        id: fpc
+        run: |
+          set -euo pipefail
+          sha=$(git ls-remote https://github.com/fpc/FPCSource.git "refs/heads/$FPC_REF" | cut -f1)
+          [ -n "$sha" ] || { echo "::error::cannot resolve FPC $FPC_REF"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "FPC $FPC_REF = $sha"
+
+      - name: Cache the loongarch64 FPC cross toolchain
+        id: cache-toolchain
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.TOOLCHAIN_ROOT }}
+          key: loong-fpc-v1-${{ steps.fpc.outputs.sha }}-${{ hashFiles('src/prj/fun/bootstrap-linux-loongarch64.sh') }}
+
+      - name: Bootstrap the FPC loongarch64 cross toolchain
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        env:
+          FPC_SHA: ${{ steps.fpc.outputs.sha }}
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/fpc-src"
+          rm -rf "$src"
+          git init -q "$src"
+          git -C "$src" remote add origin https://github.com/fpc/FPCSource.git
+          git -C "$src" fetch --depth 1 origin "$FPC_SHA"
+          git -C "$src" checkout -q FETCH_HEAD
+
+          boot=$(command -v ppcx64 || find /usr/lib/fpc -type f -name ppcx64 | head -n 1)
+          [ -n "$boot" ] || { echo "::error::no boot ppcx64 (install fpc)"; exit 1; }
+
+          mkdir -p "$(dirname "$TOOLCHAIN_ROOT")"
+          FPC_BOOT="$boot" \
+          FPC_SRC="$src" \
+          CROSSBINDIR=/usr/bin \
+          FPC_USE_LIBC=1 \
+          LOONG_FPC_ROOT="$TOOLCHAIN_ROOT" \
+          JOBS="$(nproc)" \
+            ./src/prj/fun/bootstrap-linux-loongarch64.sh
+
+      - name: Cache the Alpine loongarch64 sysroot
+        id: cache-sysroot
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SYSROOT }}
+          key: loong-sysroot-v1-${{ hashFiles('src/prj/fun/prepare-linux-loongarch64-sysroot.sh') }}
+
+      - name: Prepare the Alpine loongarch64 sysroot
+        if: steps.cache-sysroot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$SYSROOT")"
+          LOONG_SYSROOT="$SYSROOT" ./src/prj/fun/prepare-linux-loongarch64-sysroot.sh
+
+      - name: Build funcmd for linux/loongarch64
+        run: |
+          set -euo pipefail
+          LOONG_FPC_ROOT="$TOOLCHAIN_ROOT" \
+          LOONG_SYSROOT="$SYSROOT" \
+          FULL=1 \
+            ./src/prj/fun/make-linux-loongarch64.sh
+
+          LOONG_FPC_ROOT="$TOOLCHAIN_ROOT" \
+          LOONG_SYSROOT="$SYSROOT" \
+          FULL=1 SAFE=strict \
+          FUN_LOONG_OUT="$PWD/fun/funcmd-linux-loongarch64-musl-safe" \
+            ./src/prj/fun/make-linux-loongarch64.sh
+
+      - name: Cache Zig (libffitest for the qemu suite)
+        id: cache-zig
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ZIG_ROOT }}
+          key: zig-${{ env.ZIG_VERSION }}-linux-x86_64
+
+      - name: Install Zig
+        if: steps.cache-zig.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$ZIG_ROOT"
+          curl -fsSL "https://ziglang.org/download/$ZIG_VERSION/zig-linux-x86_64-$ZIG_VERSION.tar.xz" \
+            -o "$RUNNER_TEMP/zig.tar.xz"
+          tar xJf "$RUNNER_TEMP/zig.tar.xz" -C "$ZIG_ROOT" --strip-components=1
+
+      - name: Add Zig to PATH
+        run: echo "$ZIG_ROOT" >> "$GITHUB_PATH"
+
+      - name: Regression under qemu-user
+        env:
+          LOONG_SYSROOT: ${{ env.SYSROOT }}
+          LOONG_FPC_ROOT: ${{ env.TOOLCHAIN_ROOT }}
+          LOONG_LD: ${{ env.TOOLCHAIN_ROOT }}/tools/loongarch64-linux-ld
+          FUNCMD: ${{ github.workspace }}/fun/funcmd-linux-loongarch64-musl
+        run: |
+          set -euo pipefail
+          ZIG="$ZIG_ROOT/zig" ./fun/test/run-loongarch64-qemu.sh
+
+      # Release artifacts are built only from a green run. release.yml looks
+      # up this artifact by commit on nightly runs; a missing or failed run
+      # simply means that night's prerelease has no LoongArch asset.
+      - name: Stage release build
+        run: |
+          set -euo pipefail
+          stage=dist-stage
+          exe=fun/funcmd-linux-loongarch64-musl
+          safe=fun/funcmd-linux-loongarch64-musl-safe
+          qemu=$(command -v qemu-loongarch64-static || command -v qemu-loongarch64)
+
+          mkdir -p "$stage"
+          cp -f "$exe" "$stage/funcmd"
+          [ -f "$safe" ] && cp -f "$safe" "$stage/funcmd-safe"
+
+          # probe.sh executes the binaries it describes. Wrap the target
+          # binary in qemu so the capabilities come from the actual build.
+          wrap="$RUNNER_TEMP/funcmd-loong-qemu"
+          cat > "$wrap" <<EOF
+          #!/bin/sh
+          QEMU_LD_PREFIX="$SYSROOT" exec "$qemu" "$PWD/$exe" "\$@"
+          EOF
+          chmod +x "$wrap"
+
+          src/prj/fun/release/probe.sh \
+            linux-loongarch64 "$stage/build-env.json" \
+            "$wrap" "$safe" "" false
+
+      - name: Upload release stage
+        uses: actions/upload-artifact@v4
+        with:
+          name: fun-stage-linux-loongarch64
+          path: dist-stage/
+          retention-days: 90
+          if-no-files-found: error

@@ -18,6 +18,12 @@
   单线程 run/stop 循环。Quartz/AWS 扩展（`?`、`L`、`W`、`#`、年字段）直接
   拒绝，不做猜测。
 
+- Linux LoongArch64（龙芯）构建现在作为 **nightly 预发布**资产发布。新增
+  独立的 `loongarch` 工作流，用 FPC 主线快照与 Alpine musl sysroot 交叉
+  构建解释器、跑 qemu 回归并上传 stage；在 FPC 提供稳定 loongarch64 后端
+  之前，正式版有意不包含该目标。该构建含正则与 FFI，但没有 TinyCC 和原生
+  汇编后端。
+
 ## [9.5.5] - 2026-11-08
 
 - 新增 `fun/lib/lib-hmac.fun`（`HmacSha1`、`HmacSha1Hex`）与

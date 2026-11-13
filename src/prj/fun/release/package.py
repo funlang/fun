@@ -31,7 +31,13 @@ import time
 import zipfile
 from pathlib import Path
 
-UNIX_PLATFORMS = {"linux-x64", "linux-arm64", "macos-x64", "macos-arm64"}
+UNIX_PLATFORMS = {
+    "linux-x64",
+    "linux-arm64",
+    "linux-loongarch64",
+    "macos-x64",
+    "macos-arm64",
+}
 WIN_PLATFORMS = {"win-x64"}
 SUPPORTED = UNIX_PLATFORMS | WIN_PLATFORMS
 
@@ -216,6 +222,21 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
             "",
             "This is an unsigned 7z archive: Windows SmartScreen may warn. Use",
             "7-Zip (or another extractor that does not add Mark-of-the-Web).",
+        ]
+    elif platform == "linux-loongarch64":
+        notes += [
+            "",
+            "Keep lib/ next to fun/fun.",
+            "Install this extracted tree: ./install.sh --local",
+            "(adds a fun symlink under ~/.local/bin; pass --add-path to append",
+            "that directory to a shell profile). Without --local it downloads",
+            "the newest release instead.",
+            "This target has no libtcc (runtime C) or native asm backend;",
+            "the full build still provides regex and getapi/FFI.",
+            "It uses the platform loader /lib64/ld-linux-loongarch-lp64d.so.1;",
+            "install libpcre.so.1 and libffi.so.8 from your distribution if",
+            "the interpreter reports that they are missing.",
+            "Run the shipped suite with: fun/test/run-linux-regression.sh",
         ]
     else:
         notes += [

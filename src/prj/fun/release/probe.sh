@@ -8,11 +8,14 @@
 #
 # Usage:
 #   src/prj/fun/release/probe.sh <platform> <out.json> \
-#       <funcmd> <funcmd-safe> [libtcc]
+#       <funcmd> <funcmd-safe> [libtcc] [asm]
 #
 # Example:
 #   src/prj/fun/release/probe.sh linux-x64 build-env.json \
 #       fun/funcmd fun/funcmd-safe fun/libtcc.so
+#
+# `asm` defaults to true. Pass false for a target whose backend is known to be
+# absent (linux-loongarch64), so the published capabilities match the build.
 #
 # The probes are deliberately small and self-contained; a missing optional
 # dependency is a fact to report, never a failure of this script.
@@ -24,6 +27,7 @@ OUT=${2:?output json}
 FUNCMD=${3:?funcmd path}
 SAFE=${4:-}
 LIBTCC=${5:-}
+ASM=${6:-true}
 
 COMMIT=${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/fun-probe-XXXXXX") || exit 1
@@ -115,6 +119,7 @@ NOTES=""
 if [ "$REGEX" = false ]; then NOTES="$NOTES regex unavailable (PCRE source missing or build skipped)."; fi
 if [ "$FFI" = false ]; then NOTES="$NOTES getapi/FFI unavailable."; fi
 if [ "$TCC" = false ]; then NOTES="$NOTES runtime C compile unavailable (no libtcc)."; fi
+if [ "$ASM" != true ]; then NOTES="$NOTES native asm backend unavailable on this target."; fi
 NOTES=$(printf '%s' "$NOTES" | sed 's/^ //')
 
 cat > "$OUT" <<EOF
@@ -126,7 +131,7 @@ cat > "$OUT" <<EOF
   "regex": $(json_bool "$REGEX"),
   "ffi": $(json_bool "$FFI"),
   "tcc": $(json_bool "$TCC"),
-  "asm": true,
+  "asm": $(json_bool "$ASM"),
   "safe": $(json_bool "$SAFE_PRESENT"),
   "safe_level": "strict",
   "libtcc_present": $(json_bool "$LIBTCC_PRESENT"),

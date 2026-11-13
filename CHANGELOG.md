@@ -19,6 +19,13 @@ This project records notable changes in the style of [Keep a Changelog](https://
   and a blocking single-threaded run/stop loop. It rejects Quartz/AWS
   extensions (`?`, `L`, `W`, `#`, year) instead of guessing.
 
+- LoongArch64 Linux builds are now published as a **nightly prerelease**
+  asset. A separate `loongarch` workflow cross-builds the interpreter with an
+  FPC main snapshot and an Alpine musl sysroot, runs the qemu regression, and
+  stages the result; stable releases deliberately omit the target until FPC
+  ships a stable loongarch64 backend. The build has regex and FFI but no
+  TinyCC or native asm backend.
+
 ## [9.5.5] - 2026-11-08
 
 - New `fun/lib/lib-hmac.fun` (`HmacSha1`, `HmacSha1Hex`) and

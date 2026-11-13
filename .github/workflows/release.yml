@@ -20,6 +20,10 @@
 # needing a second workflow (assets are uploaded in the same job that creates
 # the release).
 #
+# LoongArch64 is an extra nightly-only stage produced by loongarch.yml. The
+# packager downloads it when that workflow succeeded for the same commit;
+# stable releases never attach it.
+#
 # secrets.HEARTBEAT_URL is optional. When set, a successful publish pings it,
 # and a failed run pings "<url>/fail". Scheduled workflows can be delayed or
 # dropped entirely by GitHub, and a dropped run produces no failure event, so
@@ -436,6 +440,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ needs.gate.outputs.run_id }}
+          SHA: ${{ needs.gate.outputs.sha }}
+          CHANNEL: ${{ needs.gate.outputs.channel }}
         run: |
           set -euo pipefail
           mkdir -p raw
@@ -443,6 +449,24 @@ jobs:
             gh run download "$RUN_ID" -n "fun-stage-$p" -D "raw/$p"
             echo "downloaded $p"
           done
+
+          # LoongArch64 is a prerelease-only target: FPC has no stable
+          # loongarch64 backend yet, so a separate cross-build workflow
+          # produces the stage. Stable releases deliberately omit it; a
+          # nightly includes it when that build succeeded for this commit.
+          if [ "$CHANNEL" = nightly ]; then
+            loong_run=$(gh run list --workflow loongarch.yml --commit "$SHA" \
+              --limit 20 --json databaseId,conclusion \
+              --jq '[.[] | select(.conclusion == "success")][0].databaseId // empty')
+            if [ -n "$loong_run" ] && \
+               gh run download "$loong_run" -n fun-stage-linux-loongarch64 \
+                 -D raw/linux-loongarch64; then
+              echo "downloaded linux-loongarch64 (loongarch run $loong_run)"
+            else
+              rm -rf raw/linux-loongarch64
+              echo "::notice::no successful linux-loongarch64 stage for $SHA; the nightly will not include it"
+            fi
+          fi
 
       - name: Build release assets
         env:

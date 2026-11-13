@@ -83,6 +83,10 @@ git push origin vX.Y.Z
   nightly 之后不再发布。
 - nightly 一律是 GitHub **prerelease**，`releases/latest` 继续指向稳定版。
   仅保留最近 14 个 nightly。
+- 龙芯（LoongArch64）是**仅预发布**目标。`.github/workflows/loongarch.yml`
+  在 main 推送时交叉构建并上传 `fun-stage-linux-loongarch64`；nightly 打包
+  只在该 commit 的此工作流成功时附带该资产，否则当晚不发布龙芯包。正式版
+  永远不会下载龙芯 stage。
 
 手动运行：Actions -> **release** -> Run workflow。选择 `nightly` 并勾选
 `force` 可以在没有新代码变更时发布当前 commit，也用于验证流水线。选择

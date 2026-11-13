@@ -82,6 +82,10 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 Prebuilt interpreters are attached to [GitHub Releases](https://github.com/funlang/fun/releases):
 
 - Linux x64 / arm64: `.tar.gz`, with `libtcc.so` and the standard `lib/`;
+- Linux LoongArch64: `.tar.gz`, published in **nightly prereleases only**
+  while FPC's loongarch64 backend is still on mainline. The full build has
+  regex and `getapi`/FFI, but no `libtcc` (runtime C) or native asm backend.
+  Stable releases do not include it;
 - macOS x64 / arm64: `.zip`. Both archives include `libtcc.dylib`. These
   builds are **unsigned and not notarized**;
   use the bundled `install.sh --local` (curl does not set the quarantine
@@ -495,6 +499,7 @@ Each script is `<toolchain>-<target>`; the **build machine** is where it runs, w
 | Linux / ARM             | Windows       | `make-arm-linux.bat`                      | FPC cross          |
 | Linux x86_64 (native)   | Linux x86_64  | `src/prj/fun/make-linux-x86_64.sh`       | FPC + gcc          |
 | Linux aarch64 (arm64)   | Linux x86_64  | `src/prj/fun/make-linux-aarch64.sh`      | FPC cross + Zig    |
+| Linux LoongArch64       | Linux x86_64  | `src/prj/fun/make-linux-loongarch64.sh`  | FPC main cross     |
 | macOS x86_64 / aarch64  | Linux x86_64  | `src/prj/fun/make-darwin.sh`             | FPC cross + Zig    |
 | macOS (native)          | macOS         | `src/prj/fun/make-macos.sh`              | FPC (Homebrew)     |
 
@@ -510,6 +515,7 @@ and a second build mode for untrusted scripts:
 | Platform       | regex | FFI | runtime C (tcc) | asm | safe build |
 | -------------- | ----- | --- | --------------- | --- | ---------- |
 | linux-arm64    | yes   | yes | yes             | yes | yes        |
+| linux-loongarch64 | yes | yes | no             | no  | yes        |
 | linux-x64      | yes   | yes | yes             | yes | yes        |
 | macos-arm64    | yes   | yes | yes             | yes | yes        |
 | macos-x64      | yes   | yes | yes             | yes | yes        |
@@ -524,12 +530,13 @@ handling. The release notes and each archive's `capabilities.json` are
 generated from probes, so a degraded build cannot claim a capability it does
 not have.
 
-### Cross builds (macOS and Linux aarch64, from Linux x86_64)
+### Cross builds (macOS, Linux aarch64 and LoongArch64, from Linux x86_64)
 
-The last two rows are the only builds that need a bootstrapped toolchain. Both
-run on a **Linux x86_64 build machine** and produce a native target binary with
-no target SDK and no target binutils — the Mach-O and aarch64 assembler/linker
-come from the clang/lld bundled with Zig 0.13:
+The macOS, Linux aarch64 and LoongArch64 rows are the builds that need a
+bootstrapped toolchain. They all run on a **Linux x86_64 build machine** and
+produce a native target binary; the macOS/aarch64 assembler and linker come
+from the clang/lld bundled with Zig 0.13, while LoongArch64 uses GNU
+`binutils-loongarch64-linux-gnu`:
 
 ```sh
 cd src/prj/fun
@@ -538,10 +545,16 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 
 ./bootstrap-linux-aarch64.sh    # once: aarch64-linux RTL, reusing ppcrossa64 + Zig from the darwin tree
 ./make-linux-aarch64.sh         # -> fun/funcmd-linux-aarch64
+
+# LoongArch64 is prerelease-only: FPC has no stable loongarch64 target yet.
+./bootstrap-linux-loongarch64.sh  # once: FPC main cross compiler + loongarch64 binutils
+./prepare-linux-loongarch64-sysroot.sh  # once: Alpine musl/FFI/PCRE sysroot
+FULL=1 ./make-linux-loongarch64.sh      # -> fun/funcmd-linux-loongarch64-musl
 ```
 
 - **Build machine requirements**: Linux x86_64, host FPC 3.2.x, `make`, `curl` or `wget`, `tar`, and ~2 GB free disk. Zig is fetched by the bootstrap (pinned to 0.13; 0.14 panics on older glibc). No macOS host, Apple SDK, or `osxcross` is required — Zig ships a libSystem stub.
 - `bootstrap-linux-aarch64.sh` reuses the `ppcrossa64` and Zig from the darwin toolchain: an FPC compiler binary is CPU-specific but can target any OS it has units for.
+- The LoongArch64 path needs `binutils-loongarch64-linux-gnu` and an FPC main snapshot. It cross-builds against an Alpine musl sysroot, so regex, FFI and the `-lnx` backends are available; TinyCC and `lib-asm` are not. `.github/workflows/loongarch.yml` runs this build on pushes to main and uploads the stage used by nightly prereleases.
 - Optional features degrade as usual: no PCRE -> no regex, no libffi unit/stub -> no `getapi` (the win64 CI supplies both, `pcre3.dll` and `ffi.dll`). The cross-built Linux aarch64 artifact is the core interpreter (its `-dRegex` and `-dLinuxFFI` need a libc / libffi that are not cross-built yet); a native Linux arm64 build, as in CI, has both.
 - Porting details: [`art/notes/macos-port.md`](art/notes/macos-port.md).
 

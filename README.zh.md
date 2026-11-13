@@ -82,6 +82,9 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 预编译解释器见 [GitHub Releases](https://github.com/funlang/fun/releases)：
 
 - Linux x64 / arm64：`.tar.gz`，内含 `libtcc.so` 与标准库 `lib/`；
+- Linux LoongArch64：`.tar.gz`，在 FPC 龙芯后端仍位于主线期间**只随
+  nightly 预发布**。完整构建含正则与 `getapi`/FFI，但没有 `libtcc`
+  （运行时 C）和原生汇编后端。正式版不包含该包；
 - macOS x64 / arm64：`.zip`。两个包都内含 `libtcc.dylib`。构建
   **未签名、未公证**；请使用包内 `install.sh`
   `--local`（curl 下载不会设置隔离属性），或解压后执行
@@ -473,6 +476,7 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | Linux / ARM            | Windows      | `make-arm-linux.bat`                     | FPC 交叉           |
 | Linux x86_64（原生）   | Linux x86_64 | `src/prj/fun/make-linux-x86_64.sh`      | FPC（本机）+ gcc   |
 | Linux aarch64（arm64） | Linux x86_64 | `src/prj/fun/make-linux-aarch64.sh`     | FPC 交叉 + Zig     |
+| Linux LoongArch64（龙芯） | Linux x86_64 | `src/prj/fun/make-linux-loongarch64.sh` | FPC 主线交叉     |
 | macOS x86_64 / aarch64 | Linux x86_64 | `src/prj/fun/make-darwin.sh`            | FPC 交叉 + Zig     |
 | macOS（原生）          | macOS        | `src/prj/fun/make-macos.sh`             | FPC（Homebrew）    |
 
@@ -487,6 +491,7 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | 平台          | regex | FFI | 运行时 C (tcc) | asm | safe 构建 |
 | ------------- | ----- | --- | -------------- | --- | --------- |
 | linux-arm64   | yes   | yes | yes            | yes | yes       |
+| linux-loongarch64 | yes | yes | no           | no  | yes       |
 | linux-x64     | yes   | yes | yes            | yes | yes       |
 | macos-arm64   | yes   | yes | yes            | yes | yes       |
 | macos-x64     | yes   | yes | yes            | yes | yes       |
@@ -498,11 +503,12 @@ macOS x64 与 arm64 上通过 `libtcc.dylib` 补齐；Apple Silicon 使用一个
 处理 Darwin ucontext 字段与 `MAP_JIT`。release notes 与每个包里的
 `capabilities.json` 都由实测探针生成，降级构建无法虚报能力。
 
-### 交叉构建（在 Linux x86_64 上构建 macOS 与 Linux aarch64）
+### 交叉构建（在 Linux x86_64 上构建 macOS、Linux aarch64 与龙芯）
 
-最后两行是仅有的、需要先搭交叉工具链的构建。二者都在 **Linux x86_64 构建机**
-上运行，产物是目标平台的原生二进制，无需目标 SDK、也无需目标平台 binutils——
-Mach-O 与 aarch64 的汇编器/链接器来自 Zig 0.13 自带的 clang/lld：
+macOS、Linux aarch64 与龙芯这几行需要先搭交叉工具链。它们都在
+**Linux x86_64 构建机**上运行，产物是目标平台的原生二进制；Mach-O 与
+aarch64 的汇编器/链接器来自 Zig 0.13 自带的 clang/lld，龙芯则使用 GNU
+`binutils-loongarch64-linux-gnu`：
 
 ```sh
 cd src/prj/fun
@@ -511,10 +517,16 @@ CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
 
 ./bootstrap-linux-aarch64.sh    # 一次性：aarch64-linux RTL，复用 darwin 工具链里的 ppcrossa64 + Zig
 ./make-linux-aarch64.sh         # -> fun/funcmd-linux-aarch64
+
+# 龙芯目前只有预发布：FPC 尚无稳定的 loongarch64 目标。
+./bootstrap-linux-loongarch64.sh  # 一次性：FPC 主线交叉编译器 + loongarch64 binutils
+./prepare-linux-loongarch64-sysroot.sh  # 一次性：Alpine musl/FFI/PCRE sysroot
+FULL=1 ./make-linux-loongarch64.sh      # -> fun/funcmd-linux-loongarch64-musl
 ```
 
 - **构建机要求**：Linux x86_64、宿主 FPC 3.2.x、`make`、`curl` 或 `wget`、`tar`，约 2 GB 空闲磁盘。Zig 由 bootstrap 下载（钉在 0.13；0.14 在较旧的 glibc 上会 panic）。**不需要** macOS 真机、Apple SDK 或 `osxcross`——Zig 自带 libSystem stub。
 - `bootstrap-linux-aarch64.sh` 复用 darwin 工具链的 `ppcrossa64` 与 Zig：FPC 编译器二进制与 CPU 绑定，但只要目标 OS 的单元齐备，就能编译该 OS。
+- 龙芯路径需要 `binutils-loongarch64-linux-gnu` 与 FPC 主线快照；它针对 Alpine musl sysroot 交叉构建，因此正则、FFI 与 `-lnx` 后端可用，TinyCC 与 `lib-asm` 不可用。`.github/workflows/loongarch.yml` 在 main 推送时执行该构建，并上传供 nightly 预发布使用的 stage。
 - 可选特性照例降级：缺 PCRE → 无正则；缺 libffi 单元/stub → 无 `getapi`（win64 的 CI 两者都会备好：`pcre3.dll` 与 `ffi.dll`）。Linux aarch64 交叉产物是核心解释器（其 `-dRegex` 与 `-dLinuxFFI` 需要 libc / libffi，尚未交叉构建）；而原生 Linux arm64 构建（CI 即如此）两者都有。
 - 移植细节见 [`art/notes/macos-port.md`](art/notes/macos-port.md)。
 
