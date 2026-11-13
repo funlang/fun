@@ -61,12 +61,15 @@ type
     procedure Final (const DigestOut);              stdcall;
   end;
 
-  TMD5InitProc   = procedure;                                stdcall;
-  TMD5UpdateProc = procedure(Data: Pointer; Count: LongWord); stdcall;
-  TMD5FinalProc  = procedure;                                stdcall;
-  TSHAInitProc   = procedure;                                stdcall;
-  TSHAUpdateProc = procedure(Data: Pointer; Count: LongWord); stdcall;
-  TSHAFinalProc  = procedure(DigestOut: Pointer);             stdcall;
+  // The advapi32 routines are plain C functions whose first argument is the
+  // context object. A statically linked method passes Self implicitly; the
+  // dynamic wrappers must pass it explicitly.
+  TMD5InitProc   = procedure(Context: Pointer);                              stdcall;
+  TMD5UpdateProc = procedure(Context, Data: Pointer; Count: LongWord);       stdcall;
+  TMD5FinalProc  = procedure(Context: Pointer);                              stdcall;
+  TSHAInitProc   = procedure(Context: Pointer);                              stdcall;
+  TSHAUpdateProc = procedure(Context, Data: Pointer; Count: LongWord);       stdcall;
+  TSHAFinalProc  = procedure(Context, DigestOut: Pointer);                   stdcall;
 
 var
   AdvApiLib    : fun.uint;
@@ -162,37 +165,37 @@ end;
 procedure TAdv32MD5.Init;                                 stdcall;
 begin
   LoadAdvApi;
-  _MD5Init();
+  _MD5Init(Self);
 end;
 
 procedure TAdv32MD5.Update(const Buffer; Size: LongWord); stdcall;
 begin
   LoadAdvApi;
-  _MD5Update(@Buffer, Size);
+  _MD5Update(Self, @Buffer, Size);
 end;
 
 procedure TAdv32MD5.Final;                                stdcall;
 begin
   LoadAdvApi;
-  _MD5Final();
+  _MD5Final(Self);
 end;
 
 procedure TAdv32SHA.Init;                                 stdcall;
 begin
   LoadAdvApi;
-  _SHAInit();
+  _SHAInit(Self);
 end;
 
 procedure TAdv32SHA.Update(const Buffer; Size: LongWord); stdcall;
 begin
   LoadAdvApi;
-  _SHAUpdate(@Buffer, Size);
+  _SHAUpdate(Self, @Buffer, Size);
 end;
 
 procedure TAdv32SHA.Final (const DigestOut);              stdcall;
 begin
   LoadAdvApi;
-  _SHAFinal(@DigestOut);
+  _SHAFinal(Self, @DigestOut);
 end;
 
 {$EndIf}
