@@ -31,9 +31,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # FPC main is the only branch with a loongarch64 backend. Bump this to a
-  # known-good commit when main regresses; the toolchain cache key follows.
-  FPC_REF: main
+  # FPC main is the only branch with a loongarch64 backend. Pin the snapshot
+  # that was validated with binutils 2.42 and the rawmemchr patch; bump it
+  # deliberately after a green loongarch run. A branch name works too.
+  FPC_REF: 7cfa1944185f5b9fd6f5cc9180ffee72e4870249
   ZIG_VERSION: 0.13.0
   TOOLCHAIN_ROOT: ${{ github.workspace }}/.loong/linux-loongarch64
   SYSROOT: ${{ github.workspace }}/.loong/linux-loongarch64-sysroot
@@ -62,7 +63,11 @@ jobs:
         id: fpc
         run: |
           set -euo pipefail
-          sha=$(git ls-remote https://github.com/fpc/FPCSource.git "refs/heads/$FPC_REF" | cut -f1)
+          if printf '%s' "$FPC_REF" | grep -Eq '^[0-9a-f]{40}$'; then
+            sha="$FPC_REF"
+          else
+            sha=$(git ls-remote https://github.com/fpc/FPCSource.git "refs/heads/$FPC_REF" | cut -f1)
+          fi
           [ -n "$sha" ] || { echo "::error::cannot resolve FPC $FPC_REF"; exit 1; }
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "FPC $FPC_REF = $sha"
