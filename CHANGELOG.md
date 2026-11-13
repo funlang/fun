@@ -14,6 +14,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
   default, `sourcePath` selects short/full/base), and `fun test` reports the
   user test line on assertion failures. `lib-path.fun` gains `PathRel()`.
 
+- New `fun/lib/cron.fun`: Vixie/POSIX 5-field cron expressions, optional
+  seconds-first 6-field expressions (`withSeconds: true`), fixed intervals,
+  and a blocking single-threaded run/stop loop. It rejects Quartz/AWS
+  extensions (`?`, `L`, `W`, `#`, year) instead of guessing.
+
 ## [9.5.5] - 2026-11-08
 
 - New `fun/lib/lib-hmac.fun` (`HmacSha1`, `HmacSha1Hex`) and

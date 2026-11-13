@@ -40,7 +40,7 @@
 In one sentence: **Fun is a scripting language that goes all the way from JSON to machine code.**
 
 - One runtime spans the whole spectrum, from high-level data work (JSON/FD) down to low-level system programming (FFI, C at runtime, JIT, machine code);
-- 80 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
+- 81 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
 - in AI-agent and domestic-IT scenarios, it is the lightweight glue connecting OSes, databases, chips, and business logic.
 
 Fun is designed around a simple premise: **data and code should be equally first-class, and a script should be able to reach down to the machine without leaving the language.**
@@ -71,7 +71,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
 - **Cross-platform** — Windows (32/64-bit), Linux, ARM, and Windows CE.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
-- **Self-hosted standard library** — 80 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
+- **Self-hosted standard library** — 81 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
 ---
 
@@ -469,7 +469,7 @@ fun/
 │   ├── utils/         # Utility functions
 │   └── prj/fun/       # Projects & build scripts (funcmd.dpr, Delphi/FPC)
 ├── fun/
-│   ├── lib/           # Standard library (pure Fun, 80 modules)
+│   ├── lib/           # Standard library (pure Fun, 81 modules)
 │   ├── demo/          # Language syntax demos
 │   ├── demos/         # Full applications & benchmarks
 │   └── key_*.ini      # Keyword alias packs (CN / FR / PUA)
@@ -643,15 +643,15 @@ and the Windows job builds and runs the same strict capability test. The
 
 ## Standard library
 
-The standard library in [`fun/lib`](fun/lib) is written in pure Fun (80 modules):
+The standard library in [`fun/lib`](fun/lib) is written in pure Fun (81 modules):
 
-> In total roughly 6,000 lines of logical code (excluding comments) — all 80 modules written in Fun itself.
+> In total roughly 6,000 lines of logical code (excluding comments) — all 81 modules written in Fun itself.
 
 - **Data**: `lib-json`, `csv`, `toml`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`, `lib-hmac`, `lib-url`
 - **Utility**: `uuid`
 - **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`
 - **Text**: `lib-string`, `lib-regex`, `lib-match`, `lib-unicode`
-- **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `env`, `cli`, `fs`, `io`, `process`, `logging`, `runtime`, `lib-time`, `lib-cmdline`, `lib-proc`
+- **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `env`, `cli`, `fs`, `io`, `process`, `logging`, `runtime`, `cron`, `lib-time`, `lib-cmdline`, `lib-proc`
 - **Network**: `lib-winsock`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`, `http-multipart`, `http-session`, `jwt`
 - **Databases**: `lib-orm`, `lib-orm-pro`, `lib-orm-gen`, `lib-orm-rpc`, `lib-orm-cte`, `lib-ado`, `lib-ado-schema`
 - **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`
@@ -691,6 +691,30 @@ except
   var e = runtime.lastError(); // message, file, path, line, function, stack
 end try;
 ```
+
+Scheduled jobs use the same blocking, single-threaded model:
+
+```fun
+use 'cron.fun';
+
+cron.addJob('0 3 * * *', cleanup);                    // 5-field Vixie/POSIX
+cron.addJob('0-30 * * * * *', cleanup, [withSeconds: true]); // seconds first
+cron.every('1s', refresh);                            // fixed interval
+
+cron.run();
+```
+
+`cron.addJob` accepts the standard `*`, ranges, lists, steps and
+`@hourly`/`@daily` descriptors. Six-field expressions require `withSeconds:
+true`; Quartz/AWS extensions such as `?`, `L`, `W`, `#` and a year field are
+rejected instead of being guessed.
+
+The v1 scheduler owns a blocking loop, so use it from a standalone script or
+daemon; it cannot share a thread with `HttpServer.run` yet. It uses local time
+with a 50 ms polling granularity, and does not yet provide timezone/DST
+control, job removal, next-run introspection, or an error callback. Callback
+exceptions are contained so the loop keeps running, but are not reported by the
+scheduler; handle expected failures inside the callback until that hook lands.
 
 Uploaded forms are read from the request directly:
 
