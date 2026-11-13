@@ -165,37 +165,37 @@ end;
 procedure TAdv32MD5.Init;                                 stdcall;
 begin
   LoadAdvApi;
-  _MD5Init(Self);
+  _MD5Init(@Self);
 end;
 
 procedure TAdv32MD5.Update(const Buffer; Size: LongWord); stdcall;
 begin
   LoadAdvApi;
-  _MD5Update(Self, @Buffer, Size);
+  _MD5Update(@Self, @Buffer, Size);
 end;
 
 procedure TAdv32MD5.Final;                                stdcall;
 begin
   LoadAdvApi;
-  _MD5Final(Self);
+  _MD5Final(@Self);
 end;
 
 procedure TAdv32SHA.Init;                                 stdcall;
 begin
   LoadAdvApi;
-  _SHAInit(Self);
+  _SHAInit(@Self);
 end;
 
 procedure TAdv32SHA.Update(const Buffer; Size: LongWord); stdcall;
 begin
   LoadAdvApi;
-  _SHAUpdate(Self, @Buffer, Size);
+  _SHAUpdate(@Self, @Buffer, Size);
 end;
 
 procedure TAdv32SHA.Final (const DigestOut);              stdcall;
 begin
   LoadAdvApi;
-  _SHAFinal(Self, @DigestOut);
+  _SHAFinal(@Self, @DigestOut);
 end;
 
 {$EndIf}
