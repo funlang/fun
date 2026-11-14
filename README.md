@@ -713,19 +713,21 @@ Scheduled jobs use the same blocking, single-threaded model:
 ```fun
 use 'cron.fun';
 
-cron.addJob('0 3 * * *', cleanup);                    // 5-field Vixie/POSIX
-cron.addJob('0-30 * * * * *', cleanup, [withSeconds: true]); // seconds first
-cron.every('1s', refresh);                            // fixed interval
+var s = CronScheduler();
+s.addJob('0 3 * * *', cleanup);                        // 5-field Vixie/POSIX
+s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]); // seconds first
+s.every('1s', refresh);                                // fixed interval
 
-cron.run();
+s.run();
 ```
 
-`cron.addJob` accepts the standard `*`, ranges, lists, steps and
-`@hourly`/`@daily` descriptors. Six-field expressions require `withSeconds:
-true`; Quartz/AWS extensions such as `?`, `L`, `W`, `#` and a year field are
-rejected instead of being guessed.
+Each `CronScheduler` owns its jobs and run/stop state; there is no
+process-global scheduler. `addJob` accepts the standard `*`, ranges, lists,
+steps and `@hourly`/`@daily` descriptors. Six-field expressions require
+`withSeconds: true`; Quartz/AWS extensions such as `?`, `L`, `W`, `#` and a
+year field are rejected instead of being guessed.
 
-The v1 scheduler owns a blocking loop, so use it from a standalone script or
+The scheduler owns a blocking loop, so use it from a standalone script or
 daemon; it cannot share a thread with `HttpServer.run` yet. It uses local time
 with a 50 ms polling granularity, and does not yet provide timezone/DST
 control, job removal, next-run introspection, or an error callback. Callback

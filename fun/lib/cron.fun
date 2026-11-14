@@ -2,26 +2,25 @@
 // SPDX-License-Identifier: MIT
 //
 // cron: a small, single-threaded scheduler for cron expressions and fixed
-// intervals.
+// intervals. Each CronScheduler owns its jobs and run/stop state.
 //
 //     use 'cron.fun';
 //
-//     cron.addJob('0 3 * * *', cleanup);
-//     cron.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
-//     cron.every('1s', refresh);
+//     var s = CronScheduler();
+//     s.addJob('0 3 * * *', cleanup);
+//     s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
+//     s.every('1s', refresh);
 //
-//     cron.run();   // blocking
-//     cron.stop();  // stop after the current callback
+//     s.run();   // blocking
+//     s.stop();  // stop after the current callback
 //
-// The cron expression is Vixie/POSIX-compatible: 5 fields, names, ranges,
-// lists and steps, plus the usual @hourly/@daily descriptors. withSeconds:true
-// means a 6-field expression whose first field is seconds. Quartz/AWS
-// extensions (? L W #, year) are deliberately rejected rather than guessed.
+// Create one scheduler per daemon or test; there is no process-global
+// instance. The cron expression is Vixie/POSIX-compatible: 5 fields, names,
+// ranges, lists and steps, plus the usual @hourly/@daily descriptors.
+// withSeconds:true means a 6-field expression whose first field is seconds.
+// Quartz/AWS extensions (? L W #, year) are deliberately rejected rather than
+// guessed.
 use 'lib-os.fun';
-
-var _cronJobs = new [];
-var _cronRunning = false;
-var _cronStop = false;
 
 fun _cronTrim(s)
   if s = nil then result = ''; return; end if;
@@ -323,48 +322,11 @@ fun _cronDurationMs(v)
   result = total;
 end fun;
 
-fun _cronTick(n, nowMs)
-  var fired = 0;
-  var i = 0;
-  while i < _cronJobs.@count() and not _cronStop do
-    var j = _cronJobs[i];
-    if j['kind'] = 'cron' then
-      if _cronMatch(j, n) then
-        var key = _cronKey(j, n);
-        if j['lastKey'] <> key then
-          j['lastKey'] = key;
-          fired += 1;
-          try
-            j['fn']();
-          except
-          end try;
-        end if;
-      end if;
-    elsif nowMs >= j['next'] then
-      fired += 1;
-      var interval = j['interval'];
-      // Missed runs are skipped; a long callback does not create a burst.
-      var nextAt = nowMs + interval;
-      try
-        j['fn']();
-      except
-      end try;
-      var after = _cronNowMs();
-      if nextAt <= after then nextAt = after + interval; end if;
-      j['next'] = nextAt;
-    end if;
-    i += 1;
-  end do;
-  result = fired;
-end fun;
+class CronScheduler()
+  var _jobs = new [];
+  var _running = false;
+  var _stopped = false;
 
-fun _cronReset()
-  _cronJobs = new [];
-  _cronRunning = false;
-  _cronStop = false;
-end fun;
-
-class _CronApi()
   fun addJob(expr, fn, opts)
     var ws = false;
     if opts <> nil then
@@ -375,7 +337,7 @@ class _CronApi()
     var j = _cronParseExpr(expr, ws);
     j['kind'] = 'cron';
     j['fn'] = fn;
-    _cronJobs.@add(j);
+    _jobs.@add(j);
   end fun;
 
   fun every(interval, fn)
@@ -385,26 +347,59 @@ class _CronApi()
     j['interval'] = ms;
     j['next'] = _cronNowMs() + ms;
     j['fn'] = fn;
-    _cronJobs.@add(j);
+    _jobs.@add(j);
   end fun;
 
   fun run()
-    if _cronRunning then raise 'cron: already running'; end if;
-    _cronRunning = true;
-    _cronStop = false;
+    if _running then raise 'cron: already running'; end if;
+    _running = true;
+    _stopped = false;
     try
-      while not _cronStop do
-        _cronTick(_cronNow(), _cronNowMs());
-        if not _cronStop then sleep(50); end if;
+      while not _stopped do
+        this._tick(_cronNow(), _cronNowMs());
+        if not _stopped then sleep(50); end if;
       end do;
     finally
-      _cronRunning = false;
+      _running = false;
     end try;
   end fun;
 
   fun stop()
-    _cronStop = true;
+    _stopped = true;
+  end fun;
+
+  fun _tick(n, nowMs)
+    var fired = 0;
+    var i = 0;
+    while i < _jobs.@count() and not _stopped do
+      var j = _jobs[i];
+      if j['kind'] = 'cron' then
+        if _cronMatch(j, n) then
+          var key = _cronKey(j, n);
+          if j['lastKey'] <> key then
+            j['lastKey'] = key;
+            fired += 1;
+            try
+              j['fn']();
+            except
+            end try;
+          end if;
+        end if;
+      elsif nowMs >= j['next'] then
+        fired += 1;
+        var interval = j['interval'];
+        // Missed runs are skipped; a long callback does not create a burst.
+        var nextAt = nowMs + interval;
+        try
+          j['fn']();
+        except
+        end try;
+        var after = _cronNowMs();
+        if nextAt <= after then nextAt = after + interval; end if;
+        j['next'] = nextAt;
+      end if;
+      i += 1;
+    end do;
+    result = fired;
   end fun;
 end class;
-
-var cron = _CronApi();
