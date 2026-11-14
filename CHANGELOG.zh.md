@@ -15,8 +15,9 @@
 
 - 新增 `fun/lib/cron.fun`：Vixie/POSIX 5 字段 cron 表达式、可选的
   秒优先 6 字段表达式（`withSeconds: true`）、固定间隔任务，以及阻塞式
-  单线程 run/stop 循环。Quartz/AWS 扩展（`?`、`L`、`W`、`#`、年字段）直接
-  拒绝，不做猜测。
+  单线程 run/stop 循环。调度器是显式的 `CronScheduler` 实例，各自持有任务和
+  run/stop 状态；不存在进程级全局调度器。Quartz/AWS 扩展（`?`、`L`、
+  `W`、`#`、年字段）直接拒绝，不做猜测。
 
 - Linux LoongArch64（龙芯）构建现在作为 **nightly 预发布**资产发布。新增
   独立的 `loongarch` 工作流，用 FPC 主线快照与 Alpine musl sysroot 交叉

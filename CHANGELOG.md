@@ -16,8 +16,10 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 - New `fun/lib/cron.fun`: Vixie/POSIX 5-field cron expressions, optional
   seconds-first 6-field expressions (`withSeconds: true`), fixed intervals,
-  and a blocking single-threaded run/stop loop. It rejects Quartz/AWS
-  extensions (`?`, `L`, `W`, `#`, year) instead of guessing.
+  and a blocking single-threaded run/stop loop. Schedulers are explicit
+  `CronScheduler` instances with independent jobs and run/stop state; there is
+  no process-global scheduler. It rejects Quartz/AWS extensions (`?`, `L`,
+  `W`, `#`, year) instead of guessing.
 
 - LoongArch64 Linux builds are now published as a **nightly prerelease**
   asset. A separate `loongarch` workflow cross-builds the interpreter with an

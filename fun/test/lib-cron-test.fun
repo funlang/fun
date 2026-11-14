@@ -76,30 +76,43 @@ var domOrDow = _cronParseExpr('0 0 1 * 1', false);
 ?. _cronDurationMs(250) = 250;
 
 // --- tick and lastKey ----------------------------------------------------
-_cronReset();
+var s = CronScheduler();
 var fired = 0;
-cron.addJob('*/5 * * * *', () { fired += 1; });
+s.addJob('*/5 * * * *', () { fired += 1; });
 var n5 = at(2026, 11, 12, 3, 5, 0);
-?. _cronTick(n5, 0) = 1;
+?. s._tick(n5, 0) = 1;
 ?. fired = 1;
-?. _cronTick(n5, 0) = 0;
+?. s._tick(n5, 0) = 0;
 ?. fired = 1;
 
-_cronReset();
+var seconds = CronScheduler();
 fired = 0;
-cron.addJob('0-30 * * * * *', () { fired += 1; }, [withSeconds: true]);
+seconds.addJob('0-30 * * * * *', () { fired += 1; }, [withSeconds: true]);
 var ns = at(2026, 11, 12, 3, 5, 10);
-?. _cronTick(ns, 0) = 1;
+?. seconds._tick(ns, 0) = 1;
 ?. fired = 1;
-?. _cronTick(ns, 0) = 0;
+?. seconds._tick(ns, 0) = 0;
+
+// --- independent instances -----------------------------------------------
+var a = CronScheduler();
+var b = CronScheduler();
+var ah = 0;
+var bh = 0;
+a.addJob('*/5 * * * *', () { ah += 1; });
+b.addJob('*/5 * * * *', () { bh += 1; });
+?. a._tick(n5, 0) = 1;
+?. ah = 1;
+?. bh = 0;
+?. b._tick(n5, 0) = 1;
+?. bh = 1;
+?. ah = 1;
 
 // --- real run/stop for an interval --------------------------------------
-_cronReset();
+var rt = CronScheduler();
 var hits = 0;
-cron.every(20, () {
+rt.every(20, () {
   hits += 1;
-  if hits >= 3 then cron.stop(); end if;
+  if hits >= 3 then rt.stop(); end if;
 });
-cron.run();
+rt.run();
 ?. hits >= 3;
-_cronReset();

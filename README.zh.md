@@ -666,18 +666,20 @@ end try;
 ```fun
 use 'cron.fun';
 
-cron.addJob('0 3 * * *', cleanup);                    // 5 字段 Vixie/POSIX
-cron.addJob('0-30 * * * * *', cleanup, [withSeconds: true]); // 第一段是秒
-cron.every('1s', refresh);                            // 固定间隔
+var s = CronScheduler();
+s.addJob('0 3 * * *', cleanup);                        // 5 字段 Vixie/POSIX
+s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]); // 第一段是秒
+s.every('1s', refresh);                                // 固定间隔
 
-cron.run();
+s.run();
 ```
 
-`cron.addJob` 支持标准 `*`、范围、列表、步长和 `@hourly`/`@daily` 宏。
+每个 `CronScheduler` 独立持有任务和 run/stop 状态，不存在进程级全局调度器。
+`addJob` 支持标准 `*`、范围、列表、步长和 `@hourly`/`@daily` 宏。
 6 字段表达式必须显式传 `withSeconds: true`；Quartz/AWS 的 `?`、`L`、`W`、
 `#` 和年字段会直接报错，不做猜测。
 
-v1 的调度器占用阻塞循环，适合独立脚本/daemon，暂不能和
+调度器占用阻塞循环，适合独立脚本/daemon，暂不能和
 `HttpServer.run` 共用线程。它使用本地时间，轮询粒度约 50ms；暂不提供时区/
 DST 控制、任务删除、下次执行查询或错误回调。回调异常会被隔离、不停止循环，
 但调度器不会上报；在错误回调加入前，请在回调内部处理预期错误。
