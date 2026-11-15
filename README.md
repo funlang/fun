@@ -4,13 +4,13 @@
 
 **English** (this file) · [简体中文](README.zh.md)
 
-- Version: **9.5.5**
+- Version: **9.5.6**
 - Website: <https://funlang.org>
 - Author: Zhang Weidong &lt;zwd@funlang.org>
 - License: MIT, plus commercial terms (see [License](#license))
 - Status and roadmap: [ROADMAP.md](ROADMAP.md)
 
-> **Version 9.5.5**: this is not a toy or a prototype — a mature language refined and production-validated for over 15 years (2010–present), with a lineage that reaches back through Nuva (2006) and TemplateScript (2005).
+> **Version 9.5.6**: this is not a toy or a prototype — a mature language refined and production-validated for over 15 years (2010–present), with a lineage that reaches back through Nuva (2006) and TemplateScript (2005).
 
 ---
 
@@ -203,7 +203,7 @@ fun package()
     version: '0.1.0',
     bin: 'src/main.fun',
     lib: '',
-    'fun': '9.5.5',
+    'fun': '9.5.6',
     dependencies: [
       'hello': [source: 'github.com/acme/hello', version: 'v1.0.0'],
       'local': [source: '../libs/local']

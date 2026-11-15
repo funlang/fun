@@ -4,7 +4,7 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 **English** (this file) · [简体中文](CHANGELOG.zh.md)
 
-## [Unreleased]
+## [9.5.6] - 2026-11-15
 
 - Runtime errors now carry a call-site traceback in the default build (the old
   `-dFunTraceback` opt-in is no longer needed). Each frame records the caller

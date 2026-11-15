@@ -4,7 +4,7 @@
 
 **English**: [CHANGELOG.md](CHANGELOG.md) · **简体中文**（本文件）
 
-## [Unreleased]
+## [9.5.6] - 2026-11-15
 
 - 默认构建的运行时错误现在会带调用点 traceback（不再需要
   `-dFunTraceback` 开关）。每帧记录调用方源码行和被调函数，使用固定 32 帧

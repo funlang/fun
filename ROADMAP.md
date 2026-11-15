@@ -4,17 +4,17 @@
 > 本文只维护当前基线、优先级、技术债和发版门槛。
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
-> 最近更新：2026-11-10
-> 基线：Fun 9.5.5（tag `v9.5.5`）
+> 最近更新：2026-11-15
+> 基线：Fun 9.5.6（tag `v9.5.6`）
 
 ## 0. 当前基线
 
-- **版本**：9.5.5，`src/core/version.inc` 的 `funRelease = '9.5.5'`。
-- **回归**：Linux `133/133`（`sh fun/test/run-linux-regression.sh`）。
-- **可加载性**：`78/84`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
+- **版本**：9.5.6，`src/core/version.inc` 的 `funRelease = '9.5.6'`。
+- **回归**：Linux `137/137`（`sh fun/test/run-linux-regression.sh`）。
+- **可加载性**：`81/87`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
-- **标准库**：84 个候选模块（`fun/lib` 共 112 个 `.fun`，内部 `lib-base`/`lib-type`
-  与 `-unx`/`-lnx` 后端单元不计），本机可加载 78 个。
+- **标准库**：87 个候选模块（`fun/lib` 共 115 个 `.fun`，内部 `lib-base`/`lib-type`
+  与 `-unx`/`-lnx` 后端单元不计），本机可加载 81 个。
 - **平台**：Linux x86_64 / arm64、macOS x64 / arm64、Windows x64（FPC）；
   Delphi/Win32 继续人工验证。
 - **CI**：GitHub Actions 的 `regression` 工作流覆盖 6 个构建作业（4 个 POSIX 平台 +
@@ -38,7 +38,7 @@
 
 | ID | 事项 | 状态 | 优先级 | 验收 | 关联 |
 |---|---|---|---|---|---|
-| S-03 | `#!fun` 经 tcc 编译 | DEFERRED | P2 | 暂缓，不阻塞 9.5.5；先做数值/字符串/函数/控制流子集，再做模块导入 | `art/notes/todo.md` |
+| S-03 | `#!fun` 经 tcc 编译 | DEFERRED | P2 | 暂缓，不阻塞 9.5.6；先做数值/字符串/函数/控制流子集，再做模块导入 | `art/notes/todo.md` |
 | S-05 | create-fun-app 脚手架 | OPEN | P3 | Fun 后端 + z-data 前端 + 一体发布 | `art/notes/todo.md` |
 | S-06 | 用 fun-ui 重写 funide | OPEN | P3 | 新 IDE 替代旧 funide | `art/notes/todo.md` |
 | S-07 | funcally AI agent | OPEN | P3 | 基于沙箱、CLI、HTTP 的 agent | `art/notes/todo.md` |
@@ -183,3 +183,7 @@
   P-09 DONE，发布/CI/真机收尾独立为 P-16。CI 增加 fun-jsbox 二进制缓存
   （按 jsbox/main.c + build-jsbox.sh 哈希），并去掉 unixODBC 安装前无条件的
   `apt-get update`（失败时回退）。回归刷新为 `133/133`，加载检查 `78/84`。
+- 2026-11-15：发布 9.5.6。运行时错误默认携带调用点 traceback，新增
+  `fun/lib/runtime.fun` 与 logging 的 `source` 字段；新增 `fun/lib/cron.fun`
+  多实例调度器；LoongArch64 nightly 资产与 asm 能力实测；`fun package tidy`
+  自动修复不可用的依赖缓存。回归刷新为 `137/137`，加载检查 `81/87`。
