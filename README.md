@@ -714,25 +714,36 @@ Scheduled jobs use the same blocking, single-threaded model:
 use 'cron.fun';
 
 var s = CronScheduler();
-s.addJob('0 3 * * *', cleanup);                        // 5-field Vixie/POSIX
-s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]); // seconds first
-s.every('1s', refresh);                                // fixed interval
+var daily = s.addJob('0 3 * * *', cleanup);                // 5-field Vixie/POSIX
+var tick = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
+var refreshId = s.every('1s', refresh);                    // fixed interval
 
+s.removeJob(daily);           // cancel one job
+?. s.jobs();                  // snapshot for monitoring
 s.run();
 ```
 
 Each `CronScheduler` owns its jobs and run/stop state; there is no
-process-global scheduler. `addJob` accepts the standard `*`, ranges, lists,
-steps and `@hourly`/`@daily` descriptors. Six-field expressions require
-`withSeconds: true`; Quartz/AWS extensions such as `?`, `L`, `W`, `#` and a
-year field are rejected instead of being guessed.
+process-global scheduler. `addJob` and `every` return a per-instance id;
+`removeJob(id)` removes one job and `jobs()` returns a snapshot of the
+registered jobs. Ids start at 1 and are never reused. Batch removal is
+`for j in s.jobs() do s.removeJob(j['id']); end do`. `addJob` accepts the
+standard `*`, ranges, lists, steps and `@hourly`/`@daily` descriptors.
+Six-field expressions require `withSeconds: true`; Quartz/AWS extensions such
+as `?`, `L`, `W`, `#` and a year field are rejected instead of being guessed.
+
+A job added from a callback starts on the next tick; a job removed from a
+callback does not run later in the current tick. This follows the
+single-threaded model and matches `stop()`; batch schedulers such as
+APScheduler and Quartz instead finish the jobs already collected for the
+current pass.
 
 The scheduler owns a blocking loop, so use it from a standalone script or
 daemon; it cannot share a thread with `HttpServer.run` yet. It uses local time
 with a 50 ms polling granularity, and does not yet provide timezone/DST
-control, job removal, next-run introspection, or an error callback. Callback
-exceptions are contained so the loop keeps running, but are not reported by the
-scheduler; handle expected failures inside the callback until that hook lands.
+control, next-run introspection, or an error callback. Callback exceptions are
+contained so the loop keeps running, but are not reported by the scheduler;
+handle expected failures inside the callback until that hook lands.
 
 Uploaded forms are read from the request directly:
 

@@ -4,6 +4,13 @@
 
 **English**: [CHANGELOG.md](CHANGELOG.md) · **简体中文**（本文件）
 
+## [Unreleased]
+
+- `CronScheduler` 的任务现在有实例内唯一 id：`addJob`/`every` 返回 id，
+  `removeJob(id)` 删除任务，`jobs()` 返回任务快照。id 从 1 开始，删除后不复用。
+  回调里新增的任务下一 tick 生效，回调里删除的任务本 tick 后续不再触发。
+  批量清空用 `for j in s.jobs() do s.removeJob(j['id']); end do`。
+
 ## [9.5.6] - 2026-11-15
 
 - 默认构建的运行时错误现在会带调用点 traceback（不再需要
