@@ -4,6 +4,14 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 **English** (this file) · [简体中文](CHANGELOG.zh.md)
 
+## [Unreleased]
+
+- `CronScheduler` jobs now carry per-instance ids returned by `addJob` and
+  `every`; `removeJob(id)` removes a job and `jobs()` returns a snapshot. Ids
+  start at 1 and are never reused. Jobs added from a callback start on the
+  next tick; jobs removed from a callback no longer run in the current tick.
+  Batch removal is `for j in s.jobs() do s.removeJob(j['id']); end do`.
+
 ## [9.5.6] - 2026-11-15
 
 - Runtime errors now carry a call-site traceback in the default build (the old

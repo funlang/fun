@@ -14,6 +14,9 @@
 //     s.run();   // blocking
 //     s.stop();  // stop after the current callback
 //
+// addJob and every return a per-instance id; removeJob(id) removes one job
+// and jobs() returns a snapshot. Ids start at 1 and are never reused.
+//
 // Create one scheduler per daemon or test; there is no process-global
 // instance. The cron expression is Vixie/POSIX-compatible: 5 fields, names,
 // ranges, lists and steps, plus the usual @hourly/@daily descriptors.
@@ -326,28 +329,37 @@ class CronScheduler()
   var _jobs = new [];
   var _running = false;
   var _stopped = false;
+  var _nextId = 1;
 
   fun addJob(expr, fn, opts)
     var ws = false;
     if opts <> nil then
       if opts.type() = 11 then ws = opts;
-      elsif opts.@has('withSeconds') then ws = opts['withSeconds'];
+      elsif opts.@has('withSeconds') then
+        if opts['withSeconds'] then ws = true; end if;
       end if;
     end if;
     var j = _cronParseExpr(expr, ws);
+    j['id'] = _nextId;
+    _nextId += 1;
     j['kind'] = 'cron';
+    j['expr'] = _cronTrim('' & expr);
     j['fn'] = fn;
     _jobs.@add(j);
+    result = j['id'];
   end fun;
 
   fun every(interval, fn)
     var ms = _cronDurationMs(interval);
     var j = new [];
+    j['id'] = _nextId;
+    _nextId += 1;
     j['kind'] = 'every';
-    j['interval'] = ms;
+    j['intervalMs'] = ms;
     j['next'] = _cronNowMs() + ms;
     j['fn'] = fn;
     _jobs.@add(j);
+    result = j['id'];
   end fun;
 
   fun run()
@@ -368,35 +380,79 @@ class CronScheduler()
     _stopped = true;
   end fun;
 
+  fun removeJob(id)
+    if id = nil then result = false; return; end if;
+    if id.type() <> 3 and id.type() <> 5 then result = false; return; end if;
+    var keep = new [];
+    var found = false;
+    for j in _jobs do
+      if not found and j['id'] = id then
+        found = true;
+      else
+        keep.@add(j);
+      end if;
+    end do;
+    if found then _jobs = keep; end if;
+    result = found;
+  end fun;
+
+  fun jobs()
+    result = new [];
+    for j in _jobs do
+      var item = new [];
+      item['id'] = j['id'];
+      item['kind'] = j['kind'];
+      if j['kind'] = 'cron' then
+        item['expr'] = j['expr'];
+        item['withSeconds'] = j['withSeconds'];
+      else
+        item['intervalMs'] = j['intervalMs'];
+      end if;
+      result.@add(item);
+    end do;
+  end fun;
+
+  fun _hasJob(id)
+    for j in _jobs do
+      if j['id'] = id then result = true; return; end if;
+    end do;
+    result = false;
+  end fun;
+
   fun _tick(n, nowMs)
     var fired = 0;
+    var list = new [];
+    for j in _jobs do list.@add(j); end do;
     var i = 0;
-    while i < _jobs.@count() and not _stopped do
-      var j = _jobs[i];
-      if j['kind'] = 'cron' then
-        if _cronMatch(j, n) then
-          var key = _cronKey(j, n);
-          if j['lastKey'] <> key then
-            j['lastKey'] = key;
-            fired += 1;
-            try
-              j['fn']();
-            except
-            end try;
+    while i < list.@count() and not _stopped do
+      var j = list[i];
+      // A callback may remove later jobs; skip anything no longer registered.
+      if this._hasJob(j['id']) then
+        if j['kind'] = 'cron' then
+          if _cronMatch(j, n) then
+            var key = _cronKey(j, n);
+            if j['lastKey'] <> key then
+              j['lastKey'] = key;
+              fired += 1;
+              try
+                j['fn']();
+              except
+              end try;
+            end if;
           end if;
+        elsif nowMs >= j['next'] then
+          fired += 1;
+          var interval = j['intervalMs'];
+          // Missed runs are skipped; a long callback does not create a burst.
+          var nextAt = nowMs + interval;
+          try
+            j['fn']();
+          except
+          end try;
+          var after = _cronNowMs();
+          if nextAt <= after then nextAt = after + interval; end if;
+          j['next'] = nextAt;
         end if;
-      elsif nowMs >= j['next'] then
-        fired += 1;
-        var interval = j['interval'];
-        // Missed runs are skipped; a long callback does not create a burst.
-        var nextAt = nowMs + interval;
-        try
-          j['fn']();
-        except
-        end try;
-        var after = _cronNowMs();
-        if nextAt <= after then nextAt = after + interval; end if;
-        j['next'] = nextAt;
       end if;
       i += 1;
     end do;

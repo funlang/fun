@@ -667,21 +667,30 @@ end try;
 use 'cron.fun';
 
 var s = CronScheduler();
-s.addJob('0 3 * * *', cleanup);                        // 5 字段 Vixie/POSIX
-s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]); // 第一段是秒
-s.every('1s', refresh);                                // 固定间隔
+var daily = s.addJob('0 3 * * *', cleanup);                // 5 字段 Vixie/POSIX
+var tick = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
+var refreshId = s.every('1s', refresh);                    // 固定间隔
 
+s.removeJob(daily);           // 取消一个任务
+?. s.jobs();                  // 任务快照，可用于监控
 s.run();
 ```
 
 每个 `CronScheduler` 独立持有任务和 run/stop 状态，不存在进程级全局调度器。
-`addJob` 支持标准 `*`、范围、列表、步长和 `@hourly`/`@daily` 宏。
-6 字段表达式必须显式传 `withSeconds: true`；Quartz/AWS 的 `?`、`L`、`W`、
-`#` 和年字段会直接报错，不做猜测。
+`addJob` 和 `every` 返回实例内唯一 id；`removeJob(id)` 删除单个任务，
+`jobs()` 返回已注册任务的快照。id 从 1 开始，删除后不复用。批量清空用
+`for j in s.jobs() do s.removeJob(j['id']); end do`。`addJob` 支持标准 `*`、
+范围、列表、步长和 `@hourly`/`@daily` 宏。6 字段表达式必须显式传
+`withSeconds: true`；Quartz/AWS 的 `?`、`L`、`W`、`#` 和年字段会直接报错，
+不做猜测。
+
+回调里新增的任务下一 tick 生效；回调里删除的任务本 tick 后续不再触发。这与
+`stop()` 的行为一致，也符合单线程模型；APScheduler/Quartz 这类批处理调度器
+则会把本轮已经收集的任务跑完。
 
 调度器占用阻塞循环，适合独立脚本/daemon，暂不能和
 `HttpServer.run` 共用线程。它使用本地时间，轮询粒度约 50ms；暂不提供时区/
-DST 控制、任务删除、下次执行查询或错误回调。回调异常会被隔离、不停止循环，
+DST 控制、下次执行查询或错误回调。回调异常会被隔离、不停止循环，
 但调度器不会上报；在错误回调加入前，请在回调内部处理预期错误。
 
 上传表单直接从请求读取，无需额外引入：
