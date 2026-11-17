@@ -120,6 +120,9 @@ end;
 // ui.dialog(save = 'All files|*.*', file = '...', defext = '...')
 // ui.dialog(path = '...')
 procedure _dialog(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+{$IfNDef NoDialog}
+// NT 3.5 has no SHGetPathFromIDListA (introduced in NT 4.0). Define NoDialog
+// to omit this dialog and its static shell32 import, so Fun can start on NT 3.5.
 var
   s, f, ret: fun.str;
   isOpen, isSave, multi: fun.bool;
@@ -182,6 +185,9 @@ begin
   end;
 
   val^ := ret;
+{$Else}
+begin
+{$EndIf}
 end;
 
 procedure _run(env: CEnv; exp: CExp; exps: CExps; val: PValue);
