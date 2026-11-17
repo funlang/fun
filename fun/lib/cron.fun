@@ -17,6 +17,9 @@
 // addJob and every return a per-instance id; removeJob(id) removes one job
 // and jobs() returns a snapshot. Ids start at 1 and are never reused.
 //
+// CronScheduler([onError: (job, err) { ... }]) reports callback exceptions with
+// a job snapshot and runtime.lastError(); without it, they stay silent.
+//
 // Create one scheduler per daemon or test; there is no process-global
 // instance. The cron expression is Vixie/POSIX-compatible: 5 fields, names,
 // ranges, lists and steps, plus the usual @hourly/@daily descriptors.
@@ -24,6 +27,7 @@
 // Quartz/AWS extensions (? L W #, year) are deliberately rejected rather than
 // guessed.
 use 'lib-os.fun';
+use 'runtime.fun';
 
 fun _cronTrim(s)
   if s = nil then result = ''; return; end if;
@@ -325,11 +329,29 @@ fun _cronDurationMs(v)
   result = total;
 end fun;
 
-class CronScheduler()
+fun _cronJobView(j)
+  var item = new [];
+  item['id'] = j['id'];
+  item['kind'] = j['kind'];
+  if j['kind'] = 'cron' then
+    item['expr'] = j['expr'];
+    item['withSeconds'] = j['withSeconds'];
+  else
+    item['intervalMs'] = j['intervalMs'];
+  end if;
+  result = item;
+end fun;
+
+class CronScheduler(opts)
   var _jobs = new [];
   var _running = false;
   var _stopped = false;
   var _nextId = 1;
+  var _onError = nil;
+
+  if opts <> nil and opts.@has('onError') then
+    _onError = opts['onError'];
+  end if;
 
   fun addJob(expr, fn, opts)
     var ws = false;
@@ -399,16 +421,7 @@ class CronScheduler()
   fun jobs()
     result = new [];
     for j in _jobs do
-      var item = new [];
-      item['id'] = j['id'];
-      item['kind'] = j['kind'];
-      if j['kind'] = 'cron' then
-        item['expr'] = j['expr'];
-        item['withSeconds'] = j['withSeconds'];
-      else
-        item['intervalMs'] = j['intervalMs'];
-      end if;
-      result.@add(item);
+      result.@add(_cronJobView(j));
     end do;
   end fun;
 
@@ -417,6 +430,19 @@ class CronScheduler()
       if j['id'] = id then result = true; return; end if;
     end do;
     result = false;
+  end fun;
+
+  fun _reportError(j)
+    if _onError = nil then return; end if;
+    var e = nil;
+    try
+      e = runtime.lastError();
+    except
+    end try;
+    try
+      _onError(_cronJobView(j), e);
+    except
+    end try;
   end fun;
 
   fun _tick(n, nowMs)
@@ -437,6 +463,7 @@ class CronScheduler()
               try
                 j['fn']();
               except
+                this._reportError(j);
               end try;
             end if;
           end if;
@@ -448,6 +475,7 @@ class CronScheduler()
           try
             j['fn']();
           except
+            this._reportError(j);
           end try;
           var after = _cronNowMs();
           if nextAt <= after then nextAt = after + interval; end if;

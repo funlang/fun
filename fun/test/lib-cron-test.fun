@@ -123,6 +123,8 @@ var id1 = life.addJob('*/5 * * * *', () {});
 var id2 = life.every('1s', () {});
 ?. id1 = 1;
 ?. id2 = 2;
+?. (id1.type() = 3) or (id1.type() = 5);
+?. (id2.type() = 3) or (id2.type() = 5);
 ?. life.removeJob(id1);
 ?. not life.removeJob(id1);
 ?. not life.removeJob(999);
@@ -140,10 +142,12 @@ var js = life.jobs();
 ?. js[0]['id'] = 2;
 ?. js[0]['kind'] = 'every';
 ?. js[0]['intervalMs'] = 1000;
+?. (js[0]['intervalMs'].type() = 3) or (js[0]['intervalMs'].type() = 5);
 ?. js[1]['id'] = 3;
 ?. js[1]['kind'] = 'cron';
 ?. js[1]['expr'] = '*/5 * * * *';
 ?. js[1]['withSeconds'] = false;
+?. js[1]['withSeconds'].type() = 11;
 js[1]['id'] = 99;
 ?. life.jobs()[1]['id'] = 3;
 
@@ -217,8 +221,9 @@ sid = self.addJob('*/5 * * * *', () {
 var ever = CronScheduler();
 var everHits = 0;
 var eid = ever.every('1s', () { everHits += 1; });
-ever.removeJob(eid);
-?. ever._tick(n5, 1000000000) = 0;
+?. ever.removeJob(eid);
+?. ever.jobs().@count() = 0;
+?. ever._tick(n5, _cronNowMs() + 2000) = 0;
 ?. everHits = 0;
 
 var ord = CronScheduler();
@@ -235,3 +240,52 @@ var oj = ord.jobs();
 var bad = CronScheduler();
 ?. raises(((){ bad.addJob('bad', () {}); }));
 ?. bad.addJob('* * * * *', () {}) = 1;
+
+// --- onError ------------------------------------------------------------
+var ehCount = 0;
+var ehJob = nil;
+var ehErr = nil;
+var eh = CronScheduler([onError: (job, err) {
+  ehCount += 1;
+  ehJob = job;
+  ehErr = err;
+}]);
+eh.addJob('*/5 * * * *', () { raise 'boom'; });
+?. eh._tick(n5, 0) = 1;
+?. ehCount = 1;
+?. ehJob['id'] = 1;
+?. (ehJob['id'].type() = 3) or (ehJob['id'].type() = 5);
+?. ehJob['kind'] = 'cron';
+?. ehJob['expr'] = '*/5 * * * *';
+?. ehJob['withSeconds'] = false;
+?. ehJob['withSeconds'].type() = 11;
+?. ehJob['fn'] = nil;
+?. ehErr <> nil;
+?. ehErr['message'].subpos('boom') >= 0;
+ehJob['id'] = 99;
+?. eh.jobs()[0]['id'] = 1;
+
+var eh2Count = 0;
+var eh2Kind = '';
+var eh2 = CronScheduler([onError: (job, err) {
+  eh2Count += 1;
+  eh2Kind = job['kind'];
+}]);
+eh2.every('1s', () { raise 'boom'; });
+?. eh2._tick(n5, _cronNowMs() + 1000000) = 1;
+?. eh2Count = 1;
+?. eh2Kind = 'every';
+
+var silent = CronScheduler();
+var silentHits = 0;
+silent.addJob('*/5 * * * *', () { raise 'boom'; });
+silent.addJob('*/5 * * * *', () { silentHits += 1; });
+?. silent._tick(n5, 0) = 2;
+?. silentHits = 1;
+
+var badHandler = CronScheduler([onError: (job, err) { raise 'handler boom'; }]);
+var afterHits = 0;
+badHandler.addJob('*/5 * * * *', () { raise 'job boom'; });
+badHandler.addJob('*/5 * * * *', () { afterHits += 1; });
+?. badHandler._tick(n5, 0) = 2;
+?. afterHits = 1;
