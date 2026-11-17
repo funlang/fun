@@ -688,10 +688,20 @@ s.run();
 `stop()` 的行为一致，也符合单线程模型；APScheduler/Quartz 这类批处理调度器
 则会把本轮已经收集的任务跑完。
 
+回调失败默认是静默的，除非传入 `onError`：
+
+```fun
+var s = CronScheduler([onError: (job, err) {
+  logger.error('cron job failed', [job: job['id'], error: err]);
+}]);
+```
+
+`job` 与 `jobs()` 返回的是同一种公开快照；`err` 是 `runtime.lastError()`。
+
 调度器占用阻塞循环，适合独立脚本/daemon，暂不能和
 `HttpServer.run` 共用线程。它使用本地时间，轮询粒度约 50ms；暂不提供时区/
-DST 控制、下次执行查询或错误回调。回调异常会被隔离、不停止循环，
-但调度器不会上报；在错误回调加入前，请在回调内部处理预期错误。
+DST 控制或下次执行查询。回调异常会被隔离、不停止循环；没有 `onError` 时
+不会上报，所以要么传入上面的处理器，要么在回调内部处理预期错误。
 
 上传表单直接从请求读取，无需额外引入：
 

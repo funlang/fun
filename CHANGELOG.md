@@ -12,6 +12,10 @@ This project records notable changes in the style of [Keep a Changelog](https://
   next tick; jobs removed from a callback no longer run in the current tick.
   Batch removal is `for j in s.jobs() do s.removeJob(j['id']); end do`.
 
+- `CronScheduler` accepts `[onError: (job, err) { ... }]` to report callback
+  exceptions with a job snapshot and `runtime.lastError()`. Without it,
+  exceptions remain contained and silent.
+
 ## [9.5.6] - 2026-11-15
 
 - Runtime errors now carry a call-site traceback in the default build (the old

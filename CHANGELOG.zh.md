@@ -11,6 +11,9 @@
   回调里新增的任务下一 tick 生效，回调里删除的任务本 tick 后续不再触发。
   批量清空用 `for j in s.jobs() do s.removeJob(j['id']); end do`。
 
+- `CronScheduler` 接受 `[onError: (job, err) { ... }]`，回调异常时以任务快照和
+  `runtime.lastError()` 上报。未配置时异常仍被隔离且静默。
+
 ## [9.5.6] - 2026-11-15
 
 - 默认构建的运行时错误现在会带调用点 traceback（不再需要

@@ -738,12 +738,23 @@ single-threaded model and matches `stop()`; batch schedulers such as
 APScheduler and Quartz instead finish the jobs already collected for the
 current pass.
 
+Callback failures are silent unless a handler is supplied:
+
+```fun
+var s = CronScheduler([onError: (job, err) {
+  logger.error('cron job failed', [job: job['id'], error: err]);
+}]);
+```
+
+`job` is the same public snapshot returned by `jobs()`; `err` is
+`runtime.lastError()`.
+
 The scheduler owns a blocking loop, so use it from a standalone script or
 daemon; it cannot share a thread with `HttpServer.run` yet. It uses local time
 with a 50 ms polling granularity, and does not yet provide timezone/DST
-control, next-run introspection, or an error callback. Callback exceptions are
-contained so the loop keeps running, but are not reported by the scheduler;
-handle expected failures inside the callback until that hook lands.
+control or next-run introspection. Callback exceptions are contained so the
+loop keeps running; without `onError` they are not reported, so either supply
+the handler above or handle expected failures inside the callback.
 
 Uploaded forms are read from the request directly:
 
