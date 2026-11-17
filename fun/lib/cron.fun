@@ -20,6 +20,9 @@
 // CronScheduler([onError: (job, err) { ... }]) reports callback exceptions with
 // a job snapshot and runtime.lastError(); without it, they stay silent.
 //
+// Jobs are scheduled by next occurrence: nextRun(id) returns the next time and
+// run() sleeps until the nearest one (capped at 1s); missed runs fire once.
+//
 // Create one scheduler per daemon or test; there is no process-global
 // instance. The cron expression is Vixie/POSIX-compatible: 5 fields, names,
 // ranges, lists and steps, plus the usual @hourly/@daily descriptors.
@@ -219,7 +222,6 @@ fun _cronParseExpr(expr, withSeconds)
   j['dow']    = dow['vals'];
   j['domWild'] = dom['wild'];
   j['dowWild'] = dow['wild'];
-  j['lastKey'] = '';
   result = j;
 end fun;
 
@@ -274,16 +276,6 @@ fun _cronMatch(j, n)
   end if;
 end fun;
 
-fun _cronKey(j, n)
-  if j['withSeconds'] then
-    result = n['year'] & '-' & n['month'] & '-' & n['day'] & ' ' &
-             n['hour'] & ':' & n['minute'] & ':' & n['second'];
-  else
-    result = n['year'] & '-' & n['month'] & '-' & n['day'] & ' ' &
-             n['hour'] & ':' & n['minute'];
-  end if;
-end fun;
-
 fun _cronDurationMs(v)
   if v.type() = 0 then raise 'cron: interval is required'; end if;
   if v.type() = 3 or v.type() = 5 then
@@ -329,6 +321,132 @@ fun _cronDurationMs(v)
   result = total;
 end fun;
 
+fun _cronLeap(y)
+  result = (y mod 4 = 0) and (y mod 100 <> 0 or y mod 400 = 0);
+end fun;
+
+fun _cronDaysInMonth(y, m)
+  if m = 2 then
+    if _cronLeap(y) then result = 29; else result = 28; end if;
+  elsif m = 4 or m = 6 or m = 9 or m = 11 then
+    result = 30;
+  else
+    result = 31;
+  end if;
+end fun;
+
+fun _cronAt(y, mo, d, h, mi, s, dow)
+  var n = new [];
+  n['year'] = y;
+  n['month'] = mo;
+  n['day'] = d;
+  n['hour'] = h;
+  n['minute'] = mi;
+  n['second'] = s;
+  n['dow'] = dow;
+  result = n;
+end fun;
+
+fun _cronDayNumber(y, m, d)
+  var yy = y;
+  var mm = m;
+  if mm <= 2 then yy -= 1; mm += 12; end if;
+  result = 365 * yy + yy div 4 - yy div 100 + yy div 400
+         + (153 * (mm - 3) + 2) div 5 + d - 719469;
+end fun;
+
+fun _cronDiffSec(a, b)
+  var days = _cronDayNumber(b['year'], b['month'], b['day'])
+           - _cronDayNumber(a['year'], a['month'], a['day']);
+  result = days * 86400
+         + (b['hour'] - a['hour']) * 3600
+         + (b['minute'] - a['minute']) * 60
+         + (b['second'] - a['second']);
+end fun;
+
+fun _cronNext(j, from)
+  var y  = from['year'];
+  var mo = from['month'];
+  var d  = from['day'];
+  var h  = from['hour'];
+  var mi = from['minute'];
+  var s  = from['second'];
+  var dow = from['dow'];
+
+  if j['withSeconds'] then
+    s += 1;
+  else
+    mi += 1;
+    s = 0;
+  end if;
+  if s > 59 then s = 0; mi += 1; end if;
+  if mi > 59 then mi = 0; h += 1; end if;
+  if h > 23 then h = 0; d += 1; dow = (dow + 1) mod 7; end if;
+  if d > _cronDaysInMonth(y, mo) then
+    d = 1;
+    mo += 1;
+    if mo > 12 then mo = 1; y += 1; end if;
+  end if;
+
+  var guard = 0;
+  while guard < 366 * 8 do
+    if j['month'][mo] then
+      var dm = j['dom'][d] <> nil;
+      var dw = j['dow'][dow] <> nil;
+      var dayOk = false;
+      if j['domWild'] then
+        if j['dowWild'] then dayOk = true; else dayOk = dw; end if;
+      elsif j['dowWild'] then
+        dayOk = dm;
+      else
+        dayOk = dm or dw;
+      end if;
+      if dayOk then
+        var hh = h;
+        while hh <= 23 do
+          if j['hour'][hh] then
+            var mstart = 0;
+            if hh = h then mstart = mi; end if;
+            var mm = mstart;
+            while mm <= 59 do
+              if j['minute'][mm] then
+                var sstart = 0;
+                if hh = h and mm = mi then sstart = s; end if;
+                if j['withSeconds'] then
+                  var ss = sstart;
+                  while ss <= 59 do
+                    if j['second'][ss] then
+                      result = _cronAt(y, mo, d, hh, mm, ss, dow);
+                      return;
+                    end if;
+                    ss += 1;
+                  end do;
+                elsif sstart = 0 then
+                  result = _cronAt(y, mo, d, hh, mm, 0, dow);
+                  return;
+                end if;
+              end if;
+              mm += 1;
+            end do;
+          end if;
+          hh += 1;
+        end do;
+      end if;
+    end if;
+
+    d += 1;
+    dow = (dow + 1) mod 7;
+    h = 0; mi = 0; s = 0;
+    if d > _cronDaysInMonth(y, mo) then
+      d = 1;
+      mo += 1;
+      if mo > 12 then mo = 1; y += 1; end if;
+    end if;
+    guard += 1;
+  end do;
+  result = nil;
+end fun;
+
 fun _cronJobView(j)
   var item = new [];
   item['id'] = j['id'];
@@ -362,11 +480,16 @@ class CronScheduler(opts)
       end if;
     end if;
     var j = _cronParseExpr(expr, ws);
+    var n = _cronNow();
+    var nx = _cronNext(j, n);
+    if nx = nil then raise 'cron: no occurrence in the next 8 years'; end if;
     j['id'] = _nextId;
     _nextId += 1;
     j['kind'] = 'cron';
     j['expr'] = _cronTrim('' & expr);
     j['fn'] = fn;
+    j['nextWall'] = nx;
+    j['removed'] = false;
     _jobs.@add(j);
     result = j['id'];
   end fun;
@@ -378,8 +501,9 @@ class CronScheduler(opts)
     _nextId += 1;
     j['kind'] = 'every';
     j['intervalMs'] = ms;
-    j['next'] = _cronNowMs() + ms;
+    j['nextMs'] = _cronNowMs() + ms;
     j['fn'] = fn;
+    j['removed'] = false;
     _jobs.@add(j);
     result = j['id'];
   end fun;
@@ -390,12 +514,38 @@ class CronScheduler(opts)
     _stopped = false;
     try
       while not _stopped do
-        this._tick(_cronNow(), _cronNowMs());
-        if not _stopped then sleep(50); end if;
+        var n = _cronNow();
+        var nowMs = _cronNowMs();
+        this._tick(n, nowMs);
+        if not _stopped then
+          var wait = this._waitMs(_cronNow(), _cronNowMs());
+          if wait < 10 then wait = 10; end if;
+          sleep(wait);
+        end if;
       end do;
     finally
       _running = false;
     end try;
+  end fun;
+
+  fun _waitMs(n, nowMs)
+    var wait = 1000;
+    for j in _jobs do
+      if not j['removed'] then
+        if j['kind'] = 'cron' then
+          if j['nextWall'] <> nil then
+            var d = _cronDiffSec(n, j['nextWall']) * 1000;
+            if d < 0 then d = 0; end if;
+            if d < wait then wait = d; end if;
+          end if;
+        else
+          var d = j['nextMs'] - nowMs;
+          if d < 0 then d = 0; end if;
+          if d < wait then wait = d; end if;
+        end if;
+      end if;
+    end do;
+    result = wait;
   end fun;
 
   fun stop()
@@ -410,6 +560,7 @@ class CronScheduler(opts)
     for j in _jobs do
       if not found and j['id'] = id then
         found = true;
+        j['removed'] = true;
       else
         keep.@add(j);
       end if;
@@ -425,11 +576,33 @@ class CronScheduler(opts)
     end do;
   end fun;
 
-  fun _hasJob(id)
+  fun _findJob(id)
     for j in _jobs do
-      if j['id'] = id then result = true; return; end if;
+      if j['id'] = id then result = j; return; end if;
     end do;
-    result = false;
+    result = nil;
+  end fun;
+
+  fun nextRun(id)
+    if id = nil then result = nil; return; end if;
+    if id.type() <> 3 and id.type() <> 5 then result = nil; return; end if;
+    var j = this._findJob(id);
+    if j = nil then result = nil; return; end if;
+    if j['kind'] = 'cron' then
+      var n = _cronNow();
+      var nx = _cronNext(j, n);
+      if nx = nil then result = nil; return; end if;
+      result = 1.time() + _cronDiffSec(n, nx) / 86400;
+    else
+      var nowMs = _cronNowMs();
+      var nextAt = j['nextMs'];
+      var interval = j['intervalMs'];
+      if nextAt <= nowMs then
+        var k = (nowMs - nextAt) div interval + 1;
+        nextAt += k * interval;
+      end if;
+      result = 1.time() + (nextAt - nowMs) / 86400000;
+    end if;
   end fun;
 
   fun _reportError(j)
@@ -452,22 +625,24 @@ class CronScheduler(opts)
     var i = 0;
     while i < list.@count() and not _stopped do
       var j = list[i];
-      // A callback may remove later jobs; skip anything no longer registered.
-      if this._hasJob(j['id']) then
+      if not j['removed'] then
         if j['kind'] = 'cron' then
-          if _cronMatch(j, n) then
-            var key = _cronKey(j, n);
-            if j['lastKey'] <> key then
-              j['lastKey'] = key;
-              fired += 1;
-              try
-                j['fn']();
-              except
-                this._reportError(j);
-              end try;
+          if j['nextWall'] <> nil and _cronDiffSec(j['nextWall'], n) >= 0 then
+            fired += 1;
+            try
+              j['fn']();
+            except
+              this._reportError(j);
+            end try;
+            var after = _cronNow();
+            var nx = _cronNext(j, after);
+            if nx = nil then
+              this.removeJob(j['id']);
+            else
+              j['nextWall'] = nx;
             end if;
           end if;
-        elsif nowMs >= j['next'] then
+        elsif nowMs >= j['nextMs'] then
           fired += 1;
           var interval = j['intervalMs'];
           // Missed runs are skipped; a long callback does not create a burst.
@@ -477,9 +652,9 @@ class CronScheduler(opts)
           except
             this._reportError(j);
           end try;
-          var after = _cronNowMs();
-          if nextAt <= after then nextAt = after + interval; end if;
-          j['next'] = nextAt;
+          var afterMs = _cronNowMs();
+          if nextAt <= afterMs then nextAt = afterMs + interval; end if;
+          j['nextMs'] = nextAt;
         end if;
       end if;
       i += 1;

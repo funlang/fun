@@ -720,6 +720,7 @@ var refreshId = s.every('1s', refresh);                    // fixed interval
 
 s.removeJob(daily);           // cancel one job
 ?. s.jobs();                  // snapshot for monitoring
+?. s.nextRun(daily);          // next run as a Fun time
 s.run();
 ```
 
@@ -731,6 +732,12 @@ registered jobs. Ids start at 1 and are never reused. Batch removal is
 standard `*`, ranges, lists, steps and `@hourly`/`@daily` descriptors.
 Six-field expressions require `withSeconds: true`; Quartz/AWS extensions such
 as `?`, `L`, `W`, `#` and a year field are rejected instead of being guessed.
+
+The scheduler sleeps until the nearest job's next run (capped at 1 s, with a
+10 ms minimum) instead of polling every 50 ms; intervals below 10 ms are
+effectively capped at about 10 ms. `nextRun(id)` returns that time; unknown ids
+return nil. If a run is missed while the process is blocked, it fires once and
+the next occurrence is computed from the wake-up time.
 
 A job added from a callback starts on the next tick; a job removed from a
 callback does not run later in the current tick. This follows the
@@ -751,10 +758,9 @@ var s = CronScheduler([onError: (job, err) {
 
 The scheduler owns a blocking loop, so use it from a standalone script or
 daemon; it cannot share a thread with `HttpServer.run` yet. It uses local time
-with a 50 ms polling granularity, and does not yet provide timezone/DST
-control or next-run introspection. Callback exceptions are contained so the
-loop keeps running; without `onError` they are not reported, so either supply
-the handler above or handle expected failures inside the callback.
+and does not yet provide timezone/DST control. Callback exceptions are contained
+so the loop keeps running; without `onError` they are not reported, so either
+supply the handler above or handle expected failures inside the callback.
 
 Uploaded forms are read from the request directly:
 

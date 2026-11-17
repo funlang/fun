@@ -16,6 +16,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
   exceptions with a job snapshot and `runtime.lastError()`. Without it,
   exceptions remain contained and silent.
 
+- Cron scheduling now follows the next occurrence instead of scanning every
+  50 ms: `nextRun(id)` returns the next run time, and `run()` sleeps until the
+  nearest job (capped at 1 s). Missed runs fire once and reschedule from the
+  wake-up time.
+
 ## [9.5.6] - 2026-11-15
 
 - Runtime errors now carry a call-site traceback in the default build (the old

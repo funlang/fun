@@ -673,6 +673,7 @@ var refreshId = s.every('1s', refresh);                    // 固定间隔
 
 s.removeJob(daily);           // 取消一个任务
 ?. s.jobs();                  // 任务快照，可用于监控
+?. s.nextRun(daily);          // 下次执行时间（Fun time）
 s.run();
 ```
 
@@ -683,6 +684,10 @@ s.run();
 范围、列表、步长和 `@hourly`/`@daily` 宏。6 字段表达式必须显式传
 `withSeconds: true`；Quartz/AWS 的 `?`、`L`、`W`、`#` 和年字段会直接报错，
 不做猜测。
+
+调度器睡到最近任务的到期时间（单次上限 1s、下限 10ms），不再固定每 50ms
+轮询；小于 10ms 的间隔实际按约 10ms 触发。`nextRun(id)` 返回该时间；未知 id
+返回 nil。如果进程被阻塞越过一次触发，只执行一次，下一次从醒来的时间重新计算。
 
 回调里新增的任务下一 tick 生效；回调里删除的任务本 tick 后续不再触发。这与
 `stop()` 的行为一致，也符合单线程模型；APScheduler/Quartz 这类批处理调度器
@@ -699,9 +704,9 @@ var s = CronScheduler([onError: (job, err) {
 `job` 与 `jobs()` 返回的是同一种公开快照；`err` 是 `runtime.lastError()`。
 
 调度器占用阻塞循环，适合独立脚本/daemon，暂不能和
-`HttpServer.run` 共用线程。它使用本地时间，轮询粒度约 50ms；暂不提供时区/
-DST 控制或下次执行查询。回调异常会被隔离、不停止循环；没有 `onError` 时
-不会上报，所以要么传入上面的处理器，要么在回调内部处理预期错误。
+`HttpServer.run` 共用线程。它使用本地时间，暂不提供时区/DST 控制。回调异常
+会被隔离、不停止循环；没有 `onError` 时不会上报，所以要么传入上面的处理器，
+要么在回调内部处理预期错误。
 
 上传表单直接从请求读取，无需额外引入：
 
