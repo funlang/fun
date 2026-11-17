@@ -23,6 +23,25 @@ fun at(y, m, d, h, mi, s)
   result = n;
 end fun;
 
+fun whenText(n)
+  if n = nil then result = 'nil'; return; end if;
+  result = n['year'] & '-' & n['month'] & '-' & n['day'] & ' ' &
+           n['hour'] & ':' & n['minute'] & ':' & n['second'];
+end fun;
+
+fun makeDue(s, id, n, nowMs)
+  for j in s._jobs do
+    if j['id'] = id then
+      if j['kind'] = 'cron' then
+        j['nextWall'] = n;
+      else
+        j['nextMs'] = nowMs;
+      end if;
+      return;
+    end if;
+  end do;
+end fun;
+
 // --- fields, macros and matching -----------------------------------------
 var every5 = _cronParseExpr('*/5 * * * *', false);
 ?. every5['minute'][0];
@@ -75,11 +94,12 @@ var domOrDow = _cronParseExpr('0 0 1 * 1', false);
 ?. _cronDurationMs('1m30s') = 90000;
 ?. _cronDurationMs(250) = 250;
 
-// --- tick and lastKey ----------------------------------------------------
+// --- tick and next -------------------------------------------------------
 var s = CronScheduler();
 var fired = 0;
-s.addJob('*/5 * * * *', () { fired += 1; });
+var sId = s.addJob('*/5 * * * *', () { fired += 1; });
 var n5 = at(2026, 11, 12, 3, 5, 0);
+makeDue(s, sId, n5, 0);
 ?. s._tick(n5, 0) = 1;
 ?. fired = 1;
 ?. s._tick(n5, 0) = 0;
@@ -87,8 +107,9 @@ var n5 = at(2026, 11, 12, 3, 5, 0);
 
 var seconds = CronScheduler();
 fired = 0;
-seconds.addJob('0-30 * * * * *', () { fired += 1; }, [withSeconds: true]);
+var secId = seconds.addJob('0-30 * * * * *', () { fired += 1; }, [withSeconds: true]);
 var ns = at(2026, 11, 12, 3, 5, 10);
+makeDue(seconds, secId, ns, 0);
 ?. seconds._tick(ns, 0) = 1;
 ?. fired = 1;
 ?. seconds._tick(ns, 0) = 0;
@@ -98,8 +119,10 @@ var a = CronScheduler();
 var b = CronScheduler();
 var ah = 0;
 var bh = 0;
-a.addJob('*/5 * * * *', () { ah += 1; });
-b.addJob('*/5 * * * *', () { bh += 1; });
+var aId = a.addJob('*/5 * * * *', () { ah += 1; });
+var bId = b.addJob('*/5 * * * *', () { bh += 1; });
+makeDue(a, aId, n5, 0);
+makeDue(b, bId, n5, 0);
 ?. a._tick(n5, 0) = 1;
 ?. ah = 1;
 ?. bh = 0;
@@ -168,13 +191,15 @@ rem.removeJob(rid);
 var del = CronScheduler();
 var order = new [];
 var delB = 0;
-del.addJob('*/5 * * * *', () {
+var delA = del.addJob('*/5 * * * *', () {
   order.@add('A');
   del.removeJob(delB);
 });
 delB = del.addJob('*/5 * * * *', () {
   order.@add('B');
 });
+makeDue(del, delA, n5, 0);
+makeDue(del, delB, n5, 0);
 ?. del._tick(n5, 0) = 1;
 ?. order.@count() = 1;
 ?. order[0] = 'A';
@@ -182,26 +207,31 @@ delB = del.addJob('*/5 * * * *', () {
 var add = CronScheduler();
 var addOrder = new [];
 var addOnce = false;
-add.addJob('*/5 * * * *', () {
+var addCId = 0;
+var addAId = add.addJob('*/5 * * * *', () {
   addOrder.@add('A');
   if not addOnce then
     addOnce = true;
-    add.addJob('*/5 * * * *', () { addOrder.@add('C'); });
+    addCId = add.addJob('*/5 * * * *', () { addOrder.@add('C'); });
   end if;
 });
+makeDue(add, addAId, n5, 0);
 ?. add._tick(n5, 0) = 1;
 ?. addOrder.@count() = 1;
+makeDue(add, addCId, n5, 0);
 ?. add._tick(n5, 0) = 1;
 ?. addOrder.@count() = 2;
 ?. addOrder[1] = 'C';
 
 var all = CronScheduler();
 var allOrder = new [];
-all.addJob('*/5 * * * *', () {
+var allA = all.addJob('*/5 * * * *', () {
   allOrder.@add('A');
   for j in all.jobs() do all.removeJob(j['id']); end do;
 });
-all.addJob('*/5 * * * *', () { allOrder.@add('B'); });
+var allB = all.addJob('*/5 * * * *', () { allOrder.@add('B'); });
+makeDue(all, allA, n5, 0);
+makeDue(all, allB, n5, 0);
 ?. all._tick(n5, 0) = 1;
 ?. allOrder.@count() = 1;
 ?. all.jobs().@count() = 0;
@@ -213,6 +243,7 @@ sid = self.addJob('*/5 * * * *', () {
   selfHits += 1;
   self.removeJob(sid);
 });
+makeDue(self, sid, n5, 0);
 ?. self._tick(n5, 0) = 1;
 ?. self._tick(n5, 0) = 0;
 ?. selfHits = 1;
@@ -241,6 +272,10 @@ var bad = CronScheduler();
 ?. raises(((){ bad.addJob('bad', () {}); }));
 ?. bad.addJob('* * * * *', () {}) = 1;
 
+var imp = CronScheduler();
+?. raises(((){ imp.addJob('0 0 31 2 *', () {}); }));
+?. imp.addJob('* * * * *', () {}) = 1;
+
 // --- onError ------------------------------------------------------------
 var ehCount = 0;
 var ehJob = nil;
@@ -250,7 +285,8 @@ var eh = CronScheduler([onError: (job, err) {
   ehJob = job;
   ehErr = err;
 }]);
-eh.addJob('*/5 * * * *', () { raise 'boom'; });
+var ehId = eh.addJob('*/5 * * * *', () { raise 'boom'; });
+makeDue(eh, ehId, n5, 0);
 ?. eh._tick(n5, 0) = 1;
 ?. ehCount = 1;
 ?. ehJob['id'] = 1;
@@ -271,21 +307,99 @@ var eh2 = CronScheduler([onError: (job, err) {
   eh2Count += 1;
   eh2Kind = job['kind'];
 }]);
-eh2.every('1s', () { raise 'boom'; });
-?. eh2._tick(n5, _cronNowMs() + 1000000) = 1;
+var eh2Id = eh2.every('1s', () { raise 'boom'; });
+var eh2Now = _cronNowMs() + 1000000;
+makeDue(eh2, eh2Id, n5, eh2Now);
+?. eh2._tick(n5, eh2Now) = 1;
 ?. eh2Count = 1;
 ?. eh2Kind = 'every';
 
 var silent = CronScheduler();
 var silentHits = 0;
-silent.addJob('*/5 * * * *', () { raise 'boom'; });
-silent.addJob('*/5 * * * *', () { silentHits += 1; });
+var silentA = silent.addJob('*/5 * * * *', () { raise 'boom'; });
+var silentB = silent.addJob('*/5 * * * *', () { silentHits += 1; });
+makeDue(silent, silentA, n5, 0);
+makeDue(silent, silentB, n5, 0);
 ?. silent._tick(n5, 0) = 2;
 ?. silentHits = 1;
 
 var badHandler = CronScheduler([onError: (job, err) { raise 'handler boom'; }]);
 var afterHits = 0;
-badHandler.addJob('*/5 * * * *', () { raise 'job boom'; });
-badHandler.addJob('*/5 * * * *', () { afterHits += 1; });
+var badA = badHandler.addJob('*/5 * * * *', () { raise 'job boom'; });
+var badB = badHandler.addJob('*/5 * * * *', () { afterHits += 1; });
+makeDue(badHandler, badA, n5, 0);
+makeDue(badHandler, badB, n5, 0);
 ?. badHandler._tick(n5, 0) = 2;
 ?. afterHits = 1;
+
+// --- engine wait and missed runs ----------------------------------------
+var w = CronScheduler();
+var wId = w.addJob('0 3 * * *', () {});
+makeDue(w, wId, at(2026, 11, 12, 3, 0, 0), 0);
+?. w._waitMs(at(2026, 11, 12, 2, 0, 0), 0) = 1000;
+
+var we = CronScheduler();
+var weId = we.every('1s', () {});
+makeDue(we, weId, n5, 1000);
+?. we._waitMs(n5, 900) = 100;
+
+var miss = CronScheduler();
+var missHits = 0;
+var missId = miss.addJob('* * * * *', () { missHits += 1; });
+makeDue(miss, missId, at(2026, 11, 12, 0, 0, 0), 0);
+?. miss._tick(at(2026, 11, 12, 10, 0, 0), 0) = 1;
+?. missHits = 1;
+?. miss._tick(at(2026, 11, 12, 10, 0, 0), 0) = 0;
+?. missHits = 1;
+
+// --- next occurrence and nextRun ----------------------------------------
+var every5n = _cronParseExpr('*/5 * * * *', false);
+?. whenText(_cronNext(every5n, at(2026, 11, 12, 3, 5, 0))) = '2026-11-12 3:10:0';
+?. whenText(_cronNext(every5n, at(2026, 11, 12, 3, 5, 1))) = '2026-11-12 3:10:0';
+
+var secn = _cronParseExpr('0-30 * * * * *', true);
+?. whenText(_cronNext(secn, at(2026, 11, 12, 3, 5, 10))) = '2026-11-12 3:5:11';
+?. whenText(_cronNext(secn, at(2026, 11, 12, 3, 5, 30))) = '2026-11-12 3:6:0';
+
+var hourn = _cronParseExpr('0 9 * * *', false);
+?. whenText(_cronNext(hourn, at(2026, 11, 12, 10, 0, 0))) = '2026-11-13 9:0:0';
+
+var carryn = _cronParseExpr('*/15 * * * *', false);
+?. whenText(_cronNext(carryn, at(2026, 11, 12, 3, 59, 0))) = '2026-11-12 4:0:0';
+
+var monthn = _cronParseExpr('0 0 1 * *', false);
+?. whenText(_cronNext(monthn, at(2026, 11, 12, 0, 0, 0))) = '2026-12-1 0:0:0';
+
+var yearn = _cronParseExpr('0 0 1 1 *', false);
+?. whenText(_cronNext(yearn, at(2026, 11, 12, 0, 0, 0))) = '2027-1-1 0:0:0';
+
+var leapn = _cronParseExpr('0 0 29 2 *', false);
+?. whenText(_cronNext(leapn, at(2026, 11, 12, 0, 0, 0))) = '2028-2-29 0:0:0';
+?. whenText(_cronNext(leapn, at(2096, 3, 1, 0, 0, 0))) = '2104-2-29 0:0:0';
+
+var orn = _cronParseExpr('0 0 1 * 1', false);
+?. whenText(_cronNext(orn, at(2026, 11, 3, 0, 0, 0))) = '2026-11-9 0:0:0';
+
+var strictn = _cronParseExpr('0 0 * * *', false);
+?. whenText(_cronNext(strictn, at(2026, 11, 12, 0, 0, 0))) = '2026-11-13 0:0:0';
+
+var secondsn = _cronParseExpr('0 0 0 * * *', true);
+?. whenText(_cronNext(secondsn, at(2026, 11, 12, 0, 0, 0))) = '2026-11-13 0:0:0';
+
+var impossiblen = _cronParseExpr('0 0 31 2 *', false);
+?. whenText(_cronNext(impossiblen, at(2026, 11, 12, 0, 0, 0))) = 'nil';
+
+?. _cronDiffSec(at(2026, 11, 12, 0, 0, 0), at(2026, 11, 13, 0, 0, 0)) = 86400;
+?. _cronDiffSec(at(2026, 11, 12, 23, 59, 59), at(2026, 11, 13, 0, 0, 0)) = 1;
+?. _cronDiffSec(at(2028, 2, 28, 0, 0, 0), at(2028, 2, 29, 0, 0, 0)) = 86400;
+?. _cronDiffSec(at(2026, 11, 12, 0, 0, 0), at(2026, 11, 12, 1, 2, 3)) = 3723;
+
+var nr = CronScheduler();
+var nrid = nr.addJob('0 0 1 1 *', () {});
+?. nr.nextRun(nrid) <> nil;
+?. nr.nextRun(nrid) * 1 > 1.time() * 1;
+?. nr.nextRun(999) = nil;
+?. nr.nextRun(nil) = nil;
+var nre = CronScheduler();
+var nreid = nre.every('1s', () {});
+?. nre.nextRun(nreid) <> nil;
