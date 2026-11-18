@@ -521,7 +521,7 @@ and a second build mode for untrusted scripts:
 | -------------- | ----- | --- | --------------- | --- | ---------- |
 | linux-arm64    | yes   | yes | yes             | yes | yes        |
 | linux-loongarch64 | yes | yes | no             | yes | yes        |
-| linux-riscv64  | yes   | yes | no              | no  | yes        |
+| linux-riscv64  | yes   | yes | no              | yes | yes        |
 | linux-x64      | yes   | yes | yes             | yes | yes        |
 | macos-arm64    | yes   | yes | yes             | yes | yes        |
 | macos-x64      | yes   | yes | yes             | yes | yes        |
