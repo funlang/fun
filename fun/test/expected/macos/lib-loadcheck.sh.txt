@@ -19,6 +19,7 @@ LOAD  lib-ajax
 LOAD  lib-asm-a64
 LOAD  lib-asm-loongarch64
 LOAD  lib-asm-pro
+LOAD  lib-asm-riscv64
 LOAD  lib-asm
 LOAD  lib-async
 LOAD  lib-base
@@ -86,4 +87,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=81 failed=6
+loaded=82 failed=6
