@@ -31,9 +31,6 @@ lib-fun-uuid-test.fun	invokes funcmd directly, not through FUNCMD
 lib-proc-test.fun	/proc/<pid>/exe names the qemu host process
 lib-os-lnx-test.fun	/proc/<pid>/comm names the qemu host process
 
-# --- emulated runtime differences ------------------------------------------
-lib-ajax-lnx-test.fun	the Alpine sysroot's libcurl words the connect error differently
-
 # --- host toolchain / services not in the emulated sysroot -----------------
 run-ado-odbc.sh	no ODBC driver in the emulated sysroot
 lib-loadcheck.sh	module set/library availability

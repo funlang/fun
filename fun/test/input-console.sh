@@ -1,7 +1,10 @@
 #!/bin/sh
 # Console input builtins ('line'/'char'/'all'.input()) with a scripted session.
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-FUNCMD="$ROOT/fun/funcmd"
+# Honour FUNCMD from the environment: the cross/qemu runners point it at a
+# wrapper that executes the target binary under an emulator.
+FUNCMD="${FUNCMD:-$ROOT/fun/funcmd}"
+[ -x "$FUNCMD" ] || FUNCMD="$ROOT/fun/funcmd"
 [ -x "$FUNCMD" ] || FUNCMD="$ROOT/src/prj/fun/funcmd"
 [ -x "$FUNCMD" ] || FUNCMD="$ROOT/fun/fun"
 [ -x "$FUNCMD" ] || { echo "funcmd not built"; exit 2; }
