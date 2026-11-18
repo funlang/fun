@@ -41,6 +41,17 @@ uses fun, base, core, host,
      ffi;
 
 type
+  // FPC's bundled ffi unit declares ffi_cif without the target-specific tail
+  // fields some libffi targets add (riscv64 appends riscv_nfixedargs and
+  // riscv_unused, making the native struct 40 bytes instead of 32). libffi's
+  // ffi_prep_cif writes the full native struct, so hand it a buffer with
+  // headroom instead of trusting SizeOf(ffi_cif); otherwise the tail lands in
+  // whatever follows the record and corrupts it.
+  TCif = record
+    cif: ffi_cif;
+    extra: array[1..16] of Byte;
+  end;
+
   // Handler added to env.libs: routes calls on a getapi() result object.
   CLffiApi = class(CLib)
   public
@@ -71,7 +82,7 @@ type
     FTypes: fun.str;        // '<argchars...>:<retchar>' from @toCallback
     FArgs: fun.str;         // argument type chars
     FRet: Char;             // return type char
-    FCif: ffi_cif;          // kept alive for the whole closure lifetime
+    FCif: TCif;             // kept alive for the whole closure lifetime
     FAt: array of Pffi_type;// closure arg types (persisted for the cif)
     FStr: AnsiString;       // keeps the last string return alive
     function Build: Pointer;
@@ -100,21 +111,31 @@ type PValue = base.PValue;
 // once at runtime and cache: new libffi first (2), old libffi second (1),
 // the unit's own FFI_DEFAULT_ABI last. Keeps CentOS 7 (libffi 3.0.13) and
 // modern distros on the same binary.
+//
+// Only x86_64 needs the probe. Elsewhere FPC's enum already matches libffi,
+// and probing 2 can be wrong: riscv64 accepts 1..4 and treats 2 as
+// FFI_UNUSED_1, so the probe would cache an unused ABI.
 var
   _cif_abi: Integer = -1;
 
 function cifABI: ffi_abi;
+{$IfDef CPUX86_64}
 var
-  cif: ffi_cif;
+  cif: TCif;
   at: array[0..0] of Pffi_type;
+{$EndIf}
 begin
+{$IfDef CPUX86_64}
   if _cif_abi < 0 then
   begin
     at[0] := @ffi_type_pointer;
-    if      ffi_prep_cif(@cif, ffi_abi(2), 1, @ffi_type_pointer, @at) = FFI_OK then _cif_abi := 2
-    else if ffi_prep_cif(@cif, ffi_abi(1), 1, @ffi_type_pointer, @at) = FFI_OK then _cif_abi := 1
+    if      ffi_prep_cif(@cif.cif, ffi_abi(2), 1, @ffi_type_pointer, @at) = FFI_OK then _cif_abi := 2
+    else if ffi_prep_cif(@cif.cif, ffi_abi(1), 1, @ffi_type_pointer, @at) = FFI_OK then _cif_abi := 1
     else _cif_abi := Ord(FFI_DEFAULT_ABI);
   end;
+{$Else}
+  _cif_abi := Ord(FFI_DEFAULT_ABI);
+{$EndIf}
   result := ffi_abi(_cif_abi);
 end;
 
@@ -231,7 +252,7 @@ function CFFIFun.call(env: CEnv; exps: CExps): PValue;
 var
   e: CExp;
   n, i: Integer;
-  cif: ffi_cif;
+  cif: TCif;
   st: ffi_status;
   at: array of Pffi_type;
   av: array of Pointer;
@@ -337,16 +358,16 @@ begin
     // Darwin arm64 the tail goes on the stack (Apple's AAPCS64), on the
     // SysV-family targets both forms behave alike. Fall back to the fixed
     // preparation if the loaded libffi refuses the variadic one.
-    st := ffi_prep_cif_var(@cif, cifABI, nfix, n, rtype, @at[0]);
-    if st <> FFI_OK then st := ffi_prep_cif(@cif, cifABI, n, rtype, @at[0]);
+    st := ffi_prep_cif_var(@cif.cif, cifABI, nfix, n, rtype, @at[0]);
+    if st <> FFI_OK then st := ffi_prep_cif(@cif.cif, cifABI, n, rtype, @at[0]);
   end
   else
-    st := ffi_prep_cif(@cif, cifABI, n, rtype, @at[0]);
+    st := ffi_prep_cif(@cif.cif, cifABI, n, rtype, @at[0]);
   if st <> FFI_OK then raise EBase.Create('getapi: ffi_prep_cif failed');
 
   ret := 0;
-  if rt = 'v' then ffi_call(@cif, TFnProc(hfun), nil, @av[0])
-  else ffi_call(@cif, TFnProc(hfun), @ret, @av[0]); // 8-byte resp buffer holds f/d too
+  if rt = 'v' then ffi_call(@cif.cif, TFnProc(hfun), nil, @av[0])
+  else ffi_call(@cif.cif, TFnProc(hfun), @ret, @av[0]); // 8-byte resp buffer holds f/d too
 
   // Write pointer-sized OUT/INOUT values back into their `var` targets.
   for i := 0 to n - 1 do
@@ -459,15 +480,15 @@ begin
   end;
 
   if Length(FArgs) > 0 then
-    st := ffi_prep_cif(@FCif, cifABI, Length(FArgs), rtype, @FAt[0])
+    st := ffi_prep_cif(@FCif.cif, cifABI, Length(FArgs), rtype, @FAt[0])
   else
-    st := ffi_prep_cif(@FCif, cifABI, 0, rtype, nil);
+    st := ffi_prep_cif(@FCif.cif, cifABI, 0, rtype, nil);
   if st <> FFI_OK then raise EBase.Create('toCallback: ffi_prep_cif failed');
 
   FClos := ffi_closure_alloc(SizeOf(ffi_closure), @FCode);
   if FClos = nil then raise EBase.Create('toCallback: ffi_closure_alloc failed');
 
-  st := ffi_prep_closure_loc(FClos, @FCif, @CFFITrampoline, Pointer(self), FCode);
+  st := ffi_prep_closure_loc(FClos, @FCif.cif, @CFFITrampoline, Pointer(self), FCode);
   if st <> FFI_OK then raise EBase.Create('toCallback: ffi_prep_closure_loc failed');
   result := FCode;
 end;

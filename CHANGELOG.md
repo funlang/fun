@@ -16,6 +16,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
   letting `run-linux-regression.sh` replace it with a host build; the FFI
   tests now exercise the cross build rather than failing to load it.
 
+- `@toCallback` closures work on riscv64. libffi's riscv64 `ffi_cif` has two
+  extra tail fields that FPC's bundled binding omits, so `ffi_prep_cif` wrote
+  past the record and corrupted the closure's argument-type array; the FFI
+  paths now pass libffi a full-size `ffi_cif` buffer.
+
 - `CronScheduler` jobs now carry per-instance ids returned by `addJob` and
   `every`; `removeJob(id)` removes a job and `jobs()` returns a snapshot. Ids
   start at 1 and are never reused. Jobs added from a callback start on the

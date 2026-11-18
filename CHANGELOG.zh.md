@@ -15,6 +15,10 @@
   `run-linux-regression.sh` 用宿主构建覆盖它；FFI 测试现在测试交叉构建本身，
   而不是因加载失败而报错。
 
+- riscv64 上的 `@toCallback` 闭包恢复正常。libffi 的 riscv64 `ffi_cif` 比
+  FPC 自带绑定多两个尾部字段，`ffi_prep_cif` 会越界写入并破坏闭包的参数类型
+  数组；FFI 路径现在为 libffi 提供带余量的 `ffi_cif` 缓冲区。
+
 - `CronScheduler` 的任务现在有实例内唯一 id：`addJob`/`every` 返回 id，
   `removeJob(id)` 删除任务，`jobs()` 返回任务快照。id 从 1 开始，删除后不复用。
   回调里新增的任务下一 tick 生效，回调里删除的任务本 tick 后续不再触发。
