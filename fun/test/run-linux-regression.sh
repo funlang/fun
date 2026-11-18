@@ -87,6 +87,7 @@ case "$HOSTOS" in
             esac ;;
     linux)  case "$(uname -m 2>/dev/null)" in
                 loongarch64|loong64) PLATFORM=linux-loongarch64 ;;
+                riscv64)             PLATFORM=linux-riscv64 ;;
                 *)                   PLATFORM=linux ;;
             esac ;;
     *)      PLATFORM="$HOSTOS" ;;
@@ -213,7 +214,9 @@ failures=''
 
 # The FFI tests call into the helper C library next to them; it is a build
 # artifact (not tracked), so build it on demand. Skipped for --list/--help.
-if [ -f "$HERE/ffi/build.sh" ]; then
+# Cross/qemu runners set FUNREG_NO_FFI_BUILD=1: they have already built the
+# target's libffitest and must not let the host compiler replace it.
+if [ -f "$HERE/ffi/build.sh" ] && [ "${FUNREG_NO_FFI_BUILD:-0}" != "1" ]; then
     sh "$HERE/ffi/build.sh" >/dev/null 2>&1 || \
         echo "warning: could not build fun/test/ffi/libffitest (FFI tests may fail)" >&2
 fi

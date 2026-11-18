@@ -163,6 +163,10 @@ end;
 
 function _hostCpu: fun.str;
 begin
+  {$IfDef CPURISCV64}
+  result := 'riscv64';
+  exit;
+  {$EndIf}
   {$IfDef CPULOONGARCH64}
   result := 'loongarch64';
   exit;

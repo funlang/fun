@@ -39,14 +39,15 @@ esac
 
 # Rebuild when the source is newer than the artifact, or when the artifact was
 # built for another CPU. The latter happens after a cross/qemu regression run
-# (e.g. loongarch64) leaves its libffitest.so behind, and a later native run
-# would otherwise load the wrong-architecture library.
+# (e.g. loongarch64 or riscv64) leaves its libffitest.so behind, and a later
+# native run would otherwise load the wrong-architecture library.
 if [ -f "$OUT" ] && [ ! "$SRC" -nt "$OUT" ]; then
     host_arch=""
     case "$(uname -m 2>/dev/null)" in
         x86_64|amd64)        host_arch='x86-64|x86_64' ;;
         aarch64|arm64)       host_arch='aarch64|arm64' ;;
         loongarch64|loong64) host_arch='LoongArch' ;;
+        riscv64)             host_arch='RISC-V' ;;
         i?86)                host_arch='80386' ;;
     esac
     if [ -z "$host_arch" ] || ! command -v file >/dev/null 2>&1 || \

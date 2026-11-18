@@ -35,6 +35,7 @@ UNIX_PLATFORMS = {
     "linux-x64",
     "linux-arm64",
     "linux-loongarch64",
+    "linux-riscv64",
     "macos-x64",
     "macos-arm64",
 }
@@ -222,6 +223,22 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
             "",
             "This is an unsigned 7z archive: Windows SmartScreen may warn. Use",
             "7-Zip (or another extractor that does not add Mark-of-the-Web).",
+        ]
+    elif platform == "linux-riscv64":
+        notes += [
+            "",
+            "Keep lib/ next to fun/fun.",
+            "Install this extracted tree: ./install.sh --local",
+            "(adds a fun symlink under ~/.local/bin; pass --add-path to append",
+            "that directory to a shell profile). Without --local it downloads",
+            "the newest release instead.",
+            "This target has no libtcc (runtime C) and no asm backend yet; the",
+            "full build still provides regex, getapi/FFI and the -lnx",
+            "standard-library backends.",
+            "It uses the platform loader /lib/ld-linux-riscv64-lp64d.so.1;",
+            "install libpcre.so.1 and libffi.so.8 from your distribution if",
+            "the interpreter reports that they are missing.",
+            "Run the shipped suite with: fun/test/run-linux-regression.sh",
         ]
     elif platform == "linux-loongarch64":
         notes += [

@@ -64,4 +64,5 @@ EOF
 chmod +x "$TMP/funcmd"
 
 FUNCMD="$TMP/funcmd" FUNREG_PLATFORM=linux-loongarch64-qemu \
+FUNREG_NO_FFI_BUILD=1 \
     sh "$HERE/run-linux-regression.sh" "$@"

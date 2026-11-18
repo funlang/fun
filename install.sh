@@ -88,6 +88,7 @@ case "$(uname -m)" in
     arm64|aarch64) arch=arm64 ;;
     x86_64|amd64) arch=x64 ;;
     loongarch64|loong64) arch=loongarch64 ;;
+    riscv64) arch=riscv64 ;;
     *) echo "install: unsupported architecture: $(uname -m)" >&2; exit 1 ;;
 esac
 platform="$os-$arch"

@@ -6,6 +6,16 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Linux riscv64 is now a prerelease-only target. `riscv64.yml` cross-builds
+  the full musl interpreter on pushes to main, `run-riscv64-qemu.sh` runs the
+  Linux regression suite under qemu-user, and nightly prereleases attach the
+  result as `fun-stage-linux-riscv64`. The build has regex, FFI and the `-lnx`
+  backends; TinyCC and asm backends are not available for the target.
+
+- The qemu regression runners keep the target's `libffitest` instead of
+  letting `run-linux-regression.sh` replace it with a host build; the FFI
+  tests now exercise the cross build rather than failing to load it.
+
 - `CronScheduler` jobs now carry per-instance ids returned by `addJob` and
   `every`; `removeJob(id)` removes a job and `jobs()` returns a snapshot. Ids
   start at 1 and are never reused. Jobs added from a callback start on the

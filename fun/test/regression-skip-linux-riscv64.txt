@@ -1,0 +1,21 @@
+# Tests skipped on Linux riscv64. run-linux-regression.sh reads this when
+# FUNREG_PLATFORM=linux-riscv64 (native RISC-V host).
+#
+# This list assumes the full build (FULL=1), i.e. FFI, PCRE and the -lnx
+# standard-library backends are available. The syscall-only cross artifact is
+# for bring-up; use a custom skip list for it.
+#
+# Emulated qemu runs use regression-skip-linux-riscv64-qemu.txt instead.
+
+# --- native code generation -------------------------------------------------
+lib-asm-lnx.fun	x86-64 assembly backend
+lib-asm-x64.fun	x86-64 assembly backend
+fractal-asm-x64.fun	x86-64 assembly backend
+lib-asm-a64.fun	aarch64 assembly backend, wrong cpu
+lib-jit-test.fun	JIT backend emits x86-64
+lib-tcc-test.fun	no TinyCC riscv64 backend
+
+# --- host toolchain / services ---------------------------------------------
+lib-loadcheck.sh	module set/library availability
+lib-func-check.fun	module set/library availability
+run-benchmarks.sh	not a correctness test

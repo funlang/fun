@@ -6,6 +6,15 @@
 
 ## [Unreleased]
 
+- Linux riscv64 现在是仅预发布目标。`riscv64.yml` 在 main 推送时交叉构建
+  完整的 musl 解释器，`run-riscv64-qemu.sh` 在 qemu-user 下运行 Linux 回归
+  套件，nightly 预发布附带 `fun-stage-linux-riscv64`。该构建包含 regex、FFI
+  和 `-lnx` 后端；目标平台暂不支持 TinyCC 与 asm 后端。
+
+- qemu 回归运行器保留目标平台的 `libffitest`，不再让
+  `run-linux-regression.sh` 用宿主构建覆盖它；FFI 测试现在测试交叉构建本身，
+  而不是因加载失败而报错。
+
 - `CronScheduler` 的任务现在有实例内唯一 id：`addJob`/`every` 返回 id，
   `removeJob(id)` 删除任务，`jobs()` 返回任务快照。id 从 1 开始，删除后不复用。
   回调里新增的任务下一 tick 生效，回调里删除的任务本 tick 后续不再触发。
