@@ -13,7 +13,7 @@
 #     ui.run()
 #     ui.delay(ms, doevent = false)
 ########################################
-use 'lib-os.fun';
+use 'lib-utils.fun';
 
 var user32    = 'user32';
 var shell32   = 'shell32';
@@ -167,7 +167,7 @@ class BaseForm(caption, width, height, onclose, onmsg)
     if claz = nil then
       claz = 'obj_Form';
     end if;
-    result = FindWindow(claz, cap);
+    result = user32.getapi('FindWindow', 'ss:i').call(claz, cap);
   end fun;
 
   // WM_NCLBUTTONDOWN A1, HTCAPTION 2
