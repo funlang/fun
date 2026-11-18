@@ -14,7 +14,8 @@
 #   - FFI (getapi): no in the default build. Needs a riscv64 libffi;
 #     FULL=1 provides it.
 #   - TinyCC / #!c: no. TinyCC has no riscv64 backend.
-#   - lib-asm / #!asm: no hand-written riscv64 backend yet.
+#   - lib-asm / #!asm: yes. lib-asm-riscv64 encodes the RV64IM base set plus
+#     Zicsr/Zifencei; JIT calls work on riscv64 hosts and under qemu-user.
 # The build is still useful for running the language, demos and the portable
 # stdlib under qemu or on real RISC-V hardware.
 #

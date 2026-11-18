@@ -2,8 +2,8 @@
 #
 # These are emulation-host limits, not architecture failures:
 #   - tests for the x86-64/aarch64 asm backends, lib-jit's x86 emitter and
-#     lib-tcc: those backends do not exist for riscv64. There is no
-#     hand-written riscv64 asm backend yet.
+#     lib-tcc: those backends do not exist for riscv64. The riscv64 encoder
+#     (lib-asm-riscv64.fun) has its own test and is not skipped.
 #   - the lib-fun-pack/package/test/uuid shell tests invoke the target binary
 #     directly instead of through FUNCMD, so they cannot run under qemu-user.
 #   - qemu-user's /proc/<pid> describes the host qemu process, not the guest,

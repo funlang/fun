@@ -108,6 +108,7 @@ case "$PLATFORM" in
     *-x64|*-x86_64|*-amd64)     asm_arch=x64 ;;
     *-arm64|*-aarch64)          asm_arch=a64 ;;
     *-loongarch64|*-loong64)    asm_arch=loongarch64 ;;
+    *-riscv64)                  asm_arch=riscv64 ;;
     *)                          asm_arch= ;;
 esac
 if [ -n "$asm_arch" ]; then
@@ -156,6 +157,24 @@ try
   Assembly = AssemblyLoongArch64;
   var f = Assembly('i:i', `#!asm
 addi.d $a0, $a0, 1
+ret
+`);
+  f.Load();
+  var r = f.Run(41);
+  f.Delete();
+  ?. r;
+except
+  ?. 'off';
+end try;
+EOF
+        ;;
+    riscv64)
+        cat > "$TMP/asm.fun" <<'EOF'
+use 'lib-asm-riscv64.fun';
+try
+  Assembly = AssemblyRiscv64;
+  var f = Assembly('i:i', `#!asm
+addi a0, a0, 1
 ret
 `);
   f.Load();

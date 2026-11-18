@@ -8,8 +8,14 @@
 
 - Linux riscv64 现在是仅预发布目标。`riscv64.yml` 在 main 推送时交叉构建
   完整的 musl 解释器，`run-riscv64-qemu.sh` 在 qemu-user 下运行 Linux 回归
-  套件，nightly 预发布附带 `fun-stage-linux-riscv64`。该构建包含 regex、FFI
-  和 `-lnx` 后端；目标平台暂不支持 TinyCC 与 asm 后端。
+  套件，nightly 预发布附带 `fun-stage-linux-riscv64`。该构建包含 regex、FFI、
+  `-lnx` 后端和 `lib-asm-riscv64`；目标平台暂不支持 TinyCC。
+
+- 新增 `lib-asm-riscv64.fun`：RISC-V 64 的手写 `#!asm` 后端。基于 GNU binutils
+  指令表生成编码表，覆盖 RV64I 基础集以及 M（乘除）、Zicsr、Zifencei；支持
+  B/J 型分支的标签解析，并展开 `li`/`mv`/`nop`/`ret`/`j`/`jr` 和零比较分支别名。
+  暂不支持 C、F/D、向量与原子扩展。JIT 调用在 riscv64 真机和 qemu-user 下都可用
+  （`__clear_cache` 负责 `fence.i`）。
 
 - qemu 回归运行器保留目标平台的 `libffitest`，不再让
   `run-linux-regression.sh` 用宿主构建覆盖它；FFI 测试现在测试交叉构建本身，

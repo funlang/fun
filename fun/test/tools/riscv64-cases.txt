@@ -1,0 +1,101 @@
+add a0, a1, a2
+addi a0, a1, -2048
+addiw a0, a1, 1
+addw a0, a1, a2
+and a0, a1, a2
+andi a0, a1, 0x7ff
+auipc a0, 0x12345
+beq a0, a1, #-8
+bgeu a0, a1, #12
+blt a0, a1, #4
+bne a0, a1, #-4
+csrrc a0, 0x300, a1
+csrrwi a0, 0xf14, 31
+div a0, a1, a2
+divuw a0, a1, a2
+fence.i
+jal ra, #16
+jalr ra, -8(sp)
+lb a0, -1(a1)
+ld a0, 2047(sp)
+lui a0, 0xfffff
+lw a0, 4(sp)
+lwu a0, 0(sp)
+mulhsu a0, a1, a2
+rem a0, a1, a2
+sb a0, 0(sp)
+sd a0, -2048(sp)
+sh a0, 6(sp)
+sll a0, a1, a2
+slli a0, a1, 63
+sltiu a0, a1, -1
+sraiw a0, a1, 3
+srl a0, a1, a2
+subw a0, a1, a2
+sw a0, 2044(sp)
+xor a0, a1, a2
+xori a0, a1, -1
+ecall
+ebreak
+wfi
+mv a0, a1
+nop
+li a0, 0x12345
+li a1, -5
+ret
+j #8
+jr a0
+beqz a0, #8
+bgtz a0, #4
+addi sp, sp, -16
+sd ra, 8(sp)
+ld ra, 8(sp)
+addi sp, sp, 16
+slliw a0, a1, 3
+srliw a0, a1, 5
+sraiw a0, a1, 31
+addiw a0, a1, -2048
+slti a0, a1, 2047
+sltu a0, a1, a2
+sltiu a0, a1, 2047
+srai a0, a1, 32
+srli a0, a1, 63
+sraw a0, a1, a2
+srlw a0, a1, a2
+sllw a0, a1, a2
+sub a0, a1, a2
+mul a0, a1, a2
+mulh a0, a1, a2
+mulhu a0, a1, a2
+mulw a0, a1, a2
+divw a0, a1, a2
+divu a0, a1, a2
+remuw a0, a1, a2
+remw a0, a1, a2
+lbu a0, 1(a1)
+lhu a0, 2(a1)
+lh a0, 2(a1)
+lw a0, 4(a1)
+sd a0, 2040(sp)
+sw a0, 0(sp)
+sb a0, -1(sp)
+sh a0, 2(sp)
+csrrw a0, 0x300, a1
+csrrs a0, 0x300, a1
+csrrc a0, 0xc00, zero
+csrrwi a0, 0x7c0, 0
+csrrsi a0, 0x100, 1
+csrrci a0, 0x300, 31
+jal #-16
+jalr zero, 0(a0)
+lui a0, 0
+auipc a0, 0xfffff
+xor a0, a1, a2
+ori a0, a1, 1
+andi a0, a1, -2048
+addi a0, zero, 0
+jal #-16
+jalr a0
+jalr ra, a0
+j #8
+ret

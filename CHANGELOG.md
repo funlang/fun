@@ -9,8 +9,16 @@ This project records notable changes in the style of [Keep a Changelog](https://
 - Linux riscv64 is now a prerelease-only target. `riscv64.yml` cross-builds
   the full musl interpreter on pushes to main, `run-riscv64-qemu.sh` runs the
   Linux regression suite under qemu-user, and nightly prereleases attach the
-  result as `fun-stage-linux-riscv64`. The build has regex, FFI and the `-lnx`
-  backends; TinyCC and asm backends are not available for the target.
+  result as `fun-stage-linux-riscv64`. The build has regex, FFI, the `-lnx`
+  backends and `lib-asm-riscv64`; TinyCC is not available for the target.
+
+- New `lib-asm-riscv64.fun`: the hand-written `#!asm` backend for RISC-V 64.
+  It encodes the RV64I base set plus M (mul/div), Zicsr and Zifencei from a
+  table generated off the GNU binutils opcode list, resolves local labels
+  through the B/J-type split layouts, and expands `li`/`mv`/`nop`/`ret`/
+  `j`/`jr` and the zero-comparison branch aliases. Only C, F/D, vector and
+  atomic extensions are missing. JIT calls work on riscv64 hosts and under
+  qemu-user (`__clear_cache` supplies the `fence.i`).
 
 - The qemu regression runners keep the target's `libffitest` instead of
   letting `run-linux-regression.sh` replace it with a host build; the FFI

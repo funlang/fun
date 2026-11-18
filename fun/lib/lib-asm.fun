@@ -104,7 +104,8 @@ class AssemblyBase(args, code, names)
   var del   = -> Delete();
 
   // Instruction set this backend emits: 'x86' (lib-asm-pro), 'arch64'
-  // (lib-asm-a64) or 'loongarch64' (lib-asm-loongarch64). '' means
+  // (lib-asm-a64), 'loongarch64' (lib-asm-loongarch64) or 'riscv64'
+  // (lib-asm-riscv64). '' means
   // arch-neutral. Load() refuses to run a backend on a cpu it does not target,
   // so a mis-selected Assembly cannot silently execute foreign machine code
   // (the pre-aarch64 failure mode was SIGILL).
