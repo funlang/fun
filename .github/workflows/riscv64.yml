@@ -45,19 +45,13 @@ jobs:
     name: linux-riscv64
     runs-on: ubuntu-24.04
     # FPC main bootstraps the native compiler, the cross compiler and the
-    # libc RTL. A cold run takes 30-50 minutes; the caches make later runs
-    # take the build + qemu suite only.
+    # libc RTL, so a cold run pays the whole toolchain build (30-50 minutes).
+    # The warm path restores the toolchain/sysroot/Zig caches and only
+    # apt-installs qemu-user and the target binutils: the qemu suite itself is
+    # about 90 seconds, and apt used to dominate a green run.
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install build, binutils and qemu dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
-            build-essential fpc libncurses-dev python3 \
-            binutils-riscv64-linux-gnu qemu-user-static curl xz-utils
 
       - name: Resolve the FPC source revision
         id: fpc
@@ -78,6 +72,36 @@ jobs:
         with:
           path: ${{ env.TOOLCHAIN_ROOT }}
           key: riscv-fpc-v1-${{ steps.fpc.outputs.sha }}-${{ hashFiles('src/prj/fun/bootstrap-linux-riscv64.sh') }}
+
+      # The cross build needs qemu-user and the target binutils on every
+      # run; the host FPC and its build tools only matter when the
+      # toolchain cache is cold. GitHub's Ubuntu images already carry
+      # gcc/make/python3, so the warm path installs two packages.
+      # Cached .debs let even a cold apt run skip the download.
+      - name: Cache apt archives
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: apt-archives-${{ runner.os }}-riscv-${{ hashFiles('.github/workflows/riscv64.yml') }}
+
+      - name: Install qemu-user and the riscv64 binutils
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/apt-archives"
+          mkdir -p "$archive"
+          sudo apt-get update -qq -o Acquire::Retries=3
+          sudo apt-get install -y -qq --no-install-recommends \
+            -o Dir::Cache::archives="$archive" \
+            binutils-riscv64-linux-gnu qemu-user-static xz-utils
+
+      - name: Install the host compiler for a cold toolchain
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/apt-archives"
+          sudo apt-get install -y -qq --no-install-recommends \
+            -o Dir::Cache::archives="$archive" \
+            build-essential fpc libncurses-dev python3
 
       - name: Bootstrap the FPC riscv64 cross toolchain
         if: steps.cache-toolchain.outputs.cache-hit != 'true'
