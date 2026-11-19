@@ -124,14 +124,21 @@ jobs:
           chmod +x "$tools/clang"
           ln -sf clang "$tools/aarch64-win64-clang"
           export PATH="$tools:$PATH"
+          export ZIG="$ZIG_ROOT/zig"
 
-          make -C "$src" all OS_TARGET=win64 CPU_TARGET=aarch64 \
-            PP="$boot" -j"$(nproc)" > "$RUNNER_TEMP/fpc-all.log" 2>&1 || {
-              tail -40 "$RUNNER_TEMP/fpc-all.log"; exit 1; }
-          make -C "$src" crossinstall OS_TARGET=win64 CPU_TARGET=aarch64 \
-            PP="$boot" INSTALL_PREFIX="$TOOLCHAIN_ROOT" \
-            > "$RUNNER_TEMP/fpc-install.log" 2>&1 || {
-              tail -40 "$RUNNER_TEMP/fpc-install.log"; exit 1; }
+          if ! make -C "$src" all OS_TARGET=win64 CPU_TARGET=aarch64 \
+                 PP="$boot" -j"$(nproc)" > "$RUNNER_TEMP/fpc-all.log" 2>&1; then
+            echo "::error title=fpc make all::$(grep -E 'Error|Fatal' "$RUNNER_TEMP/fpc-all.log" | tail -5 | tr '\n' '~')"
+            tail -40 "$RUNNER_TEMP/fpc-all.log"
+            exit 1
+          fi
+          if ! make -C "$src" crossinstall OS_TARGET=win64 CPU_TARGET=aarch64 \
+                 PP="$boot" INSTALL_PREFIX="$TOOLCHAIN_ROOT" \
+                 > "$RUNNER_TEMP/fpc-install.log" 2>&1; then
+            echo "::error title=fpc crossinstall::$(grep -E 'Error|Fatal' "$RUNNER_TEMP/fpc-install.log" | tail -5 | tr '\n' '~')"
+            tail -40 "$RUNNER_TEMP/fpc-install.log"
+            exit 1
+          fi
 
       # Save explicitly: actions/cache only saves at job end on success, and a
       # later compile failure should not force a full toolchain rebuild.
