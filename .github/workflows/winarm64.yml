@@ -202,6 +202,31 @@ jobs:
           FUN_WINARM_OUT: ${{ github.workspace }}/fun/funcmd-win-arm64-safe.exe
         run: "./src/prj/fun/make-win-arm64.sh"
 
+      - name: Build a diagnostic hello.exe
+        env:
+          WINARM_FPC_ROOT: ${{ env.TOOLCHAIN_ROOT }}
+          ZIG: ${{ env.ZIG_ROOT }}/zig
+        run: |
+          set -euo pipefail
+          # A bare FPC program separates "the target's RTL is broken" from
+          # "Fun trips a codegen bug". The test job runs it and reports the
+          # exit code in an annotation.
+          tools="$RUNNER_TEMP/winarm-tools"
+          mkdir -p "$tools"
+          cp src/prj/fun/win-arm64/clang "$tools/clang"
+          chmod +x "$tools/clang"
+          ln -sf clang "$tools/aarch64-win64-clang"
+          export PATH="$tools:$PATH"
+          printf "program hello;\nbegin\n  writeln('hello');\nend.\n" \
+            > "$RUNNER_TEMP/hello.pas"
+          mkdir -p "$RUNNER_TEMP/hello-units"
+          "$WINARM_FPC_ROOT/lib/fpc/3.3.1/ppcrossa64" \
+            -n -Twin64 -Paarch64 -XPaarch64-win64- \
+            -Fu"$WINARM_FPC_ROOT/lib/fpc/3.3.1/units/aarch64-win64/*" \
+            -FU"$RUNNER_TEMP/hello-units" -FE"$RUNNER_TEMP" \
+            -o"$RUNNER_TEMP/hello.exe" "$RUNNER_TEMP/hello.pas"
+          ls -l "$RUNNER_TEMP/hello.exe"
+
       - name: Stage the build artifact
         run: |
           set -euo pipefail
@@ -210,6 +235,7 @@ jobs:
           mkdir -p "$stage"
           cp -f fun/funcmd-win-arm64.exe "$stage/funcmd.exe"
           cp -f fun/funcmd-win-arm64-safe.exe "$stage/funcmd-safe.exe"
+          cp -f "$RUNNER_TEMP/hello.exe" "$stage/hello.exe"
           [ -f src/prj/fun/pcre3.dll ] && cp -f src/prj/fun/pcre3.dll "$stage/pcre3.dll"
           label="-dFunPack -dMD5 -dFunTraceback"
           [ -f src/prj/fun/pcre3.dll ] && label="$label -dRegex -dPCRE_WinDLL"
@@ -240,6 +266,16 @@ jobs:
         with:
           name: fun-win-arm64-build
           path: src/prj/fun
+
+      - name: Diagnostic hello.exe
+        shell: pwsh
+        run: |
+          # One annotation decides whether the FPC win64/aarch64 RTL works at
+          # all on this host, independent of the Fun interpreter.
+          $hello = "$env:GITHUB_WORKSPACE\src\prj\fun\hello.exe"
+          $out = & $hello 2>&1
+          Write-Host "::warning title=hello (win-arm64)::exit=$LASTEXITCODE out=[$($out -join '~')]"
+          $global:LASTEXITCODE = 0
 
       - name: Capability probes
         shell: pwsh
