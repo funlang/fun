@@ -162,9 +162,21 @@ jobs:
           src="$PWD/src/3rd/pcre-8"
           out="$PWD/src/prj/fun/pcre3.dll"
           rm -f "$out"
+          # src/3rd is not tracked; fetch the release tarball like the win64 job.
           if [ ! -f "$src/pcre_compile.c" ]; then
-            echo "::warning title=pcre (win-arm64)::missing vendored sources"
-            exit 0
+            tmp="$RUNNER_TEMP/pcre-src"
+            rm -rf "$tmp" "$src"
+            mkdir -p "$tmp"
+            if curl -fsSL --retry 3 --retry-all-errors \
+                 -o "$tmp/pcre.tar.gz" \
+                 https://downloads.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz \
+               && tar xzf "$tmp/pcre.tar.gz" -C "$tmp"; then
+              mkdir -p "$(dirname "$src")"
+              mv "$tmp/pcre-8.45" "$src"
+            else
+              echo "::warning title=pcre (win-arm64)::sources unavailable"
+              exit 0
+            fi
           fi
           # Generic hand-built configuration, same as the win-x64 job.
           cp -f "$src/config.h.generic" "$src/config.h"
@@ -192,7 +204,15 @@ jobs:
           WINARM_FPC_ROOT: ${{ env.TOOLCHAIN_ROOT }}
           ZIG: ${{ env.ZIG_ROOT }}/zig
           FUN_WINARM_OUT: ${{ github.workspace }}/fun/funcmd-win-arm64.exe
-        run: "./src/prj/fun/make-win-arm64.sh"
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/build-funcmd-arm64.log"
+          if ! ./src/prj/fun/make-win-arm64.sh > "$log" 2>&1; then
+            echo "::error title=build (windows-arm64)::$(grep -E 'Fatal:|Error:|error:' "$log" | tail -5 | tr '\n' '~')"
+            tail -40 "$log"
+            exit 1
+          fi
+          tail -3 "$log"
 
       - name: Build funcmd-safe.exe
         env:
@@ -200,7 +220,15 @@ jobs:
           ZIG: ${{ env.ZIG_ROOT }}/zig
           SAFE: strict
           FUN_WINARM_OUT: ${{ github.workspace }}/fun/funcmd-win-arm64-safe.exe
-        run: "./src/prj/fun/make-win-arm64.sh"
+        run: |
+          set -o pipefail
+          log="$RUNNER_TEMP/build-funcmd-arm64-safe.log"
+          if ! ./src/prj/fun/make-win-arm64.sh > "$log" 2>&1; then
+            echo "::error title=safe build (windows-arm64)::$(grep -E 'Fatal:|Error:|error:' "$log" | tail -5 | tr '\n' '~')"
+            tail -40 "$log"
+            exit 1
+          fi
+          tail -3 "$log"
 
       - name: Build a diagnostic hello.exe
         env:
