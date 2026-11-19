@@ -64,6 +64,7 @@ src/prj/fun/darwin/clang        text eol=lf
 src/prj/fun/darwin/ld           text eol=lf
 src/prj/fun/linux-aarch64/as    text eol=lf
 src/prj/fun/linux-aarch64/ld    text eol=lf
+src/prj/fun/win-arm64/clang     text eol=lf
 
 # Editor assets for the notepad-- demo.
 fun/demos/notepad--/notepad--.css       text eol=lf

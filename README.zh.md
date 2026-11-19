@@ -474,7 +474,7 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | ---------------------- | ------------ | ---------------------------------------- | ------------------ |
 | Windows 32 位          | Windows      | `src/prj/fun/make-2006.bat` / `-2009.bat` | Delphi 2006 / 2009 |
 | Windows 64 位          | Windows      | `make-win64.bat`                         | FPC 交叉           |
-| Windows arm64          | Windows arm64 | `src/prj/fun/make-win-arm64.bat`        | FPC 3.3.1 快照     |
+| Windows arm64          | Linux x86_64 | `src/prj/fun/make-win-arm64.sh`         | FPC 3.3.1 交叉 + Zig |
 | Windows CE / ARM       | Windows      | `make-wince.bat`                         | FPC 交叉           |
 | Linux（i386）          | Windows      | `make-linux.bat`                         | FPC 2.4.0 交叉     |
 | Linux / ARM            | Windows      | `make-arm-linux.bat`                     | FPC 交叉           |
@@ -602,11 +602,13 @@ Windows job 还会运行 `build-win64-deps.sh`（x86-64 `libtcc.dll` 与 `zlib.d
 
 `windows-arm64` 由 `.github/workflows/winarm64.yml` 构建，不属于五平台回归门禁：
 它需要 FPC 3.3.1（主线；所钉住的 3.2.2 没有 win64/aarch64 目标）以及 GitHub
-预览版的 `windows-11-arm` runner。该作业原生构建 `funcmd.exe` 与
-`funcmd-safe.exe`，运行 Windows 便携子集，并上传 `fun-stage-win-arm64`，供
-nightly 预发布附带；正式版不会包含它。能构建出 arm64 `pcre3.dll` 时会启用
-regex；运行时 C（libtcc）、getapi/FFI 与 zlib 暂未支持该目标，`lib-asm` 也
-没有 Windows arm64 后端。
+预览版的 `windows-11-arm` runner。FPC 原生的 win64/aarch64 编译器目前在真机上
+会崩溃，因此作业在 Linux 上用 `src/prj/fun/make-win-arm64.sh` 交叉构建
+`funcmd.exe` 与 `funcmd-safe.exe`（经 Zig 的 clang 汇编），再到
+`windows-11-arm` 上原生运行 Windows 便携子集。产物上传为
+`fun-stage-win-arm64`，供 nightly 预发布附带；正式版不会包含它。能构建出 arm64
+`pcre3.dll` 时会启用 regex；运行时 C（libtcc）、getapi/FFI 与 zlib 暂未支持
+该目标，`lib-asm` 也没有 Windows arm64 后端。
 
 需要运行不受信任的脚本时，可以单独编译安全构建：
 

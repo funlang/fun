@@ -1,0 +1,25 @@
+#!/bin/bash
+# ============================================================
+# clang -- assembler driver shim for FPC's win64/aarch64 target.
+#
+# FPC's aarch64-win64 backend emits GNU assembly and invokes
+# <target>-clang (aarch64-win64-clang) rather than an internal assembler.
+# Zig's bundled clang accepts those flags, but spells the target
+# aarch64-windows-gnu and rejects FPC's -march=armv8-a, whose baseline its
+# assembler already assumes. Translate both here.
+#
+# Sourced by PATH lookups only; make-win-arm64.sh installs this file under
+# both `clang` and `aarch64-win64-clang` in a private tools directory.
+# ============================================================
+set -e
+ZIG="${ZIG:?set ZIG to the zig binary}"
+
+args=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -target)               args+=(-target aarch64-windows-gnu); shift 2 ;;
+    -march=*|-mcpu=*)      shift ;;
+    *)                     args+=("$1"); shift ;;
+  esac
+done
+exec "$ZIG" cc "${args[@]}"

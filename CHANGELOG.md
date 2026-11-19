@@ -7,13 +7,14 @@ This project records notable changes in the style of [Keep a Changelog](https://
 ## [Unreleased]
 
 - Windows arm64 is now a prerelease-only target. FPC 3.3.1 (trunk) is the
-  first compiler with the win64/aarch64 target, so `winarm64.yml` runs
-  natively on GitHub's preview `windows-11-arm` runner, builds `funcmd.exe`
-  and `funcmd-safe.exe` with `src/prj/fun/make-win-arm64.bat`, runs the
-  portable Windows suite, and uploads `fun-stage-win-arm64`. Nightly
-  prereleases attach it; stable releases never include it. Regex is enabled
-  when the job can build an arm64 `pcre3.dll`; libtcc, getapi/FFI, zlib and
-  `lib-asm` are not available for this target yet.
+  first compiler with the win64/aarch64 target; its native binaries currently
+  crash on real arm64 Windows, so `winarm64.yml` cross-builds `funcmd.exe` and
+  `funcmd-safe.exe` on Linux with `src/prj/fun/make-win-arm64.sh`, runs the
+  portable Windows suite natively on GitHub's preview `windows-11-arm`
+  runner, and uploads `fun-stage-win-arm64`. Nightly prereleases attach it;
+  stable releases never include it. Regex is enabled when the job can build an
+  arm64 `pcre3.dll`; libtcc, getapi/FFI, zlib and `lib-asm` are not available
+  for this target yet.
 
 - Linux riscv64 is now a prerelease-only target. `riscv64.yml` cross-builds
   the full musl interpreter on pushes to main, `run-riscv64-qemu.sh` runs the

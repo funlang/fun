@@ -3,14 +3,16 @@
 #
 # Windows arm64 is a prerelease target. FPC 3.2.2, the toolchain pinned for the
 # five stable platforms, has no win64/aarch64 target; FPC 3.3.1 (the trunk
-# line) is the first compiler that does. GitHub's windows-11-arm host is a
-# public preview. That is why regression.yml still keeps its windows-arm64 slot
+# line) is the first compiler that does, and GitHub's windows-11-arm host is a
+# public preview. That is why regression.yml keeps its windows-arm64 slot
 # disabled and this workflow lives on its own.
 #
-# The job runs natively on windows-11-arm: the FPC snapshot is a native
-# aarch64-win64 installation, so it builds funcmd.exe and runs the Windows
-# regression suite on the same runner. No cross compiler or emulation is
-# involved.
+# Two jobs, because the target has no usable native compiler yet: the FPC
+# snapshot's own fpc.exe/ppca64.exe crash with an access violation on real
+# Windows arm64 hardware, while the same source cross-compiles correctly on
+# Linux. So `build` produces funcmd.exe on ubuntu-24.04 with an FPC 3.3.1
+# cross compiler (assembled through Zig's clang, like LoongArch/riscv64), and
+# `test` runs the portable Windows suite natively on windows-11-arm.
 #
 # This workflow is deliberately separate from regression.yml: a broken FPC
 # trunk snapshot or a missing preview runner must not block the five-platform
@@ -20,12 +22,6 @@
 #
 # The resulting stage (fun-stage-win-arm64) is attached to nightly prereleases
 # by release.yml. Stable releases never include it.
-#
-# Provenance: the FPC snapshot is fetched from the trunk snapshot directory,
-# which only serves the current build. The cache key pins the copy a run uses;
-# bump FPC_SNAPSHOT_KEY when the compiler needs refreshing, and record the
-# compiler version printed by the sanity step. funcmd itself is built from the
-# commit under test, exactly like every other stage.
 # ============================================================
 name: winarm64
 
@@ -42,190 +38,194 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  FPC_SNAPSHOT_KEY: fpc-3.3.1-aarch64-win64-snapshot-20261119
-  FPC_SNAPSHOT_URL: https://downloads.freepascal.org/fpc/snapshot/trunk/aarch64-win64/fpc-3.3.1.aarch64-win64.built.on.x86_64-linux.tar.gz
-  FPC_ROOT: C:\FPC\aarch64-win64
+  # FPC main is the branch with the win64/aarch64 backend. Pin the snapshot
+  # validated with Zig 0.13; bump it deliberately after a green run.
+  FPC_REF: 6c67b89328feca1cdfb9c63c23ed3f12976b071d
+  ZIG_VERSION: 0.13.0
+  TOOLCHAIN_ROOT: ${{ github.workspace }}/.winarm/fpc
+  ZIG_ROOT: ${{ github.workspace }}/.winarm/zig
 
 jobs:
-  win-arm64:
-    name: windows-arm64
-    runs-on: windows-11-arm
-    # A cold run downloads and unpacks the 125 MB FPC snapshot, builds the
-    # interpreter twice (normal + safe) and runs the portable suite.
-    timeout-minutes: 60
+  # --------------------------------------------------------------- BUILD ---
+  build:
+    name: build-win-arm64
+    runs-on: ubuntu-24.04
+    # Cold builds bootstrap the FPC cross compiler and its packages; warm runs
+    # restore the toolchain cache (about 360 MB) and only compile funcmd.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache the FPC aarch64-win64 snapshot
-        id: cache-fpc
+      - name: Resolve the FPC source revision
+        id: fpc
+        run: |
+          set -euo pipefail
+          if printf '%s' "$FPC_REF" | grep -Eq '^[0-9a-f]{40}$'; then
+            sha="$FPC_REF"
+          else
+            sha=$(git ls-remote https://github.com/fpc/FPCSource.git "refs/heads/$FPC_REF" | cut -f1)
+          fi
+          [ -n "$sha" ] || { echo "::error::cannot resolve FPC $FPC_REF"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "FPC $FPC_REF = $sha"
+
+      - name: Cache the win64/aarch64 FPC cross toolchain
+        id: cache-toolchain
         uses: actions/cache@v4
         with:
-          path: C:\FPC\aarch64-win64
-          key: ${{ env.FPC_SNAPSHOT_KEY }}
+          path: ${{ env.TOOLCHAIN_ROOT }}
+          key: winarm-fpc-v1-${{ steps.fpc.outputs.sha }}
 
-      - name: Install FPC 3.3.1 (win64/aarch64)
-        if: steps.cache-fpc.outputs.cache-hit != 'true'
-        shell: pwsh
+      - name: Cache Zig (assembler driver)
+        id: cache-zig
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.ZIG_ROOT }}
+          key: zig-${{ env.ZIG_VERSION }}-linux-x86_64
+
+      - name: Install the host compiler for a cold toolchain
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
         run: |
-          # The archive is a complete target installation: bin\aarch64-win64\
-          # fpc.exe (native arm64), ppca64.exe and the units. No installer.
-          $ErrorActionPreference = 'Stop'
-          $tar = Join-Path $env:RUNNER_TEMP 'fpc-aarch64-win64.tar.gz'
-          curl.exe -fsSL --retry 3 --retry-all-errors -o $tar $env:FPC_SNAPSHOT_URL
-          if ($LASTEXITCODE -ne 0) { throw "FPC snapshot download failed ($LASTEXITCODE)" }
-          $root = $env:FPC_ROOT
-          Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
-          New-Item -ItemType Directory -Force -Path $root | Out-Null
-          tar.exe -xf $tar -C $root
-          if ($LASTEXITCODE -ne 0) { throw "tar failed ($LASTEXITCODE)" }
-          Write-Host "installed $root"
+          set -euo pipefail
+          sudo apt-get update -qq -o Acquire::Retries=3
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential fpc libncurses-dev python3
+
+      - name: Install Zig
+        if: steps.cache-zig.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "$ZIG_ROOT"
+          curl -fsSL "https://ziglang.org/download/$ZIG_VERSION/zig-linux-x86_64-$ZIG_VERSION.tar.xz" \
+            -o "$RUNNER_TEMP/zig.tar.xz"
+          tar xJf "$RUNNER_TEMP/zig.tar.xz" -C "$ZIG_ROOT" --strip-components=1
+
+      - name: Bootstrap the FPC win64/aarch64 cross toolchain
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        env:
+          FPC_SHA: ${{ steps.fpc.outputs.sha }}
+        run: |
+          set -euo pipefail
+          src="$RUNNER_TEMP/fpc-src"
+          rm -rf "$src"
+          git init -q "$src"
+          git -C "$src" remote add origin https://github.com/fpc/FPCSource.git
+          git -C "$src" fetch --depth 1 origin "$FPC_SHA"
+          git -C "$src" checkout -q FETCH_HEAD
+
+          boot=$(command -v ppcx64 || find /usr/lib/fpc -type f -name ppcx64 | head -n 1)
+          [ -n "$boot" ] || { echo "::error::no boot ppcx64 (install fpc)"; exit 1; }
+
+          # The aarch64-win64 backend assembles through <target>-clang. The
+          # checked-in shim maps that to Zig's clang.
+          tools="$RUNNER_TEMP/winarm-tools"
+          mkdir -p "$tools"
+          cp src/prj/fun/win-arm64/clang "$tools/clang"
+          chmod +x "$tools/clang"
+          ln -sf clang "$tools/aarch64-win64-clang"
+          export PATH="$tools:$PATH"
+
+          make -C "$src" all OS_TARGET=win64 CPU_TARGET=aarch64 \
+            PP="$boot" -j"$(nproc)" > "$RUNNER_TEMP/fpc-all.log" 2>&1 || {
+              tail -40 "$RUNNER_TEMP/fpc-all.log"; exit 1; }
+          make -C "$src" crossinstall OS_TARGET=win64 CPU_TARGET=aarch64 \
+            PP="$boot" INSTALL_PREFIX="$TOOLCHAIN_ROOT" \
+            > "$RUNNER_TEMP/fpc-install.log" 2>&1 || {
+              tail -40 "$RUNNER_TEMP/fpc-install.log"; exit 1; }
 
       # Save explicitly: actions/cache only saves at job end on success, and a
-      # later regression failure should not force the next run to download the
-      # 125 MB snapshot again.
-      - name: Save the FPC aarch64-win64 snapshot
-        if: steps.cache-fpc.outputs.cache-hit != 'true'
+      # later compile failure should not force a full toolchain rebuild.
+      - name: Save the FPC cross toolchain
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: C:\FPC\aarch64-win64
-          key: ${{ env.FPC_SNAPSHOT_KEY }}
+          path: ${{ env.TOOLCHAIN_ROOT }}
+          key: winarm-fpc-v1-${{ steps.fpc.outputs.sha }}
 
-      - name: Verify the compiler
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Continue'
-          $fpc = "$env:FPC_ROOT\bin\aarch64-win64\fpc.exe"
-          $pp  = "$env:FPC_ROOT\bin\aarch64-win64\ppca64.exe"
-          Write-Host "looking for $fpc"
-          Get-ChildItem $env:FPC_ROOT | ForEach-Object { Write-Host "root: $($_.Name)" }
-          if (-not (Test-Path $fpc)) { throw "missing $fpc" }
-          if (-not (Test-Path "$env:FPC_ROOT\units\aarch64-win64\rtl\system.ppu")) {
-            throw "missing aarch64-win64 RTL units"
-          }
-          Write-Host "sizes: fpc=$((Get-Item $fpc).Length) ppca64=$((Get-Item $pp -ErrorAction SilentlyContinue).Length)"
-
-          # Run through cmd.exe as well as PowerShell's call operator: if the
-          # image lacks a dependency or blocks the exe, the two differ.
-          $cmdOut = cmd.exe /c "`"$fpc`" -iV 2>&1"
-          Write-Host "::warning title=verify cmd::exit=$LASTEXITCODE out=[$cmdOut]"
-          $ppOut = cmd.exe /c "`"$pp`" -iV 2>&1"
-          Write-Host "::warning title=verify pp::exit=$LASTEXITCODE out=[$ppOut]"
-
-          # -iVDW includes the git revision of the snapshot, so the log records
-          # exactly which trunk build produced this stage.
-          $v = ((& $fpc -iV 2>&1) | Out-String).Trim()
-          $full = ((& $fpc -iVDW 2>&1) | Out-String).Trim()
-          $tp = ((& $fpc -iTP 2>&1) | Out-String).Trim()
-          $to = ((& $fpc -iTO 2>&1) | Out-String).Trim()
-          # These queries are the first thing that can fail on a new preview
-          # runner; put the raw values in annotations because job logs need a
-          # signed-in viewer.
-          Write-Host "::warning title=verify fpc::amp-exit=$LASTEXITCODE version=[$v] build=[$full] cpu=[$tp] os=[$to]"
-          if ($v -notmatch '^3\.3\.') { throw "expected FPC 3.3.x, got '$v'" }
-          if ($tp.ToLowerInvariant() -ne 'aarch64' -or $to.ToLowerInvariant() -ne 'win64') {
-            throw "unexpected target '$tp-$to'"
-          }
-          "FUN_FPC_VERSION=$full" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-
-      # PCRE 8 is not vendored as a DLL and MSYS2 is unavailable on this image,
-      # so build pcre3.dll with the image's Visual Studio ARM64 tools. This is
-      # best effort, exactly like the win64 job: without the DLL the build
-      # drops -dRegex and the runner reports the regex tests as SKIP.
       - name: Build pcre3.dll for win-arm64 (regex, best effort)
-        shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          try {
-            $src = Join-Path $env:GITHUB_WORKSPACE 'src\3rd\pcre-8'
-            if (-not (Test-Path (Join-Path $src 'pcre_compile.c'))) {
-              throw "missing vendored PCRE 8 sources at $src"
-            }
-            Copy-Item (Join-Path $src 'config.h.generic') (Join-Path $src 'config.h') -Force
-            Copy-Item (Join-Path $src 'pcre.h.generic') (Join-Path $src 'pcre.h') -Force
-            Copy-Item (Join-Path $src 'pcre_chartables.c.dist') (Join-Path $src 'pcre_chartables.c') -Force
-
-            $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-            if (-not (Test-Path $vswhere)) { throw 'vswhere.exe not found' }
-            $vs = & $vswhere -latest -products * -property installationPath
-            if (-not $vs) { throw 'Visual Studio not found' }
-            $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvarsall.bat'
-            if (-not (Test-Path $vcvars)) { throw "missing $vcvars" }
-
-            $dll = Join-Path (Join-Path $env:GITHUB_WORKSPACE 'src\prj\fun') 'pcre3.dll'
-            $units = 'pcre_byte_order','pcre_chartables','pcre_compile','pcre_config',
-                     'pcre_dfa_exec','pcre_exec','pcre_fullinfo','pcre_get','pcre_globals',
-                     'pcre_maketables','pcre_newline','pcre_ord2utf8','pcre_refcount',
-                     'pcre_string_utils','pcre_study','pcre_tables','pcre_ucd',
-                     'pcre_valid_utf8','pcre_version','pcre_xclass'
-            $sources = ($units | ForEach-Object { "`"$(Join-Path $src "$_.c")`"" }) -join ' '
-            $bat = Join-Path $env:RUNNER_TEMP 'build-pcre-arm64.bat'
-            # A PowerShell here-string cannot close at column 0 inside a YAML
-            # block scalar, so assemble the batch file line by line.
-            $batText = @(
-              '@echo off',
-              ('call "{0}" arm64 || exit /b 1' -f $vcvars),
-              ('cd /d "{0}"' -f $src),
-              ('cl /nologo /O2 /LD /D_CRT_SECURE_NO_WARNINGS /DHAVE_CONFIG_H /DSUPPORT_PCRE8 /I"{0}" {1} /Fe"{2}" /link /MACHINE:ARM64 || exit /b 1' -f $src, $sources, $dll)
-            ) -join "`r`n"
-            $batText | Out-File -FilePath $bat -Encoding ascii
-            cmd /c "`"$bat`"" 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP\pcre-winarm64.log"
-            if ($LASTEXITCODE -ne 0) { throw "cl failed ($LASTEXITCODE)" }
-            if (-not (Test-Path $dll)) { throw "cl produced no $dll" }
-            Write-Host "::warning title=pcre (win-arm64) ok::pcre3.dll=$((Get-Item $dll).Length) bytes"
-          } catch {
-            Write-Host "::warning title=pcre (win-arm64)::$($_.Exception.Message)"
-            Remove-Item 'src\prj\fun\pcre3.dll' -Force -ErrorAction SilentlyContinue
-          }
-          $global:LASTEXITCODE = 0
+          set -uo pipefail
+          src="$PWD/src/3rd/pcre-8"
+          out="$PWD/src/prj/fun/pcre3.dll"
+          rm -f "$out"
+          if [ ! -f "$src/pcre_compile.c" ]; then
+            echo "::warning title=pcre (win-arm64)::missing vendored sources"
+            exit 0
+          fi
+          # Generic hand-built configuration, same as the win-x64 job.
+          cp -f "$src/config.h.generic" "$src/config.h"
+          cp -f "$src/pcre.h.generic" "$src/pcre.h"
+          cp -f "$src/pcre_chartables.c.dist" "$src/pcre_chartables.c"
+          units='pcre_byte_order pcre_chartables pcre_compile pcre_config
+                 pcre_dfa_exec pcre_exec pcre_fullinfo pcre_get pcre_globals
+                 pcre_maketables pcre_newline pcre_ord2utf8 pcre_refcount
+                 pcre_string_utils pcre_study pcre_tables pcre_ucd
+                 pcre_valid_utf8 pcre_version pcre_xclass'
+          sources=""
+          for u in $units; do sources="$sources $src/$u.c"; done
+          # shellcheck disable=SC2086
+          if "$ZIG_ROOT/zig" cc -target aarch64-windows-gnu -O2 -shared \
+               -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -I"$src" $sources -o "$out" \
+               > "$RUNNER_TEMP/pcre.log" 2>&1; then
+            echo "::warning title=pcre (win-arm64) ok::pcre3.dll=$(stat -c %s "$out") bytes"
+          else
+            rm -f "$out"
+            echo "::warning title=pcre (win-arm64)::$(tail -3 "$RUNNER_TEMP/pcre.log" | tr '\n' ' ')"
+          fi
 
       - name: Build funcmd.exe
-        shell: pwsh
-        run: |
-          $env:FPC_ARM64 = $env:FPC_ROOT
-          $log = "$env:RUNNER_TEMP\build-windows-arm64.log"
-          cmd /c "src\prj\fun\make-win-arm64.bat" 2>&1 | Tee-Object -FilePath $log
-          if ($LASTEXITCODE -ne 0) {
-            $errs = (Get-Content $log |
-                       Select-String -Pattern 'Fatal:|Error:' |
-                       Select-Object -Last 10 |
-                       ForEach-Object { $_.Line }) -join ' | '
-            if ([string]::IsNullOrEmpty($errs)) { $errs = "fpc exited $LASTEXITCODE" }
-            Write-Host "::error title=build (windows-arm64)::$($errs.Substring(0, [Math]::Min(900, $errs.Length)))"
-            exit 1
-          }
-          if (-not (Test-Path 'src\prj\fun\funcmd.exe')) {
-            Write-Host "::error title=build (windows-arm64)::funcmd.exe is missing"
-            exit 1
-          }
-          $label = @('-dFunPack', '-dMD5', '-dFunTraceback')
-          if (Test-Path 'src\prj\fun\pcre3.dll') { $label += @('-dRegex', '-dPCRE_WinDLL') }
-          if (Test-Path 'src\prj\fun\ffi.dll')  { $label += @('-dWinFFI') }
-          $label = $label -join ' '
-          Write-Host "::warning title=build (windows-arm64) flags::[$label]"
-          "FUN_WIN_BUILD_LABEL=$label" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          $label | Out-File -FilePath 'src\prj\fun\funcmd.flags.txt' -Encoding ascii
+        env:
+          WINARM_FPC_ROOT: ${{ env.TOOLCHAIN_ROOT }}
+          ZIG: ${{ env.ZIG_ROOT }}/zig
+          FUN_WINARM_OUT: ${{ github.workspace }}/fun/funcmd-win-arm64.exe
+        run: "./src/prj/fun/make-win-arm64.sh"
 
       - name: Build funcmd-safe.exe
-        if: success()
-        shell: pwsh
+        env:
+          WINARM_FPC_ROOT: ${{ env.TOOLCHAIN_ROOT }}
+          ZIG: ${{ env.ZIG_ROOT }}/zig
+          SAFE: strict
+          FUN_WINARM_OUT: ${{ github.workspace }}/fun/funcmd-win-arm64-safe.exe
+        run: "./src/prj/fun/make-win-arm64.sh"
+
+      - name: Stage the build artifact
         run: |
-          $env:FPC_ARM64 = $env:FPC_ROOT
-          $env:SAFE = 'strict'
-          $log = "$env:RUNNER_TEMP\build-windows-arm64-safe.log"
-          cmd /c "src\prj\fun\make-win-arm64.bat" 2>&1 | Tee-Object -FilePath $log
-          if ($LASTEXITCODE -ne 0) {
-            $errs = (Get-Content $log |
-                       Select-String -Pattern 'Fatal:|Error:' |
-                       Select-Object -Last 10 |
-                       ForEach-Object { $_.Line }) -join ' | '
-            if ([string]::IsNullOrEmpty($errs)) { $errs = "fpc exited $LASTEXITCODE" }
-            Write-Host "::error title=safe build (windows-arm64)::$($errs.Substring(0, [Math]::Min(900, $errs.Length)))"
-            exit 1
-          }
-          if (-not (Test-Path 'src\prj\fun\funcmd-safe.exe')) {
-            Write-Host "::error title=safe build (windows-arm64)::funcmd-safe.exe is missing"
-            exit 1
-          }
+          set -euo pipefail
+          stage="$RUNNER_TEMP/build-stage"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          cp -f fun/funcmd-win-arm64.exe "$stage/funcmd.exe"
+          cp -f fun/funcmd-win-arm64-safe.exe "$stage/funcmd-safe.exe"
+          [ -f src/prj/fun/pcre3.dll ] && cp -f src/prj/fun/pcre3.dll "$stage/pcre3.dll"
+          label="-dFunPack -dMD5 -dFunTraceback"
+          [ -f src/prj/fun/pcre3.dll ] && label="$label -dRegex -dPCRE_WinDLL"
+          printf '%s\n' "$label" > "$stage/funcmd.flags.txt"
+          echo "::warning title=build (windows-arm64) flags::[$label]"
+          ls -l "$stage"
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: fun-win-arm64-build
+          path: ${{ runner.temp }}/build-stage/
+          retention-days: 7
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------- TEST ---
+  test:
+    name: windows-arm64
+    needs: build
+    runs-on: windows-11-arm
+    # The build is native; only the portable suite and two probes run here.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the build
+        uses: actions/download-artifact@v4
+        with:
+          name: fun-win-arm64-build
+          path: src/prj/fun
 
       - name: Capability probes
         shell: pwsh
@@ -310,18 +310,16 @@ jobs:
           $stage = "$env:GITHUB_WORKSPACE\dist-stage"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item 'src\prj\fun\funcmd.exe' $stage -Force
-          if (Test-Path 'src\prj\fun\funcmd-safe.exe') {
-            Copy-Item 'src\prj\fun\funcmd-safe.exe' $stage -Force
-          }
-          # Only arm64 DLLs that the build could actually import. tcc and ffi
-          # are not cross-built for this target yet.
-          foreach ($dll in @('pcre3.dll')) {
-            if (Test-Path "src\prj\fun\$dll") { Copy-Item "src\prj\fun\$dll" $stage -Force }
+          Copy-Item 'src\prj\fun\funcmd-safe.exe' $stage -Force
+          # Only arm64 DLLs the build produced. tcc and ffi are not cross-built
+          # for this target yet.
+          if (Test-Path 'src\prj\fun\pcre3.dll') {
+            Copy-Item 'src\prj\fun\pcre3.dll' $stage -Force
           }
 
           $label = if (Test-Path 'src\prj\fun\funcmd.flags.txt') {
             (Get-Content 'src\prj\fun\funcmd.flags.txt' -Raw).Trim()
-          } else { [string]$env:FUN_WIN_BUILD_LABEL }
+          } else { '-dFunPack -dMD5 -dFunTraceback' }
           $caps = [ordered]@{
             platform       = 'win-arm64'
             commit_sha     = $env:GITHUB_SHA
