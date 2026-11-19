@@ -6,15 +6,15 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
-- Windows arm64 is now a prerelease-only target. FPC 3.3.1 (trunk) is the
-  first compiler with the win64/aarch64 target; its native binaries currently
-  crash on real arm64 Windows, so `winarm64.yml` cross-builds `funcmd.exe` and
-  `funcmd-safe.exe` on Linux with `src/prj/fun/make-win-arm64.sh`, runs the
-  portable Windows suite natively on GitHub's preview `windows-11-arm`
-  runner, and uploads `fun-stage-win-arm64`. Nightly prereleases attach it;
-  stable releases never include it. Regex is enabled when the job can build an
-  arm64 `pcre3.dll`; libtcc, getapi/FFI, zlib and `lib-asm` are not available
-  for this target yet.
+- Windows arm64 is **not a release target yet**. FPC 3.2.2 has no
+  win64/aarch64 target; FPC 3.3.1 (trunk), which does, currently produces
+  binaries that crash with `0xC0000005` on real ARM64 Windows, including its
+  own compiler. A bare `writeln('hello')` at `-O-`, `-O1` and `-O2` reproduces
+  it (upstream #42048/#42091), so the fault is in FPC, not in Fun. Added
+  `src/prj/fun/make-win-arm64.sh` and `src/prj/fun/win-arm64/clang`, plus a
+  manual `winarm64.yml` bring-up harness that cross-builds on Linux, tests on
+  `windows-11-arm`, and publishes nothing. Nightly releases do not include a
+  win-arm64 asset.
 
 - Linux riscv64 is now a prerelease-only target. `riscv64.yml` cross-builds
   the full musl interpreter on pushes to main, `run-riscv64-qemu.sh` runs the

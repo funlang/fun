@@ -1,33 +1,24 @@
 # ============================================================
-# winarm64.yml -- build and test the Windows on arm64 interpreter.
+# winarm64.yml -- manual bring-up harness for Windows on arm64.
 #
-# Windows arm64 is a prerelease target. FPC 3.2.2, the toolchain pinned for the
-# five stable platforms, has no win64/aarch64 target; FPC 3.3.1 (the trunk
-# line) is the first compiler that does, and GitHub's windows-11-arm host is a
-# public preview. That is why regression.yml keeps its windows-arm64 slot
-# disabled and this workflow lives on its own.
+# NOT a release target. FPC 3.2.2 has no win64/aarch64 target, and while FPC
+# 3.3.1 (trunk) does, every binary it produces -- its own compiler included --
+# crashes with 0xC0000005 on real Windows arm64 hardware. The epilogue fix for
+# upstream #42091 is applied below, but a bare `writeln('hello')` compiled with
+# -O-, -O1 and -O2 still crashes, so the remaining fault is in FPC's RTL or
+# codegen (upstream #42048 and friends), not in Fun.
 #
-# Two jobs, because the target has no usable native compiler yet: the FPC
-# snapshot's own fpc.exe/ppca64.exe crash with an access violation on real
-# Windows arm64 hardware, while the same source cross-compiles correctly on
-# Linux. So `build` produces funcmd.exe on ubuntu-24.04 with an FPC 3.3.1
-# cross compiler (assembled through Zig's clang, like LoongArch/riscv64), and
-# `test` runs the portable Windows suite natively on windows-11-arm.
+# This workflow therefore runs on manual dispatch only and uploads no release
+# stage. It keeps the cross-build path (FPC source on ubuntu-24.04, assembled
+# through Zig's clang) and the native windows-11-arm test job ready so the
+# target can be re-validated when FPC fixes the backend. Once it goes green,
+# re-add the push trigger and the release.yml stage download.
 #
-# This workflow is deliberately separate from regression.yml: a broken FPC
-# trunk snapshot or a missing preview runner must not block the five-platform
-# stable gate. It runs on every push to main (including docs-only commits) so
-# the exact SHA the nightly publishes always has a matching stage, and on
-# manual dispatch for bring-up.
-#
-# The resulting stage (fun-stage-win-arm64) is attached to nightly prereleases
-# by release.yml. Stable releases never include it.
+# See `make-win-arm64.sh` and `win-arm64/clang` for the build itself.
 # ============================================================
 name: winarm64
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -171,20 +162,6 @@ jobs:
           fi
           tail -3 "$log"
 
-      - name: Build funcmd optimization variants
-        env:
-          WINARM_FPC_ROOT: ${{ env.TOOLCHAIN_ROOT }}
-          ZIG: ${{ env.ZIG_ROOT }}/zig
-        run: |
-          set -euo pipefail
-          for pair in "O0:-O-" "O1:-O1"; do
-            tag="${pair%%:*}"
-            opt="${pair#*:}"
-            echo "building funcmd-$tag with $opt"
-            FUN_OPT="$opt" FUN_WINARM_OUT="$PWD/fun/funcmd-win-arm64-$tag.exe" \
-              ./src/prj/fun/make-win-arm64.sh
-          done
-
       - name: Build funcmd-safe.exe
         env:
           WINARM_FPC_ROOT: ${{ env.TOOLCHAIN_ROOT }}
@@ -237,8 +214,6 @@ jobs:
           rm -rf "$stage"
           mkdir -p "$stage"
           cp -f fun/funcmd-win-arm64.exe "$stage/funcmd.exe"
-          cp -f fun/funcmd-win-arm64-O0.exe "$stage/funcmd-O0.exe"
-          cp -f fun/funcmd-win-arm64-O1.exe "$stage/funcmd-O1.exe"
           cp -f fun/funcmd-win-arm64-safe.exe "$stage/funcmd-safe.exe"
           cp -f "$RUNNER_TEMP"/hello-O*.exe "$stage/"
           label="-dFunPack -dMD5 -dFunTraceback -dFunNoRes -O2"
@@ -283,10 +258,8 @@ jobs:
             $out = & "$dir\$v" 2>&1
             Write-Host "::warning title=matrix $v::exit=$LASTEXITCODE out=[$($out -join '~')]"
           }
-          foreach ($v in @('funcmd-O0.exe','funcmd-O1.exe','funcmd.exe')) {
-            $out = & "$dir\$v" $script 2>&1
-            Write-Host "::warning title=matrix $v::exit=$LASTEXITCODE out=[$($out -join '~')]"
-          }
+          $out = & "$dir\funcmd.exe" $script 2>&1
+          Write-Host "::warning title=matrix funcmd.exe::exit=$LASTEXITCODE out=[$($out -join '~')]"
           $global:LASTEXITCODE = 0
 
       - name: Capability probes
@@ -362,60 +335,3 @@ jobs:
             Write-Host "::error title=safe regression (windows-arm64)::$fails"
             exit $LASTEXITCODE
           }
-
-      # Same contract as the other platforms: only a green main run produces a
-      # release stage, and release.yml downloads it instead of rebuilding.
-      - name: Stage release build
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: |
-          $stage = "$env:GITHUB_WORKSPACE\dist-stage"
-          New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          Copy-Item 'src\prj\fun\funcmd.exe' $stage -Force
-          Copy-Item 'src\prj\fun\funcmd-safe.exe' $stage -Force
-          # Only arm64 DLLs the build produced. tcc and ffi are not cross-built
-          # for this target yet.
-          if (Test-Path 'src\prj\fun\pcre3.dll') {
-            Copy-Item 'src\prj\fun\pcre3.dll' $stage -Force
-          }
-
-          $label = if (Test-Path 'src\prj\fun\funcmd.flags.txt') {
-            (Get-Content 'src\prj\fun\funcmd.flags.txt' -Raw).Trim()
-          } else { '-dFunPack -dMD5 -dFunTraceback' }
-          $caps = [ordered]@{
-            platform       = 'win-arm64'
-            commit_sha     = $env:GITHUB_SHA
-            tag            = ''
-            build_flags    = @($label -split '\s+' | Where-Object { $_ })
-            regex          = ($label -match 'dRegex')
-            ffi            = ($label -match 'dWinFFI')
-            tcc            = $false
-            # The lib-asm machine-code backends are x86-64 and riscv64; there
-            # is no Windows arm64 code generator yet.
-            asm            = $false
-            safe           = (Test-Path 'src\prj\fun\funcmd-safe.exe')
-            safe_level     = 'strict'
-            libtcc_present = $false
-            zlib_present   = $false
-            notes          = ''
-          }
-          $missing = @()
-          if (-not $caps.regex) { $missing += 'regex unavailable (pcre3.dll not built)' }
-          if (-not $caps.ffi) { $missing += 'getapi/FFI unavailable (no arm64 ffi.dll)' }
-          $missing += 'runtime C unavailable (libtcc has no win-arm64 build)'
-          $missing += 'zlib unavailable (not built for win-arm64)'
-          $missing += 'lib-asm has no win-arm64 backend'
-          $caps.notes = ($missing -join '; ')
-          Write-Host "::warning title=win-arm64 stage::safe=$($caps.safe) regex=$($caps.regex) ffi=$($caps.ffi)"
-          ($caps | ConvertTo-Json -Depth 5) |
-            Out-File -FilePath "$stage\build-env.json" -Encoding utf8
-          Get-ChildItem $stage | ForEach-Object { Write-Host "staged: $($_.Name)" }
-
-      - name: Upload release stage
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: fun-stage-win-arm64
-          path: dist-stage/
-          retention-days: 90
-          if-no-files-found: error

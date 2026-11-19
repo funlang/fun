@@ -91,13 +91,17 @@ time-gated.
   after the day's first nightly.
 - Every nightly is a GitHub **prerelease**, so `releases/latest` keeps
   pointing at the stable release. Only the newest 14 nightlies are kept.
-- LoongArch64, riscv64 and Windows arm64 are **prerelease-only** targets.
-  `.github/workflows/loongarch.yml`, `.github/workflows/riscv64.yml` and
-  `.github/workflows/winarm64.yml` build them on pushes to main and upload
-  `fun-stage-linux-loongarch64`, `fun-stage-linux-riscv64` and
-  `fun-stage-win-arm64`; the nightly packager attaches each asset when the run
-  for the same commit succeeded, and otherwise publishes the night without it.
-  Stable packages never download these stages.
+- LoongArch64 and riscv64 are **prerelease-only** targets.
+  `.github/workflows/loongarch.yml` and `.github/workflows/riscv64.yml`
+  cross-build them on pushes to main and upload `fun-stage-linux-loongarch64`
+  and `fun-stage-linux-riscv64`; the nightly packager attaches each asset when
+  the run for the same commit succeeded, and otherwise publishes the night
+  without it. Stable packages never download either stage.
+
+  Windows arm64 is **not** a release target yet: FPC's win64/aarch64 backend
+  still produces binaries that crash at startup on real ARM64 Windows
+  (upstream #42048/#42091). `.github/workflows/winarm64.yml` is a manual
+  bring-up harness only and does not upload a stage.
 
 Manual runs: Actions -> **release** -> Run workflow. Choose `nightly` and tick
 `force` to publish the current commit even when it has no new code changes.

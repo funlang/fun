@@ -498,7 +498,7 @@ Each script is `<toolchain>-<target>`; the **build machine** is where it runs, w
 | ----------------------- | ------------- | ----------------------------------------- | ------------------ |
 | Windows 32-bit          | Windows       | `src/prj/fun/make-2006.bat` / `-2009.bat` | Delphi 2006 / 2009 |
 | Windows 64-bit          | Windows       | `make-win64.bat`                          | FPC cross          |
-| Windows arm64           | Linux x86_64  | `src/prj/fun/make-win-arm64.sh`           | FPC 3.3.1 cross + Zig |
+| Windows arm64 (bring-up) | Linux x86_64  | `src/prj/fun/make-win-arm64.sh`           | FPC 3.3.1 cross + Zig |
 | Windows CE / ARM        | Windows       | `make-wince.bat`                          | FPC cross          |
 | Linux (i386)            | Windows       | `make-linux.bat`                          | FPC 2.4.0 cross    |
 | Linux / ARM             | Windows       | `make-arm-linux.bat`                      | FPC cross          |
@@ -527,7 +527,6 @@ and a second build mode for untrusted scripts:
 | macos-arm64    | yes   | yes | yes             | yes | yes        |
 | macos-x64      | yes   | yes | yes             | yes | yes        |
 | win-x64        | yes   | yes | yes             | yes | yes        |
-| win-arm64      | best effort | no | no        | no  | yes        |
 
 `safe build` is the separate `fun-safe` binary (`-dFunSafe`, strict level); it
 ships next to the default interpreter, so the default build and its behaviour
@@ -642,17 +641,16 @@ The Windows job also runs `build-win64-deps.sh` (x86-64 `libtcc.dll` and
 `funcmd-safe.exe` with the same feature set, and runs the focused safe test.
 The stage step copies only what those probes accepted.
 
-`windows-arm64` is built by `.github/workflows/winarm64.yml`, not by the
-five-platform regression gate: it needs FPC 3.3.1 (the trunk line; the pinned
-3.2.2 has no win64/aarch64 target) and GitHub's preview `windows-11-arm`
-runner. FPC's native win64/aarch64 compiler currently crashes on real arm64
-Windows, so the job cross-builds `funcmd.exe` and `funcmd-safe.exe` on Linux
-with `src/prj/fun/make-win-arm64.sh` (assembled through Zig's clang), then runs
-the portable Windows suite natively on `windows-11-arm`. The stage is uploaded
-as `fun-stage-win-arm64` and nightly prereleases attach it; stable releases
-never include it. Regex is enabled when the job can build an arm64
-`pcre3.dll`. Runtime C (libtcc), getapi/FFI and zlib are not built for this
-target yet, and `lib-asm` has no Windows arm64 backend.
+`windows-arm64` is **not a release target yet**. FPC 3.2.2 has no
+win64/aarch64 target, and FPC 3.3.1 (trunk), which does, currently produces
+binaries that crash with `0xC0000005` on real ARM64 Windows -- including its
+own compiler. A bare `writeln('hello')` compiled with `-O-`, `-O1` and `-O2`
+reproduces it, so the fault is in FPC's aarch64-win64 backend/RTL (upstream
+#42048, #42091), not in Fun. `.github/workflows/winarm64.yml` is a manual
+bring-up harness that cross-builds on Linux (through Zig's clang) and runs the
+portable suite on `windows-11-arm`; it publishes nothing, and nightly releases
+never include a win-arm64 asset. `make-win-arm64.sh` is ready for experiments
+and can become a real build once FPC fixes the target.
 
 For untrusted scripts, build the separate capability-restricted interpreter:
 
