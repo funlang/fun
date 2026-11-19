@@ -9,9 +9,9 @@
 #   linux-safe   ubuntu-24.04      SAFE=1 build + focused capability test only
 #   windows-x64  windows-latest    FPC (ppcrossx64) + the Windows runner (portable subset)
 #
-# windows-arm64 is disabled: FPC 3.2.2 has no win64/aarch64 target, so there is
-# no toolchain to build with (see the commented-out job at the end of the file;
-# re-enable it when a >= 3.3.x FPC with aarch64-windows support is pinned).
+# windows-arm64 is not part of this gate: FPC 3.2.2 has no win64/aarch64
+# target. .github/workflows/winarm64.yml builds and tests it natively with an
+# FPC 3.3.1 snapshot on windows-11-arm, and nightly releases attach the stage.
 #
 # The POSIX runner auto-detects the host and reads a per-platform skip list
 # (fun/test/regression-skip-<platform>.txt) plus optional
@@ -1476,23 +1476,6 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
-  # windows-arm64 is temporarily disabled: FPC 3.2.2 (the pinned toolchain) has
-  # no win64/aarch64 target, so there is nothing to build with and the job could
-  # only ever fail. Re-enable it together with an FPC >= 3.3.x that ships the
-  # aarch64-windows target (and a win64/aarch64 host runner).
-  #
-  # windows-arm64:
-  #   name: windows-arm64
-  #   runs-on: windows-11-arm
-  #   continue-on-error: true   # see the step below: no aarch64-windows FPC yet
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     - name: No aarch64-windows FPC in the pinned toolchain
-  #       shell: pwsh
-  #       run: |
-  #         Write-Host "FPC 3.2.2 (the pinned toolchain) has no win64/aarch64 target,"
-  #         Write-Host "so funcmd cannot be built natively for Windows arm64 yet."
-  #         Write-Host "This job reserves the matrix slot and will fail until an FPC"
-  #         Write-Host "with aarch64-windows support (>= 3.3.x) is available."
-  #         exit 1
+  # windows-arm64 lives in .github/workflows/winarm64.yml: it needs FPC 3.3.1
+  # (win64/aarch64) and GitHub's preview windows-11-arm runner, neither of
+  # which belongs in the five-platform stable gate.

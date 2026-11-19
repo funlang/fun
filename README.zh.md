@@ -474,6 +474,7 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | ---------------------- | ------------ | ---------------------------------------- | ------------------ |
 | Windows 32 位          | Windows      | `src/prj/fun/make-2006.bat` / `-2009.bat` | Delphi 2006 / 2009 |
 | Windows 64 位          | Windows      | `make-win64.bat`                         | FPC 交叉           |
+| Windows arm64          | Windows arm64 | `src/prj/fun/make-win-arm64.bat`        | FPC 3.3.1 快照     |
 | Windows CE / ARM       | Windows      | `make-wince.bat`                         | FPC 交叉           |
 | Linux（i386）          | Windows      | `make-linux.bat`                         | FPC 2.4.0 交叉     |
 | Linux / ARM            | Windows      | `make-arm-linux.bat`                     | FPC 交叉           |
@@ -501,6 +502,7 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | macos-arm64   | yes   | yes | yes            | yes | yes       |
 | macos-x64     | yes   | yes | yes            | yes | yes       |
 | win-x64       | yes   | yes | yes            | yes | yes       |
+| win-arm64     | 尽力而为 | no | no          | no  | yes       |
 
 `safe 构建` 指独立的 `fun-safe` 二进制（`-dFunSafe`，strict 档），与默认解释器
 一起发布，默认构建的行为不受影响；其余列均描述默认二进制。`运行时 C` 已在
@@ -598,8 +600,13 @@ Windows job 还会运行 `build-win64-deps.sh`（x86-64 `libtcc.dll` 与 `zlib.d
 用真实的 C 编译 / deflate 调用实测两者，以同一特性集构建 `funcmd-safe.exe`，
 并运行 focused safe 测试；stage 步骤只复制探针通过的文件。
 
-`windows-arm64` 已暂时禁用：所钉住的工具链 FPC 3.2.2 没有 win64/aarch64 目标，
-没有可用的构建方式。
+`windows-arm64` 由 `.github/workflows/winarm64.yml` 构建，不属于五平台回归门禁：
+它需要 FPC 3.3.1（主线；所钉住的 3.2.2 没有 win64/aarch64 目标）以及 GitHub
+预览版的 `windows-11-arm` runner。该作业原生构建 `funcmd.exe` 与
+`funcmd-safe.exe`，运行 Windows 便携子集，并上传 `fun-stage-win-arm64`，供
+nightly 预发布附带；正式版不会包含它。能构建出 arm64 `pcre3.dll` 时会启用
+regex；运行时 C（libtcc）、getapi/FFI 与 zlib 暂未支持该目标，`lib-asm` 也
+没有 Windows arm64 后端。
 
 需要运行不受信任的脚本时，可以单独编译安全构建：
 

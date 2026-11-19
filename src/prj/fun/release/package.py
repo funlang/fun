@@ -39,7 +39,7 @@ UNIX_PLATFORMS = {
     "macos-x64",
     "macos-arm64",
 }
-WIN_PLATFORMS = {"win-x64"}
+WIN_PLATFORMS = {"win-x64", "win-arm64"}
 SUPPORTED = UNIX_PLATFORMS | WIN_PLATFORMS
 
 LICENSE_FILES = ["LICENSE", "LICENSE.custom", "LICENSE.dll"]

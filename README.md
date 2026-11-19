@@ -498,6 +498,7 @@ Each script is `<toolchain>-<target>`; the **build machine** is where it runs, w
 | ----------------------- | ------------- | ----------------------------------------- | ------------------ |
 | Windows 32-bit          | Windows       | `src/prj/fun/make-2006.bat` / `-2009.bat` | Delphi 2006 / 2009 |
 | Windows 64-bit          | Windows       | `make-win64.bat`                          | FPC cross          |
+| Windows arm64           | Windows arm64 | `src/prj/fun/make-win-arm64.bat`          | FPC 3.3.1 snapshot |
 | Windows CE / ARM        | Windows       | `make-wince.bat`                          | FPC cross          |
 | Linux (i386)            | Windows       | `make-linux.bat`                          | FPC 2.4.0 cross    |
 | Linux / ARM             | Windows       | `make-arm-linux.bat`                      | FPC cross          |
@@ -526,6 +527,7 @@ and a second build mode for untrusted scripts:
 | macos-arm64    | yes   | yes | yes             | yes | yes        |
 | macos-x64      | yes   | yes | yes             | yes | yes        |
 | win-x64        | yes   | yes | yes             | yes | yes        |
+| win-arm64      | best effort | no | no        | no  | yes        |
 
 `safe build` is the separate `fun-safe` binary (`-dFunSafe`, strict level); it
 ships next to the default interpreter, so the default build and its behaviour
@@ -640,8 +642,14 @@ The Windows job also runs `build-win64-deps.sh` (x86-64 `libtcc.dll` and
 `funcmd-safe.exe` with the same feature set, and runs the focused safe test.
 The stage step copies only what those probes accepted.
 
-`windows-arm64` is disabled: FPC 3.2.2, the pinned toolchain, has no
-win64/aarch64 target, so there is nothing to build with.
+`windows-arm64` is built by `.github/workflows/winarm64.yml`, not by the
+five-platform regression gate: it needs FPC 3.3.1 (the trunk line; the pinned
+3.2.2 has no win64/aarch64 target) and GitHub's preview `windows-11-arm`
+runner. The job builds `funcmd.exe` and `funcmd-safe.exe` natively, runs the
+portable Windows suite, and uploads a `fun-stage-win-arm64` stage that nightly
+prereleases attach; stable releases never include it. Regex is enabled when the
+job can build an arm64 `pcre3.dll`. Runtime C (libtcc), getapi/FFI and zlib are
+not built for this target yet, and `lib-asm` has no Windows arm64 backend.
 
 For untrusted scripts, build the separate capability-restricted interpreter:
 

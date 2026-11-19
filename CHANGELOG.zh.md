@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+- Windows arm64 现在是仅预发布目标。FPC 3.3.1（主线）是首个支持
+  win64/aarch64 的编译器，因此 `winarm64.yml` 直接在 GitHub 预览版
+  `windows-11-arm` runner 上运行，用 `src/prj/fun/make-win-arm64.bat`
+  构建 `funcmd.exe` 与 `funcmd-safe.exe`，运行 Windows 便携回归，并上传
+  `fun-stage-win-arm64`；nightly 预发布附带该产物，正式版不包含。作业能
+  构建 arm64 `pcre3.dll` 时启用 regex；libtcc、getapi/FFI、zlib 与 `lib-asm`
+  暂不支持该目标。
+
 - Linux riscv64 现在是仅预发布目标。`riscv64.yml` 在 main 推送时交叉构建
   完整的 musl 解释器，`run-riscv64-qemu.sh` 在 qemu-user 下运行 Linux 回归
   套件，nightly 预发布附带 `fun-stage-linux-riscv64`。该构建包含 regex、FFI、

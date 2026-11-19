@@ -1,0 +1,335 @@
+# ============================================================
+# winarm64.yml -- build and test the Windows on arm64 interpreter.
+#
+# Windows arm64 is a prerelease target. FPC 3.2.2, the toolchain pinned for the
+# five stable platforms, has no win64/aarch64 target; FPC 3.3.1 (the trunk
+# line) is the first compiler that does. GitHub's windows-11-arm host is a
+# public preview. That is why regression.yml still keeps its windows-arm64 slot
+# disabled and this workflow lives on its own.
+#
+# The job runs natively on windows-11-arm: the FPC snapshot is a native
+# aarch64-win64 installation, so it builds funcmd.exe and runs the Windows
+# regression suite on the same runner. No cross compiler or emulation is
+# involved.
+#
+# This workflow is deliberately separate from regression.yml: a broken FPC
+# trunk snapshot or a missing preview runner must not block the five-platform
+# stable gate. It runs on every push to main (including docs-only commits) so
+# the exact SHA the nightly publishes always has a matching stage, and on
+# manual dispatch for bring-up.
+#
+# The resulting stage (fun-stage-win-arm64) is attached to nightly prereleases
+# by release.yml. Stable releases never include it.
+#
+# Provenance: the FPC snapshot is fetched from the trunk snapshot directory,
+# which only serves the current build. The cache key pins the copy a run uses;
+# bump FPC_SNAPSHOT_KEY when the compiler needs refreshing, and record the
+# compiler version printed by the sanity step. funcmd itself is built from the
+# commit under test, exactly like every other stage.
+# ============================================================
+name: winarm64
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: winarm64-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FPC_SNAPSHOT_KEY: fpc-3.3.1-aarch64-win64-snapshot-20261119
+  FPC_SNAPSHOT_URL: https://downloads.freepascal.org/fpc/snapshot/trunk/aarch64-win64/fpc-3.3.1.aarch64-win64.built.on.x86_64-linux.tar.gz
+  FPC_ROOT: C:\FPC\aarch64-win64
+
+jobs:
+  win-arm64:
+    name: windows-arm64
+    runs-on: windows-11-arm
+    # A cold run downloads and unpacks the 125 MB FPC snapshot, builds the
+    # interpreter twice (normal + safe) and runs the portable suite.
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache the FPC aarch64-win64 snapshot
+        id: cache-fpc
+        uses: actions/cache@v4
+        with:
+          path: C:\FPC\aarch64-win64
+          key: ${{ env.FPC_SNAPSHOT_KEY }}
+
+      - name: Install FPC 3.3.1 (win64/aarch64)
+        if: steps.cache-fpc.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          # The archive is a complete target installation: bin\aarch64-win64\
+          # fpc.exe (native arm64), ppca64.exe and the units. No installer.
+          $ErrorActionPreference = 'Stop'
+          $tar = Join-Path $env:RUNNER_TEMP 'fpc-aarch64-win64.tar.gz'
+          curl.exe -fsSL --retry 3 --retry-all-errors -o $tar $env:FPC_SNAPSHOT_URL
+          if ($LASTEXITCODE -ne 0) { throw "FPC snapshot download failed ($LASTEXITCODE)" }
+          $root = $env:FPC_ROOT
+          Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          tar.exe -xf $tar -C $root
+          if ($LASTEXITCODE -ne 0) { throw "tar failed ($LASTEXITCODE)" }
+          Write-Host "installed $root"
+
+      - name: Verify the compiler
+        shell: pwsh
+        run: |
+          $fpc = "$env:FPC_ROOT\bin\aarch64-win64\fpc.exe"
+          if (-not (Test-Path $fpc)) { throw "missing $fpc" }
+          if (-not (Test-Path "$env:FPC_ROOT\units\aarch64-win64\rtl\system.ppu")) {
+            throw "missing aarch64-win64 RTL units"
+          }
+          # -iVDW includes the git revision of the snapshot, so the log records
+          # exactly which trunk build produced this stage.
+          $v = & $fpc -iV
+          $full = & $fpc -iVDW
+          Write-Host "FPC version: $v"
+          Write-Host "FPC build:   $full"
+          if ($v -notmatch '^3\.3\.') { throw "expected FPC 3.3.x, got '$v'" }
+          $tp = & $fpc -iTP
+          $to = & $fpc -iTO
+          Write-Host "target: $tp-$to"
+          if ($tp -ne 'aarch64' -or $to -ne 'win64') { throw "unexpected target $tp-$to" }
+          "FUN_FPC_VERSION=$full" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # PCRE 8 is not vendored as a DLL and MSYS2 is unavailable on this image,
+      # so build pcre3.dll with the image's Visual Studio ARM64 tools. This is
+      # best effort, exactly like the win64 job: without the DLL the build
+      # drops -dRegex and the runner reports the regex tests as SKIP.
+      - name: Build pcre3.dll for win-arm64 (regex, best effort)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          try {
+            $src = Join-Path $env:GITHUB_WORKSPACE 'src\3rd\pcre-8'
+            if (-not (Test-Path (Join-Path $src 'pcre_compile.c'))) {
+              throw "missing vendored PCRE 8 sources at $src"
+            }
+            Copy-Item (Join-Path $src 'config.h.generic') (Join-Path $src 'config.h') -Force
+            Copy-Item (Join-Path $src 'pcre.h.generic') (Join-Path $src 'pcre.h') -Force
+            Copy-Item (Join-Path $src 'pcre_chartables.c.dist') (Join-Path $src 'pcre_chartables.c') -Force
+
+            $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+            if (-not (Test-Path $vswhere)) { throw 'vswhere.exe not found' }
+            $vs = & $vswhere -latest -products * -property installationPath
+            if (-not $vs) { throw 'Visual Studio not found' }
+            $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvarsall.bat'
+            if (-not (Test-Path $vcvars)) { throw "missing $vcvars" }
+
+            $dll = Join-Path (Join-Path $env:GITHUB_WORKSPACE 'src\prj\fun') 'pcre3.dll'
+            $units = 'pcre_byte_order','pcre_chartables','pcre_compile','pcre_config',
+                     'pcre_dfa_exec','pcre_exec','pcre_fullinfo','pcre_get','pcre_globals',
+                     'pcre_maketables','pcre_newline','pcre_ord2utf8','pcre_refcount',
+                     'pcre_string_utils','pcre_study','pcre_tables','pcre_ucd',
+                     'pcre_valid_utf8','pcre_version','pcre_xclass'
+            $sources = ($units | ForEach-Object { "`"$(Join-Path $src "$_.c")`"" }) -join ' '
+            $bat = Join-Path $env:RUNNER_TEMP 'build-pcre-arm64.bat'
+            # A PowerShell here-string cannot close at column 0 inside a YAML
+            # block scalar, so assemble the batch file line by line.
+            $batText = @(
+              '@echo off',
+              ('call "{0}" arm64 || exit /b 1' -f $vcvars),
+              ('cd /d "{0}"' -f $src),
+              ('cl /nologo /O2 /LD /D_CRT_SECURE_NO_WARNINGS /DHAVE_CONFIG_H /DSUPPORT_PCRE8 /I"{0}" {1} /Fe"{2}" /link /MACHINE:ARM64 || exit /b 1' -f $src, $sources, $dll)
+            ) -join "`r`n"
+            $batText | Out-File -FilePath $bat -Encoding ascii
+            cmd /c "`"$bat`"" 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP\pcre-winarm64.log"
+            if ($LASTEXITCODE -ne 0) { throw "cl failed ($LASTEXITCODE)" }
+            if (-not (Test-Path $dll)) { throw "cl produced no $dll" }
+            Write-Host "::warning title=pcre (win-arm64) ok::pcre3.dll=$((Get-Item $dll).Length) bytes"
+          } catch {
+            Write-Host "::warning title=pcre (win-arm64)::$($_.Exception.Message)"
+            Remove-Item 'src\prj\fun\pcre3.dll' -Force -ErrorAction SilentlyContinue
+          }
+          $global:LASTEXITCODE = 0
+
+      - name: Build funcmd.exe
+        shell: pwsh
+        run: |
+          $env:FPC_ARM64 = $env:FPC_ROOT
+          $log = "$env:RUNNER_TEMP\build-windows-arm64.log"
+          cmd /c "src\prj\fun\make-win-arm64.bat" 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            $errs = (Get-Content $log |
+                       Select-String -Pattern 'Fatal:|Error:' |
+                       Select-Object -Last 10 |
+                       ForEach-Object { $_.Line }) -join ' | '
+            if ([string]::IsNullOrEmpty($errs)) { $errs = "fpc exited $LASTEXITCODE" }
+            Write-Host "::error title=build (windows-arm64)::$($errs.Substring(0, [Math]::Min(900, $errs.Length)))"
+            exit 1
+          }
+          if (-not (Test-Path 'src\prj\fun\funcmd.exe')) {
+            Write-Host "::error title=build (windows-arm64)::funcmd.exe is missing"
+            exit 1
+          }
+          $label = @('-dFunPack', '-dMD5', '-dFunTraceback')
+          if (Test-Path 'src\prj\fun\pcre3.dll') { $label += @('-dRegex', '-dPCRE_WinDLL') }
+          if (Test-Path 'src\prj\fun\ffi.dll')  { $label += @('-dWinFFI') }
+          $label = $label -join ' '
+          Write-Host "::warning title=build (windows-arm64) flags::[$label]"
+          "FUN_WIN_BUILD_LABEL=$label" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $label | Out-File -FilePath 'src\prj\fun\funcmd.flags.txt' -Encoding ascii
+
+      - name: Build funcmd-safe.exe
+        if: success()
+        shell: pwsh
+        run: |
+          $env:FPC_ARM64 = $env:FPC_ROOT
+          $env:SAFE = 'strict'
+          $log = "$env:RUNNER_TEMP\build-windows-arm64-safe.log"
+          cmd /c "src\prj\fun\make-win-arm64.bat" 2>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) {
+            $errs = (Get-Content $log |
+                       Select-String -Pattern 'Fatal:|Error:' |
+                       Select-Object -Last 10 |
+                       ForEach-Object { $_.Line }) -join ' | '
+            if ([string]::IsNullOrEmpty($errs)) { $errs = "fpc exited $LASTEXITCODE" }
+            Write-Host "::error title=safe build (windows-arm64)::$($errs.Substring(0, [Math]::Min(900, $errs.Length)))"
+            exit 1
+          }
+          if (-not (Test-Path 'src\prj\fun\funcmd-safe.exe')) {
+            Write-Host "::error title=safe build (windows-arm64)::funcmd-safe.exe is missing"
+            exit 1
+          }
+
+      - name: Capability probes
+        shell: pwsh
+        run: |
+          # Which optional features the build actually has, visible from
+          # outside (the job log is not). Same regex probe the runner uses,
+          # plus getapi when ffi.dll was provided.
+          $exe = "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd.exe"
+          $probes = @{
+            regex  = @("var r = 'a1b2'.replace(/\d++/g, '-');",
+                       "if r = 'a-b-' then ?. 'on'; else ?. 'off'; end if;")
+            getapi = @("var f = 'kernel32'.getapi('GetTickCount', ':i');",
+                       "var t = f();",
+                       "if t > 0 then ?. 'on'; else ?. 'off'; end if;")
+          }
+          foreach ($name in $probes.Keys) {
+            $f = "$env:RUNNER_TEMP\probe-$name.fun"
+            ($probes[$name]) -join "`n" | Out-File -FilePath $f -Encoding ascii
+            $out = & $exe $f 2>&1
+            Write-Host "::warning title=probe $name::exit=$LASTEXITCODE out=[$($out -join '~')]"
+          }
+          # Diagnostic only: 'off' or an error is a finding, not a regression.
+          $global:LASTEXITCODE = 0
+
+      - name: Regression (portable subset)
+        shell: pwsh
+        run: |
+          # The shared snapshots are stored CRLF; match the win64 runner's
+          # byte-for-byte comparison, including the lone trailing CR.
+          $expSrc = "fun\test\expected"
+          $expDst = "$env:RUNNER_TEMP\expected-win"
+          Remove-Item -Recurse -Force $expDst -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $expDst | Out-Null
+          Get-ChildItem "$expSrc\*.txt" | ForEach-Object {
+            $b = [IO.File]::ReadAllBytes($_.FullName)
+            if ($b.Length -gt 0 -and $b[$b.Length - 1] -eq 13) { $b += [byte]10 }
+            [IO.File]::WriteAllBytes((Join-Path $expDst $_.Name), $b)
+          }
+          $env:FUNREG_EXPECTED = $expDst
+
+          $log = "$env:RUNNER_TEMP\reg-windows-arm64.log"
+          cmd /c "fun\test\run-windows-regression.bat --portable" 2>&1 |
+            Tee-Object -FilePath $log
+          $sum = (Get-Content $log | Select-String -Pattern 'checks passed' |
+                    Select-Object -Last 1 | ForEach-Object { $_.Line.Trim() })
+          Write-Host "::warning title=regression (windows-arm64) summary::$sum"
+          if ($LASTEXITCODE -ne 0) {
+            $head = (Get-Content $log | Select-Object -First 45 | ForEach-Object { $_ }) -join '~'
+            Write-Host "::warning title=regression (windows-arm64) head::$($head.Substring(0, [Math]::Min(2500, $head.Length)))"
+            $fails = (Get-Content $log |
+                        Select-String -Pattern 'FAIL|failed|mismatch|not found|error' |
+                        Select-Object -First 40 |
+                        ForEach-Object { $_.Line }) -join ' | '
+            if ([string]::IsNullOrEmpty($fails)) { $fails = "runner exited $LASTEXITCODE" }
+            Write-Host "::error title=regression (windows-arm64)::$($fails.Substring(0, [Math]::Min(900, $fails.Length)))"
+            exit 1
+          }
+
+      - name: Safe capability regression (strict)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'src\prj\fun\funcmd-safe.exe')) {
+            Write-Host "::error title=safe regression (windows-arm64)::funcmd-safe.exe is missing"
+            exit 1
+          }
+          $out = cmd /c "fun\test\run-safe-regression.bat strict" 2>&1
+          $out | Write-Host
+          if ($LASTEXITCODE -ne 0) {
+            $fails = ($out | Select-String -Pattern 'not ok|FAIL|failed|safe regression|Error' |
+                        Select-Object -Last 20 | ForEach-Object { $_.Line }) -join ' | '
+            if ([string]::IsNullOrEmpty($fails)) { $fails = "runner exited $LASTEXITCODE" }
+            Write-Host "::error title=safe regression (windows-arm64)::$fails"
+            exit $LASTEXITCODE
+          }
+
+      # Same contract as the other platforms: only a green main run produces a
+      # release stage, and release.yml downloads it instead of rebuilding.
+      - name: Stage release build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: |
+          $stage = "$env:GITHUB_WORKSPACE\dist-stage"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item 'src\prj\fun\funcmd.exe' $stage -Force
+          if (Test-Path 'src\prj\fun\funcmd-safe.exe') {
+            Copy-Item 'src\prj\fun\funcmd-safe.exe' $stage -Force
+          }
+          # Only arm64 DLLs that the build could actually import. tcc and ffi
+          # are not cross-built for this target yet.
+          foreach ($dll in @('pcre3.dll')) {
+            if (Test-Path "src\prj\fun\$dll") { Copy-Item "src\prj\fun\$dll" $stage -Force }
+          }
+
+          $label = if (Test-Path 'src\prj\fun\funcmd.flags.txt') {
+            (Get-Content 'src\prj\fun\funcmd.flags.txt' -Raw).Trim()
+          } else { [string]$env:FUN_WIN_BUILD_LABEL }
+          $caps = [ordered]@{
+            platform       = 'win-arm64'
+            commit_sha     = $env:GITHUB_SHA
+            tag            = ''
+            build_flags    = @($label -split '\s+' | Where-Object { $_ })
+            regex          = ($label -match 'dRegex')
+            ffi            = ($label -match 'dWinFFI')
+            tcc            = $false
+            # The lib-asm machine-code backends are x86-64 and riscv64; there
+            # is no Windows arm64 code generator yet.
+            asm            = $false
+            safe           = (Test-Path 'src\prj\fun\funcmd-safe.exe')
+            safe_level     = 'strict'
+            libtcc_present = $false
+            zlib_present   = $false
+            notes          = ''
+          }
+          $missing = @()
+          if (-not $caps.regex) { $missing += 'regex unavailable (pcre3.dll not built)' }
+          if (-not $caps.ffi) { $missing += 'getapi/FFI unavailable (no arm64 ffi.dll)' }
+          $missing += 'runtime C unavailable (libtcc has no win-arm64 build)'
+          $missing += 'zlib unavailable (not built for win-arm64)'
+          $missing += 'lib-asm has no win-arm64 backend'
+          $caps.notes = ($missing -join '; ')
+          Write-Host "::warning title=win-arm64 stage::safe=$($caps.safe) regex=$($caps.regex) ffi=$($caps.ffi)"
+          ($caps | ConvertTo-Json -Depth 5) |
+            Out-File -FilePath "$stage\build-env.json" -Encoding utf8
+          Get-ChildItem $stage | ForEach-Object { Write-Host "staged: $($_.Name)" }
+
+      - name: Upload release stage
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fun-stage-win-arm64
+          path: dist-stage/
+          retention-days: 90
+          if-no-files-found: error
