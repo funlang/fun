@@ -80,25 +80,40 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "tar failed ($LASTEXITCODE)" }
           Write-Host "installed $root"
 
+      # Save explicitly: actions/cache only saves at job end on success, and a
+      # later regression failure should not force the next run to download the
+      # 125 MB snapshot again.
+      - name: Save the FPC aarch64-win64 snapshot
+        if: steps.cache-fpc.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: C:\FPC\aarch64-win64
+          key: ${{ env.FPC_SNAPSHOT_KEY }}
+
       - name: Verify the compiler
         shell: pwsh
         run: |
           $fpc = "$env:FPC_ROOT\bin\aarch64-win64\fpc.exe"
+          Write-Host "looking for $fpc"
+          Get-ChildItem $env:FPC_ROOT | ForEach-Object { Write-Host "root: $($_.Name)" }
           if (-not (Test-Path $fpc)) { throw "missing $fpc" }
           if (-not (Test-Path "$env:FPC_ROOT\units\aarch64-win64\rtl\system.ppu")) {
             throw "missing aarch64-win64 RTL units"
           }
           # -iVDW includes the git revision of the snapshot, so the log records
           # exactly which trunk build produced this stage.
-          $v = & $fpc -iV
-          $full = & $fpc -iVDW
-          Write-Host "FPC version: $v"
-          Write-Host "FPC build:   $full"
+          $v = ((& $fpc -iV 2>&1) | Out-String).Trim()
+          $full = ((& $fpc -iVDW 2>&1) | Out-String).Trim()
+          $tp = ((& $fpc -iTP 2>&1) | Out-String).Trim()
+          $to = ((& $fpc -iTO 2>&1) | Out-String).Trim()
+          # These queries are the first thing that can fail on a new preview
+          # runner; put the raw values in annotations because job logs need a
+          # signed-in viewer.
+          Write-Host "::warning title=verify fpc::version=[$v] build=[$full] cpu=[$tp] os=[$to]"
           if ($v -notmatch '^3\.3\.') { throw "expected FPC 3.3.x, got '$v'" }
-          $tp = & $fpc -iTP
-          $to = & $fpc -iTO
-          Write-Host "target: $tp-$to"
-          if ($tp -ne 'aarch64' -or $to -ne 'win64') { throw "unexpected target $tp-$to" }
+          if ($tp.ToLowerInvariant() -ne 'aarch64' -or $to.ToLowerInvariant() -ne 'win64') {
+            throw "unexpected target '$tp-$to'"
+          }
           "FUN_FPC_VERSION=$full" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       # PCRE 8 is not vendored as a DLL and MSYS2 is unavailable on this image,
