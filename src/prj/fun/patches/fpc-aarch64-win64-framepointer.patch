@@ -1,0 +1,30 @@
+Fix the aarch64-win64 epilogue for routines that need no frame pointer.
+
+tcgaarch64.g_proc_exit emitted `mov sp,x29` whenever callee-saved registers
+were stored, without checking pi_no_framepointer_needed. For a frameless
+routine x29 still holds the caller's frame pointer, so the epilogue reset SP
+to the caller's frame record and the caller then read and wrote its stack
+slots at the wrong place. The observed symptom is an access violation at
+startup (0xC0000005) in SysAllocateThreadVars on Windows 11 ARM64.
+
+Upstream issue: https://gitlab.com/freepascal.org/fpc/source/-/issues/42091
+
+Applied by .github/workflows/winarm64.yml to the pinned FPC_REF before the
+cross compiler is built. Drop this patch when the pinned revision includes
+the upstream fix.
+
+--- a/compiler/aarch64/cgcpu.pas
++++ b/compiler/aarch64/cgcpu.pas
+@@ -2236,8 +2236,11 @@
+                 load_regs(list,R_INTREGISTER,RS_X19,RS_X28,R_SUBWHOLE);
+                 { on Windows also restore SP even if the add should be enough
+                   to have matching exit sequence to the entry sequence.
+-                  Skip for exceptfilters where FP points to parent's frame, not local frame. }
++                  Skip for exceptfilters where FP points to parent's frame, not local frame,
++                  and for routines without a frame pointer: x29 still holds the caller's FP
++                  there, so mov sp,x29 would corrupt the stack (FPC #42091). }
+                 if (target_info.system=system_aarch64_win64) and
++                   not (pi_no_framepointer_needed in current_procinfo.flags) and
+                    (current_procinfo.procdef.proctypeoption<>potype_exceptfilter) then
+                   a_load_reg_reg(list,OS_ADDR,OS_ADDR,NR_FP,NR_SP);
+               end

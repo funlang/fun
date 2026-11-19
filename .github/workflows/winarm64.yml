@@ -74,7 +74,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.TOOLCHAIN_ROOT }}
-          key: winarm-fpc-v1-${{ steps.fpc.outputs.sha }}
+          key: winarm-fpc-v2-${{ steps.fpc.outputs.sha }}
 
       - name: Cache Zig (assembler driver)
         id: cache-zig
@@ -113,6 +113,13 @@ jobs:
           git -C "$src" fetch --depth 1 origin "$FPC_SHA"
           git -C "$src" checkout -q FETCH_HEAD
 
+          # The pinned revision still miscompiles frameless aarch64-win64
+          # routines (FPC #42091), which makes every produced exe crash at
+          # startup. Patch it before building the cross compiler; drop the
+          # patch once FPC_REF includes the upstream fix.
+          git -C "$src" apply "$GITHUB_WORKSPACE/src/prj/fun/patches/fpc-aarch64-win64-framepointer.patch" \
+            || { echo "::error::cannot apply the aarch64-win64 framepointer patch"; exit 1; }
+
           boot=$(command -v ppcx64 || find /usr/lib/fpc -type f -name ppcx64 | head -n 1)
           [ -n "$boot" ] || { echo "::error::no boot ppcx64 (install fpc)"; exit 1; }
 
@@ -147,7 +154,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ env.TOOLCHAIN_ROOT }}
-          key: winarm-fpc-v1-${{ steps.fpc.outputs.sha }}
+          key: winarm-fpc-v2-${{ steps.fpc.outputs.sha }}
 
       - name: Build pcre3.dll for win-arm64 (regex, best effort)
         run: |
