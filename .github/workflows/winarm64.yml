@@ -156,49 +156,6 @@ jobs:
           path: ${{ env.TOOLCHAIN_ROOT }}
           key: winarm-fpc-v2-${{ steps.fpc.outputs.sha }}
 
-      - name: Build pcre3.dll for win-arm64 (regex, best effort)
-        run: |
-          set -uo pipefail
-          src="$PWD/src/3rd/pcre-8"
-          out="$PWD/src/prj/fun/pcre3.dll"
-          rm -f "$out"
-          # src/3rd is not tracked; fetch the release tarball like the win64 job.
-          if [ ! -f "$src/pcre_compile.c" ]; then
-            tmp="$RUNNER_TEMP/pcre-src"
-            rm -rf "$tmp" "$src"
-            mkdir -p "$tmp"
-            if curl -fsSL --retry 3 --retry-all-errors \
-                 -o "$tmp/pcre.tar.gz" \
-                 https://downloads.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz \
-               && tar xzf "$tmp/pcre.tar.gz" -C "$tmp"; then
-              mkdir -p "$(dirname "$src")"
-              mv "$tmp/pcre-8.45" "$src"
-            else
-              echo "::warning title=pcre (win-arm64)::sources unavailable"
-              exit 0
-            fi
-          fi
-          # Generic hand-built configuration, same as the win-x64 job.
-          cp -f "$src/config.h.generic" "$src/config.h"
-          cp -f "$src/pcre.h.generic" "$src/pcre.h"
-          cp -f "$src/pcre_chartables.c.dist" "$src/pcre_chartables.c"
-          units='pcre_byte_order pcre_chartables pcre_compile pcre_config
-                 pcre_dfa_exec pcre_exec pcre_fullinfo pcre_get pcre_globals
-                 pcre_maketables pcre_newline pcre_ord2utf8 pcre_refcount
-                 pcre_string_utils pcre_study pcre_tables pcre_ucd
-                 pcre_valid_utf8 pcre_version pcre_xclass'
-          sources=""
-          for u in $units; do sources="$sources $src/$u.c"; done
-          # shellcheck disable=SC2086
-          if "$ZIG_ROOT/zig" cc -target aarch64-windows-gnu -O2 -shared \
-               -DHAVE_CONFIG_H -DSUPPORT_PCRE8 -I"$src" $sources -o "$out" \
-               > "$RUNNER_TEMP/pcre.log" 2>&1; then
-            echo "::warning title=pcre (win-arm64) ok::pcre3.dll=$(stat -c %s "$out") bytes"
-          else
-            rm -f "$out"
-            echo "::warning title=pcre (win-arm64)::$(tail -3 "$RUNNER_TEMP/pcre.log" | tr '\n' ' ')"
-          fi
-
       - name: Build funcmd.exe
         env:
           WINARM_FPC_ROOT: ${{ env.TOOLCHAIN_ROOT }}
@@ -213,6 +170,20 @@ jobs:
             exit 1
           fi
           tail -3 "$log"
+
+      - name: Build funcmd optimization variants
+        env:
+          WINARM_FPC_ROOT: ${{ env.TOOLCHAIN_ROOT }}
+          ZIG: ${{ env.ZIG_ROOT }}/zig
+        run: |
+          set -euo pipefail
+          for pair in "O0:-O-" "O1:-O1"; do
+            tag="${pair%%:*}"
+            opt="${pair#*:}"
+            echo "building funcmd-$tag with $opt"
+            FUN_OPT="$opt" FUN_WINARM_OUT="$PWD/fun/funcmd-win-arm64-$tag.exe" \
+              ./src/prj/fun/make-win-arm64.sh
+          done
 
       - name: Build funcmd-safe.exe
         env:
@@ -230,7 +201,7 @@ jobs:
           fi
           tail -3 "$log"
 
-      - name: Build a diagnostic hello.exe
+      - name: Build diagnostic hello.exe variants
         env:
           WINARM_FPC_ROOT: ${{ env.TOOLCHAIN_ROOT }}
           ZIG: ${{ env.ZIG_ROOT }}/zig
@@ -247,13 +218,17 @@ jobs:
           export PATH="$tools:$PATH"
           printf "program hello;\nbegin\n  writeln('hello');\nend.\n" \
             > "$RUNNER_TEMP/hello.pas"
-          mkdir -p "$RUNNER_TEMP/hello-units"
-          "$WINARM_FPC_ROOT/lib/fpc/3.3.1/ppcrossa64" \
-            -n -Twin64 -Paarch64 -XPaarch64-win64- \
-            -Fu"$WINARM_FPC_ROOT/lib/fpc/3.3.1/units/aarch64-win64/*" \
-            -FU"$RUNNER_TEMP/hello-units" -FE"$RUNNER_TEMP" \
-            -o"$RUNNER_TEMP/hello.exe" "$RUNNER_TEMP/hello.pas"
-          ls -l "$RUNNER_TEMP/hello.exe"
+          for pair in "O0:-O-" "O1:-O1" "O2:-O2"; do
+            tag="${pair%%:*}"
+            opt="${pair#*:}"
+            mkdir -p "$RUNNER_TEMP/hello-units-$tag"
+            "$WINARM_FPC_ROOT/lib/fpc/3.3.1/ppcrossa64" \
+              -n "$opt" -Twin64 -Paarch64 -XPaarch64-win64- \
+              -Fu"$WINARM_FPC_ROOT/lib/fpc/3.3.1/units/aarch64-win64/*" \
+              -FU"$RUNNER_TEMP/hello-units-$tag" -FE"$RUNNER_TEMP" \
+              -o"$RUNNER_TEMP/hello-$tag.exe" "$RUNNER_TEMP/hello.pas"
+          done
+          ls -l "$RUNNER_TEMP"/hello-*.exe
 
       - name: Stage the build artifact
         run: |
@@ -262,11 +237,11 @@ jobs:
           rm -rf "$stage"
           mkdir -p "$stage"
           cp -f fun/funcmd-win-arm64.exe "$stage/funcmd.exe"
+          cp -f fun/funcmd-win-arm64-O0.exe "$stage/funcmd-O0.exe"
+          cp -f fun/funcmd-win-arm64-O1.exe "$stage/funcmd-O1.exe"
           cp -f fun/funcmd-win-arm64-safe.exe "$stage/funcmd-safe.exe"
-          cp -f "$RUNNER_TEMP/hello.exe" "$stage/hello.exe"
-          [ -f src/prj/fun/pcre3.dll ] && cp -f src/prj/fun/pcre3.dll "$stage/pcre3.dll"
-          label="-dFunPack -dMD5 -dFunTraceback"
-          [ -f src/prj/fun/pcre3.dll ] && label="$label -dRegex -dPCRE_WinDLL"
+          cp -f "$RUNNER_TEMP"/hello-O*.exe "$stage/"
+          label="-dFunPack -dMD5 -dFunTraceback -dFunNoRes -O2"
           printf '%s\n' "$label" > "$stage/funcmd.flags.txt"
           echo "::warning title=build (windows-arm64) flags::[$label]"
           ls -l "$stage"
@@ -295,14 +270,23 @@ jobs:
           name: fun-win-arm64-build
           path: src/prj/fun
 
-      - name: Diagnostic hello.exe
+      - name: Optimization matrix
         shell: pwsh
         run: |
-          # One annotation decides whether the FPC win64/aarch64 RTL works at
-          # all on this host, independent of the Fun interpreter.
-          $hello = "$env:GITHUB_WORKSPACE\src\prj\fun\hello.exe"
-          $out = & $hello 2>&1
-          Write-Host "::warning title=hello (win-arm64)::exit=$LASTEXITCODE out=[$($out -join '~')]"
+          # One annotation per candidate decides whether the FPC
+          # win64/aarch64 RTL works at all on this host, independent of the
+          # Fun interpreter, and whether optimization level matters.
+          $dir = "$env:GITHUB_WORKSPACE\src\prj\fun"
+          $script = "$env:RUNNER_TEMP\smoke.fun"
+          "?. 'ok';" | Out-File -FilePath $script -Encoding ascii
+          foreach ($v in @('hello-O0.exe','hello-O1.exe','hello-O2.exe')) {
+            $out = & "$dir\$v" 2>&1
+            Write-Host "::warning title=matrix $v::exit=$LASTEXITCODE out=[$($out -join '~')]"
+          }
+          foreach ($v in @('funcmd-O0.exe','funcmd-O1.exe','funcmd.exe')) {
+            $out = & "$dir\$v" $script 2>&1
+            Write-Host "::warning title=matrix $v::exit=$LASTEXITCODE out=[$($out -join '~')]"
+          }
           $global:LASTEXITCODE = 0
 
       - name: Capability probes

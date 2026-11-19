@@ -57,6 +57,7 @@ export PATH ZIG
 BUILD="$(mktemp -d "${TMPDIR:-/tmp}/fun-win-a64-build-XXXXXX")"
 OUT="${FUN_WINARM_OUT:-$HERE/funcmd${FUN_SAFE_LEVEL:+-safe}.exe}"
 
+OPT="${FUN_OPT:--O2}"
 FEATURES="-dFunPack -dMD5 -dFunTraceback -dFunNoRes $FUN_SAFE_FLAGS"
 [ -f pcre3.dll ] && FEATURES="$FEATURES -dRegex -dPCRE_WinDLL"
 [ -f ffi.dll ]   && FEATURES="$FEATURES -dWinFFI"
@@ -67,7 +68,7 @@ echo "Building funcmd for win64/aarch64 with $PPCROSS"
 #   version resource is not needed for the interpreter to run.
 # -Fu<units>/* covers the snapshot's package directories, as fpc.cfg does.
 # shellcheck disable=SC2086
-"$PPCROSS" funcmd.dpr -n -B -Sd -O2 -Twin64 -Paarch64 -dWin64 \
+"$PPCROSS" funcmd.dpr -n -B -Sd "$OPT" -Twin64 -Paarch64 -dWin64 \
     -XPaarch64-win64- \
     -Fu..\\..\\lib -Fu"$UNITS/*" -Fu"$UNITS/rtl" \
     -FU"$BUILD" -FE"$BUILD" -o"$OUT" \
