@@ -32,11 +32,20 @@ end fun;
 fun makeDue(s, id, n, nowMs)
   for j in s._jobs do
     if j['id'] = id then
-      if j['kind'] = 'cron' then
-        j['nextWall'] = n;
-      else
-        j['nextMs'] = nowMs;
-      end if;
+      if j['kind'] = 'cron' then j['nextWall'] = n; end if;
+      j['nextMs'] = nowMs;
+      s._heapify();
+      return;
+    end if;
+  end do;
+end fun;
+
+fun makeWait(s, id, n, nextMs)
+  for j in s._jobs do
+    if j['id'] = id then
+      if j['kind'] = 'cron' then j['nextWall'] = n; end if;
+      j['nextMs'] = nextMs;
+      s._heapify();
       return;
     end if;
   end do;
@@ -335,13 +344,41 @@ makeDue(badHandler, badB, n5, 0);
 // --- engine wait and missed runs ----------------------------------------
 var w = CronScheduler();
 var wId = w.addJob('0 3 * * *', () {});
-makeDue(w, wId, at(2026, 11, 12, 3, 0, 0), 0);
-?. w._waitMs(at(2026, 11, 12, 2, 0, 0), 0) = 1000;
+makeWait(w, wId, at(2026, 11, 12, 3, 0, 0), 1000);
+?. w._nextWait(0) = 1000;
 
 var we = CronScheduler();
 var weId = we.every('1s', () {});
-makeDue(we, weId, n5, 1000);
-?. we._waitMs(n5, 900) = 100;
+makeWait(we, weId, n5, 1000);
+?. we._nextWait(900) = 100;
+
+var hp = CronScheduler();
+var h1 = hp.addJob('* * * * *', () {});
+var h2 = hp.addJob('* * * * *', () {});
+var h3 = hp.addJob('* * * * *', () {});
+makeWait(hp, h1, at(2026, 11, 12, 0, 0, 0), 3000);
+makeWait(hp, h2, at(2026, 11, 12, 0, 0, 0), 1000);
+makeWait(hp, h3, at(2026, 11, 12, 0, 0, 0), 2000);
+?. hp._heapPeek()['id'] = h2;
+?. hp._heapPop()['id'] = h2;
+?. hp._heapPeek()['id'] = h3;
+?. hp._heapPop()['id'] = h3;
+?. hp._heapPeek()['id'] = h1;
+
+var lazy = CronScheduler();
+var l1 = lazy.addJob('* * * * *', () {});
+var l2 = lazy.addJob('* * * * *', () {});
+makeWait(lazy, l1, at(2026, 11, 12, 0, 0, 0), 1000);
+makeWait(lazy, l2, at(2026, 11, 12, 0, 0, 0), 2000);
+lazy.removeJob(l1);
+?. lazy._nextWait(0) = 1000;
+?. lazy.jobs().@count() = 1;
+
+var rb = CronScheduler();
+var rbId = rb.addJob('0 3 * * *', () {});
+makeWait(rb, rbId, at(2026, 11, 12, 3, 0, 0), 999999);
+rb._rebaseCron(at(2026, 11, 12, 2, 0, 0), 1000);
+?. rb._heapPeek()['nextMs'] = 1000 + 3600 * 1000;
 
 var miss = CronScheduler();
 var missHits = 0;
@@ -351,6 +388,92 @@ makeDue(miss, missId, at(2026, 11, 12, 0, 0, 0), 0);
 ?. missHits = 1;
 ?. miss._tick(at(2026, 11, 12, 10, 0, 0), 0) = 0;
 ?. missHits = 1;
+
+// --- index regressions ---------------------------------------------------
+var alias = CronScheduler();
+var al1 = alias.addJob('* * * * *', () {});
+var al2 = alias.addJob('* * * * *', () {});
+?. not alias.removeJob(-1);
+?. not alias.removeJob(1.5);
+?. not alias.removeJob(4294967297);
+?. not alias.removeJob(0);
+?. alias.nextRun(-1) = nil;
+?. alias.nextRun(1.5) = nil;
+?. alias.nextRun(4294967297) = nil;
+?. alias.jobs().@count() = 2;
+?. alias.removeJob(al2);
+?. alias.jobs().@count() = 1;
+?. alias.removeJob(al1);
+?. alias.jobs().@count() = 0;
+
+var bulk = CronScheduler();
+for i = 1 to 300 do bulk.addJob('* * * * *', () {}); end do;
+for j in bulk.jobs() do bulk.removeJob(j['id']); end do;
+?. bulk.jobs().@count() = 0;
+?. bulk._heapN <= 256;
+
+var nm = CronScheduler();
+var nmId = nm.addJob('0 0 29 2 *', () {});
+var nmJob = nm._byId['id:' & nmId];
+var nmD = (nmJob['nextMs'] - _cronNowMs()) div 1000;
+var nmW = _cronDiffSec(_cronNow(), nmJob['nextWall']);
+?. nmD >= nmW - 2 and nmD <= nmW + 2;
+
+var cb = CronScheduler();
+var cbHits = 0;
+var cbId = cb.addJob('* * * * *', () { cbHits += 1; });
+makeWait(cb, cbId, at(2026, 11, 12, 10, 0, 0), 0);
+?. cb._tick(at(2026, 11, 12, 9, 0, 0), 0) = 0;
+?. cbHits = 0;
+?. cb._tick(at(2026, 11, 12, 10, 0, 0), 3600 * 1000) = 1;
+?. cbHits = 1;
+
+var deep = CronScheduler();
+var deepIds = new [];
+for i = 1 to 16 do deepIds.@add(deep.addJob('* * * * *', () {})); end do;
+for i = 0 to 15 do makeWait(deep, deepIds[i], at(2026, 11, 12, 0, 0, 0), (16 - i) * 1000); end do;
+var deepOk = true;
+var deepPrev = -1;
+for i = 1 to 16 do
+  var dj = deep._heapPop();
+  if dj['nextMs'] < deepPrev then deepOk = false; end if;
+  deepPrev = dj['nextMs'];
+end do;
+?. deepOk;
+
+var lz = CronScheduler();
+var lz1 = lz.addJob('* * * * *', () {});
+var lz2 = lz.addJob('* * * * *', () {});
+makeWait(lz, lz1, at(2026, 11, 12, 0, 0, 0), 100);
+makeWait(lz, lz2, at(2026, 11, 12, 0, 0, 0), 500);
+lz.removeJob(lz1);
+?. lz._nextWait(0) = 500;
+
+var nv = CronScheduler();
+var nvId = nv.addJob('0 0 29 2 *', () {});
+var nvNow = _cronNow();
+var nvExp = 1.time() + _cronDiffSec(nvNow, _cronNext(nv._byId['id:' & nvId], nvNow)) / 86400;
+var nvDiff = (nv.nextRun(nvId) * 1 - nvExp * 1) * 86400;
+?. nvDiff > -3 and nvDiff < 3;
+
+var nve = CronScheduler();
+var nveId = nve.every('1h', () {});
+makeWait(nve, nveId, n5, 0);
+var nveSec = (nve.nextRun(nveId) * 1 - 1.time() * 1) * 86400;
+?. nveSec > 0 and nveSec <= 3600;
+
+var mb = CronScheduler();
+var mbOrder = new [];
+var mbA = mb.addJob('* * * * *', () { mbOrder.@add('A'); mb.stop(); });
+var mbB = mb.addJob('* * * * *', () { mbOrder.@add('B'); });
+makeDue(mb, mbA, n5, 0);
+makeDue(mb, mbB, n5, 0);
+?. mb._tick(n5, 0) = 1;
+?. mbOrder.@count() = 1;
+mb._stopped = false;
+?. mb._tick(n5, 0) = 1;
+?. mbOrder.@count() = 2;
+?. mbOrder[1] = 'B';
 
 // --- next occurrence and nextRun ----------------------------------------
 var every5n = _cronParseExpr('*/5 * * * *', false);

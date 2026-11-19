@@ -739,6 +739,13 @@ effectively capped at about 10 ms. `nextRun(id)` returns that time; unknown ids
 return nil. If a run is missed while the process is blocked, it fires once and
 the next occurrence is computed from the wake-up time.
 
+Internally jobs are kept in a min-heap keyed by next run time plus an id map;
+an idle wake only looks at the earliest job instead of scanning all jobs.
+Removed jobs are skipped lazily and the index is compacted when stale entries
+accumulate. That keeps thousands of registered jobs practical, but callbacks
+still run serially; if thousands of jobs become due in the same instant, that
+burst itself can block the loop.
+
 A job added from a callback starts on the next tick; a job removed from a
 callback does not run later in the current tick. This follows the
 single-threaded model and matches `stop()`; batch schedulers such as

@@ -21,6 +21,9 @@ This project records notable changes in the style of [Keep a Changelog](https://
   nearest job (capped at 1 s). Missed runs fire once and reschedule from the
   wake-up time.
 
+- Cron jobs are now kept in a min-heap keyed by next run time plus an id map;
+  an idle wake only inspects the earliest job instead of scanning all jobs.
+
 ## [9.5.6] - 2026-11-15
 
 - Runtime errors now carry a call-site traceback in the default build (the old

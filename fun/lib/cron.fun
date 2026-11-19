@@ -466,10 +466,126 @@ class CronScheduler(opts)
   var _stopped = false;
   var _nextId = 1;
   var _onError = nil;
+  var _byId = new [];
+  var _heap = new [];
+  var _heapN = 0;
+  var _deadHeap = 0;
+  var _deadJobs = 0;
+  var _inTick = false;
 
   if opts <> nil and opts.@has('onError') then
     _onError = opts['onError'];
   end if;
+
+  fun _heapLess(a, b)
+    if a['nextMs'] <> b['nextMs'] then
+      result = a['nextMs'] < b['nextMs'];
+    else
+      result = a['id'] < b['id'];
+    end if;
+  end fun;
+
+  fun _heapSwap(i, j)
+    var t = _heap[i];
+    _heap[i] = _heap[j];
+    _heap[j] = t;
+  end fun;
+
+  fun _siftUp(i)
+    var done = false;
+    while i > 0 and not done do
+      var p = (i - 1) div 2;
+      if this._heapLess(_heap[i], _heap[p]) then
+        this._heapSwap(i, p);
+        i = p;
+      else
+        done = true;
+      end if;
+    end do;
+  end fun;
+
+  fun _siftDown(i)
+    var done = false;
+    while not done do
+      var l = 2 * i + 1;
+      if l >= _heapN then
+        done = true;
+      else
+        var r = l + 1;
+        var m = i;
+        if this._heapLess(_heap[l], _heap[m]) then m = l; end if;
+        if r < _heapN and this._heapLess(_heap[r], _heap[m]) then m = r; end if;
+        if m = i then
+          done = true;
+        else
+          this._heapSwap(i, m);
+          i = m;
+        end if;
+      end if;
+    end do;
+  end fun;
+
+  fun _heapPush(j)
+    j['inHeap'] = true;
+    _heap[_heapN] = j;
+    _heapN += 1;
+    this._siftUp(_heapN - 1);
+  end fun;
+
+  fun _heapPop()
+    if _heapN <= 0 then result = nil; return; end if;
+    var top = _heap[0];
+    top['inHeap'] = false;
+    _heapN -= 1;
+    if _heapN > 0 then
+      _heap[0] = _heap[_heapN];
+      _heap[_heapN] = nil;
+      this._siftDown(0);
+    else
+      _heap[0] = nil;
+    end if;
+    result = top;
+  end fun;
+
+  fun _heapPeek()
+    if _heapN <= 0 then result = nil; else result = _heap[0]; end if;
+  end fun;
+
+  fun _heapify()
+    var i = (_heapN div 2) - 1;
+    while i >= 0 do
+      this._siftDown(i);
+      i -= 1;
+    end do;
+  end fun;
+
+  fun _compact()
+    var live = new [];
+    var map = new [];
+    for j in _jobs do
+      if not j['removed'] then
+        live.@add(j);
+        map['id:' & j['id']] = j;
+      end if;
+    end do;
+    _jobs = live;
+    _byId = map;
+    _heap = new [];
+    _heapN = 0;
+    for j in live do this._heapPush(j); end do;
+    _deadHeap = 0;
+    _deadJobs = 0;
+  end fun;
+
+  fun _maybeCompact()
+    if _deadJobs > 0 and _deadJobs = _jobs.@count() then
+      this._compact();
+    elsif _deadJobs > 256 and _deadJobs * 2 > _jobs.@count() then
+      this._compact();
+    elsif _deadHeap > 256 and _deadHeap * 2 > _heapN then
+      this._compact();
+    end if;
+  end fun;
 
   fun addJob(expr, fn, opts)
     var ws = false;
@@ -489,8 +605,11 @@ class CronScheduler(opts)
     j['expr'] = _cronTrim('' & expr);
     j['fn'] = fn;
     j['nextWall'] = nx;
+    j['nextMs'] = _cronNowMs() + _cronDiffSec(n, nx) * 1000;
     j['removed'] = false;
     _jobs.@add(j);
+    _byId['id:' & j['id']] = j;
+    this._heapPush(j);
     result = j['id'];
   end fun;
 
@@ -505,6 +624,8 @@ class CronScheduler(opts)
     j['fn'] = fn;
     j['removed'] = false;
     _jobs.@add(j);
+    _byId['id:' & j['id']] = j;
+    this._heapPush(j);
     result = j['id'];
   end fun;
 
@@ -512,13 +633,25 @@ class CronScheduler(opts)
     if _running then raise 'cron: already running'; end if;
     _running = true;
     _stopped = false;
+    this._rebaseCron(_cronNow(), _cronNowMs());
+    var lastN = nil;
+    var lastMs = 0;
     try
       while not _stopped do
         var n = _cronNow();
         var nowMs = _cronNowMs();
+        if lastN <> nil then
+          var wallD = _cronDiffSec(lastN, n);
+          var monoD = (nowMs - lastMs) / 1000;
+          if wallD - monoD > 2 or monoD - wallD > 2 then
+            this._rebaseCron(n, nowMs);
+          end if;
+        end if;
+        lastN = n;
+        lastMs = nowMs;
         this._tick(n, nowMs);
         if not _stopped then
-          var wait = this._waitMs(_cronNow(), _cronNowMs());
+          var wait = this._nextWait(_cronNowMs());
           if wait < 10 then wait = 10; end if;
           sleep(wait);
         end if;
@@ -528,24 +661,35 @@ class CronScheduler(opts)
     end try;
   end fun;
 
-  fun _waitMs(n, nowMs)
-    var wait = 1000;
-    for j in _jobs do
-      if not j['removed'] then
-        if j['kind'] = 'cron' then
-          if j['nextWall'] <> nil then
-            var d = _cronDiffSec(n, j['nextWall']) * 1000;
-            if d < 0 then d = 0; end if;
-            if d < wait then wait = d; end if;
-          end if;
-        else
-          var d = j['nextMs'] - nowMs;
-          if d < 0 then d = 0; end if;
-          if d < wait then wait = d; end if;
-        end if;
+  fun _nextWait(nowMs)
+    var done = false;
+    while not done do
+      var top = this._heapPeek();
+      if top = nil then
+        result = 1000;
+        return;
+      elsif top['removed'] then
+        this._heapPop();
+        if _deadHeap > 0 then _deadHeap -= 1; end if;
+      else
+        var d = top['nextMs'] - nowMs;
+        if d < 0 then d = 0; end if;
+        if d > 1000 then d = 1000; end if;
+        result = d;
+        return;
       end if;
     end do;
-    result = wait;
+  end fun;
+
+  fun _rebaseCron(n, nowMs)
+    for j in _jobs do
+      if j['kind'] = 'cron' and j['nextWall'] <> nil and not j['removed'] then
+        var d = _cronDiffSec(n, j['nextWall']) * 1000;
+        if d < 0 then d = 0; end if;
+        j['nextMs'] = nowMs + d;
+      end if;
+    end do;
+    this._heapify();
   end fun;
 
   fun stop()
@@ -554,39 +698,31 @@ class CronScheduler(opts)
 
   fun removeJob(id)
     if id = nil then result = false; return; end if;
-    if id.type() <> 3 and id.type() <> 5 then result = false; return; end if;
-    var keep = new [];
-    var found = false;
-    for j in _jobs do
-      if not found and j['id'] = id then
-        found = true;
-        j['removed'] = true;
-      else
-        keep.@add(j);
-      end if;
-    end do;
-    if found then _jobs = keep; end if;
-    result = found;
+    if id.type() <> 3 then result = false; return; end if;
+    if id <= 0 then result = false; return; end if;
+    var key = 'id:' & id;
+    var j = _byId[key];
+    if j = nil then result = false; return; end if;
+    j['removed'] = true;
+    _byId[key] = nil;
+    _deadJobs += 1;
+    if j['inHeap'] then _deadHeap += 1; end if;
+    result = true;
+    if not _inTick then this._maybeCompact(); end if;
   end fun;
 
   fun jobs()
     result = new [];
     for j in _jobs do
-      result.@add(_cronJobView(j));
+      if not j['removed'] then result.@add(_cronJobView(j)); end if;
     end do;
-  end fun;
-
-  fun _findJob(id)
-    for j in _jobs do
-      if j['id'] = id then result = j; return; end if;
-    end do;
-    result = nil;
   end fun;
 
   fun nextRun(id)
     if id = nil then result = nil; return; end if;
-    if id.type() <> 3 and id.type() <> 5 then result = nil; return; end if;
-    var j = this._findJob(id);
+    if id.type() <> 3 then result = nil; return; end if;
+    if id <= 0 then result = nil; return; end if;
+    var j = _byId['id:' & id];
     if j = nil then result = nil; return; end if;
     if j['kind'] = 'cron' then
       var n = _cronNow();
@@ -619,12 +755,28 @@ class CronScheduler(opts)
   end fun;
 
   fun _tick(n, nowMs)
+    if _stopped then result = 0; return; end if;
+    _inTick = true;
     var fired = 0;
-    var list = new [];
-    for j in _jobs do list.@add(j); end do;
+    var batch = new [];
+    var done = false;
+    while not done do
+      var top = this._heapPeek();
+      if top = nil then
+        done = true;
+      elsif top['removed'] then
+        this._heapPop();
+        if _deadHeap > 0 then _deadHeap -= 1; end if;
+      elsif top['nextMs'] > nowMs then
+        done = true;
+      else
+        batch.@add(this._heapPop());
+      end if;
+    end do;
+
     var i = 0;
-    while i < list.@count() and not _stopped do
-      var j = list[i];
+    while i < batch.@count() and not _stopped do
+      var j = batch[i];
       if not j['removed'] then
         if j['kind'] = 'cron' then
           if j['nextWall'] <> nil and _cronDiffSec(j['nextWall'], n) >= 0 then
@@ -634,31 +786,50 @@ class CronScheduler(opts)
             except
               this._reportError(j);
             end try;
-            var after = _cronNow();
-            var nx = _cronNext(j, after);
-            if nx = nil then
-              this.removeJob(j['id']);
-            else
-              j['nextWall'] = nx;
+            if not j['removed'] then
+              var after = _cronNow();
+              var nx = _cronNext(j, after);
+              if nx = nil then
+                this.removeJob(j['id']);
+              else
+                j['nextWall'] = nx;
+                j['nextMs'] = _cronNowMs() + _cronDiffSec(after, nx) * 1000;
+                this._heapPush(j);
+              end if;
             end if;
+          else
+            // Clock moved backward: the wall-clock trigger has not arrived yet.
+            var d = _cronDiffSec(n, j['nextWall']) * 1000;
+            if d < 0 then d = 0; end if;
+            j['nextMs'] = nowMs + d;
+            this._heapPush(j);
           end if;
-        elsif nowMs >= j['nextMs'] then
+        else
           fired += 1;
           var interval = j['intervalMs'];
-          // Missed runs are skipped; a long callback does not create a burst.
           var nextAt = nowMs + interval;
           try
             j['fn']();
           except
             this._reportError(j);
           end try;
-          var afterMs = _cronNowMs();
-          if nextAt <= afterMs then nextAt = afterMs + interval; end if;
-          j['nextMs'] = nextAt;
+          if not j['removed'] then
+            var afterMs = _cronNowMs();
+            if nextAt <= afterMs then nextAt = afterMs + interval; end if;
+            j['nextMs'] = nextAt;
+            this._heapPush(j);
+          end if;
         end if;
       end if;
       i += 1;
     end do;
+    while i < batch.@count() do
+      var j = batch[i];
+      if not j['removed'] then this._heapPush(j); end if;
+      i += 1;
+    end do;
+    _inTick = false;
+    this._maybeCompact();
     result = fired;
   end fun;
 end class;
