@@ -93,13 +93,24 @@ jobs:
       - name: Verify the compiler
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Continue'
           $fpc = "$env:FPC_ROOT\bin\aarch64-win64\fpc.exe"
+          $pp  = "$env:FPC_ROOT\bin\aarch64-win64\ppca64.exe"
           Write-Host "looking for $fpc"
           Get-ChildItem $env:FPC_ROOT | ForEach-Object { Write-Host "root: $($_.Name)" }
           if (-not (Test-Path $fpc)) { throw "missing $fpc" }
           if (-not (Test-Path "$env:FPC_ROOT\units\aarch64-win64\rtl\system.ppu")) {
             throw "missing aarch64-win64 RTL units"
           }
+          Write-Host "sizes: fpc=$((Get-Item $fpc).Length) ppca64=$((Get-Item $pp -ErrorAction SilentlyContinue).Length)"
+
+          # Run through cmd.exe as well as PowerShell's call operator: if the
+          # image lacks a dependency or blocks the exe, the two differ.
+          $cmdOut = cmd.exe /c "`"$fpc`" -iV 2>&1"
+          Write-Host "::warning title=verify cmd::exit=$LASTEXITCODE out=[$cmdOut]"
+          $ppOut = cmd.exe /c "`"$pp`" -iV 2>&1"
+          Write-Host "::warning title=verify pp::exit=$LASTEXITCODE out=[$ppOut]"
+
           # -iVDW includes the git revision of the snapshot, so the log records
           # exactly which trunk build produced this stage.
           $v = ((& $fpc -iV 2>&1) | Out-String).Trim()
@@ -109,7 +120,7 @@ jobs:
           # These queries are the first thing that can fail on a new preview
           # runner; put the raw values in annotations because job logs need a
           # signed-in viewer.
-          Write-Host "::warning title=verify fpc::version=[$v] build=[$full] cpu=[$tp] os=[$to]"
+          Write-Host "::warning title=verify fpc::amp-exit=$LASTEXITCODE version=[$v] build=[$full] cpu=[$tp] os=[$to]"
           if ($v -notmatch '^3\.3\.') { throw "expected FPC 3.3.x, got '$v'" }
           if ($tp.ToLowerInvariant() -ne 'aarch64' -or $to.ToLowerInvariant() -ne 'win64') {
             throw "unexpected target '$tp-$to'"
