@@ -752,6 +752,16 @@ effectively capped at about 10 ms. `nextRun(id)` returns that time; unknown ids
 return nil. If a run is missed while the process is blocked, it fires once and
 the next occurrence is computed from the wake-up time.
 
+Cron due times use local wall time; waits and `every` intervals use a monotonic
+clock. If wall and monotonic time drift by more than 2 seconds, `run()` rebases
+cron next-run times and fires an overdue job once. Between passes, moving the
+wall clock backward does not fire early; a job already selected in the current
+pass still follows that pass's start time. A cron job's next occurrence is
+computed from the wall time after its callback returns. An `every` job's interval
+is anchored at the pass start: a callback shorter than the interval keeps the
+original schedule, and a callback that overruns it starts the next interval from
+the callback's end. Neither mode catches up missed periods.
+
 Internally jobs are kept in a min-heap keyed by next run time plus an id map;
 an idle wake only looks at the earliest job instead of scanning all jobs.
 Removed jobs are skipped lazily and the index is compacted when stale entries

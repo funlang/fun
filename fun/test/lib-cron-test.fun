@@ -51,6 +51,19 @@ fun makeWait(s, id, n, nextMs)
   end do;
 end fun;
 
+// sleep advances mono/time only; wall-mutating tests override it.
+fun fakeClock(st)
+  var c = new [];
+  c['wall'] = () { result = st['wall']; };
+  c['mono'] = () { result = st['mono']; };
+  c['time'] = () { result = st['time']; };
+  c['sleep'] = (ms) {
+    st['mono'] += ms;
+    st['time'] += ms / 86400000;
+  };
+  result = c;
+end fun;
+
 // --- fields, macros and matching -----------------------------------------
 var every5 = _cronParseExpr('*/5 * * * *', false);
 ?. every5['minute'][0];
@@ -526,3 +539,243 @@ var nrid = nr.addJob('0 0 1 1 *', () {});
 var nre = CronScheduler();
 var nreid = nre.every('1s', () {});
 ?. nre.nextRun(nreid) <> nil;
+
+// --- clock port and deterministic time semantics ------------------------
+var dc = CronScheduler();
+var dclk = dc._clk();
+?. dclk['wall'] <> nil;
+?. dclk['mono'] <> nil;
+?. dclk['time'] <> nil;
+?. dclk['sleep'] <> nil;
+
+var addSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 1000, time: 5000.0];
+var addS = CronScheduler();
+addS._clock = fakeClock(addSt);
+var addId = addS.addJob('* * * * *', () {});
+var addJob = addS._byId['id:' & addId];
+?. addJob['nextMs'] = 61000;
+
+var everySt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 1000, time: 5000.0];
+var everyS = CronScheduler();
+everyS._clock = fakeClock(everySt);
+var everyId = everyS.every('1s', () {});
+var everyJob = everyS._byId['id:' & everyId];
+?. everyJob['nextMs'] = 2000;
+
+var bdSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var bdHits = 0;
+var bd = CronScheduler();
+bd._clock = fakeClock(bdSt);
+bd.every('1s', () { bdHits += 1; });
+?. bd._tick(at(2026, 11, 12, 0, 0, 0), 999) = 0;
+?. bdHits = 0;
+?. bd._tick(at(2026, 11, 12, 0, 0, 0), 1000) = 1;
+?. bdHits = 1;
+
+var cbnSt = new [wall: at(2026, 11, 12, 0, 0, 59), mono: 59999, time: 5000.0];
+var cbnHits = 0;
+var cbn = CronScheduler();
+cbn._clock = fakeClock(cbnSt);
+var cbnId = cbn.addJob('* * * * *', () { cbnHits += 1; });
+makeWait(cbn, cbnId, at(2026, 11, 12, 0, 1, 0), 60000);
+?. cbn._tick(at(2026, 11, 12, 0, 0, 59), 59999) = 0;
+?. cbnHits = 0;
+?. cbn._tick(at(2026, 11, 12, 0, 1, 0), 60000) = 1;
+?. cbnHits = 1;
+
+var iaSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 111, time: 5000.0];
+var ibSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 222, time: 5000.0];
+var ia = CronScheduler();
+var ib = CronScheduler();
+ia._clock = new [];
+ia._clock['wall'] = () { result = iaSt['wall']; };
+ia._clock['mono'] = () { result = iaSt['mono']; };
+ia._clock['time'] = () { result = iaSt['time']; };
+ia._clock['sleep'] = (ms) { iaSt['mono'] += ms; };
+ib._clock = new [];
+ib._clock['wall'] = () { result = ibSt['wall']; };
+ib._clock['mono'] = () { result = ibSt['mono']; };
+ib._clock['time'] = () { result = ibSt['time']; };
+ib._clock['sleep'] = (ms) { ibSt['mono'] += ms; };
+var iaId = ia.addJob('* * * * *', () {});
+var ibId = ib.addJob('* * * * *', () {});
+?. ia._byId['id:' & iaId]['nextMs'] = 60111;
+?. ib._byId['id:' & ibId]['nextMs'] = 60222;
+
+var nrSt = new [wall: at(2026, 11, 12, 3, 0, 0), mono: 0, time: 5000.0];
+var nrS = CronScheduler();
+nrS._clock = fakeClock(nrSt);
+var nrSId = nrS.addJob('0 3 * * *', () {});
+var nrSDiff = (nrS.nextRun(nrSId) * 1 - 5001) * 86400;
+?. nrSDiff > -3 and nrSDiff < 3;
+
+var neSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var neS = CronScheduler();
+neS._clock = fakeClock(neSt);
+var neSId = neS.every('1h', () {});
+var neSDiff = (neS.nextRun(neSId) * 1 - 5000) * 86400;
+?. neSDiff > 3599 and neSDiff < 3601;
+
+var lcSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var lc = CronScheduler();
+lc._clock = fakeClock(lcSt);
+var lcHits = 0;
+var lcId = lc.addJob('* * * * *', () {
+  lcHits += 1;
+  lcSt['wall'] = at(2026, 11, 12, 0, 7, 0);
+  lcSt['mono'] = 420000;
+});
+makeDue(lc, lcId, at(2026, 11, 12, 0, 0, 0), 0);
+?. lc._tick(at(2026, 11, 12, 0, 0, 0), 0) = 1;
+?. lcHits = 1;
+var lcJob = lc._byId['id:' & lcId];
+?. whenText(lcJob['nextWall']) = '2026-11-12 0:8:0';
+?. lcJob['nextMs'] = 480000;
+
+var leSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var le = CronScheduler();
+le._clock = fakeClock(leSt);
+var leHits = 0;
+var leId = le.every('1s', () {
+  leHits += 1;
+  leSt['mono'] = 5000;
+});
+makeDue(le, leId, at(2026, 11, 12, 0, 0, 0), 0);
+?. le._tick(at(2026, 11, 12, 0, 0, 0), 0) = 1;
+?. leHits = 1;
+?. le._byId['id:' & leId]['nextMs'] = 6000;
+
+var rjSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var rj = CronScheduler();
+rj._clock = fakeClock(rjSt);
+var rjHits = 0;
+var rjId = rj.addJob('* * * * * *', () {
+  rjHits += 1;
+  rj.stop();
+}, [withSeconds: true]);
+rj._clock['sleep'] = (ms) {
+  rjSt['wall'] = at(2026, 11, 12, 0, 2, 0);
+  rjSt['mono'] = 2000;
+  rjSt['time'] += ms / 86400000;
+};
+rj.run();
+?. rjHits = 1;
+var rjJob = rj._byId['id:' & rjId];
+?. whenText(rjJob['nextWall']) = '2026-11-12 0:2:1';
+?. rjJob['nextMs'] = 3000;
+?. rj._tick(at(2026, 11, 12, 0, 2, 0), 2000) = 0;
+
+var rsSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var rs = CronScheduler();
+var rsHits = 0;
+var rsSleeps = 0;
+rs._clock = fakeClock(rsSt);
+rs.addJob('* * * * *', () {
+  rsHits += 1;
+  rs.stop();
+});
+rs._clock['sleep'] = (ms) {
+  rsSleeps += 1;
+  rsSt['mono'] += ms;
+  rsSt['time'] += ms / 86400000;
+};
+rsSt['wall'] = at(2026, 11, 12, 0, 2, 0);
+rsSt['mono'] = 2000;
+rs.run();
+?. rsHits = 1;
+?. rsSleeps = 0;
+
+var rbkSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var rbkStep = 0;
+var rbkHits = 0;
+var rbkEarly = false;
+var rbkGuard = false;
+var rbk = CronScheduler();
+rbk._clock = fakeClock(rbkSt);
+rbk.addJob('* * * * *', () {
+  rbkHits += 1;
+  if rbkStep < 3 then rbkEarly = true; end if;
+  rbk.stop();
+});
+rbk._clock['sleep'] = (ms) {
+  rbkStep += 1;
+  if rbkStep > 6 then
+    rbkGuard = true;
+    rbk.stop();
+    return;
+  end if;
+  if rbkStep = 1 then
+    rbkSt['wall'] = at(2026, 11, 12, 0, 0, 30);
+    rbkSt['mono'] = 1000;
+  elsif rbkStep = 2 then
+    rbkSt['wall'] = at(2026, 11, 12, 0, 0, 10);
+    rbkSt['mono'] = 2000;
+  else
+    rbkSt['wall'] = at(2026, 11, 12, 0, 1, 0);
+    rbkSt['mono'] = 3000;
+  end if;
+  rbkSt['time'] += ms / 86400000;
+};
+rbk.run();
+?. rbkHits = 1;
+?. not rbkEarly;
+?. not rbkGuard;
+
+var feSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var fe = CronScheduler();
+fe._clock = fakeClock(feSt);
+var feHits = 0;
+var feSleeps = new [];
+fe.every('1s', () {
+  feHits += 1;
+  if feHits >= 3 then fe.stop(); end if;
+});
+fe._clock['sleep'] = (ms) {
+  feSleeps.@add(ms);
+  if feSleeps.@count() > 10 then fe.stop(); return; end if;
+  feSt['mono'] += ms;
+  feSt['time'] += ms / 86400000;
+};
+fe.run();
+?. feHits = 3;
+?. feSleeps.@count() = 3;
+?. feSleeps[0] = 1000;
+
+var rrSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var rr = CronScheduler();
+var rrHits = 0;
+var rrSleeps = 0;
+rr._clock = fakeClock(rrSt);
+rr.every('1s', () {
+  rrHits += 1;
+  if rrHits = 1 or rrHits = 2 then rr.stop(); end if;
+});
+rr._clock['sleep'] = (ms) {
+  rrSleeps += 1;
+  if rrSleeps > 10 then rr.stop(); return; end if;
+  rrSt['mono'] += ms;
+  rrSt['time'] += ms / 86400000;
+};
+rr.run();
+?. rrHits = 1;
+rr.run();
+?. rrHits = 2;
+
+var bwSt = new [wall: at(2026, 11, 12, 0, 5, 0), mono: 300000, time: 5000.0];
+var bw = CronScheduler();
+var bwOrder = new [];
+bw._clock = fakeClock(bwSt);
+var bwA = bw.addJob('* * * * *', () {
+  bwOrder.@add('A');
+  bwSt['wall'] = at(2026, 11, 12, 0, 0, 0);
+});
+var bwB = bw.addJob('* * * * *', () { bwOrder.@add('B'); });
+makeDue(bw, bwA, at(2026, 11, 12, 0, 5, 0), 300000);
+makeDue(bw, bwB, at(2026, 11, 12, 0, 5, 0), 300000);
+?. bw._tick(at(2026, 11, 12, 0, 5, 0), 300000) = 2;
+?. bwOrder.@count() = 2;
+
+var w0 = dclk['wall']();
+sleep(1100);
+var w1 = dclk['wall']();
+?. _cronDiffSec(w0, w1) <> 0;
