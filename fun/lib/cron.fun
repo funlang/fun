@@ -472,10 +472,23 @@ class CronScheduler(opts)
   var _deadHeap = 0;
   var _deadJobs = 0;
   var _inTick = false;
+  var _clock = nil;
 
   if opts <> nil and opts.@has('onError') then
     _onError = opts['onError'];
   end if;
+
+  // Internal test seam: wall/mono/time/sleep. Not a public constructor option.
+  fun _clk()
+    if _clock = nil then
+      _clock = new [];
+      _clock['wall'] = () { result = _cronNow(); };
+      _clock['mono'] = () { result = _cronNowMs(); };
+      _clock['time'] = () { result = 1.time(); };
+      _clock['sleep'] = (ms) { sleep(ms); };
+    end if;
+    result = _clock;
+  end fun;
 
   fun _heapLess(a, b)
     if a['nextMs'] <> b['nextMs'] then
@@ -596,7 +609,8 @@ class CronScheduler(opts)
       end if;
     end if;
     var j = _cronParseExpr(expr, ws);
-    var n = _cronNow();
+    var c = this._clk();
+    var n = c['wall']();
     var nx = _cronNext(j, n);
     if nx = nil then raise 'cron: no occurrence in the next 8 years'; end if;
     j['id'] = _nextId;
@@ -605,7 +619,7 @@ class CronScheduler(opts)
     j['expr'] = _cronTrim('' & expr);
     j['fn'] = fn;
     j['nextWall'] = nx;
-    j['nextMs'] = _cronNowMs() + _cronDiffSec(n, nx) * 1000;
+    j['nextMs'] = c['mono']() + _cronDiffSec(n, nx) * 1000;
     j['removed'] = false;
     _jobs.@add(j);
     _byId['id:' & j['id']] = j;
@@ -615,12 +629,13 @@ class CronScheduler(opts)
 
   fun every(interval, fn)
     var ms = _cronDurationMs(interval);
+    var c = this._clk();
     var j = new [];
     j['id'] = _nextId;
     _nextId += 1;
     j['kind'] = 'every';
     j['intervalMs'] = ms;
-    j['nextMs'] = _cronNowMs() + ms;
+    j['nextMs'] = c['mono']() + ms;
     j['fn'] = fn;
     j['removed'] = false;
     _jobs.@add(j);
@@ -633,13 +648,14 @@ class CronScheduler(opts)
     if _running then raise 'cron: already running'; end if;
     _running = true;
     _stopped = false;
-    this._rebaseCron(_cronNow(), _cronNowMs());
+    var c = this._clk();
+    this._rebaseCron(c['wall'](), c['mono']());
     var lastN = nil;
     var lastMs = 0;
     try
       while not _stopped do
-        var n = _cronNow();
-        var nowMs = _cronNowMs();
+        var n = c['wall']();
+        var nowMs = c['mono']();
         if lastN <> nil then
           var wallD = _cronDiffSec(lastN, n);
           var monoD = (nowMs - lastMs) / 1000;
@@ -651,9 +667,9 @@ class CronScheduler(opts)
         lastMs = nowMs;
         this._tick(n, nowMs);
         if not _stopped then
-          var wait = this._nextWait(_cronNowMs());
+          var wait = this._nextWait(c['mono']());
           if wait < 10 then wait = 10; end if;
-          sleep(wait);
+          c['sleep'](wait);
         end if;
       end do;
     finally
@@ -724,20 +740,21 @@ class CronScheduler(opts)
     if id <= 0 then result = nil; return; end if;
     var j = _byId['id:' & id];
     if j = nil then result = nil; return; end if;
+    var c = this._clk();
     if j['kind'] = 'cron' then
-      var n = _cronNow();
+      var n = c['wall']();
       var nx = _cronNext(j, n);
       if nx = nil then result = nil; return; end if;
-      result = 1.time() + _cronDiffSec(n, nx) / 86400;
+      result = c['time']() + _cronDiffSec(n, nx) / 86400;
     else
-      var nowMs = _cronNowMs();
+      var nowMs = c['mono']();
       var nextAt = j['nextMs'];
       var interval = j['intervalMs'];
       if nextAt <= nowMs then
         var k = (nowMs - nextAt) div interval + 1;
         nextAt += k * interval;
       end if;
-      result = 1.time() + (nextAt - nowMs) / 86400000;
+      result = c['time']() + (nextAt - nowMs) / 86400000;
     end if;
   end fun;
 
@@ -757,6 +774,7 @@ class CronScheduler(opts)
   fun _tick(n, nowMs)
     if _stopped then result = 0; return; end if;
     _inTick = true;
+    var c = this._clk();
     var fired = 0;
     var batch = new [];
     var done = false;
@@ -787,13 +805,13 @@ class CronScheduler(opts)
               this._reportError(j);
             end try;
             if not j['removed'] then
-              var after = _cronNow();
+              var after = c['wall']();
               var nx = _cronNext(j, after);
               if nx = nil then
                 this.removeJob(j['id']);
               else
                 j['nextWall'] = nx;
-                j['nextMs'] = _cronNowMs() + _cronDiffSec(after, nx) * 1000;
+                j['nextMs'] = c['mono']() + _cronDiffSec(after, nx) * 1000;
                 this._heapPush(j);
               end if;
             end if;
@@ -814,7 +832,7 @@ class CronScheduler(opts)
             this._reportError(j);
           end try;
           if not j['removed'] then
-            var afterMs = _cronNowMs();
+            var afterMs = c['mono']();
             if nextAt <= afterMs then nextAt = afterMs + interval; end if;
             j['nextMs'] = nextAt;
             this._heapPush(j);
