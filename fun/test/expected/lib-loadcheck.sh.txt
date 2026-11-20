@@ -38,6 +38,7 @@ LOAD  lib-file
 LOAD  lib-hmac
 LOAD  lib-host
 FAIL  lib-icmp               fun/lib/lib-icmp.fun:7: getapi: cannot load library "icmp.dl
+LOAD  lib-input
 LOAD  lib-jit
 LOAD  lib-jsasync
 LOAD  lib-jsbox
@@ -87,4 +88,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=82 failed=6
+loaded=83 failed=6

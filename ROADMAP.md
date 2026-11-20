@@ -51,6 +51,7 @@
 | K-01 | 内核 | P3 | OPEN | H-09 `_eval` 的 `$@@` 整体重扫 | 本地 hazards 清单 |
 | K-02 | 内核 | P2 | OPEN | H-05 `div/mod 0` 仍抛 RTL `EDivByZero`，脚本可捕获，按兼容保留 | 本地 hazards 清单 |
 | K-03 | 内核 | P2 | OPEN | H-06 Delphi/32 位与 Int64 极值边界未复测 | 本地 hazards 清单 |
+| K-05 | 内核 | P3 | OPEN | `result` 按 Pascal 语义由脚本手动初始化；同一函数重复调用会复用上次栈槽的旧值（`CVarStack.PushVar` 不清空），不是 bug，但新库必须在入口写 `result = nil` / `result = 0` | `src/core/core.pas:1058`、`src/core/base.pas:980` |
 | D-02 | 数据 | P2 | OPEN | FD fixed-length binary 类型跨端会退化成文本 | `art/notes/data-format-alignment.md` |
 | D-03 | 数据 | P2 | OPEN | 日期/时间跨端约定未统一 | `art/notes/data-format-alignment.md` |
 | D-04 | 数据 | P2 | OPEN | Fun `Int64` 超过 2^53 传给 JS 会静默丢精度 | `art/notes/data-format-alignment.md` |
