@@ -267,10 +267,17 @@ jobs:
             # morning and publish a second nightly (.2) for what is still the
             # same night's schedule. Manual dispatch (force) is not gated, so
             # an intentional extra nightly is still possible.
+            #
+            # Compare publishedAt, not createdAt. A nightly tag is lightweight,
+            # and GitHub reports a lightweight tag's release createdAt as the
+            # commit date. Comparing createdAt with today therefore compared
+            # yesterday's commit with the runner's clock and let the gate
+            # through whenever commits landed during the morning window (two
+            # nightlies were published on 2026-11-17 that way).
             if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
               last_nightly_at=$(gh release list --limit 100 \
-                --json isPrerelease,createdAt \
-                --jq '[.[] | select(.isPrerelease)][0].createdAt // empty')
+                --json isPrerelease,publishedAt \
+                --jq '[.[] | select(.isPrerelease) | .publishedAt] | sort | last // empty')
               if [ -n "$last_nightly_at" ] \
                  && [ "$(TZ='Asia/Shanghai' date -d "$last_nightly_at" +%Y%m%d)" \
                       = "$(TZ='Asia/Shanghai' date +%Y%m%d)" ]; then
