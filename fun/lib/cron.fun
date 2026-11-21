@@ -12,7 +12,11 @@
 //     s.every('1s', refresh);
 //
 //     s.run();   // blocking
-//     s.stop();  // stop after the current callback
+//     s.stop();  // stop the run() loop after the current callback
+//
+//     // or drive one pass without sleeping from your own loop:
+//     s.tick();
+//     var wait = s.nextWaitMs(200);
 //
 // addJob and every return a per-instance id; removeJob(id) removes one job
 // and jobs() returns a snapshot. Ids start at 1 and are never reused.
@@ -472,6 +476,8 @@ class CronScheduler(opts)
   var _deadHeap = 0;
   var _deadJobs = 0;
   var _inTick = false;
+  var _lastWall = nil;
+  var _lastMono = 0;
   var _clock = nil;
 
   if opts <> nil and opts.@has('onError') then
@@ -646,26 +652,15 @@ class CronScheduler(opts)
 
   fun run()
     if _running then raise 'cron: already running'; end if;
+    if _inTick then raise 'cron: already ticking'; end if;
     _running = true;
     _stopped = false;
     var c = this._clk();
-    this._rebaseCron(c['wall'](), c['mono']());
-    var lastN = nil;
-    var lastMs = 0;
+    _lastWall = nil;
+    _lastMono = 0;
     try
       while not _stopped do
-        var n = c['wall']();
-        var nowMs = c['mono']();
-        if lastN <> nil then
-          var wallD = _cronDiffSec(lastN, n);
-          var monoD = (nowMs - lastMs) / 1000;
-          if wallD - monoD > 2 or monoD - wallD > 2 then
-            this._rebaseCron(n, nowMs);
-          end if;
-        end if;
-        lastN = n;
-        lastMs = nowMs;
-        this._tick(n, nowMs);
+        this._pass(c);
         if not _stopped then
           var wait = this._nextWait(c['mono']());
           if wait < 10 then wait = 10; end if;
@@ -675,6 +670,60 @@ class CronScheduler(opts)
     finally
       _running = false;
     end try;
+  end fun;
+
+  fun _pass(c)
+    var n = c['wall']();
+    var nowMs = c['mono']();
+    if _lastWall = nil then
+      this._rebaseCron(n, nowMs);
+    else
+      var wallD = _cronDiffSec(_lastWall, n);
+      var monoD = (nowMs - _lastMono) / 1000;
+      if wallD - monoD > 2 or monoD - wallD > 2 then
+        this._rebaseCron(n, nowMs);
+      end if;
+    end if;
+    _lastWall = n;
+    _lastMono = nowMs;
+    result = this._tick(n, nowMs);
+  end fun;
+
+  fun tick()
+    if _running then raise 'cron: already running'; end if;
+    if _inTick then raise 'cron: already ticking'; end if;
+    if _stopped then result = 0; return; end if;
+    var c = this._clk();
+    result = this._pass(c);
+  end fun;
+
+  fun nextWaitMs(maxMs)
+    var cap = 1000;
+    if maxMs.type() <> 0 then
+      cap = maxMs;
+      if cap < 0 then cap = 0; end if;
+    end if;
+    if _stopped then result = cap; return; end if;
+    if _inTick then result = 0; return; end if;
+    var c = this._clk();
+    var nowMs = c['mono']();
+    var done = false;
+    while not done do
+      var top = this._heapPeek();
+      if top = nil then
+        result = cap;
+        return;
+      elsif top['removed'] then
+        this._heapPop();
+        if _deadHeap > 0 then _deadHeap -= 1; end if;
+      else
+        var d = top['nextMs'] - nowMs;
+        if d < 0 then d = 0; end if;
+        if d > cap then d = cap; end if;
+        result = d;
+        return;
+      end if;
+    end do;
   end fun;
 
   fun _nextWait(nowMs)

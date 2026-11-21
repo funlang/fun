@@ -687,7 +687,7 @@ use 'cron.fun';
 
 var s = CronScheduler();
 var daily = s.addJob('0 3 * * *', cleanup);                // 5 字段 Vixie/POSIX
-var tick = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
+var every30s = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
 var refreshId = s.every('1s', refresh);                    // 固定间隔
 
 s.removeJob(daily);           // 取消一个任务
@@ -734,10 +734,50 @@ var s = CronScheduler([onError: (job, err) {
 
 `job` 与 `jobs()` 返回的是同一种公开快照；`err` 是 `runtime.lastError()`。
 
-调度器占用阻塞循环，适合独立脚本/daemon，暂不能和
-`HttpServer.run` 共用线程。它使用本地时间，暂不提供时区/DST 控制。回调异常
-会被隔离、不停止循环；没有 `onError` 时不会上报，所以要么传入上面的处理器，
-要么在回调内部处理预期错误。
+`run()` 是阻塞循环，适合独立脚本/daemon。要和 `HttpServer` 或其它 poll 循环
+共用线程，可以用 `tick()` 和 `nextWaitMs(maxMs)` 协作驱动：
+
+```fun
+use 'cron.fun';
+use 'http-server.fun';
+
+var s = CronScheduler();
+s.addJob('0 3 * * *', cleanup);
+s.every('1s', refresh);
+
+var web = HttpServer(':8080');
+var running = true;
+web.get('/health', health);
+web.get('/quit', (req, res) {
+  running = false;
+  res.text('bye');
+});
+web.listen();
+while running do
+  s.tick();
+  if running then
+    var wait = s.nextWaitMs(200);
+    if wait < 1 then wait = 1; end if;
+    web.runOnce(wait);
+  end if;
+end do;
+web.stop();
+```
+
+`tick()` 执行一次不 sleep 的调度 pass，返回本次触发的回调数。`nextWaitMs(maxMs)`
+只是查询：任务到期时返回 `0`，否则最多返回 `maxMs` 毫秒（nil 或省略表示
+1000）；负数按 0，空调度器或已停止返回上限。它不执行回调，也不修改任务的下次
+执行时间。`nextRun(id)` 不同：它接收 id，返回绝对 Fun time。
+
+poll 间隔决定任务最坏延迟和墙钟跳变的检测延迟；小于 poll 间隔的任务会按
+poll 粒度合并。`tick()` 同步执行回调：慢 cron 回调会推迟 HTTP 请求，慢 HTTP
+handler 也会推迟 cron。`run()` 活跃或回调内调用 `tick()` 会被拒绝。`stop()`
+是给 `run()` 用的；tick 驱动的循环应使用自己的 running 标志，`stop()` 后
+`tick()` 返回 0，直到再次调用 `run()`。现有 `HttpServer.runOnce(0)` 会被当作
+200ms，所以 recipe 把到期等待钳到至少 1ms。`runOnce()` 目前 Linux/macOS 可用。
+调度器使用本地时间，暂不提供时区/DST 控制。回调异常会被隔离、不停止循环；
+没有 `onError` 时不会上报，所以要么传入上面的处理器，要么在回调内部处理预期
+错误。
 
 上传表单直接从请求读取，无需额外引入：
 

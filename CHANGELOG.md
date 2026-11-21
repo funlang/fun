@@ -62,6 +62,14 @@ This project records notable changes in the style of [Keep a Changelog](https://
   now cover wall-clock rebase, backward jumps, long callbacks and missed runs
   deterministically.
 
+- `CronScheduler` gains `tick()` and `nextWaitMs(maxMs)` for cooperative
+  driving in a single-threaded service. `tick()` runs one scheduling pass
+  without sleeping and returns the fired count; `nextWaitMs()` returns the next
+  poll timeout. This lets cron share an `HttpServer.runOnce()` or custom poll
+  loop without giving cron its own blocking loop; callbacks still run
+  synchronously and can block the shared thread. `run()` keeps its existing
+  blocking behavior.
+
 ## [9.5.6] - 2026-11-15
 
 - Runtime errors now carry a call-site traceback in the default build (the old
