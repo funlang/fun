@@ -127,9 +127,8 @@ fun _nowMs()
 end fun;
 
 // Run pending onDone callbacks on the calling (main) thread. Call this from
-// your event loop; returns the number of callbacks fired. Callbacks of
-// workers that finished are removed before they run, so a raising callback
-// does not leave a stuck entry behind.
+// your event loop; returns the number of callbacks fired. Every ready callback
+// runs even if an earlier one raises; the first error is re-raised afterwards.
 fun workerTick()
   var old = _pending;
   _pending = new [];
@@ -137,11 +136,20 @@ fun workerTick()
   for w in old do
     if w.alive() then _pending.@add(w); else ready.@add(w); end if;
   end do;
+  var firstErr = nil;
   for w in ready do
     var cb = w.doneCb;
     w.doneCb = nil;
-    if cb <> nil then cb(w.result(), w.error()); end if;
+    if cb <> nil then
+      try
+        cb(w.result(), w.error());
+      except
+        var e = @;
+        if firstErr = nil then firstErr = e; end if;
+      end try;
+    end if;
   end do;
+  if firstErr <> nil then raise firstErr; end if;
   result = ready.@count();
 end fun;
 

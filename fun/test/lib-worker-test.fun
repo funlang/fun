@@ -158,6 +158,26 @@ ew.onDone(fun (r, e) {
 check('onDone error wait', workerWaitAll(10000));
 check('onDone error', errSeen <> nil and errSeen.subpos('worker boom') >= 0);
 
+// 12. a raising onDone callback does not starve later callbacks
+var secondRan = false;
+var bw = WorkerFile(job, 'echo', 'bad');
+bw.onDone(fun (r, e) {
+  raise 'callback boom';
+});
+var gw = WorkerFile(job, 'echo', 'good');
+gw.onDone(fun (r, e) {
+  secondRan = true;
+});
+var cbErr = nil;
+try
+  workerWaitAll(10000);
+except
+  cbErr = @;
+end try;
+check('callback error surfaced', cbErr <> nil and cbErr.subpos('callback boom') >= 0);
+check('callback after error ran', secondRan);
+check('callback queue empty', workerPending() = 0);
+
 ?. 'worker tests: pass=' & pass & ' fail=' & failed;
 if failed > 0 then
   raise 'worker tests failed';
