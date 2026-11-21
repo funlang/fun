@@ -717,9 +717,12 @@ Shared('counter').add('done', 1);
 Channel('log').send('job finished');
 
 // completion callback on the main thread (call workerTick in an event loop)
-w.onDone(fun (result, error) {
+var w2 = WorkerFile('job.fun', 'sum', (new [1000]).@toJson(fd: true));
+w2.onDone(fun (result, error) {
   ?. 'worker returned ' & result;
 });
+// ... later, in the event loop:
+workerTick();
 ```
 
 Logging is configured once and then used through named loggers:
