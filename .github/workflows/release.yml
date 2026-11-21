@@ -5,8 +5,9 @@
 #
 #   nightly  schedule 04:37 Asia/Shanghai, or manual dispatch. Publishes a
 #            prerelease only when code changed since the previous nightly and
-#            the exact commit passed regression. Dates come from the commit
-#            timestamp, never from the runner clock. Published as a
+#            the exact commit passed regression. The date names the night
+#            being delivered (the preceding calendar day), so a commit made
+#            just after midnight stays with that night. Published as a
 #            lightweight tag and a GitHub prerelease.
 #
 #   stable   pushing an annotated v* tag, or manual dispatch. Publishes the
@@ -160,8 +161,9 @@ jobs:
           # jitter (see `on.schedule`). Only the first scheduled run that
           # actually starts at or after 04:37 Asia/Shanghai should publish;
           # earlier entries exit here. The runner clock decides *whether to
-          # act now*; the tag date still comes from the commit timestamp
-          # below, so a delayed run never changes the release date.
+          # act now*; the date below always names the night being delivered
+          # (the preceding day), so a delayed run never produces a future
+          # date.
           # Manual dispatch is never gated.
           if [ "$GITHUB_EVENT_NAME" = "schedule" ]; then
             NOW_HM=$((10#$(TZ='Asia/Shanghai' date +%H%M)))
@@ -179,12 +181,22 @@ jobs:
           VERSION=$(sed -n "s/.*funRelease = '\([0-9][0-9.]*\)'.*/\1/p" src/core/version.inc | head -1)
           [ -n "$VERSION" ] || { echo "::error::cannot read funRelease from src/core/version.inc"; exit 1; }
 
-          # A dated nightly must use the commit date, not the runner clock: a
-          # delayed schedule can cross midnight, and the tag should describe
-          # the code, not the queue.
           COMMIT_TS=$(git log -1 --format=%ct "$SHA")
           COMMIT_YMD=$(TZ='Asia/Shanghai' date -d "@$COMMIT_TS" +%Y%m%d)
-          out date "$COMMIT_YMD"
+
+          # A nightly delivers the night that just ended, so a run on day D is
+          # dated D-1. Every scheduled entry is between 00:37 and 07:37
+          # Asia/Shanghai, and a manual dispatch delivers the same night.
+          # Looking back one day instead of at HEAD's commit timestamp keeps
+          # the series continuous when a commit lands just after midnight:
+          # that commit belongs to the night already in progress, not to a new
+          # date. A delayed run still never names a future date.
+          if [ "$CHANNEL" = nightly ]; then
+            RELEASE_YMD=$(TZ='Asia/Shanghai' date -d 'yesterday' +%Y%m%d)
+          else
+            RELEASE_YMD=$COMMIT_YMD
+          fi
+          out date "$RELEASE_YMD"
 
           latest_stable=$(gh release list --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName // empty')
           next_patch=$(python3 - "$VERSION" "$latest_stable" <<'PY'
@@ -247,7 +259,7 @@ jobs:
 
           # --- nightly ----------------------------------------------------
           else
-            TAG="v${next_patch}-nightly.${COMMIT_YMD}"
+            TAG="v${next_patch}-nightly.${RELEASE_YMD}"
             out version "$next_patch"
 
             # Waterline: the previous nightly if there is one, else the last
@@ -307,7 +319,7 @@ jobs:
             # above the highest suffix already used today, so deleting an old
             # tag cannot make a newer nightly take a lower version.
             maxsuffix=1
-            prefix="v${next_patch}-nightly.${COMMIT_YMD}"
+            prefix="v${next_patch}-nightly.${RELEASE_YMD}"
             for t in $(git tag -l "${prefix}*"); do
               if [ "$t" = "$prefix" ]; then
                 s=1
@@ -318,7 +330,7 @@ jobs:
               [ "$s" -gt "$maxsuffix" ] && maxsuffix=$s
             done
             n=$maxsuffix
-            if [ "$n" -eq 1 ]; then candidate="$TAG"; else candidate="v${next_patch}-nightly.${COMMIT_YMD}.${n}"; fi
+            if [ "$n" -eq 1 ]; then candidate="$TAG"; else candidate="v${next_patch}-nightly.${RELEASE_YMD}.${n}"; fi
             while git rev-parse -q --verify "refs/tags/$candidate^{commit}" >/dev/null; do
               existing=$(git rev-parse "refs/tags/$candidate^{commit}")
               if [ "$existing" = "$SHA" ]; then
@@ -327,7 +339,7 @@ jobs:
                 break
               fi
               n=$((n + 1))
-              candidate="v${next_patch}-nightly.${COMMIT_YMD}.${n}"
+              candidate="v${next_patch}-nightly.${RELEASE_YMD}.${n}"
             done
             TAG="$candidate"
             out tag "$TAG"
@@ -423,7 +435,7 @@ jobs:
             echo "| tag | ${{ steps.decide.outputs.tag }} |"
             echo "| version | ${{ steps.decide.outputs.version }} |"
             echo "| commit | \`${{ steps.decide.outputs.sha }}\` |"
-            echo "| date (commit, Asia/Shanghai) | ${{ steps.decide.outputs.date }} |"
+            echo "| date (night, Asia/Shanghai) | ${{ steps.decide.outputs.date }} |"
             echo "| regression run | ${{ steps.decide.outputs.run_id }} |"
             echo "| previous | ${{ steps.decide.outputs.previous_tag }} |"
             echo "| reason | ${{ steps.decide.outputs.reason }} |"

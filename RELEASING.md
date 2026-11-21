@@ -79,8 +79,11 @@ time-gated.
   during an incident), the gate dispatches `regression` for `main` and waits
   for the same commit instead of silently skipping. A failed or mismatched
   dispatched run fails the gate, so `HEARTBEAT_URL` reports it.
-- The date comes from the HEAD commit timestamp in Asia/Shanghai, not from
-  the runner clock, so a delayed run does not produce tomorrow's date.
+- The date names the night being delivered: a run in the 00:37-07:37 window
+  is dated the previous calendar day in Asia/Shanghai. A commit made just
+  after midnight therefore stays with the night it belongs to instead of
+  leaving a hole in the date series, and a delayed run never produces
+  tomorrow's date.
 - The version is the next patch after the newest stable version, e.g.
   `v9.5.5-nightly.20261104`. In SemVer this sorts below `v9.5.5`. Nightly
   runs never modify `version.inc`, README, ROADMAP or CHANGELOG and never

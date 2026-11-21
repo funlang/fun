@@ -73,8 +73,9 @@ git push origin vX.Y.Z
   触发的运行缺失（GitHub Actions 故障时可能丢事件），gate 会为 `main` 重新
   触发 regression 并等待同一个 commit，而不是静默跳过。重触发的运行失败或
   指向别的 commit 时 gate 失败，`HEARTBEAT_URL` 会收到失败信号。
-- 日期取自 HEAD commit 时间戳的北京时间，不取 runner 墙钟，延迟跨午夜也不会
-  错一天。
+- 日期表示本次交付的“夜里”：在 00:37-07:37 窗口运行的 nightly 记为北京时间
+  的前一天。午夜后刚提交的代码仍属于同一夜，日期序列不会出现空洞；运行延迟
+  也不会写成明天的日期。
 - 版本是当前最新稳定版的下一个 patch，例如
   `v9.5.5-nightly.20261104`。按 SemVer 它低于 `v9.5.5`。nightly 不修改
   `version.inc`、README、ROADMAP、CHANGELOG，也不产生任何提交。
