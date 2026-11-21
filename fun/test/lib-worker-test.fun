@@ -178,6 +178,21 @@ check('callback error surfaced', cbErr <> nil and cbErr.subpos('callback boom') 
 check('callback after error ran', secondRan);
 check('callback queue empty', workerPending() = 0);
 
+// 13. workerAttach drives onDone from an event loop's onTick hook
+var tickRan = 0;
+var ticker = new [onTick: nil];
+workerAttach(ticker);
+var aw = WorkerFile(job, 'echo', 'attached');
+aw.onDone(fun (r, e) {
+  tickRan += 1;
+});
+var spins = 0;
+while workerPending() > 0 and spins < 100000 do
+  ticker.onTick();
+  spins += 1;
+end do;
+check('workerAttach fired', tickRan = 1 and spins < 100000);
+
 ?. 'worker tests: pass=' & pass & ' fail=' & failed;
 if failed > 0 then
   raise 'worker tests failed';

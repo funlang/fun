@@ -144,6 +144,15 @@ w.onDone(fun (text, err) {
 workerTick();
 ```
 
+For an event loop with an `onTick` hook, `workerAttach` connects the two. The
+`Scheduler` in `lib-winsock-base` has such a hook, so HTTP-style loops can drive
+completions without calling `workerTick` themselves:
+
+```fun
+var s = Scheduler();
+workerAttach(s);       // every s.Tick() now ends with workerTick()
+```
+
 - `Worker.onDone(fx)` can be set once per worker. It registers the worker in the
   module-level pending list.
 - `workerTick()` fires callbacks for finished workers, returns the number fired,
@@ -152,6 +161,9 @@ workerTick();
   dispatched.
 - `workerWaitAll(timeout)` joins every registered worker and then dispatches.
   It is convenient for scripts, but it blocks the main thread.
+- `workerAttach(scheduler)` assigns `scheduler.onTick = fun () { workerTick(); }`,
+  so a loop that already has an `onTick` hook needs one wiring call. It returns
+  the scheduler. Callback errors propagate out of the tick.
 - `workerTick` is a plain function, so any event loop can call it. It does not
   depend on a particular HTTP or socket loop.
 

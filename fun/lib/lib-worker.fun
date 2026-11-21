@@ -157,6 +157,15 @@ fun workerPending()
   result = _pending.@count();
 end fun;
 
+// Attach worker completions to an event loop that has an assignable onTick
+// field. Scheduler in lib-winsock-base is the built-in example; any object with
+// the same field works. Each Tick then calls workerTick(). Callback errors
+// propagate out of Tick, so handle them where the loop is driven.
+fun workerAttach(scheduler)
+  scheduler.onTick = fun () { workerTick(); };
+  result = scheduler;
+end fun;
+
 // Join every worker registered with onDone, firing callbacks as they finish.
 // timeout is milliseconds and -1 waits forever. Returns true when nothing
 // remains pending. In an event-driven program prefer workerTick() instead:

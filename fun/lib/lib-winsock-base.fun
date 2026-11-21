@@ -117,6 +117,9 @@ end fun;
 class Scheduler()
   var timers = new [];
   var tasks  = new [];
+  // Optional hook called at the end of every Tick, after timers and tasks.
+  // workerAttach(scheduler) in lib-worker uses it to dispatch onDone callbacks.
+  var onTick = nil;
 
   fun Post(fx)
     this.tasks.@add(fx);
@@ -172,6 +175,7 @@ class Scheduler()
     var ts = this.tasks;
     this.tasks = new [];
     for f in ts do f(); end do;
+    if this.onTick <> nil then this.onTick(); end if;
     result = fired;
   end fun;
 end class;
