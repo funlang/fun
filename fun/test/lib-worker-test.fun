@@ -88,6 +88,49 @@ sh.set('s', 'hello');
 check('shared string', sh.get('s') = 'hello');
 check('shared add', sh.add('n', 10) = 14);
 
+// 9. named channel: FIFO in one thread, then producer worker -> main thread,
+// then main thread -> consumer worker.
+var ch = Channel('worker-test-chan-a');
+check('channel empty', ch.count() = 0);
+ch.send('one');
+ch.send('two');
+check('channel count', ch.count() = 2);
+check('channel fifo', ch.recv(0) = 'one' and ch.recv(0) = 'two');
+check('channel empty recv', ch.recv(0) = nil);
+
+var cp = Channel('worker-test-chan-b');
+var pw = WorkerFile(job, 'sendN', ['worker-test-chan-b', 5].@toJson(fd: true));
+var got = 0;
+for i = 1 to 5 do
+  var cv = cp.recv(5000);
+  if cv <> nil then got += cv.toNum(); end if;
+end do;
+check('channel worker sum', got = 15);
+check('channel producer', pw.join(-1) = '5');
+
+var cq = Channel('worker-test-chan-c');
+var cw = WorkerFile(job, 'recvN', ['worker-test-chan-c', 4].@toJson(fd: true));
+for i = 1 to 4 do cq.send('' & i); end do;
+check('channel consumer', cw.join(-1) = '10');
+
+var cc = Channel('worker-test-chan-d');
+cc.close();
+check('channel closed', cc.closed());
+check('channel closed recv', cc.recv(0) = nil);
+check('channel closed try', cc.tryRecv() = nil);
+
+// 10. onDone runs on the main thread, not on the worker thread. workerTick is
+// the event-loop form; workerWaitAll joins and then dispatches.
+var seen = new [];
+var cbw = WorkerFile(job, 'echo', 'cb');
+cbw.onDone(fun (r, e) {
+  seen.@add('ok:' & r & ':' & (e = nil));
+});
+check('pending 1', workerPending() = 1);
+check('waitAll', workerWaitAll(10000));
+check('onDone fired', seen.@count() = 1 and seen[0] = 'ok:cb:true');
+check('pending empty', workerPending() = 0);
+
 ?. 'worker tests: pass=' & pass & ' fail=' & failed;
 if failed > 0 then
   raise 'worker tests failed';

@@ -700,6 +700,27 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (81 modules)
 `lib-worker` needs the opt-in `funcmd-mt` Linux build
 (`src/prj/fun/make-linux-x86_64-mt.sh`). The default `funcmd` keeps its
 single-threaded heap and performance and reports a clear error on first use.
+A worker parses its own module and owns its AST and heap, so nothing Fun-visible
+is shared between threads. Results are strings; `Shared` and `Channel` copy
+values in and out:
+
+```fun
+use 'lib-worker.fun';
+
+// file, entry function, FD payload; -1 waits forever
+var w = WorkerFile('job.fun', 'sum', (new [1000]).@toJson(fd: true));
+var total = w.join(-1);
+if w.error() <> nil then raise w.error(); end if;
+
+// named, process-wide store and FIFO; workers open them by the same name
+Shared('counter').add('done', 1);
+Channel('log').send('job finished');
+
+// completion callback on the main thread (call workerTick in an event loop)
+w.onDone(fun (result, error) {
+  ?. 'worker returned ' & result;
+});
+```
 
 Logging is configured once and then used through named loggers:
 

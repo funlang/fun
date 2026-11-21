@@ -6,6 +6,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `lib-worker` now has named FIFO **channels** (`Channel(name)` with `send`,
+  `recv(timeout)`, `tryRecv`, `close`, `closed`, `count`) and main-thread
+  completion callbacks (`Worker.onDone`, `workerTick`, `workerPending`,
+  `workerWaitAll`). Channels copy strings/FD in and out, so a producer and a
+  consumer on different threads never share a Fun object. `funcmd-mt` only.
+
 - Windows arm64 is **not a release target yet**. FPC 3.2.2 has no
   win64/aarch64 target; FPC 3.3.1 (trunk), which does, currently produces
   binaries that crash with `0xC0000005` on real ARM64 Windows, including its

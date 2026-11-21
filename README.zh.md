@@ -652,7 +652,27 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 
 `lib-worker` 需要 opt-in 的 Linux `funcmd-mt` 构建
 （`src/prj/fun/make-linux-x86_64-mt.sh`）。默认 `funcmd` 保持单线程堆与性能，
-首次使用 worker 时会给出明确错误。
+首次使用 worker 时会给出明确错误。worker 会解析自己的模块并拥有独立的 AST 与堆，
+因此线程之间不共享任何 Fun 对象。结果以字符串返回；`Shared` 与 `Channel`
+在进出时复制值：
+
+```fun
+use 'lib-worker.fun';
+
+// 文件、入口函数、FD 负载；-1 表示一直等待
+var w = WorkerFile('job.fun', 'sum', (new [1000]).@toJson(fd: true));
+var total = w.join(-1);
+if w.error() <> nil then raise w.error(); end if;
+
+// 进程范围、按名字共享的存储与 FIFO 队列
+Shared('counter').add('done', 1);
+Channel('log').send('job finished');
+
+// 在主线程执行完成回调（事件循环中调用 workerTick）
+w.onDone(fun (result, error) {
+  ?. 'worker returned ' & result;
+});
+```
 
 日志在入口配置一次，之后通过命名 logger 使用：
 

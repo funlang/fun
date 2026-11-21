@@ -31,7 +31,7 @@ unit worker;
 
 interface
 
-uses fun, base, core;
+uses fun, base, core, Classes;
 
 type
   // One evaluation thread with its own module and environment.
@@ -99,13 +99,46 @@ type
 // 'Shared'.open(name)
 procedure _sharedOpen(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 
+// A named, process-wide FIFO channel. Workers on different threads open the
+// same channel by name. Payloads are copied in and out, so no Fun string is
+// referenced from two threads. recv() blocks in 1 ms steps; close() makes a
+// blocked recv return nil after draining queued items.
+type
+  CChannelItem = class(CBase)
+  public
+    value: fun.str;
+    constructor Create(const avalue: fun.str);
+  end;
+
+  CChannel = class(CBase)
+  private
+    FLock: TRTLCriticalSection;
+    FItems: TList;
+    FClosed: Boolean;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Send(const value: fun.str);
+    function TryRecv(out s: fun.str): Boolean;
+    function Recv(timeout: fun.int; out s: fun.str): Boolean;
+    procedure Close;
+    function Closed: Boolean;
+    function Count: fun.int;
+  end;
+
+// 'Channel'.open(name)
+procedure _channelOpen(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+
+// 'Shared'.open / 'Channel'.open dispatcher.
+procedure _openNamed(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+
 {$EndIf}
 
 implementation
 
 {$IfDef FunThreads}
 
-uses SysUtils, Classes, parse;
+uses SysUtils, parse;
 
 type
   // Parse errors must stay on the worker thread. The driver's CFunParser
@@ -323,6 +356,7 @@ end;
 var
   SharedLock: TRTLCriticalSection;
   SharedList: TStringList; // name -> CShared (OwnsObjects)
+  ChannelList: TStringList; // name -> CChannel (OwnsObjects)
 
 function CopyStr(const s: fun.str): fun.str;
 begin
@@ -463,6 +497,140 @@ begin
 end;
 
 //==============================================================
+// FIFO channel
+//==============================================================
+constructor CChannelItem.Create(const avalue: fun.str);
+begin
+  inherited Create;
+  value := CopyStr(avalue);
+end;
+
+constructor CChannel.Create;
+begin
+  inherited Create;
+  InitCriticalSection(FLock);
+  FItems := TList.Create;
+end;
+
+destructor CChannel.Destroy;
+var
+  i: fun.int;
+begin
+  for i := 0 to FItems.Count - 1 do
+    CChannelItem(FItems[i]).Free;
+  FItems.Free;
+  DoneCriticalSection(FLock);
+  inherited Destroy;
+end;
+
+procedure CChannel.Send(const value: fun.str);
+begin
+  EnterCriticalSection(FLock);
+  try
+    if FClosed then raise EBase.Create('channel is closed');
+    FItems.Add(CChannelItem.Create(value));
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+function CChannel.TryRecv(out s: fun.str): Boolean;
+var
+  it: CChannelItem;
+begin
+  result := False;
+  s := '';
+  EnterCriticalSection(FLock);
+  try
+    if FItems.Count = 0 then exit;
+    it := CChannelItem(FItems[0]);
+    s := CopyStr(it.value);
+    FItems.Delete(0);
+    it.Free;
+    result := True;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+function CChannel.Recv(timeout: fun.int; out s: fun.str): Boolean;
+begin
+  while True do
+  begin
+    if TryRecv(s) then exit(True);
+    if Closed then exit(False);
+    if timeout = 0 then exit(False);
+    Sleep(1);
+    if timeout > 0 then Dec(timeout);
+  end;
+end;
+
+procedure CChannel.Close;
+begin
+  EnterCriticalSection(FLock);
+  try
+    FClosed := True;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+function CChannel.Closed: Boolean;
+begin
+  EnterCriticalSection(FLock);
+  try
+    result := FClosed;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+function CChannel.Count: fun.int;
+begin
+  EnterCriticalSection(FLock);
+  try
+    result := FItems.Count;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+procedure _channelOpen(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  e: CExp;
+  name: fun.str;
+  c: CChannel;
+  i: fun.int;
+begin
+  e := CExps.Find(exps, '', 0);
+  if e = nil then name := '' else name := e.asStr;
+  EnterCriticalSection(SharedLock);
+  try
+    i := ChannelList.IndexOf(name);
+    if i < 0 then
+    begin
+      c := CChannel.Create;
+      ChannelList.AddObject(name, c);
+    end
+    else
+      c := CChannel(ChannelList.Objects[i])
+    ;
+    setObj(val, c, VarObjNew);
+  finally
+    LeaveCriticalSection(SharedLock);
+  end;
+end;
+
+procedure _openNamed(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  if exp.asStr = 'Channel' then
+    _channelOpen(env, exp, exps, val)
+  else
+    _sharedOpen(env, exp, exps, val)
+  ;
+end;
+
+//==============================================================
 procedure _workerStart(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   source, entry, payload: fun.str;
@@ -497,7 +665,11 @@ initialization
   SharedList := TStringList.Create;
   SharedList.OwnsObjects := True;
   SharedList.CaseSensitive := True;
+  ChannelList := TStringList.Create;
+  ChannelList.OwnsObjects := True;
+  ChannelList.CaseSensitive := True;
 finalization
+  ChannelList.Free;
   SharedList.Free;
   DoneCriticalSection(SharedLock);
 {$EndIf}

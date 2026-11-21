@@ -85,6 +85,14 @@ type
     constructor Create;
     function accept(exp: CExp): fun.bool; override;
   end;
+
+  // FIFO channel handles (send/recv/close). Kept separate from CLworker so a
+  // method on the wrong handle type is rejected by dispatch, not a cast.
+  CLchannel = class(CLib)
+  public
+    constructor Create;
+    function accept(exp: CExp): fun.bool; override;
+  end;
   {$EndIf}
   
 
@@ -176,6 +184,7 @@ begin
   {$IfDef FunThreads}
   // worker handles (FunThreads builds only)
   libs.add(CLworker.Create());
+  libs.add(CLchannel.Create());
   {$EndIf}
   
   // win api
@@ -411,6 +420,76 @@ end;
 function CLworker.accept(exp: CExp): fun.bool;
 begin
   result := (exp.asObj is CWorker) or (exp.asObj is CShared);
+end;
+
+procedure NeedChannel(exp: CExp);
+begin
+  if not (exp.asObj is CChannel) then
+    raise EBase.Create('not a channel');
+end;
+
+procedure _channelSend(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  e: CExp;
+begin
+  NeedChannel(exp);
+  e := CExps.Find(exps, '', 0);
+  if e = nil then raise EBase.Create('channel.send: value required');
+  CChannel(exp.asObj).Send(e.asStr);
+  val^ := true;
+end;
+
+procedure _channelRecv(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  t: fun.int;
+  s: fun.str;
+begin
+  NeedChannel(exp);
+  t := CExps.FindAsVal(exps, 'timeout', 0, -1);
+  if CChannel(exp.asObj).Recv(t, s) then val^ := s else val^ := NullValue;
+end;
+
+procedure _channelTryRecv(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  s: fun.str;
+begin
+  NeedChannel(exp);
+  if CChannel(exp.asObj).TryRecv(s) then val^ := s else val^ := NullValue;
+end;
+
+procedure _channelClose(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedChannel(exp);
+  CChannel(exp.asObj).Close;
+  val^ := true;
+end;
+
+procedure _channelClosed(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedChannel(exp);
+  val^ := CChannel(exp.asObj).Closed;
+end;
+
+procedure _channelCount(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedChannel(exp);
+  val^ := CChannel(exp.asObj).Count;
+end;
+
+constructor CLchannel.Create;
+begin
+  inherited Create;
+  ids['send']    := CExp.new(nil).parse(Int64(fun.uintptr(@_channelSend)));
+  ids['recv']    := CExp.new(nil).parse(Int64(fun.uintptr(@_channelRecv)));
+  ids['tryRecv'] := CExp.new(nil).parse(Int64(fun.uintptr(@_channelTryRecv)));
+  ids['close']   := CExp.new(nil).parse(Int64(fun.uintptr(@_channelClose)));
+  ids['closed']  := CExp.new(nil).parse(Int64(fun.uintptr(@_channelClosed)));
+  ids['count']   := CExp.new(nil).parse(Int64(fun.uintptr(@_channelCount)));
+end;
+
+function CLchannel.accept(exp: CExp): fun.bool;
+begin
+  result := exp.asObj is CChannel;
 end;
 {$EndIf}
 

@@ -6,6 +6,12 @@
 
 ## [Unreleased]
 
+- `lib-worker` 新增按名字共享的 FIFO **通道**（`Channel(name)`，含 `send`、
+  `recv(timeout)`、`tryRecv`、`close`、`closed`、`count`）和主线程完成回调
+  （`Worker.onDone`、`workerTick`、`workerPending`、`workerWaitAll`）。通道在
+  进出时复制字符串/FD，因此不同线程上的生产者与消费者不会共享 Fun 对象。
+  仅 `funcmd-mt` 支持。
+
 - Windows arm64 **还不是发布目标**。FPC 3.2.2 没有 win64/aarch64 目标；
   支持该目标的 FPC 3.3.1（主线）目前生成的二进制在真机 Windows ARM64 上会以
   `0xC0000005` 崩溃（连它自己的编译器也一样）。裸 `writeln('hello')` 在

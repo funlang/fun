@@ -35,6 +35,10 @@ use 'lib-host.fun';
 
 var _hostFacts = 'host'.arg().getJson(fd: true);
 
+// Workers waiting for a main-thread onDone callback. Only the main thread
+// touches this list.
+var _pending = new [];
+
 fun _requireThreads()
   if _hostFacts.threads <> 1 then
     raise 'lib-worker requires funcmd-mt (build with FUN_THREADS=1)';
@@ -48,6 +52,17 @@ end fun;
 // result: nil means timeout, an error means the worker raised.
 class Worker(file, entry, payload, isFile)
   var h = 'Worker'.start(file, entry, payload, isFile);
+  var doneCb = nil;
+
+  // Run fx(result, error) on the thread that later calls workerTick().
+  // result is the raw entry result string; error is nil on success. The
+  // callback never runs on the worker thread.
+  fun onDone(fx)
+    if this.doneCb <> nil then raise 'worker.onDone already set'; end if;
+    this.doneCb = fx;
+    _pending.@add(this);
+    result = this;
+  end fun;
 
   // timeout is milliseconds; pass -1 to wait forever.
   fun join(timeout)
@@ -90,6 +105,66 @@ end class;
 fun Shared(name)
   _requireThreads();
   result = 'Shared'.open(name);
+end fun;
+
+// A named FIFO channel shared by every thread that opens the same name.
+// Values are strings (FD-encode structured data). send(v) never blocks;
+// recv(timeout) blocks up to timeout ms, or forever with -1, and returns nil
+// on timeout or after close. tryRecv() never blocks, closed() and count()
+// inspect the queue. Channels are process-wide, so passing the name through
+// a payload is enough.
+fun Channel(name)
+  _requireThreads();
+  result = 'Channel'.open(name);
+end fun;
+
+fun _nowMs()
+  var p = -2;
+  var f = -1;
+  result = p.time() div (f.time() div 1000);
+end fun;
+
+// Run pending onDone callbacks on the calling (main) thread. Call this from
+// your event loop; returns the number of callbacks fired. Callbacks of
+// workers that finished are removed before they run, so a raising callback
+// does not leave a stuck entry behind.
+fun workerTick()
+  var old = _pending;
+  _pending = new [];
+  var ready = new [];
+  for w in old do
+    if w.alive() then _pending.@add(w); else ready.@add(w); end if;
+  end do;
+  for w in ready do
+    var cb = w.doneCb;
+    w.doneCb = nil;
+    if cb <> nil then cb(w.result(), w.error()); end if;
+  end do;
+  result = ready.@count();
+end fun;
+
+fun workerPending()
+  result = _pending.@count();
+end fun;
+
+// Join every worker registered with onDone, firing callbacks as they finish.
+// timeout is milliseconds and -1 waits forever. Returns true when nothing
+// remains pending. In an event-driven program prefer workerTick() instead:
+// it never blocks the main thread.
+fun workerWaitAll(timeout)
+  var start = _nowMs();
+  var waiting = new [];
+  for w in _pending do waiting.@add(w); end do;
+  for w in waiting do
+    var left = -1;
+    if timeout >= 0 then
+      left = timeout - (_nowMs() - start);
+      if left < 0 then left = 0; end if;
+    end if;
+    w.join(left);
+  end do;
+  workerTick();
+  result = _pending.@count() = 0;
 end fun;
 
 // File-based worker. This is the common form: the module is parsed by the

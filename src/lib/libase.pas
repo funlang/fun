@@ -1982,8 +1982,8 @@ begin
   {$IfDef FunThreads}
   // 'Worker'.start(source, entry, payload, file = true)
   ids['start'] := CExp.new(nil).parse(Int64(fun.uintptr(@_workerStart)));
-  // 'Shared'.open(name)
-  ids['open']  := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedOpen)));
+  // 'Shared'.open(name) / 'Channel'.open(name)
+  ids['open']  := CExp.new(nil).parse(Int64(fun.uintptr(@_openNamed)));
   {$EndIf}
   // Easter egg
   ids['@uthor']  := CExp.new(nil).parse(Int64(fun.uintptr(@_author)));
