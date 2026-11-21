@@ -11,7 +11,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
   completion callbacks (`Worker.onDone`, `workerTick`, `workerPending`,
   `workerWaitAll`). Channels copy strings/FD in and out, so a producer and a
   consumer on different threads never share a Fun object. `Shared` also gained
-  `del(key)`, `clear()` and `keyAt(i)` for key management. `funcmd-mt` only.
+  `del(key)`, `clear()` and `keyAt(i)` for key management, and `workerMapLimit`
+  runs a map with a fixed number of concurrent workers. `funcmd-mt` only.
 
 - Windows arm64 is **not a release target yet**. FPC 3.2.2 has no
   win64/aarch64 target; FPC 3.3.1 (trunk), which does, currently produces

@@ -44,6 +44,13 @@ var sums = workerMap(job, 'fdadd', [[1, 2], [3, 4], [5, 6]], -1);
 check('map count', sums.@count() = 3);
 check('map values', sums[0] = 3 and sums[1] = 7 and sums[2] = 11);
 
+// 3b. bounded map: at most three workers run at once, results stay in order
+var pairs = [[1, 10], [2, 20], [3, 30], [4, 40], [5, 50],
+             [6, 60], [7, 70], [8, 80], [9, 90]];
+var lm = workerMapLimit(job, 'fdadd', pairs, 3, -1);
+check('mapLimit count', lm.@count() = 9);
+check('mapLimit values', lm[0] = 11 and lm[4] = 55 and lm[8] = 99);
+
 // 4. workerRun: FD args in, FD result out
 var rr = workerRun(job, 'fdadd', [[10, 20]], -1);
 check('run fd', rr[0] = 30);

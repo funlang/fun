@@ -226,6 +226,57 @@ fun workerMap(file, entry, items, timeout)
   result = out;
 end fun;
 
+// workerMap with a concurrency limit. At most `limit` workers run at once, so a
+// large input does not spawn one thread per item or hold every worker handle at
+// the same time. Results keep input order. timeout is per join, in milliseconds
+// (-1 waits forever).
+fun workerMapLimit(file, entry, items, limit, timeout)
+  _requireThreads();
+  if limit < 1 then raise 'workerMapLimit: limit must be at least 1'; end if;
+  var n = items.@count();
+  var out = new [];
+  out.@count(n);
+  var workers = new [];
+  var indexes = new [];
+  for i = 0 to limit - 1 do
+    workers.@add(nil);
+    indexes.@add(0);
+  end do;
+  var lost = new [];
+  var at = 0;
+  var done = 0;
+  while done < n do
+    for i = 0 to limit - 1 do
+      if workers[i] = nil and at < n then
+        workers[i] = WorkerFile(file, entry,
+                     (new [items[at]]).@toJson(fd: true));
+        // `at + 0` snapshots the value; a bare variable in a list literal
+        // stays a reference and would make every slot read the final index.
+        indexes[i] = at + 0;
+        at += 1;
+      end if;
+    end do;
+    var pick = -1;
+    for i = 0 to limit - 1 do
+      if pick < 0 and workers[i] <> nil then pick = i; end if;
+    end do;
+    var w = workers[pick];
+    var idx = indexes[pick] + 0;
+    var r = w.join(timeout);
+    var e = w.error();
+    if e <> nil then raise e; end if;
+    if r = nil then
+      out[idx] = nil;
+      lost.@add(w);
+    else
+      out[idx] = r.getJson(fd: true)[0];
+    end if;
+    workers[pick] = nil;
+    done += 1;
+  end do;
+  result = out;
+end fun;
+
 // Wait for a list of workers and return their raw result strings in order.
 // Raises the first worker error encountered. Useful when the caller wants to
 // start all workers itself (for different entry functions or payloads). Decode
