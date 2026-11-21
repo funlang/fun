@@ -130,6 +130,12 @@ cc.close();
 check('channel closed', cc.closed());
 check('channel closed recv', cc.recv(0) = nil);
 check('channel closed try', cc.tryRecv() = nil);
+try
+  cc.send('x');
+  check('channel closed send', false);
+except
+  check('channel closed send', true);
+end try;
 
 // 10. onDone runs on the main thread, not on the worker thread. workerTick is
 // the event-loop form; workerWaitAll joins and then dispatches.
@@ -142,6 +148,15 @@ check('pending 1', workerPending() = 1);
 check('waitAll', workerWaitAll(10000));
 check('onDone fired', seen.@count() = 1 and seen[0] = 'ok:cb:true');
 check('pending empty', workerPending() = 0);
+
+// 11. onDone reports worker errors without throwing across the thread boundary
+var errSeen = nil;
+var ew = WorkerFile(job, 'fail', '[]');
+ew.onDone(fun (r, e) {
+  errSeen = e;
+});
+check('onDone error wait', workerWaitAll(10000));
+check('onDone error', errSeen <> nil and errSeen.subpos('worker boom') >= 0);
 
 ?. 'worker tests: pass=' & pass & ' fail=' & failed;
 if failed > 0 then
