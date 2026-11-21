@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+- `funcmd-mt` 现在会串行化共享的 PCRE 已编译模式缓存、引用计数和 JIT 升级，
+  多个 worker 并发执行正则时不再竞争。直接 `Worker(...)` 构造也会报告
+  需要 `funcmd-mt`，而不是以 `.start not found` 失败；`lib-os-lnx` 测试现在
+  接受 `funcmd-mt` 这个二进制名。
+
 - `lib-worker` 新增按名字共享的 FIFO **通道**（`Channel(name)`，含 `send`、
   `recv(timeout)`、`tryRecv`、`close`、`closed`、`count`）和主线程完成回调
   （`Worker.onDone`、`workerTick`、`workerPending`、`workerWaitAll`）。通道在

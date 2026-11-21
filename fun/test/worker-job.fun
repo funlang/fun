@@ -36,6 +36,22 @@ fun slow(payload)
   result = '' & s;
 end fun;
 
+// Concurrent regex use: every worker shares the process-wide PCRE pattern
+// cache, so this exercises its lock (and the JIT upgrade on second use).
+fun regexHammer(payload)
+  var n = payload.toNum();
+  var sum = 0;
+  var i = 0;
+  while i < n loop
+    var s = 'a1b22c333';
+    if s.match(/\d+/g) <> nil then sum += 1; end if;
+    var r = ('(\d+)' & (i mod 7)).toRegex('g');
+    sum += s.replace(r, '#').length();
+    i += 1;
+  end loop;
+  result = '' & sum;
+end fun;
+
 // Producer: put 1..n into a named channel carried in the payload.
 fun sendN(payload)
   var args = payload.getJson(fd: true);

@@ -13,8 +13,10 @@
 // ergonomic API, is ordinary Fun code.
 //
 // Requires funcmd-mt (the -dFunThreads -dUseCThreads build). The default
-// funcmd reports `threads` as absent from 'host'.arg() and this module refuses
-// to load, so a script cannot accidentally depend on a non-threaded binary.
+// funcmd reports `threads` as absent from 'host'.arg() and every worker
+// constructor plus Shared/Channel refuses with a clear error, so a script
+// cannot accidentally depend on a non-threaded binary. The module itself still
+// loads on either build (the regression suite asserts that).
 //
 // Basic use:
 //
@@ -50,8 +52,13 @@ end fun;
 // or nil when the timeout expires. `error` returns the worker-side error text
 // (message plus traceback) or nil. Always inspect `error` before using a nil
 // result: nil means timeout, an error means the worker raised.
+fun _workerStart(file, entry, payload, isFile)
+  _requireThreads();
+  result = 'Worker'.start(file, entry, payload, isFile);
+end fun;
+
 class Worker(file, entry, payload, isFile)
-  var h = 'Worker'.start(file, entry, payload, isFile);
+  var h = _workerStart(file, entry, payload, isFile);
   var doneCb = nil;
 
   // Run fx(result, error) on the thread that later calls workerTick().

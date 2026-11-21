@@ -13,9 +13,12 @@ use 'fun/lib/lib-os-lnx.fun';
 
 ?. GetPId() > 0;
 var procName = GetProcName(GetPId(), nil);
-?. procName.substr(-6) = 'funcmd' or procName.substr(-3) = 'fun';
+// The worker build is a separate binary (funcmd-mt), so match the name
+// anywhere, not only at the end.
+?. procName.subpos('funcmd') >= 0 or procName.substr(-3) = 'fun';
 
-?. tryFind('funcmd', 'src/prj/fun').length() > 0;
+?. tryFind('funcmd', 'src/prj/fun').length() > 0 or
+   tryFind('funcmd-mt', 'src/prj/fun').length() > 0;
 ?. tryFind('base', 'src/prj/fun') = 'base';
 
 var d = GetTempPath('sd-' & GetPId() & '.tmp');

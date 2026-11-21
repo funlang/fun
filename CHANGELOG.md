@@ -6,6 +6,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `funcmd-mt` now serializes the shared PCRE compiled-pattern cache, its
+  reference counts and the JIT upgrade, so workers evaluating regexes
+  concurrently no longer race. Direct `Worker(...)` construction now reports
+  the `funcmd-mt` requirement instead of failing with `.start not found`, and
+  the `lib-os-lnx` test accepts the `funcmd-mt` binary name.
+
 - `lib-worker` now has named FIFO **channels** (`Channel(name)` with `send`,
   `recv(timeout)`, `tryRecv`, `close`, `closed`, `count`) and main-thread
   completion callbacks (`Worker.onDone`, `workerTick`, `workerPending`,

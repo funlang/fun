@@ -193,6 +193,17 @@ while workerPending() > 0 and spins < 100000 do
 end do;
 check('workerAttach fired', tickRan = 1 and spins < 100000);
 
+// 14. concurrent regex use: the shared PCRE cache must stay consistent across
+// workers, including the second-use JIT upgrade.
+var rws = new [];
+for i = 1 to 4 do
+  rws.@add(WorkerFile(job, 'regexHammer', '500'));
+end do;
+var rout = workerAll(rws, -1);
+check('regex workers', rout.@count() = 4);
+check('regex values', rout[0] = '4786' and rout[1] = '4786'
+                    and rout[2] = '4786' and rout[3] = '4786');
+
 ?. 'worker tests: pass=' & pass & ' fail=' & failed;
 if failed > 0 then
   raise 'worker tests failed';

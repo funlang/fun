@@ -153,6 +153,14 @@ var
   PcreCacheCount: Integer = 0;
   PcreCacheClock: Int64 = 0;
 
+{$IfDef FunThreads}
+// Workers share this unit's globals. The cache itself, the LRU clock and every
+// TPcreCode reference count/JIT upgrade must therefore be serialized. A default
+// single-threaded build compiles the plain paths below unchanged.
+var
+  PcreLock: TRTLCriticalSection;
+{$EndIf}
+
 function PcreHash(const S: PCREString; Options: Integer): LongWord;
 var
   I: Integer;
@@ -194,7 +202,16 @@ end;
 
 procedure TPcreCode.AddRef;
 begin
+{$IfDef FunThreads}
+  EnterCriticalSection(PcreLock);
+  try
+    Inc(FRefCount);
+  finally
+    LeaveCriticalSection(PcreLock);
+  end;
+{$Else}
   Inc(FRefCount);
+{$EndIf}
 end;
 
 // Upgrade a pattern that has been used at least twice to PCRE's JIT. pcre_exec
@@ -205,73 +222,125 @@ var
   Extra: PPCREExtra;
   Error: PAnsiChar;
 begin
+{$IfDef FunThreads}
+  EnterCriticalSection(PcreLock);
+  try
+{$EndIf}
   if FJitDone then Exit;
   FJitDone := True;
   Extra := CallPCREStudy(PPCRE(FRegex), PCRE_STUDY_JIT_COMPILE, @Error);
   if Extra <> nil then
   begin
+{$IfDef FunThreads}
+    // Do not free the previous hints block: another worker may already have
+    // loaded that pointer and be inside pcre_exec with it. The old block is
+    // small and a pattern is upgraded at most once, so leaking it is the
+    // cheap way to keep concurrent readers valid.
+    FHints := Extra;
+{$Else}
     if FHints <> nil then CallPCREFreeStudy(PPCREExtra(FHints));
     FHints := Extra;
+{$EndIf}
   end;
+{$IfDef FunThreads}
+  finally
+    LeaveCriticalSection(PcreLock);
+  end;
+{$EndIf}
 end;
 
 procedure TPcreCode.Release;
 begin
+{$IfDef FunThreads}
+  EnterCriticalSection(PcreLock);
+  try
+{$EndIf}
   Dec(FRefCount);
   if (FRefCount <= 0) and not FInCache then
     Free;
+{$IfDef FunThreads}
+  finally
+    LeaveCriticalSection(PcreLock);
+  end;
+{$EndIf}
 end;
 
 // Find a cached compiled pattern, or compile and cache a new one. The returned
 // object carries one reference for the caller.
 function PcreGetCode(const APattern: PCREString; AOptions: Integer): TPcreCode;
 var
-  I, Victim: Integer;
+  I, Victim, Found: Integer;
   H: LongWord;
   C: TPcreCode;
+  Upgrade: Boolean;
 begin
   H := PcreHash(APattern, AOptions);
+  Upgrade := False;
+{$IfDef FunThreads}
+  EnterCriticalSection(PcreLock);
+  try
+{$EndIf}
   Inc(PcreCacheClock);
+  Found := -1;
   for I := 0 to PcreCacheCount - 1 do
   begin
     C := PcreCache[I];
     if (C.FHash = H) and (C.FOptions = AOptions) and (C.FPattern = APattern) then
     begin
       C.FLastUsed := PcreCacheClock;
-      // Second use of this pattern: now the JIT cost is likely to be repaid.
-      C.EnableJit;
-      C.AddRef;
-      Result := C;
-      Exit;
+      Inc(C.FRefCount);
+      Found := I;
+      Break;
     end;
   end;
 
-  C := TPcreCode.Create(APattern, AOptions);
-  C.FLastUsed := PcreCacheClock;
-  if PcreCacheCount < PcreCacheLimit then
+  if Found >= 0 then
   begin
-    PcreCache[PcreCacheCount] := C;
-    Inc(PcreCacheCount);
-    C.FInCache := True;
+    C := PcreCache[Found];
+    // Second use of this pattern: now the JIT cost is likely to be repaid.
+    Upgrade := True;
   end
   else
   begin
-    Victim := -1;
-    for I := 0 to PcreCacheCount - 1 do
-      if PcreCache[I].FRefCount <= 0 then
-        if (Victim < 0) or (PcreCache[I].FLastUsed < PcreCache[Victim].FLastUsed) then
-          Victim := I;
-    if Victim >= 0 then
+    C := TPcreCode.Create(APattern, AOptions);
+    C.FLastUsed := PcreCacheClock;
+    if PcreCacheCount < PcreCacheLimit then
     begin
-      PcreCache[Victim].FInCache := False;
-      PcreCache[Victim].Release; // frees it if nobody else holds it
-      PcreCache[Victim] := C;
+      PcreCache[PcreCacheCount] := C;
+      Inc(PcreCacheCount);
       C.FInCache := True;
+    end
+    else
+    begin
+      Victim := -1;
+      for I := 0 to PcreCacheCount - 1 do
+        if PcreCache[I].FRefCount <= 0 then
+          if (Victim < 0) or (PcreCache[I].FLastUsed < PcreCache[Victim].FLastUsed) then
+            Victim := I;
+      if Victim >= 0 then
+      begin
+        PcreCache[Victim].FInCache := False;
+        // Frees it if nobody else holds it. Inlined (not Release) because the
+        // cache lock is already held.
+        Dec(PcreCache[Victim].FRefCount);
+        if PcreCache[Victim].FRefCount <= 0 then
+          PcreCache[Victim].Free;
+        PcreCache[Victim] := C;
+        C.FInCache := True;
+      end;
+      // If every entry is in use, leave this one uncached; C is still owned by
+      // the caller and will free itself on release.
     end;
-    // If every entry is in use, leave this one uncached; C is still owned by
-    // the caller and will free itself on release.
   end;
   Result := C;
+{$IfDef FunThreads}
+  finally
+    LeaveCriticalSection(PcreLock);
+  end;
+{$EndIf}
+  // JIT study can be slow and must not serialize the whole cache, so do it
+  // after releasing the lock. C now owns a reference, so it stays alive.
+  if Upgrade then C.EnableJit;
 end;
 
 //==============================================================
@@ -950,10 +1019,17 @@ begin
 end;
 
 initialization
+{$IfDef FunThreads}
+  InitCriticalSection(PcreLock);
+{$EndIf}
 
 finalization
   // Drop idle patterns. A pattern still referenced by a live CPcre is left
   // alone; its owner releases it later.
+{$IfDef FunThreads}
+  EnterCriticalSection(PcreLock);
+  try
+{$EndIf}
   while PcreCacheCount > 0 do
   begin
     Dec(PcreCacheCount);
@@ -962,5 +1038,11 @@ finalization
       PcreCache[PcreCacheCount].Free;
     PcreCache[PcreCacheCount] := nil;
   end;
+{$IfDef FunThreads}
+  finally
+    LeaveCriticalSection(PcreLock);
+  end;
+  DoneCriticalSection(PcreLock);
+{$EndIf}
 
 end.
