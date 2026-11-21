@@ -27,11 +27,14 @@ rem       set FUNREG_EXPECTED=fun\test\expected-win
 rem       fun\test\run-windows-regression.bat --update
 rem   then compare fun\test\expected-win\*.txt with fun\test\expected\*.txt.
 rem
-rem Two more sets are skipped without being host-dependent in principle:
+rem Three more sets are skipped without being host-dependent in principle:
 rem   REGEXTESTS - need the PCRE engine, which the Windows build does not link
 rem                yet. Probed at startup (a regex literal parses to a nil node
 rem                without -dRegex), so they start running by themselves once
 rem                PCRE is wired up. See README "Third-party dependencies".
+rem   ZLIBTESTS  - inflate their data tables at module load and need zlib.dll.
+rem                The win64 DLL is built best-effort, so a runner without it
+rem                skips these rather than failing on an optional dependency.
 rem   HOSTDEP    - plus lib-file-test/lib-dyns-test: find() emits '\' on
 rem                Windows and '/' elsewhere (io.pas Norm/_find), and the shared
 rem                snapshots use '/'.
@@ -70,6 +73,12 @@ rem REGEXOK=0. The CI win64 build links PCRE dynamically (pcre3.dll next to
 rem funcmd.exe, -dPCRE_WinDLL), so the probe normally finds it; a toolchain
 rem without PCRE just skips these instead of failing.
 set "REGEXTESTS= all.fun regex-adv.fun lib-match-test.fun lib-regex-test.fun lib-func-check.fun lib-bnf-dedup.fun lib-regex-replace.fun portability-probe.fun lib-jsonschema-test.fun fd-bnf-align.fun "
+
+rem Tests that cannot load without zlib.dll: the riscv64/loongarch64 asm
+rem backends inflate their opcode tables at module load. zlib.dll is built
+rem best-effort on the Windows runner, so skip these instead of treating the
+rem missing optional DLL as a regression.
+set "ZLIBTESTS= lib-asm-riscv64.fun lib-asm-loongarch64.fun "
 
 set "MODE=compare"
 set "PORTABLE=0"
@@ -112,6 +121,18 @@ set "PROBEFILE=fun\test\.regex-probe.fun"
 "%FUNCMD%" "%PROBEFILE%" > "%TEMP%\funreg-regex.out" 2>&1
 findstr /x /c:"regex-on" "%TEMP%\funreg-regex.out" >nul 2>&1
 if not errorlevel 1 set "REGEXOK=1"
+del "%PROBEFILE%" >nul 2>&1
+
+rem --- optional zlib.dll ----------------------------------------------------
+rem Keep the zlib-dependent tests out of the gate when the DLL is absent; the
+rem rest of the suite must still pass without it.
+set "ZLIBOK=0"
+set "PROBEFILE=fun\test\.zlib-probe.fun"
+>"%PROBEFILE%" echo use 'fun/lib/lib-zlib.fun';
+>>"%PROBEFILE%" echo if zlib then ?. 'zlib-on'; else ?. 'zlib-off'; end if;
+"%FUNCMD%" "%PROBEFILE%" > "%TEMP%\funreg-zlib.out" 2>&1
+findstr /x /c:"zlib-on" "%TEMP%\funreg-zlib.out" >nul 2>&1
+if not errorlevel 1 set "ZLIBOK=1"
 del "%PROBEFILE%" >nul 2>&1
 
 rem --- native cases: getapi and (for FFI tests) the helper library ----------
@@ -161,6 +182,10 @@ if "%PORTABLE%"=="1" (
 if "%REGEXOK%"=="0" (
   echo !REGEXTESTS! | findstr /i /c:" %name% " >nul
   if not errorlevel 1 goto skip_regex
+)
+if "%ZLIBOK%"=="0" (
+  echo !ZLIBTESTS! | findstr /i /c:" %name% " >nul
+  if not errorlevel 1 goto skip_zlib
 )
 set "OUT=%TEMP%\funreg-%name%.out"
 "%FUNCMD%" "fun\%script%" > "%OUT%" 2>&1
@@ -216,6 +241,11 @@ exit /b 0
 
 :skip_regex
 echo %name%   SKIP (no regex engine)
+set /a SKIP+=1
+exit /b 0
+
+:skip_zlib
+echo %name%   SKIP (no zlib)
 set /a SKIP+=1
 exit /b 0
 

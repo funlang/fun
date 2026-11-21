@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+- Windows CI 不再把缺少可选的 `zlib.dll` 当成回归：DLL 无法加载时
+  `lib-zlib` 保持静默，便携测试集先探测 zlib 并跳过依赖它的两个汇编表测试；
+  win64 运行时 DLL 缓存改为按固定的第三方构建脚本计算键，而不再随每次
+  `src/` 变更失效，成功构建后可在后续提交中复用，无需每次重新下载。
+
 - `funcmd-mt` 现在会串行化共享的 PCRE 已编译模式缓存、引用计数和 JIT 升级，
   多个 worker 并发执行正则时不再竞争。直接 `Worker(...)` 构造也会报告
   需要 `funcmd-mt`，而不是以 `.start not found` 失败；`lib-os-lnx` 测试现在

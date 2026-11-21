@@ -63,7 +63,13 @@ try
       inflateEnd:   zlibdll.getapi('inflateEnd',    's:i'),
     ];
   end if;
-except ?. @;
+except
+  // zlib is optional: every caller checks `if zlib`. Never print the load
+  // error to stdout: the shared regression snapshots are byte-exact, so a
+  // Windows runner without zlib.dll would otherwise prepend
+  // `getapi: cannot load library "zlib.dll"` to every script that imports a
+  // module with optional gzip support (http-server, lib-ajax, ...).
+  zlib = nil;
 end try;
 
 // zlib's compressBound() formula; computed here so the Windows getapi map stays

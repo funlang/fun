@@ -683,6 +683,11 @@ jobs:
           "value=${{ hashFiles('src/**') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "dlls=${{ hashFiles('src/prj/fun/pcre3.dll', 'src/prj/fun/ffi.dll') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "jsbox=${{ hashFiles('src/prj/fun/jsbox/main.c', 'src/prj/fun/build-jsbox.sh') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          # libtcc.dll/zlib.dll are compiled from the pinned third-party
+          # sources by these two scripts, so only their hash matters. Keying
+          # the cache on src/** forced a fresh download (zlib.net, which
+          # occasionally answers 504) after every source commit.
+          "deps=${{ hashFiles('src/prj/fun/fetch-3rd-party.sh', 'src/prj/fun/build-win64-deps.sh') }}" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       # 64-bit libtcc.dll / zlib.dll. They are loaded by name from next to
       # funcmd.exe, so the archive can only ship them if this job builds them
@@ -694,7 +699,7 @@ jobs:
           path: |
             src\prj\fun\libtcc.dll
             src\prj\fun\zlib.dll
-          key: win64-runtime-tcc-0.9.27-zlib-1.2.11-v1-${{ steps.src-hash.outputs.value }}
+          key: win64-runtime-tcc-0.9.27-zlib-1.2.11-v2-${{ steps.src-hash.outputs.deps }}
 
       # Build reuse, same rule as the unix job.
       - name: Restore built funcmd.exe
@@ -1095,7 +1100,7 @@ jobs:
           path: |
             src\prj\fun\libtcc.dll
             src\prj\fun\zlib.dll
-          key: win64-runtime-tcc-0.9.27-zlib-1.2.11-v1-${{ steps.src-hash.outputs.value }}
+          key: win64-runtime-tcc-0.9.27-zlib-1.2.11-v2-${{ steps.src-hash.outputs.deps }}
 
       - name: Build funcmd.exe
         if: steps.cache-funcmd-win.outputs.cache-hit != 'true'

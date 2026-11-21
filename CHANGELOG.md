@@ -6,6 +6,13 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Windows CI no longer reports a missing optional `zlib.dll` as a regression:
+  `lib-zlib` stays silent when the DLL cannot be loaded, the portable runner
+  probes zlib and skips the two asm-list tests that need it, and the win64
+  runtime-DLL cache is keyed on the pinned third-party build scripts rather
+  than every `src/` change, so a successful build is reused across source
+  commits instead of re-downloading after each one.
+
 - `funcmd-mt` now serializes the shared PCRE compiled-pattern cache, its
   reference counts and the JIT upgrade, so workers evaluating regexes
   concurrently no longer race. Direct `Worker(...)` construction now reports
