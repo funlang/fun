@@ -87,6 +87,11 @@ check('shared sum', vs = 10);
 sh.set('s', 'hello');
 check('shared string', sh.get('s') = 'hello');
 check('shared add', sh.add('n', 10) = 14);
+check('shared keyAt', sh.keyAt(0) = 'n' and sh.keyAt(1) = 's');
+check('shared del', sh.del('s') and not sh.has('s'));
+check('shared keyAt after del', sh.keyAt(0) = 'n' and sh.keyAt(1) = '');
+sh.clear();
+check('shared clear', sh.count() = 0);
 
 // 9. named channel: FIFO in one thread, then producer worker -> main thread,
 // then main thread -> consumer worker.

@@ -94,6 +94,9 @@ type
     function Has(const key: fun.str): Boolean;
     function Count: fun.int;
     function Add(const key: fun.str; delta: Int64): Int64;
+    function Delete(const key: fun.str): Boolean;
+    procedure Clear;
+    function KeyAt(index: fun.int): fun.str;
   end;
 
 // 'Shared'.open(name)
@@ -465,6 +468,58 @@ begin
       it.value := IntToStr(v);
     end;
     result := v;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+function CShared.Delete(const key: fun.str): Boolean;
+var
+  i, j: fun.int;
+  it: CSharedItem;
+begin
+  EnterCriticalSection(FLock);
+  try
+    result := False;
+    for i := 0 to FItems.Count - 1 do
+      if CSharedItem(FItems[i]).key = key then
+      begin
+        it := CSharedItem(FItems[i]);
+        for j := i to FItems.Count - 2 do
+          FItems.List^[j] := FItems.List^[j + 1];
+        FItems.Count := FItems.Count - 1;
+        del(it);
+        result := True;
+        exit;
+      end;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+procedure CShared.Clear;
+var
+  i: fun.int;
+begin
+  EnterCriticalSection(FLock);
+  try
+    for i := FItems.Count - 1 downto 0 do
+      del(CSharedItem(FItems[i]));
+    FItems.Count := 0;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+function CShared.KeyAt(index: fun.int): fun.str;
+begin
+  EnterCriticalSection(FLock);
+  try
+    if (index < 0) or (index >= FItems.Count) then
+      result := ''
+    else
+      result := CopyStr(CSharedItem(FItems[index]).key)
+    ;
   finally
     LeaveCriticalSection(FLock);
   end;

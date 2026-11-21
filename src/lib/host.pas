@@ -402,6 +402,35 @@ begin
   ;
 end;
 
+procedure _sharedDel(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  e: CExp;
+begin
+  NeedShared(exp);
+  e := CExps.Find(exps, '', 0);
+  val^ := (e <> nil) and CShared(exp.asObj).Delete(e.asStr);
+end;
+
+procedure _sharedClear(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedShared(exp);
+  CShared(exp.asObj).Clear;
+  val^ := true;
+end;
+
+procedure _sharedKeyAt(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  e: CExp;
+begin
+  NeedShared(exp);
+  e := CExps.Find(exps, '', 0);
+  if e = nil then
+    val^ := ''
+  else
+    val^ := CShared(exp.asObj).KeyAt(e.asInt)
+  ;
+end;
+
 constructor CLworker.Create;
 begin
   inherited Create;
@@ -415,6 +444,9 @@ begin
   ids['has']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedHas)));
   ids['count']  := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedCount)));
   ids['add']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedAdd)));
+  ids['del']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedDel)));
+  ids['clear']  := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedClear)));
+  ids['keyAt']  := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedKeyAt)));
 end;
 
 function CLworker.accept(exp: CExp): fun.bool;

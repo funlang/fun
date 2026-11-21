@@ -96,7 +96,9 @@ end class;
 // that calls Shared('same-name') gets the same store, so workers do not need
 // to receive a handle through a payload. Values are strings (use FD for
 // structured data); get/set copy the bytes, so no Fun string is shared between
-// threads. Methods: get(key), set(key, value), has(key), count(), add(key, n).
+// threads. Methods: get(key), set(key, value), has(key), count(), add(key, n),
+// del(key), clear(), keyAt(i). Iterate keys with `for i = 0 to s.count() - 1`
+// and `s.keyAt(i)`.
 //
 //   var n = Shared('counter');
 //   n.set('jobs', 0);
