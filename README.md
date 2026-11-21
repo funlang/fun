@@ -694,8 +694,12 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (81 modules)
 - **Databases**: `lib-orm`, `lib-orm-pro`, `lib-orm-gen`, `lib-orm-rpc`, `lib-orm-cte`, `lib-ado`, `lib-ado-schema`
 - **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`
 - **UI**: `lib-ui`, `lib-ui-base`, `lib-dialog`, `lib-trayicon`
-- **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`
+- **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`, `lib-worker`
 - **Testing**: `test` (registration and assertions for `fun test`)
+
+`lib-worker` needs the opt-in `funcmd-mt` Linux build
+(`src/prj/fun/make-linux-x86_64-mt.sh`). The default `funcmd` keeps its
+single-threaded heap and performance and reports a clear error on first use.
 
 Logging is configured once and then used through named loggers:
 

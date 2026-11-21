@@ -647,8 +647,12 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
 - **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`
 - **UI**：`lib-ui`、`lib-ui-base`、`lib-dialog`、`lib-trayicon`
-- **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`
+- **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`、`lib-worker`
 - **测试**：`test`（`fun test` 的注册与断言库）
+
+`lib-worker` 需要 opt-in 的 Linux `funcmd-mt` 构建
+（`src/prj/fun/make-linux-x86_64-mt.sh`）。默认 `funcmd` 保持单线程堆与性能，
+首次使用 worker 时会给出明确错误。
 
 日志在入口配置一次，之后通过命名 logger 使用：
 
