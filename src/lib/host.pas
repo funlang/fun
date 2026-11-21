@@ -281,11 +281,24 @@ end;
 
 //==============================================================
 {$IfDef FunThreads}
+procedure NeedWorker(exp: CExp);
+begin
+  if not (exp.asObj is CWorker) then
+    raise EBase.Create('not a worker handle');
+end;
+
+procedure NeedShared(exp: CExp);
+begin
+  if not (exp.asObj is CShared) then
+    raise EBase.Create('not a Shared store');
+end;
+
 procedure _workerJoin(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   w: CWorker;
   t: fun.int;
 begin
+  NeedWorker(exp);
   w := CWorker(exp.asObj);
   t := CExps.FindAsVal(exps, 'timeout', 0, -1);
   if w.Join(t) then
@@ -297,6 +310,7 @@ end;
 
 procedure _workerResult(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 begin
+  NeedWorker(exp);
   val^ := CWorker(exp.asObj).ResultText;
 end;
 
@@ -304,17 +318,20 @@ procedure _workerError(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   w: CWorker;
 begin
+  NeedWorker(exp);
   w := CWorker(exp.asObj);
   if w.HasError then val^ := w.ErrorText else val^ := NullValue;
 end;
 
 procedure _workerAlive(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 begin
+  NeedWorker(exp);
   val^ := CWorker(exp.asObj).Alive;
 end;
 
 procedure _workerId(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 begin
+  NeedWorker(exp);
   val^ := Int64(fun.uintptr(CWorker(exp.asObj).ThreadId));
 end;
 
@@ -322,6 +339,7 @@ procedure _sharedGet(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   e: CExp;
 begin
+  NeedShared(exp);
   e := CExps.Find(exps, '', 0);
   if e = nil then val^ := '' else val^ := CShared(exp.asObj).GetValue(e.asStr);
 end;
@@ -330,6 +348,7 @@ procedure _sharedSet(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   k, v: CExp;
 begin
+  NeedShared(exp);
   k := CExps.Find(exps, '', 0);
   v := CExps.Find(exps, '', 1);
   if k <> nil then
@@ -347,12 +366,14 @@ procedure _sharedHas(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   e: CExp;
 begin
+  NeedShared(exp);
   e := CExps.Find(exps, '', 0);
   val^ := (e <> nil) and CShared(exp.asObj).Has(e.asStr);
 end;
 
 procedure _sharedCount(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 begin
+  NeedShared(exp);
   val^ := CShared(exp.asObj).Count;
 end;
 
@@ -360,6 +381,7 @@ procedure _sharedAdd(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   k, d: CExp;
 begin
+  NeedShared(exp);
   k := CExps.Find(exps, '', 0);
   d := CExps.Find(exps, '', 1);
   if k = nil then
