@@ -11,6 +11,17 @@ fun raises(fn)
   result = bad;
 end fun;
 
+fun errorText(fn)
+  var msg = '';
+  try
+    fn();
+  except
+    var e = runtime.lastError();
+    if e <> nil then msg = e['message']; end if;
+  end try;
+  result = msg;
+end fun;
+
 fun at(y, m, d, h, mi, s)
   var n = new [];
   n['year'] = y;
@@ -779,3 +790,136 @@ var w0 = dclk['wall']();
 sleep(1100);
 var w1 = dclk['wall']();
 ?. _cronDiffSec(w0, w1) <> 0;
+
+// --- cooperative tick ---------------------------------------------------
+var tkSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var tk = CronScheduler();
+tk._clock = fakeClock(tkSt);
+var tkHits = 0;
+var tkId = tk.addJob('* * * * *', () { tkHits += 1; });
+makeDue(tk, tkId, at(2026, 11, 12, 0, 0, 0), 0);
+?. tk.tick() = 1;
+?. tkHits = 1;
+?. tk.tick() = 0;
+?. tkHits = 1;
+
+var mdSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var md = CronScheduler();
+md._clock = fakeClock(mdSt);
+var mdHits = 0;
+var mdCron = md.addJob('* * * * *', () { mdHits += 1; });
+var mdEvery = md.every('1s', () { mdHits += 1; });
+makeDue(md, mdCron, at(2026, 11, 12, 0, 0, 0), 0);
+makeDue(md, mdEvery, at(2026, 11, 12, 0, 0, 0), 0);
+?. md.tick() = 2;
+?. mdHits = 2;
+
+var tsSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var ts = CronScheduler();
+ts._clock = fakeClock(tsSt);
+var tsHits = 0;
+var tsA = ts.addJob('* * * * *', () { tsHits += 1; ts.stop(); });
+var tsB = ts.addJob('* * * * *', () { tsHits += 1; });
+makeDue(ts, tsA, at(2026, 11, 12, 0, 0, 0), 0);
+makeDue(ts, tsB, at(2026, 11, 12, 0, 0, 0), 0);
+?. ts.tick() = 1;
+?. tsHits = 1;
+?. ts.tick() = 0;
+
+var ex = CronScheduler();
+ex._running = true;
+?. errorText(((){ ex.tick(); })) = 'cron: already running';
+ex._running = false;
+ex._inTick = true;
+?. errorText(((){ ex.tick(); })) = 'cron: already ticking';
+ex._inTick = false;
+
+var re = CronScheduler();
+var reErr = false;
+var reMsg = '';
+re.every(20, () {
+  try
+    re.tick();
+  except
+    reErr = true;
+    reMsg = errorText(((){ re.tick(); }));
+  end try;
+  re.stop();
+});
+re.run();
+?. reErr;
+?. reMsg = 'cron: already running';
+
+var nestedSched = CronScheduler();
+var nestedSchedMsg = '';
+var nestedSchedNext = -1;
+var nestedSchedId = nestedSched.addJob('* * * * *', () {
+  nestedSchedMsg = errorText(((){ nestedSched.run(); }));
+  nestedSchedNext = nestedSched.nextWaitMs(10000);
+});
+makeDue(nestedSched, nestedSchedId, at(2026, 11, 12, 0, 0, 0), 0);
+?. nestedSched.tick() = 1;
+?. nestedSchedMsg = 'cron: already ticking';
+?. nestedSchedNext = 0;
+?. not nestedSched._inTick;
+?. nestedSched.tick() = 0;
+
+var reentrantSched = CronScheduler();
+var reentrantSchedMsg = '';
+var reentrantSchedId = reentrantSched.addJob('* * * * *', () {
+  reentrantSchedMsg = errorText(((){ reentrantSched.tick(); }));
+});
+makeDue(reentrantSched, reentrantSchedId, at(2026, 11, 12, 0, 0, 0), 0);
+?. reentrantSched.tick() = 1;
+?. reentrantSchedMsg = 'cron: already ticking';
+?. not reentrantSched._inTick;
+?. reentrantSched.tick() = 0;
+
+var nwSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 1000, time: 5000.0];
+var nw = CronScheduler();
+nw._clock = fakeClock(nwSt);
+var nwId = nw.addJob('* * * * *', () {});
+makeWait(nw, nwId, at(2026, 11, 12, 0, 1, 0), 5000);
+?. nw.nextWaitMs(nil) = 1000;
+?. nw.nextWaitMs() = 1000;
+?. nw.nextWaitMs(200) = 200;
+?. nw.nextWaitMs(10000) = 4000;
+?. nw.nextWaitMs(-1) = 0;
+?. nw.nextWaitMs(0) = 0;
+makeWait(nw, nwId, at(2026, 11, 12, 0, 0, 0), 1000);
+?. nw.nextWaitMs(200) = 0;
+
+var emp = CronScheduler();
+?. emp.nextWaitMs(nil) = 1000;
+?. emp.nextWaitMs(250) = 250;
+
+var rwSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 1000, time: 5000.0];
+var rw = CronScheduler();
+rw._clock = fakeClock(rwSt);
+var rwA = rw.addJob('* * * * *', () {});
+var rwB = rw.addJob('* * * * *', () {});
+makeWait(rw, rwA, at(2026, 11, 12, 0, 1, 0), 2000);
+makeWait(rw, rwB, at(2026, 11, 12, 0, 1, 0), 3000);
+rw.removeJob(rwA);
+?. rw.nextWaitMs(10000) = 2000;
+
+var tjSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 5000.0];
+var tj = CronScheduler();
+tj._clock = fakeClock(tjSt);
+var tjHits = 0;
+var tjId = tj.addJob('* * * * *', () { tjHits += 1; });
+makeWait(tj, tjId, at(2026, 11, 12, 0, 1, 0), 60000);
+?. tj.tick() = 0;
+tjSt['wall'] = at(2026, 11, 12, 0, 2, 0);
+tjSt['mono'] = 2000;
+?. tj.tick() = 1;
+?. tjHits = 1;
+var tjJob = tj._byId['id:' & tjId];
+?. tjJob['nextMs'] = 62000;
+?. tj.nextWaitMs(1000) = 1000;
+?. tj.tick() = 0;
+
+nw.stop();
+?. nw.nextWaitMs(250) = 250;
+?. nw.nextWaitMs(nil) = 1000;
+?. nw.tick() = 0;

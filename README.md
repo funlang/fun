@@ -737,7 +737,7 @@ use 'cron.fun';
 
 var s = CronScheduler();
 var daily = s.addJob('0 3 * * *', cleanup);                // 5-field Vixie/POSIX
-var tick = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
+var every30s = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
 var refreshId = s.every('1s', refresh);                    // fixed interval
 
 s.removeJob(daily);           // cancel one job
@@ -795,11 +795,57 @@ var s = CronScheduler([onError: (job, err) {
 `job` is the same public snapshot returned by `jobs()`; `err` is
 `runtime.lastError()`.
 
-The scheduler owns a blocking loop, so use it from a standalone script or
-daemon; it cannot share a thread with `HttpServer.run` yet. It uses local time
-and does not yet provide timezone/DST control. Callback exceptions are contained
-so the loop keeps running; without `onError` they are not reported, so either
-supply the handler above or handle expected failures inside the callback.
+`run()` is a blocking loop, so use it from a standalone script or daemon. To
+share the thread with an `HttpServer` or another poll loop, drive the scheduler
+cooperatively with `tick()` and `nextWaitMs(maxMs)`:
+
+```fun
+use 'cron.fun';
+use 'http-server.fun';
+
+var s = CronScheduler();
+s.addJob('0 3 * * *', cleanup);
+s.every('1s', refresh);
+
+var web = HttpServer(':8080');
+var running = true;
+web.get('/health', health);
+web.get('/quit', (req, res) {
+  running = false;
+  res.text('bye');
+});
+web.listen();
+while running do
+  s.tick();
+  if running then
+    var wait = s.nextWaitMs(200);
+    if wait < 1 then wait = 1; end if;
+    web.runOnce(wait);
+  end if;
+end do;
+web.stop();
+```
+
+`tick()` performs one scheduling pass without sleeping and returns the number of
+callbacks it fired. `nextWaitMs(maxMs)` is a query only: it returns `0` when a
+job is due, otherwise at most `maxMs` milliseconds (`nil` or omitted means
+1000); negative values are treated as 0, and an empty or stopped scheduler
+returns the cap. It does not execute a callback or change the next run time.
+`nextRun(id)` is different: it takes an id and returns an absolute Fun time.
+
+The poll interval bounds how late a job can fire and how late a wall-clock jump
+can be noticed. Jobs shorter than the poll interval are coalesced at the poll
+granularity. `tick()` runs callbacks synchronously: a slow callback delays HTTP
+requests, and a slow HTTP handler delays cron. `tick()` is rejected while
+`run()` is active or inside a callback. `stop()` is intended for `run()`; a
+tick-driven loop should use its own running flag, and after `stop()` `tick()`
+returns 0 until `run()` is called again. `HttpServer.runOnce(0)` is treated as
+200 ms by the existing HTTP loop, so the recipe clamps a due wait to 1 ms.
+`runOnce()` is currently available on Linux and macOS. The scheduler uses local
+time and does not yet provide timezone/DST control. Callback exceptions are
+contained so the loop keeps running; without `onError` they are not reported,
+so either supply the handler above or handle expected failures inside the
+callback.
 
 Uploaded forms are read from the request directly:
 
