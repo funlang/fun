@@ -617,6 +617,14 @@ into funcmd, so `pcrd.pas` imports the DLL under `-dPCRE_WinDLL`);
 the regex-dependent tests as SKIP when a build has none, so a regex-less
 toolchain degrades instead of failing.
 
+The `linux-x64` job also builds `funcmd-mt` (`FUN_THREADS=1`) and runs the
+focused `lib-worker-test` suite. This stays in the existing job rather than a
+separate workflow: the compiler and third-party caches are already present, and
+a second runner would pay checkout and toolchain startup for a roughly one
+second compile. Only the MT binary has its own cache entry, so the other
+platforms keep their existing `funcmd` cache.
+
+
 The same job installs libffi from the runner's MSYS2 and builds win64 with
 `-dWinFFI` when the resulting `ffi.dll` sits next to `funcmd.exe`, which is what
 turns on `getapi` there: FPC's bundled `ffi` unit already has a WIN64 target, so
@@ -697,8 +705,9 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (81 modules)
 - **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`, `lib-worker`
 - **Testing**: `test` (registration and assertions for `fun test`)
 
-`lib-worker` needs the opt-in `funcmd-mt` Linux build
-(`src/prj/fun/make-linux-x86_64-mt.sh`). The default `funcmd` keeps its
+`lib-worker` needs the opt-in `funcmd-mt` build. Linux x64 release archives
+ship it as `fun/fun-mt`; from source use
+`src/prj/fun/make-linux-x86_64-mt.sh`. The default `funcmd` keeps its
 single-threaded heap and performance and reports a clear error on first use.
 A worker parses its own module and owns its AST and heap, so nothing Fun-visible
 is shared between threads. Results are strings; `Shared` and `Channel` copy

@@ -14,7 +14,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
   `del(key)`, `clear()` and `keyAt(i)` for key management, and `workerMapLimit`
   runs a map with a fixed number of concurrent workers. `workerAttach` wires
   completions into an event loop with an `onTick` hook; `Scheduler` in
-  `lib-winsock-base` now has that hook. `funcmd-mt` only.
+  `lib-winsock-base` now has that hook. The linux-x64 release archive also
+  ships the worker binary as `fun/fun-mt`. `funcmd-mt` only.
 
 - Windows arm64 is **not a release target yet**. FPC 3.2.2 has no
   win64/aarch64 target; FPC 3.3.1 (trunk), which does, currently produces

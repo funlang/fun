@@ -2,12 +2,18 @@
 # on five platforms - Linux / macOS / Windows, x64 for each, arm64 for the
 # two where an FPC target exists.
 #
-#   linux-x64    ubuntu-24.04      native FPC + full suite
+#   linux-x64    ubuntu-24.04      native FPC + full suite + opt-in MT build
 #   linux-arm64  ubuntu-24.04-arm  native FPC + full suite (linux-aarch64 skips)
 #   macos-x64    macos-15-intel    FPC universal dmg + macOS suite
 #   macos-arm64  macos-latest      Homebrew FPC 3.2.2 bottle + macOS suite
 #   linux-safe   ubuntu-24.04      SAFE=1 build + focused capability test only
 #   windows-x64  windows-latest    FPC (ppcrossx64) + the Windows runner (portable subset)
+#
+# linux-x64 sets `mt: true`: it also builds `funcmd-mt` (FUN_THREADS=1) in the
+# same job and runs the focused `lib-worker-test`. A separate job would pay a
+# second runner, checkout and toolchain install for a compile that reuses the
+# caches already present here. Only the MT binary gets its own cache entry, so
+# the other platforms keep their existing funcmd cache.
 #
 # windows-arm64 is not part of this gate: FPC 3.2.2 has no win64/aarch64
 # target. .github/workflows/winarm64.yml builds and tests it natively with an
@@ -71,6 +77,7 @@ jobs:
             build: ./make-linux-x86_64.sh
             fetch_all: true
             tcc: true
+            mt: true
           - name: linux-arm64
             os: ubuntu-24.04-arm
             platform: linux-aarch64
@@ -122,6 +129,16 @@ jobs:
           # v2 also caches funcmd-safe (see the build step).
           key: funcmd-v2-${{ matrix.name }}-fpc-3.2.2-${{ steps.src-hash.outputs.value }}
 
+      # The worker binary is Linux x64 only, so it has its own cache instead of
+      # adding a path that never exists on macOS or linux-arm64.
+      - name: Restore built funcmd-mt (MT matrix entries)
+        if: matrix.mt
+        id: cache-funcmd-mt
+        uses: actions/cache@v4
+        with:
+          path: src/prj/fun/funcmd-mt
+          key: funcmd-mt-v1-${{ matrix.name }}-fpc-3.2.2-${{ steps.src-hash.outputs.value }}
+
       # libtcc is dlopen'd next to funcmd by lib-tcc.fun; Linux produces
       # libtcc.so and macOS x64 produces libtcc.dylib. It is a separate
       # artifact from the interpreter.
@@ -136,7 +153,7 @@ jobs:
           key: libtcc-v2-${{ matrix.name }}-${{ steps.src-hash.outputs.value }}
 
       - name: Cache Free Pascal (Linux)
-        if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true'))
+        if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true') || (matrix.mt && steps.cache-funcmd-mt.outputs.cache-hit != 'true'))
         id: cache-fpc
         uses: actions/cache@v4
         with:
@@ -146,7 +163,7 @@ jobs:
           key: ${{ matrix.fpc_tar }}
 
       - name: Install Free Pascal 3.2.2 (Linux)
-        if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true')) && steps.cache-fpc.outputs.cache-hit != 'true'
+        if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true') || (matrix.mt && steps.cache-funcmd-mt.outputs.cache-hit != 'true')) && steps.cache-fpc.outputs.cache-hit != 'true'
         run: |
           set -e
           cd "$RUNNER_TEMP"
@@ -159,7 +176,7 @@ jobs:
           printf '%s\n\n\n\n\n\n\n\n\n\n' "$HOME/fpc-3.2.2" | ./install.sh
 
       - name: Put fpc on PATH (Linux)
-        if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true'))
+        if: runner.os == 'Linux' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true') || (matrix.mt && steps.cache-funcmd-mt.outputs.cache-hit != 'true'))
         run: echo "$HOME/fpc-3.2.2/bin" >> "$GITHUB_PATH"
 
       - name: Install OpenSSL (lib-crypto tests)
@@ -364,7 +381,7 @@ jobs:
         run: brew link --force --overwrite openssl@3 || brew install openssl@3
 
       - name: Cache third-party C sources
-        if: steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true')
+        if: steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true') || (matrix.mt && steps.cache-funcmd-mt.outputs.cache-hit != 'true')
         id: cache-third
         uses: actions/cache@v4
         with:
@@ -372,7 +389,7 @@ jobs:
           key: third-party-v2-${{ runner.os }}-${{ runner.arch }}-${{ matrix.fetch_all }}-${{ hashFiles('src/prj/fun/fetch-3rd-party.sh') }}
 
       - name: Fetch third-party C sources
-        if: (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true')) && steps.cache-third.outputs.cache-hit != 'true'
+        if: (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true') || (matrix.mt && steps.cache-funcmd-mt.outputs.cache-hit != 'true')) && steps.cache-third.outputs.cache-hit != 'true'
         run: |
           if [ "${{ matrix.fetch_all }}" = "true" ]; then
             src/prj/fun/fetch-3rd-party.sh
@@ -381,7 +398,7 @@ jobs:
           fi
 
       - name: Build funcmd
-        if: steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true')
+        if: steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true') || (matrix.mt && steps.cache-funcmd-mt.outputs.cache-hit != 'true')
         working-directory: src/prj/fun
         run: |
           log="$RUNNER_TEMP/build-${{ matrix.name }}.log"
@@ -407,6 +424,21 @@ jobs:
           fi
           grep -E 'SAFE=strict' "$safe_log" || true
 
+          # The opt-in worker build is Linux x64 only. It shares the compiler
+          # and third-party caches with the default build; cthreads makes the
+          # binary different, not the inputs. Building it here avoids a second
+          # runner just to compile one extra FPC target mode.
+          if [ "${{ matrix.mt }}" = "true" ]; then
+            mt_log="$RUNNER_TEMP/build-${{ matrix.name }}-mt.log"
+            if ! FUN_THREADS=1 ${{ matrix.build }} >"$mt_log" 2>&1; then
+              tail -n 40 "$mt_log"
+              err="$(grep -B8 -m1 -E 'Fatal: There were|Fatal: Compilation|Error:' "$mt_log" | tr '\n' '|' | cut -c1-900)"
+              echo "::error title=mt build (${{ matrix.name }})::$err"
+              exit 1
+            fi
+            grep -E 'funcmd-mt' "$mt_log" || true
+          fi
+
       - name: Verify libtcc (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -429,6 +461,9 @@ jobs:
         run: |
           cp -f src/prj/fun/funcmd fun/funcmd
           cp -f src/prj/fun/funcmd-safe fun/funcmd-safe
+          if [ -f src/prj/fun/funcmd-mt ]; then
+            cp -f src/prj/fun/funcmd-mt fun/funcmd-mt
+          fi
           for lib in libtcc.so libtcc.dylib; do
             if [ -f "src/prj/fun/$lib" ]; then
               cp -f "src/prj/fun/$lib" "fun/$lib"
@@ -461,6 +496,17 @@ jobs:
           FUNREG_PLATFORM: ${{ matrix.platform }}
         run: fun/test/run-linux-regression.sh
 
+      # Focused MT test. The full suite above intentionally runs on the
+      # single-threaded default binary; only lib-worker-test needs funcmd-mt.
+      - name: Worker regression (MT)
+        if: matrix.mt
+        run: |
+          test -x fun/funcmd-mt || {
+            echo "::error title=mt binary missing::fun/funcmd-mt was not built or restored"
+            exit 1
+          }
+          fun/funcmd-mt fun/test/lib-worker-test.fun
+
       # Release artifacts are built only from a green run on main. The release
       # workflow downloads these stages from the successful regression run that
       # matches the commit it is about to tag; it never rebuilds.
@@ -470,6 +516,9 @@ jobs:
           mkdir -p dist-stage
           cp -f src/prj/fun/funcmd dist-stage/
           cp -f src/prj/fun/funcmd-safe dist-stage/
+          if [ "${{ matrix.mt }}" = "true" ] && [ -f src/prj/fun/funcmd-mt ]; then
+            cp -f src/prj/fun/funcmd-mt dist-stage/
+          fi
           libtcc=""
           for lib in libtcc.so libtcc.dylib; do
             if [ -f "src/prj/fun/$lib" ]; then

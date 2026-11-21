@@ -201,10 +201,13 @@ else
     (cd "$inner" && tar cf - .) | (cd "$dest" && tar xf -)
 fi
 
-chmod +x "$dest/fun/fun" "$dest/fun/fun-safe" 2>/dev/null || true
+chmod +x "$dest/fun/fun" "$dest/fun/fun-safe" "$dest/fun/fun-mt" 2>/dev/null || true
 # Compatibility links: older docs and scripts invoke funcmd and funcmd-safe.
 ln -sfn fun "$dest/fun/funcmd"
 ln -sfn fun-safe "$dest/fun/funcmd-safe"
+if [ -f "$dest/fun/fun-mt" ]; then
+    ln -sfn fun-mt "$dest/fun/funcmd-mt"
+fi
 
 # macOS: no code signing, so the only reliable path is to avoid/remove the
 # quarantine attribute. curl downloads are not quarantined; this also handles

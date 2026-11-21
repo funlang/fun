@@ -18,7 +18,8 @@
 - **平台**：Linux x86_64 / arm64、macOS x64 / arm64、Windows x64（FPC）；
   Delphi/Win32 继续人工验证。
 - **CI**：GitHub Actions 的 `regression` 工作流覆盖 6 个构建作业（4 个 POSIX 平台 +
-  linux-safe + windows-x64），`docs` 工作流检查本文件。
+  linux-safe + windows-x64），`linux-x64` 额外构建 `funcmd-mt` 并跑 worker 测试；
+  `docs` 工作流检查本文件。
 - **能力链**：ffi → 同步文件 IO → 进程 → 网络 → 数据库；另有 C/JIT/汇编、
   HTTP/WebSocket 单线程事件循环、safe 构建。
 
@@ -56,7 +57,7 @@
 | D-03 | 数据 | P2 | OPEN | 日期/时间跨端约定未统一 | `art/notes/data-format-alignment.md` |
 | D-04 | 数据 | P2 | OPEN | Fun `Int64` 超过 2^53 传给 JS 会静默丢精度 | `art/notes/data-format-alignment.md` |
 | D-05 | 数据 | P3 | OPEN | FD/JSON 其余低风险一致性项（空键、定长前缀、kvd 空白分隔等） | `art/notes/data-format-alignment.md` |
-| P-01 | 平台/并发 | P2 | OPEN | 真并发未做，同一函数并发调用仍不安全 | `art/notes/linux-threading.md` |
+| P-01 | 平台/并发 | P2 | DOING | `funcmd-mt`（Linux x64）已支持 worker：每个 worker 独立解析 AST/CEnv，跨线程只走字符串/FD，`Shared`/`Channel`/`onDone` 可用；`linux-x64` CI 在同一任务内构建并跑 `lib-worker-test`，发布包附带 fun/fun-mt。剩余：macOS/Windows MT 构建、常驻 worker 池、取消，以及把 `mt: true` 扩到更多平台 | `fun/lib/worker-model.md` |
 | P-02 | 平台 | P2 | OPEN | `lib-os` 全量 host 分派器未做 | `art/notes/library-port-plan.md` |
 | P-03 | 平台 | P2 | OPEN | `lib-message`/`lib-async`/`lib-jsasync` 仍依赖消息泵或线程 | `art/notes/linux-capabilities.md` |
 | P-04 | 平台 | P3 | OPEN | `lib-icmp` raw socket 未做，需 root/CAP_NET_RAW | `art/notes/linux-capabilities.md` |

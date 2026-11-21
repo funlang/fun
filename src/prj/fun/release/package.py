@@ -4,7 +4,7 @@
 #
 # The regression workflow uploads a small stage directory per platform:
 #
-#   raw/<platform>/{funcmd, funcmd-safe, libtcc.so, *.dll, build-env.json}
+#   raw/<platform>/{funcmd, funcmd-safe, funcmd-mt, libtcc.so, *.dll, build-env.json}
 #
 # This script lays out the user-visible tree (binary + lib/ + licenses +
 # capabilities.json), creates reproducible archives, and writes the release
@@ -99,8 +99,10 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
     # the documented command and fun.exe on Windows).
     src_exe = "funcmd.exe" if is_win else "funcmd"
     src_safe = "funcmd-safe.exe" if is_win else "funcmd-safe"
+    src_mt = "funcmd-mt"
     exe = "fun.exe" if is_win else "fun"
     safe_exe = "fun-safe.exe" if is_win else "fun-safe"
+    mt_exe = "fun-mt"
 
     caps_path = src / "build-env.json"
     if caps_path.is_file():
@@ -119,6 +121,7 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
             "date": meta["date"],
             "safe": (src / src_safe).is_file(),
             "safe_level": "strict",
+            "mt": (src / src_mt).is_file(),
             "libtcc_present": any(
                 (src / name).is_file()
                 for name in (
@@ -128,7 +131,8 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
                 )
             ),
             "executables": ["fun/" + exe]
-            + (["fun/" + safe_exe] if (src / src_safe).is_file() else []),
+            + (["fun/" + safe_exe] if (src / src_safe).is_file() else [])
+            + (["fun/" + mt_exe] if (src / src_mt).is_file() else []),
         }
     )
     caps.setdefault("notes", "")
@@ -156,6 +160,11 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
         shutil.copy2(src / src_safe, runtime / safe_exe)
         os.chmod(runtime / safe_exe, 0o755)
         os.utime(runtime / safe_exe, (epoch, epoch))
+
+    if caps["mt"]:
+        shutil.copy2(src / src_mt, runtime / mt_exe)
+        os.chmod(runtime / mt_exe, 0o755)
+        os.utime(runtime / mt_exe, (epoch, epoch))
 
     # Windows users need the optional DLLs beside the exe. Copy whichever the
     # build produced; a missing one is reported in capabilities.json.
@@ -203,6 +212,7 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
         "",
         "Run:        ./fun/" + exe + " --help",
         "Safe build: ./fun/" + safe_exe if caps["safe"] else "Safe build: not included",
+        "Worker build: ./fun/" + mt_exe if caps["mt"] else "Worker build: not included",
         "",
         "regex: " + ("yes" if caps.get("regex") else "NO"),
         "getapi/FFI: " + ("yes" if caps.get("ffi") else "NO"),
@@ -501,8 +511,8 @@ def notes(meta, caps_list, archives, repo_root, previous):
     lines += [
         "### Capabilities",
         "",
-        "| platform | regex | FFI | runtime C (tcc) | asm | safe build | notes |",
-        "|---|---|---|---|---|---|---|",
+        "| platform | regex | FFI | runtime C (tcc) | asm | safe build | worker build | notes |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for c in caps_list:
         mark = lambda v: "yes" if v else "no"
@@ -510,12 +520,13 @@ def notes(meta, caps_list, archives, repo_root, previous):
         lines.append(
             f"| {c['platform']} | {mark(c.get('regex'))} | {mark(c.get('ffi'))} | "
             f"{mark(c.get('tcc'))} | {mark(c.get('asm', True))} | "
-            f"{mark(c.get('safe'))} | {note} |"
+            f"{mark(c.get('safe'))} | {mark(c.get('mt'))} | {note} |"
         )
     lines += [
         "",
         "The first five columns describe the default binary. `safe build` is the",
         "separate capability-restricted `fun-safe` binary (strict level).",
+        "`worker build` is the opt-in `fun-mt` binary (Linux x64 only).",
         "`capabilities.json` in each archive is the machine-readable table.",
         "",
         "Verify with `sha256sum -c SHA256SUMS` (Linux/macOS) or",

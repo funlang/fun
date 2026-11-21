@@ -57,6 +57,7 @@ src/prj/fun/.ffi/
 /fun/funcmd
 /fun/funcmd-safe
 /fun/funcmd-mt
+/fun/fun-mt
 /fun/funcmd[0-9]*
 
 # Local transcripts from running the interactive demos (scratch output)

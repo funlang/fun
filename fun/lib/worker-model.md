@@ -1,8 +1,9 @@
 # Worker and shared-data model
 
-Status: implemented in the opt-in `funcmd-mt` build (`FUN_THREADS=1`). The
-default `funcmd` stays single-threaded and reports a clear error on first use of
-`lib-worker`.
+Status: implemented in the opt-in `funcmd-mt` build (`FUN_THREADS=1`). Linux
+x64 release archives ship it as `fun/fun-mt`; from source, use
+`src/prj/fun/make-linux-x86_64-mt.sh`. The default `funcmd` stays
+single-threaded and reports a clear error on first use of `lib-worker`.
 
 ## Why a separate binary
 
@@ -190,8 +191,8 @@ workerAttach(s);       // every s.Tick() now ends with workerTick()
   parse cost per job. `workerMapLimit` limits concurrency, not parsing.
 - No worker-to-worker direct message object. Use `Shared` or `Channel` names.
 - No cross-process workers, no remote workers, and no distributed queues.
-- No Windows or macOS MT build script yet. The current `funcmd-mt` target is
-  Linux x86_64.
+- No Windows or macOS MT build script yet. The only worker target is Linux
+  x86_64, shipped as `fun/fun-mt` in the linux-x64 archive.
 - No fairness or priority control. OS scheduling decides which worker runs.
 - FFI callbacks into Fun from a thread that Fun did not create need a build with
   the thread-safe RTL and careful callback design. This model does not make

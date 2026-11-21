@@ -12,7 +12,8 @@
   进出时复制字符串/FD，因此不同线程上的生产者与消费者不会共享 Fun 对象。
   `Shared` 还新增 `del(key)`、`clear()` 与 `keyAt(i)`，`workerMapLimit` 以固定
   并发数执行 map；`workerAttach` 把完成回调接到带 `onTick` 钩子的事件循环，
-  `lib-winsock-base` 的 `Scheduler` 已提供该钩子。仅 `funcmd-mt` 支持。
+  `lib-winsock-base` 的 `Scheduler` 已提供该钩子。Linux x64 发布包还把 worker
+  二进制作为 `fun/fun-mt` 附带。仅 `funcmd-mt` 支持。
 
 - Windows arm64 **还不是发布目标**。FPC 3.2.2 没有 win64/aarch64 目标；
   支持该目标的 FPC 3.3.1（主线）目前生成的二进制在真机 Windows ARM64 上会以

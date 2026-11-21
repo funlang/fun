@@ -583,6 +583,12 @@ funcmd，因此 `pcrd.pas` 以 `-dPCRE_WinDLL` 方式导入 DLL）；`run-window
 启动时仍会探测引擎，构建没有正则时把依赖正则的用例报成 SKIP，于是缺 PCRE 的工具链
 只会降级而不是失败。
 
+`linux-x64` 任务还会用 `FUN_THREADS=1` 构建 `funcmd-mt`，并运行聚焦的
+`lib-worker-test`。它留在现有任务里而不是单独开 workflow：编译器和第三方缓存
+已经就绪，另起 runner 只会为约一秒的编译再付一次 checkout 与工具链安装时间。
+只有 MT 二进制使用独立缓存，其他平台继续复用原有的 `funcmd` 缓存。
+
+
 同一个 job 还会从 runner 的 MSYS2 装 libffi，当 `ffi.dll` 落在 `funcmd.exe` 旁时就以
 `-dWinFFI` 构建 win64，这正是打开 `getapi` 的开关：FPC 自带的 `ffi` 单元本就有 WIN64
 目标，Windows 上只差这个库。两个可选特性遵循同一条规则——DLL 或单元缺失时 job 退回
@@ -650,8 +656,9 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 - **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`、`lib-worker`
 - **测试**：`test`（`fun test` 的注册与断言库）
 
-`lib-worker` 需要 opt-in 的 Linux `funcmd-mt` 构建
-（`src/prj/fun/make-linux-x86_64-mt.sh`）。默认 `funcmd` 保持单线程堆与性能，
+`lib-worker` 需要 opt-in 的 `funcmd-mt` 构建。Linux x64 发布包会把它作为
+`fun/fun-mt` 附带；从源码构建使用
+`src/prj/fun/make-linux-x86_64-mt.sh`。默认 `funcmd` 保持单线程堆与性能，
 首次使用 worker 时会给出明确错误。worker 会解析自己的模块并拥有独立的 AST 与堆，
 因此线程之间不共享任何 Fun 对象。结果以字符串返回；`Shared` 与 `Channel`
 在进出时复制值：
