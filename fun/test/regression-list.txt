@@ -136,3 +136,4 @@ lib-process-test.fun	test/lib-process-test.fun	snap
 alias-re-export.fun	test/alias-re-export.fun	snap
 compile-inline-scope.fun	test/compile-inline-scope.fun	snap
 var-ref-args.fun	test/var-ref-args.fun	snap
+lib-worker-test.fun	test/lib-worker-test.fun	snap

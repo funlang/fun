@@ -78,6 +78,7 @@ LOAD  lib-utils
 LOAD  lib-winapi
 LOAD  lib-winole
 LOAD  lib-winsock
+LOAD  lib-worker
 LOAD  lib-xml
 LOAD  lib-yaml
 LOAD  lib-zlib
@@ -88,4 +89,4 @@ LOAD  test
 LOAD  toml
 LOAD  uuid
 
-loaded=83 failed=6
+loaded=84 failed=6

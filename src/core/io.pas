@@ -49,8 +49,13 @@ const
   CP_UCS2b = 1201;
 
 {$IfDef Unicode}
+{$IfDef FunThreads}
+threadvar
+  CP_Last: fun.word;
+{$Else}
 var
   CP_Last: fun.word;
+{$EndIf}
 {$EndIf}
 
 function LoadLib(const fn: fun.str): fun.uint;

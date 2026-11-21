@@ -62,6 +62,9 @@
 #                                         # from a pthread it created itself; it
 #                                         # adds ~20% to every single-threaded
 #                                         # run, so it is off by default.
+#   FUN_THREADS=1 ./make-linux-x86_64.sh  # build funcmd-mt (workers)
+#                                         # (adds -dFunThreads -dUseCThreads,
+#                                         # leaves the default funcmd alone)
 # ============================================================
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -247,11 +250,26 @@ SAFE_OUT=""
 if [ -n "$SAFE_LEVEL" ]; then
     SAFE_OUT="-o$HERE/funcmd-safe"
 fi
+# Worker build: a separate binary so the default funcmd keeps its exact heap
+# and performance. cthreads supplies both the thread driver (BeginThread /
+# RTLEvent) and the thread-safe FPC heap on Unix.
+MT_FLAGS=""
+MT_OUT=""
+if [ "${FUN_THREADS:-0}" = "1" ]; then
+    if [ -n "$SAFE_LEVEL" ]; then
+        echo "FUN_THREADS=1 cannot be combined with SAFE=...; build them separately." >&2
+        exit 2
+    fi
+    MT_FLAGS="-dFunThreads -dUseCThreads"
+    MT_OUT="-o$HERE/funcmd-mt"
+fi
 # Keep the two modes' .ppu/.o files apart. FPC otherwise writes units into the
 # current directory, and a later build of the other mode can silently reuse
 # them (normal code leaking into safe, or safe checks leaking into normal).
 if [ -n "$SAFE_LEVEL" ]; then
     UNITS="$HERE/units-safe"
+elif [ -n "$MT_FLAGS" ]; then
+    UNITS="$HERE/units-mt"
 else
     UNITS="$HERE/units"
 fi
@@ -263,7 +281,7 @@ UNIT_FLAGS="-FU$UNITS"
 # build is about a second.
 rm -f "$UNITS"/*.ppu "$UNITS"/*.o "$UNITS"/*.or 2>/dev/null || true
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $TRACEBACK_FLAGS $SAFE_FLAGS $SAFE_OUT $UNIT_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $TRACEBACK_FLAGS $SAFE_FLAGS $SAFE_OUT $MT_FLAGS $MT_OUT $UNIT_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) -------------
 # Refresh fun/funcmd on every build, so a run from the repo root is just
@@ -275,6 +293,9 @@ ROOT="$(cd "$HERE/../../.." && pwd)"
 if [ -n "$SAFE_LEVEL" ]; then
     BUILD_BIN="$HERE/funcmd-safe"
     TARGET_BIN="$ROOT/fun/funcmd-safe"
+elif [ -n "$MT_FLAGS" ]; then
+    BUILD_BIN="$HERE/funcmd-mt"
+    TARGET_BIN="$ROOT/fun/funcmd-mt"
 else
     BUILD_BIN="$HERE/funcmd"
     TARGET_BIN="$ROOT/fun/funcmd"

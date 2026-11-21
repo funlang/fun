@@ -63,6 +63,7 @@ uses SysUtils, Variants,
        unixtype, baseunix, termio,
      {$EndIf}
      io, parse
+     {$IfDef FunThreads}, worker{$EndIf}
      {$IfDef WinCOM}  , winole  {$EndIf}
      {$IfDef WinAPI}  , winapi  {$EndIf}
      {$IfDef UnixFFI}, lffi    {$EndIf}
@@ -207,7 +208,11 @@ begin
       'compiler ' + _hostCompiler + #10 +
       'bits '     + IntToStr(SizeOf(fun.ptr) * 8) + #10 +
       'chars '    + IntToStr(SizeOf(fun.char)) + #10 +
-      'version '  + IntToStr(funVersion);
+      'version '  + IntToStr(funVersion)
+{$IfDef FunThreads}
+      + #10 + 'threads 1'
+{$EndIf}
+      ;
 end;
 
 //==============================================================
@@ -1974,6 +1979,12 @@ end;
 constructor CLbase.Create;
 begin
   inherited Create;
+  {$IfDef FunThreads}
+  // 'Worker'.start(source, entry, payload, file = true)
+  ids['start'] := CExp.new(nil).parse(Int64(fun.uintptr(@_workerStart)));
+  // 'Shared'.open(name)
+  ids['open']  := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedOpen)));
+  {$EndIf}
   // Easter egg
   ids['@uthor']  := CExp.new(nil).parse(Int64(fun.uintptr(@_author)));
   

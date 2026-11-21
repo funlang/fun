@@ -494,7 +494,12 @@ function FrameLine(const f: CCallFrame): fun.int;
 {$EndIf}
 
 // for OLE lib - PropertyGet or Set
+{$IfDef FunThreads}
+// With workers, each thread evaluates against its own environment.
+threadvar _ENV: CEnv;
+{$Else}
 var _ENV: CEnv;
+{$EndIf}
 
 // Object-aware boolean coercion of a value. Unlike base.funBool (which relies
 // on the implicit Variant->Boolean cast routed through the custom

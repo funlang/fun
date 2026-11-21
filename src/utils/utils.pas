@@ -348,7 +348,7 @@ begin
 {$EndIf}
 end;
 
-procedure WriteErr(const s: fun.str);
+procedure WriteErrRaw(const s: fun.str);
 {$IfDef UNIX}
 begin
   if s <> '' then
@@ -382,7 +382,7 @@ end;
 {$EndIf}
 {$EndIf}
 
-procedure WriteOut(const s: fun.str);
+procedure WriteOutRaw(const s: fun.str);
 {$IfDef FPC}
 {$IfNDef UNIX}
 {$IfNDef WinCE}
@@ -413,6 +413,44 @@ begin
   // Unix, WinCE and Delphi: the RTL write is already byte-exact.
   Write(Output, s);
 end;
+
+{$IfDef FunThreads}
+// Workers share stdout/stderr. Serialize each write so two workers cannot
+// interleave inside the RTL text buffer. Single-thread builds keep the direct
+// call path unchanged.
+var
+  WriteLock: TRTLCriticalSection;
+
+procedure WriteErr(const s: fun.str);
+begin
+  EnterCriticalSection(WriteLock);
+  try
+    WriteErrRaw(s);
+  finally
+    LeaveCriticalSection(WriteLock);
+  end;
+end;
+
+procedure WriteOut(const s: fun.str);
+begin
+  EnterCriticalSection(WriteLock);
+  try
+    WriteOutRaw(s);
+  finally
+    LeaveCriticalSection(WriteLock);
+  end;
+end;
+{$Else}
+procedure WriteErr(const s: fun.str);
+begin
+  WriteErrRaw(s);
+end;
+
+procedure WriteOut(const s: fun.str);
+begin
+  WriteOutRaw(s);
+end;
+{$EndIf}
 
 {$IfDef FunPack}
 //==============================================================
@@ -681,6 +719,13 @@ begin
     BundleDir := '';
   end;
 end;
+{$EndIf}
+
+{$IfDef FunThreads}
+initialization
+  InitCriticalSection(WriteLock);
+finalization
+  DoneCriticalSection(WriteLock);
 {$EndIf}
 
 end.

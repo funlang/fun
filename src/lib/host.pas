@@ -34,7 +34,8 @@ unit host;
 
 interface
 
-uses fun, base, core;
+uses fun, base, core
+     {$IfDef FunThreads}, worker{$EndIf};
 
 type
   CPasFun = procedure (env: CEnv; exp: CExp; exps: CExps; val: PValue);
@@ -75,6 +76,16 @@ type
     constructor Create;
     function accept(exp: CExp): fun.bool; override;
   end;
+
+  {$IfDef FunThreads}
+  // Method dispatch for CWorker handles. The primitive stays tiny; everything
+  // user-facing (Worker class, FD payloads, shared-data helpers) is Fun code.
+  CLworker = class(CLib)
+  public
+    constructor Create;
+    function accept(exp: CExp): fun.bool; override;
+  end;
+  {$EndIf}
   
 
 procedure _getlib(env: CEnv; exp: CExp; exps: CExps; val: PValue);
@@ -161,6 +172,11 @@ begin
   
   // fun lib
   libs.add(CLfun.Create());
+
+  {$IfDef FunThreads}
+  // worker handles (FunThreads builds only)
+  libs.add(CLworker.Create());
+  {$EndIf}
   
   // win api
   {$IfDef WinAPI}
@@ -262,6 +278,119 @@ function CLfun.accept(exp: CExp): fun.bool;
 begin
   result := exp.asObj is CFun;
 end;
+
+//==============================================================
+{$IfDef FunThreads}
+procedure _workerJoin(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  w: CWorker;
+  t: fun.int;
+begin
+  w := CWorker(exp.asObj);
+  t := CExps.FindAsVal(exps, 'timeout', 0, -1);
+  if w.Join(t) then
+    val^ := w.ResultText
+  else
+    val^ := NullValue
+  ;
+end;
+
+procedure _workerResult(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  val^ := CWorker(exp.asObj).ResultText;
+end;
+
+procedure _workerError(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  w: CWorker;
+begin
+  w := CWorker(exp.asObj);
+  if w.HasError then val^ := w.ErrorText else val^ := NullValue;
+end;
+
+procedure _workerAlive(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  val^ := CWorker(exp.asObj).Alive;
+end;
+
+procedure _workerId(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  val^ := Int64(fun.uintptr(CWorker(exp.asObj).ThreadId));
+end;
+
+procedure _sharedGet(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  e: CExp;
+begin
+  e := CExps.Find(exps, '', 0);
+  if e = nil then val^ := '' else val^ := CShared(exp.asObj).GetValue(e.asStr);
+end;
+
+procedure _sharedSet(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  k, v: CExp;
+begin
+  k := CExps.Find(exps, '', 0);
+  v := CExps.Find(exps, '', 1);
+  if k <> nil then
+  begin
+    if v = nil then
+      CShared(exp.asObj).SetValue(k.asStr, '')
+    else
+      CShared(exp.asObj).SetValue(k.asStr, v.asStr)
+    ;
+  end;
+  val^ := true;
+end;
+
+procedure _sharedHas(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  e: CExp;
+begin
+  e := CExps.Find(exps, '', 0);
+  val^ := (e <> nil) and CShared(exp.asObj).Has(e.asStr);
+end;
+
+procedure _sharedCount(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  val^ := CShared(exp.asObj).Count;
+end;
+
+procedure _sharedAdd(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  k, d: CExp;
+begin
+  k := CExps.Find(exps, '', 0);
+  d := CExps.Find(exps, '', 1);
+  if k = nil then
+    val^ := Int64(0)
+  else if d = nil then
+    val^ := CShared(exp.asObj).Add(k.asStr, 1)
+  else
+    val^ := CShared(exp.asObj).Add(k.asStr, d.asInt)
+  ;
+end;
+
+constructor CLworker.Create;
+begin
+  inherited Create;
+  ids['join']   := CExp.new(nil).parse(Int64(fun.uintptr(@_workerJoin)));
+  ids['result'] := CExp.new(nil).parse(Int64(fun.uintptr(@_workerResult)));
+  ids['error']  := CExp.new(nil).parse(Int64(fun.uintptr(@_workerError)));
+  ids['alive']  := CExp.new(nil).parse(Int64(fun.uintptr(@_workerAlive)));
+  ids['id']     := CExp.new(nil).parse(Int64(fun.uintptr(@_workerId)));
+  ids['get']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedGet)));
+  ids['set']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedSet)));
+  ids['has']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedHas)));
+  ids['count']  := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedCount)));
+  ids['add']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedAdd)));
+end;
+
+function CLworker.accept(exp: CExp): fun.bool;
+begin
+  result := (exp.asObj is CWorker) or (exp.asObj is CShared);
+end;
+{$EndIf}
 
 
 end.

@@ -66,6 +66,9 @@ uses
   parse in '..\..\parse\parse.pas',
   libase in '..\..\lib\libase.pas',
   libset in '..\..\lib\libset.pas',
+{$IfDef FunThreads}
+  worker in '..\..\lib\worker.pas',
+{$EndIf}
 {$IfDef WinAPI}
   winapi in '..\..\lib\winapi.pas',
 {$EndIf}
