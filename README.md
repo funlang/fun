@@ -725,6 +725,9 @@ w2.onDone(fun (result, error) {
 workerTick();
 ```
 
+See [`fun/lib/worker-model.md`](fun/lib/worker-model.md) for the isolation
+model, shared-data idioms, and current limits.
+
 Logging is configured once and then used through named loggers:
 
 ```fun

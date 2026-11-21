@@ -677,6 +677,9 @@ w2.onDone(fun (result, error) {
 workerTick();
 ```
 
+隔离模型、共享数据惯用法与当前限制见
+[`fun/lib/worker-model.md`](fun/lib/worker-model.md)。
+
 日志在入口配置一次，之后通过命名 logger 使用：
 
 ```fun
