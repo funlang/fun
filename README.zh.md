@@ -669,9 +669,12 @@ Shared('counter').add('done', 1);
 Channel('log').send('job finished');
 
 // 在主线程执行完成回调（事件循环中调用 workerTick）
-w.onDone(fun (result, error) {
+var w2 = WorkerFile('job.fun', 'sum', (new [1000]).@toJson(fd: true));
+w2.onDone(fun (result, error) {
   ?. 'worker returned ' & result;
 });
+// ... 之后在事件循环中：
+workerTick();
 ```
 
 日志在入口配置一次，之后通过命名 logger 使用：
