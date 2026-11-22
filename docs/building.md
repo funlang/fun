@@ -101,6 +101,25 @@ Windows arm64 is bring-up only (an FPC codegen crash blocks release), and the
 Win32/Windows CE builds are legacy; none of them is a release gate. See
 [`ROADMAP.md`](../ROADMAP.md) for their current status.
 
+### Legacy Win32
+
+The 32-bit build has been probed far below the official support floor:
+
+- **Windows 95 OSR2 (4.00.1111)**: language core, FFI (`MessageBoxA`),
+  hand-written machine code through `lib-asm`, and the full UI stack
+  (`lib-ui` with the IE3 WebBrowser control, HTML/CSS, `fun:data` binding,
+  `fun:click`/`fun:key` events and COM callbacks into Fun).
+- **Windows NT 3.5 (Build 807)**: core, FFI, machine code and window creation
+  work with `-DNoDialog`. The embedded WebBrowser has no content because the
+  IE control is absent.
+- **Windows NT 3.1**: does not start because OLE 2.0 (`oleaut32.dll`) is not
+  part of the system.
+
+These are compatibility probes, not release gates. Write-ups and screenshots:
+[Windows 95](https://funlang.org/art/fun-on-win95.htm),
+[Windows 95 UI](https://funlang.org/art/fun-win95-ui-bind.htm),
+[NT 3.5](https://funlang.org/art/fun-on-nt35.htm).
+
 ## Cross builds
 
 The macOS, Linux aarch64, LoongArch64 and riscv64 rows are the builds that need

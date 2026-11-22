@@ -94,6 +94,22 @@ Fedora/RHEL 风格的布局上 `getapi`/FFI 也会自动启用。
 Windows arm64 仍处于 bring-up（FPC 代码生成崩溃，无法发布）；Win32/Windows CE
 构建属于遗留路径，均不在发布门槛内。当前状态见 [`ROADMAP.md`](../ROADMAP.md)。
 
+### 老 Win32
+
+32 位构建的实际兼容底线远低于官方支持列表：
+
+- **Windows 95 OSR2（4.00.1111）**：语言核心、FFI（`MessageBoxA`）、
+  `lib-asm` 手写机器码，以及完整 UI（`lib-ui` + IE3 WebBrowser 控件、
+  HTML/CSS、`fun:data` 绑定、`fun:click`/`fun:key` 事件、COM 回调进 Fun）。
+- **Windows NT 3.5（Build 807）**：加 `-DNoDialog` 后，核心、FFI、机器码与
+  窗口创建可用；系统没有 IE 控件，内嵌 WebBrowser 无内容。
+- **Windows NT 3.1**：系统没有 OLE 2.0（`oleaut32.dll`），无法启动。
+
+这些是兼容性探针，不是发布门槛。实测文章与截图：
+[Windows 95](https://funlang.org/art/fun-on-win95.htm)、
+[Windows 95 UI](https://funlang.org/art/fun-win95-ui-bind.htm)、
+[NT 3.5](https://funlang.org/art/fun-on-nt35.htm)。
+
 ## 交叉构建
 
 macOS、Linux aarch64、龙芯与 riscv64 这几行需要先搭交叉工具链。它们都在

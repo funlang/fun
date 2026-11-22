@@ -91,6 +91,14 @@ an ORM, YAML/XML/TOML/CSV, JSON Schema, desktop UI and a worker pool.
 **Embed in three lines.** `Run(PChar('script.fun')); Run(source); Run(-1);`
 turns the whole runtime into an embeddable `fun.dll`.
 
+**Thirty years of Win32, not just modern Windows.** The 32-bit build runs the
+language core, FFI and hand-written machine code on Windows 95 OSR2, and the
+UI stack too (HTML/CSS in the IE3 WebBrowser control with callbacks into Fun).
+Windows NT 3.5 runs the core, FFI, machine code and window creation with
+`-DNoDialog`. See the probes: [Windows 95](https://funlang.org/art/fun-on-win95.htm),
+[Windows 95 UI](https://funlang.org/art/fun-win95-ui-bind.htm),
+[NT 3.5](https://funlang.org/art/fun-on-nt35.htm).
+
 ---
 
 ## Why Fun
@@ -127,7 +135,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Runtime C & machine code** — bundled Tiny C Compiler, JIT, and inline assembly (see [the capability ladder](#the-capability-ladder)).
 - **C-level FFI** — paste a C prototype or use a compact signature string to call DLL/shared-library functions (see [FFI](#foreign-function-interface)).
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
-- **Cross-platform** — Linux x64/arm64 (LoongArch64/riscv64 prerelease), macOS x64/arm64, and Windows x64; legacy Win32/CE builds remain in the tree.
+- **Cross-platform** — Linux x64/arm64 (LoongArch64/riscv64 prerelease), macOS x64/arm64, and Windows x64; the 32-bit build still runs on Windows 95 OSR2 and NT 3.5 (see [legacy Win32](docs/building.md#legacy-win32)).
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
 - **Self-hosted standard library** — about 90 public modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
@@ -419,6 +427,15 @@ Platform capability matrix (default build plus the opt-in `fun-safe` and
 | macos-arm64    | yes   | yes | yes             | yes | yes        | yes          |
 | macos-x64      | yes   | yes | yes             | yes | yes        | yes          |
 | win-x64        | yes   | yes | yes             | yes | yes        | yes          |
+
+Legacy Win32 compatibility goes much further than the table suggests. The
+32-bit build runs the language core, FFI, machine code and the full UI stack
+on Windows 95 OSR2 (IE3 WebBrowser control included), and the core, FFI,
+machine code plus window creation on Windows NT 3.5 with `-DNoDialog`. NT 3.1
+predates the bundled OLE 2.0 and does not start. These are compatibility
+probes, not release gates; see
+[Windows 95](https://funlang.org/art/fun-on-win95.htm) and
+[NT 3.5](https://funlang.org/art/fun-on-nt35.htm).
 
 The macOS, Linux aarch64, LoongArch64 and riscv64 rows are cross-built on Linux
 x86_64 with bootstrapped FPC toolchains. Third-party sources (PCRE, TCC, zlib,

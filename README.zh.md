@@ -88,6 +88,13 @@ JSON Schema、桌面 UI 与 worker pool。
 **三行代码嵌入。** `Run(PChar('script.fun')); Run(source); Run(-1);`
 把整个运行时变成可嵌入的 `fun.dll`。
 
+**三十年 Win32 兼容，不只现代 Windows。** 32 位构建在 Windows 95 OSR2 上跑通
+语言核心、FFI、手写机器码，连 UI 也是全特性（IE3 WebBrowser 控件里跑 HTML/CSS，
+事件回调进 Fun）。Windows NT 3.5 上加 `-DNoDialog` 可跑核心、FFI、机器码与
+窗口创建。实测见 [Windows 95](https://funlang.org/art/fun-on-win95.htm)、
+[Windows 95 UI](https://funlang.org/art/fun-win95-ui-bind.htm)、
+[NT 3.5](https://funlang.org/art/fun-on-nt35.htm)。
+
 ---
 
 ## 为什么是 Fun
@@ -124,7 +131,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **运行时 C 与机器码** —— 内置 Tiny C 编译器、JIT 与内联汇编（见[能力阶梯](#能力阶梯)）。
 - **C 级 FFI** —— 贴入 C 声明，或用简短签名串调用 DLL/共享库函数（见 [FFI](#外部函数接口ffi)）。
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
-- **跨平台** —— Linux x64/arm64（LoongArch64/riscv64 为预发布）、macOS x64/arm64 与 Windows x64；旧 Win32/CE 构建仍保留在源码树中。
+- **跨平台** —— Linux x64/arm64（LoongArch64/riscv64 为预发布）、macOS x64/arm64 与 Windows x64；32 位构建仍能在 Windows 95 OSR2 与 NT 3.5 上运行（见[老 Win32](docs/building.zh.md#老-win32)）。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
 - **自托管的标准库** —— 约 90 个用 Fun 自身编写的公开模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
@@ -407,6 +414,13 @@ make-win64.bat
 | macos-arm64   | yes   | yes | yes            | yes | yes       | yes         |
 | macos-x64     | yes   | yes | yes            | yes | yes       | yes         |
 | win-x64       | yes   | yes | yes            | yes | yes       | yes         |
+
+老 Win32 的兼容性远比表格更深。32 位构建在 Windows 95 OSR2 上跑通语言核心、
+FFI、机器码与完整 UI（含 IE3 WebBrowser 控件）；Windows NT 3.5 上加
+`-DNoDialog` 可跑核心、FFI、机器码与窗口创建。NT 3.1 缺少内置 OLE 2.0，
+无法启动。这些是兼容性探针，不是发布门槛；见
+[Windows 95](https://funlang.org/art/fun-on-win95.htm) 与
+[NT 3.5](https://funlang.org/art/fun-on-nt35.htm)。
 
 macOS、Linux aarch64、龙芯与 riscv64 这几行在 Linux x86_64 上用引导好的 FPC
 交叉工具链构建。第三方源码（PCRE、TCC、zlib、libffi）不随仓库携带；缺失时
