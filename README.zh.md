@@ -88,11 +88,9 @@ JSON Schema、桌面 UI 与 worker pool。
 **三行代码嵌入。** `Run(PChar('script.fun')); Run(source); Run(-1);`
 把整个运行时变成可嵌入的 `fun.dll`。
 
-**三十年 Win32 兼容，不只现代 Windows。** 32 位构建在 Windows 95 OSR2 上跑通
-语言核心、FFI、手写机器码，连 UI 也是全特性（IE3 WebBrowser 控件里跑 HTML/CSS，
-事件回调进 Fun）。Windows NT 3.5 上加 `-DNoDialog` 可跑核心、FFI、机器码与
-窗口创建。实测见 [Windows 95](https://funlang.org/art/fun-on-win95.htm)、
-[Windows 95 UI](https://funlang.org/art/fun-win95-ui-bind.htm)、
+**老 Windows 仍然算数。** 大多数运行时都在追新，Fun 还照顾老系统与遗留系统。
+32 位构建仍能在 Windows 95 OSR2（含完整 UI）与 NT 3.5 上运行，FFI 与机器码
+保持可用。见 [Windows 95](https://funlang.org/art/fun-on-win95.htm) 与
 [NT 3.5](https://funlang.org/art/fun-on-nt35.htm)。
 
 ---
@@ -415,10 +413,8 @@ make-win64.bat
 | macos-x64     | yes   | yes | yes            | yes | yes       | yes         |
 | win-x64       | yes   | yes | yes            | yes | yes       | yes         |
 
-老 Win32 的兼容性远比表格更深。32 位构建在 Windows 95 OSR2 上跑通语言核心、
-FFI、机器码与完整 UI（含 IE3 WebBrowser 控件）；Windows NT 3.5 上加
-`-DNoDialog` 可跑核心、FFI、机器码与窗口创建。NT 3.1 缺少内置 OLE 2.0，
-无法启动。这些是兼容性探针，不是发布门槛；见
+老 Win32 不是事后补丁：32 位构建仍能在 Windows 95 OSR2（含 UI）与 NT 3.5 上
+运行。这些是兼容性探针，不是发布门槛；见
 [Windows 95](https://funlang.org/art/fun-on-win95.htm) 与
 [NT 3.5](https://funlang.org/art/fun-on-nt35.htm)。
 

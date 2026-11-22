@@ -91,12 +91,10 @@ an ORM, YAML/XML/TOML/CSV, JSON Schema, desktop UI and a worker pool.
 **Embed in three lines.** `Run(PChar('script.fun')); Run(source); Run(-1);`
 turns the whole runtime into an embeddable `fun.dll`.
 
-**Thirty years of Win32, not just modern Windows.** The 32-bit build runs the
-language core, FFI and hand-written machine code on Windows 95 OSR2, and the
-UI stack too (HTML/CSS in the IE3 WebBrowser control with callbacks into Fun).
-Windows NT 3.5 runs the core, FFI, machine code and window creation with
-`-DNoDialog`. See the probes: [Windows 95](https://funlang.org/art/fun-on-win95.htm),
-[Windows 95 UI](https://funlang.org/art/fun-win95-ui-bind.htm),
+**Legacy Windows still counts.** Most runtimes chase the newest OS; Fun keeps
+legacy systems running. The 32-bit build still runs on Windows 95 OSR2 (UI
+included) and Windows NT 3.5, with FFI and machine code intact. See
+[Windows 95](https://funlang.org/art/fun-on-win95.htm) and
 [NT 3.5](https://funlang.org/art/fun-on-nt35.htm).
 
 ---
@@ -428,13 +426,9 @@ Platform capability matrix (default build plus the opt-in `fun-safe` and
 | macos-x64      | yes   | yes | yes             | yes | yes        | yes          |
 | win-x64        | yes   | yes | yes             | yes | yes        | yes          |
 
-Legacy Win32 compatibility goes much further than the table suggests. The
-32-bit build runs the language core, FFI, machine code and the full UI stack
-on Windows 95 OSR2 (IE3 WebBrowser control included), and the core, FFI,
-machine code plus window creation on Windows NT 3.5 with `-DNoDialog`. NT 3.1
-predates the bundled OLE 2.0 and does not start. These are compatibility
-probes, not release gates; see
-[Windows 95](https://funlang.org/art/fun-on-win95.htm) and
+Legacy Win32 is not an afterthought: the 32-bit build still runs on Windows 95
+OSR2 (UI included) and NT 3.5. These are compatibility probes, not release
+gates; see [Windows 95](https://funlang.org/art/fun-on-win95.htm) and
 [NT 3.5](https://funlang.org/art/fun-on-nt35.htm).
 
 The macOS, Linux aarch64, LoongArch64 and riscv64 rows are cross-built on Linux
