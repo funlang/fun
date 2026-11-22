@@ -41,11 +41,11 @@
 | S-05 | create-fun-app 脚手架 | OPEN | P3 | Fun 后端 + z-data 前端 + 一体发布 | `art/notes/todo.md` |
 | S-06 | 用 fun-ui 重写 funide | OPEN | P3 | 新 IDE 替代旧 funide | `art/notes/todo.md` |
 | S-07 | funcally AI agent | OPEN | P3 | 基于沙箱、CLI、HTTP 的 agent | `art/notes/todo.md` |
-| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | 管道交给子进程并边跑边读写；进程树终止见 S-12，Windows Unicode 见 S-13 | `README.zh.md` 的 io 一节 |
+| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | 管道交给子进程并边跑边读写；进程树终止见 S-12，Windows Unicode 见 S-13 | `docs/standard-library.zh.md` 的子进程一节 |
 | S-10 | jsbox 网络与挂载隔离 | OPEN | P2 | Linux bubblewrap/nsjail 网络与挂载隔离（S-02 剩余） | `src/prj/fun/jsbox/README.md` |
 | S-11 | jsbox Windows/macOS 沙箱验证 | OPEN | P2 | Job Object / sandbox profile 的 CI 与真机验证（S-02 剩余） | `src/prj/fun/jsbox/README.md` |
-| S-12 | 子进程树终止 | OPEN | P2 | Unix 进程组 / Windows Job Object 终止整棵进程树（S-09 剩余） | `README.zh.md` 的 io 一节 |
-| S-13 | Windows Unicode 子进程命令行 | OPEN | P3 | 命令行走宽字符并正确转义（S-09 剩余） | `README.zh.md` 的 io 一节 |
+| S-12 | 子进程树终止 | OPEN | P2 | Unix 进程组 / Windows Job Object 终止整棵进程树（S-09 剩余） | `docs/standard-library.zh.md` 的子进程一节 |
+| S-13 | Windows Unicode 子进程命令行 | OPEN | P3 | 命令行走宽字符并正确转义（S-09 剩余） | `docs/standard-library.zh.md` 的子进程一节 |
 
 ## 4. 技术债台账
 

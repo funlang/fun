@@ -1,16 +1,32 @@
 # Fun 语言
 
-> 一门轻量、可嵌入、**以数据为中心**的脚本语言，能力覆盖从 JSON/FD 数据处理一直到运行时编译 C 与直接编写机器码。
+> 一门轻量、可嵌入、**以数据为中心**的脚本语言，能力从 JSON/FD 数据一路延伸到运行时编译的 C 与原生机器码。
 
-**English**: [README.md](README.md) · **简体中文**（本文件）
+[English](README.md) · **简体中文**（本文件）
 
 - 版本：**9.5.7**
 - 官网：<https://funlang.org>
-- 作者：张卫东 &lt;zwd@funlang.org>
-- 授权：MIT（另有商业授权条款，见下文「许可证」）
+- 作者：张卫东 &lt;zwd@funlang.org&gt;
+- 许可证：MIT，另有商业条款（见[许可证](#许可证)）
 - 状态与路线图：[ROADMAP.md](ROADMAP.md)
 
-> **版本 9.5.7**：这不是玩具或原型——一门经历了超过 15 年（2010 至今）持续演化与生产级验证的成熟语言，其前身可追溯至 Nuva（2006）与 TemplateScript（2005）。
+> **9.5.7**：这不是玩具或原型——一门经过 15 年以上（2010 至今）打磨与生产验证的成熟语言，其传承可追溯到 Nuva（2006）与 TemplateScript（2005）。
+
+---
+
+## 文档
+
+建议从[教程](docs/tutorial.zh.md)开始；精确语言规则查官网
+[中文手册](https://funlang.org/man-cn.htm)。
+
+| 文档 | 内容 |
+| ---- | ---- |
+| [教程](docs/tutorial.zh.md) | 上手路径：第一个脚本、值、集合、类、文件、包、HTTP、worker、原生代码。 |
+| [标准库指南](docs/standard-library.zh.md) | 模块地图，以及 worker、日志、运行时、cron、HTTP、CLI、IO、格式与 schema 的详细用法。 |
+| [安装](docs/install.zh.md) | 发布包、一行安装、Windows 安装器、运行要求。 |
+| [构建](docs/building.zh.md) | 原生与交叉构建、能力矩阵、第三方依赖、安全构建、CI。 |
+| [工具链](docs/tooling.zh.md) | `package.fun`、`fun package`、`fun run`、`fun test`、`fun pack`。 |
+| [中文手册](https://funlang.org/man-cn.htm) | 按章节组织的语言参考。 |
 
 ---
 
@@ -19,9 +35,8 @@
 - [为什么是 Fun](#为什么是-fun)
 - [核心特性](#核心特性)
 - [快速开始](#快速开始)
-- [包管理](#包管理)
-- [测试](#测试)
 - [体验 Fun 语言](#体验-fun-语言)
+- [包管理与测试](#包管理与测试)
 - [能力阶梯](#能力阶梯)
 - [FD 数据格式](#fd-数据格式)
 - [外部函数接口（FFI）](#外部函数接口ffi)
@@ -69,90 +84,35 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **运行时 C 与机器码** —— 内置 Tiny C 编译器、JIT 与内联汇编（见[能力阶梯](#能力阶梯)）。
 - **紧凑的 FFI** —— 用简短的签名串调用 DLL/共享库函数（见 [FFI](#外部函数接口ffi)）。
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
-- **跨平台** —— Linux x64/arm64（LoongArch64/riscv64 为预发布）、macOS
-  x64/arm64 与 Windows x64；旧 Win32/CE 构建仍保留在源码树中。
+- **跨平台** —— Linux x64/arm64（LoongArch64/riscv64 为预发布）、macOS x64/arm64 与 Windows x64；旧 Win32/CE 构建仍保留在源码树中。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
-- **自托管的标准库** —— 约 90 个用 Fun 自身编写的公开模块，覆盖
-  JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
+- **自托管的标准库** —— 约 90 个用 Fun 自身编写的公开模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
 ---
 
 ## 快速开始
 
-### 预编译二进制
-
-预编译解释器见 [GitHub Releases](https://github.com/funlang/fun/releases)：
-
-- Linux x64 / arm64：`.tar.gz`，内含 `libtcc.so`、`fun-mt` 与标准库 `lib/`；
-- Linux LoongArch64：`.tar.gz`，在 FPC 龙芯后端仍位于主线期间**只随
-  nightly 预发布**。完整构建含正则、`getapi`/FFI 与原生汇编后端
-  （`lib-asm-loongarch64`），但没有 `libtcc`（运行时 C），并附带
-  `fun-mt`。正式版不包含该包；
-- Linux riscv64：`.tar.gz`，在 FPC 的 riscv64 后端仍位于主线期间**只随
-  nightly 预发布**。完整构建含正则、`getapi`/FFI、`-lnx` 后端与
-  `lib-asm-riscv64`，但没有 `libtcc`（运行时 C），并附带 `fun-mt`。
-  正式版不包含该包；
-- macOS x64 / arm64：`.zip`。两个包都内含 `libtcc.dylib` 与 `fun-mt`。构建
-  **未签名、未公证**；请使用包内 `install.sh`
-  `--local`（curl 下载不会设置隔离属性），或解压后执行
-  `xattr -dr com.apple.quarantine <目录>`；
-- Windows x64：`.7z`。构建未签名，SmartScreen 可能提示；请用 7-Zip 解压，
-  然后双击包内 `install.cmd`（也可以运行
-  `powershell -ExecutionPolicy Bypass -File install.ps1`）。包内包含 `fun.exe`、
-  `fun-safe.exe`、`fun-mt.exe`、安装脚本，以及 CI 构建的 x86-64 运行期 DLL（`pcre3.dll`、
-  `ffi.dll`、`libtcc.dll`、`zlib.dll`）；个别构建缺失的能力由
-  `capabilities.json` 记录。
-
-macOS / Linux 一行安装（校验 `SHA256SUMS`，安装到 `~/.fun`）：
+从 [GitHub Releases](https://github.com/funlang/fun/releases) 下载预编译包，或使用
+一行安装（macOS / Linux；校验 `SHA256SUMS`，安装到 `~/.fun`）：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/funlang/fun/main/install.sh | sh
 ```
 
-如果最新稳定版还没有二进制资产，安装脚本会明确提示并回退到最新 nightly。
-也可以直接用 `--tag` 或 `--nightly` 指定。默认把 `fun` 链接到
-`~/.local/bin`；该目录不在 `PATH` 时，可加 `--add-path` 向 `~/.profile`
-（zsh 为 `~/.zshrc`）追加一段带标记的 PATH 配置，或用 `--bin-dir DIR`
-把链接放到已有的 PATH 目录。
-
-Windows 安装（当前用户，无需管理员权限）：
-
-1. 用 7-Zip 解压 `.7z`；
-2. 双击解压目录里的 `install.cmd`。
-
-`install.cmd` 会把运行时复制到 `%LOCALAPPDATA%\Programs\Fun`，把
-`%LOCALAPPDATA%\Programs\Fun\fun` 加入用户 `PATH`，注册 `.fun`、`.foo`、
-`.fxx` 的 `Fun Script` 关联（双击脚本即可运行），在 Win+R 中加入 `fun`，
-并在**设置 > 应用**中生成卸载项。常用参数：`-AllUsers`（需管理员，安装到
-`Program Files`）、`-Dir DIR`、`-NoPath`、`-NoAssoc`、`-Portable`。
-从安装目录运行 `uninstall.cmd`，或在**设置 > 应用**中卸载。Windows 可能
-保留已有的用户选择；用一次**打开方式 > 选择其他应用**选中 Fun 即可。
-
-每个压缩包内是一个 `fun/` 运行时目录：`fun/fun`（Windows 为 `fun/fun.exe`）、
-`fun/fun-safe`（能力受限构建），以及可用时的 `fun/fun-mt`；另有 `lib/`、`demo/`、`demos/` 和
-`test/` 回归套件。运行 `./fun/fun --help`；Linux/macOS 可用
-`./fun/test/run-linux-regression.sh` 跑自带测试，Windows 用
-`fun\test\run-windows-regression.bat --portable`。
-`install.sh` 出现在所有 Unix 压缩包内（不再只限 macOS），同时建立指向
-`fun` / `fun-safe` 的 `funcmd` / `funcmd-safe` 兼容软链接。两个安装脚本都
-与运行时目录一起打包，是获得全局 `fun` 命令的受支持方式。解压后运行
-`./install.sh --local` 会离线安装该目录；不带 `--local` 则下载最新版本。
-每个 release 另附 `capabilities.json` 与 `SHA256SUMS`，缺失的可选能力会明确
-列出。nightly 是 prerelease，`releases/latest` 仍指向稳定版。`fun.dll` 是
-单独授权的产品，不包含在这些产物中。
-Linux 产物在 Ubuntu 24.04 上构建，需要 glibc 2.34 或更新版本；启用
-getapi/FFI 时还需要运行时的 `libffi.so.8`。
+Windows 上用 7-Zip 解压 `.7z`，双击 `install.cmd`。每个包都带 `fun`、
+`fun-safe`、可用时的 `fun-mt`、标准 `lib/`、demo 与回归套件。发布包细节、
+安装器选项与运行要求见 [docs/install.zh.md](docs/install.zh.md)。
 
 运行脚本：
 
 ```text
-fun.exe <file.fun>            # 运行脚本（.fun / .foo / .fxx）
-fun.exe -v <file.fun>         # 显示编译与运行耗时
-fun.exe -log[:log.txt] -gui   # 输出到日志 / 以 GUI 模式运行
-fun.exe -key:key_cn.ini       # 加载关键字别名包
+fun <file.fun>                # 运行脚本（.fun / .foo / .fxx）
+fun -v <file.fun>             # 显示编译与运行耗时
+fun -log[:log.txt] -gui       # 输出日志 / GUI 模式运行
+fun -key:key_cn.ini           # 加载关键字别名包
 ```
 
-Hello world（规范英文关键字）：
+Hello world（规范关键字）：
 
 ```fun
 fun foo()
@@ -176,96 +136,11 @@ end fun;
 运行：
 
 ```text
-> fun.exe fun/demo/fun.fun
+> fun fun/demo/fun.fun
 Hello, fun!
 9
 9
 ```
-
----
-
-## 包管理
-
-下文 `fun` 指命令行程序（Windows 上是 `fun.exe`）。一个项目就是一个带
-`package.fun` 清单的目录，`fun package init` 生成清单和最小模板：
-
-```text
-fun package init myapp          # package.fun + src/main.fun
-fun package init mylib --lib    # package.fun + src/lib.fun
-```
-
-```fun
-fun package()
-  result = [
-    name: 'myapp',
-    version: '0.1.0',
-    bin: 'src/main.fun',
-    lib: '',
-    'fun': '9.5.7',
-    dependencies: [
-      'hello': [source: 'github.com/acme/hello', version: 'v1.0.0'],
-      'local': [source: '../libs/local']
-    ],
-    // >>> generated - do not edit; run 'fun package tidy' to refresh
-    resolved: []
-    // <<< generated
-  ];
-end fun;
-```
-
-- `fun package add <name> <source> [--version <v>]` / `remove <name>` 只改
-  `dependencies` 段；版本只接受精确的 tag、分支或 commit。
-- `fun package tidy` 把声明的版本装进共享的 `~/.fun` 缓存（`FUN_HOME` 可
-  覆盖），校验 git tree 哈希，并写回 `resolved` 段；path 依赖就地使用，
-  只有 git 依赖需要 `git`。
-- `fun run [args...]` 以清单目录为根运行 `bin`；在项目里 `fun <script>` 是
-  同一个启动器的平铺模式，带依赖运行指定脚本。
-- `fun pack` 把应用和依赖库打成单个可执行文件，产物运行时不依赖 `~/.fun`。
-
-运行期只读校验：缺失或陈旧的依赖会提示 `run 'fun package tidy'`，不会联网
-或改清单。`FUN_PACKAGE_READY=1` 可跳过项目模式（清单损坏时的逃生口）。可运行
-示例见 [`fun/demos/package-demo`](fun/demos/package-demo)。
-
----
-
-## 测试
-
-测试文件名以 `_test.fun` 结尾，位置不限（推荐放在 `tests/`）。其他 `.fun`
-是普通模块，测试之间可以复用 helper。测试文件导入 `test.fun` 并注册用例：
-
-```fun
-use 'test.fun';
-use '../src/lib.fun';
-
-test('adds', {
-  assert.equal(add(1, 2), 3);
-});
-```
-
-```text
-fun test
-```
-
-`fun test` 会在项目根下查找并运行所有 `*_test.fun`，每个文件一个子进程，
-逐文件打印 `PASS`/`FAIL`，任一测试失败时以非 0 退出。项目只需要
-`package.fun`（不要求 `bin`）；清单里的依赖通过和 `fun run` 相同的项目
-启动器生效。
-
-- 断言：`assert.equal`、`not_equal`、`is_true`、`is_false`、`match`、`contains`、
-  `greater`、`less`、`is_nil`、`not_nil`、`raises`、`fail`，每个都可带最后一个
-  自定义消息参数。
-- 在测试块内调用 `test.skip('reason')` 可跳过当前测试；reason 可省略，
-  跳过数单独统计，不影响套件通过。不要用宽泛的 `try/except` 捕获它：
-  测试仍记为跳过，但测试块剩余语句会继续执行。
-- `test.todo('name', 'reason')` 登记一个不执行的占位测试；
-  `test.todo('name', { ... }, 'reason')` 执行测试体，失败视为预期。
-  预期失败的测试体通过时会打印 `todo passed: ... (remove todo)`。
-  todo 单独计数，不影响套件通过。
-- `test.fun`、全局名 `test`/`assert`/`runTests`、别名 `as test`/`as assert`、
-  依赖键 `test`/`assert` 为保留名；三方测试库请换别名导入。
-- `dist/`、`.` 开头目录和 path 依赖目录不会参与发现。
-
-可运行示例见 [`fun/demos/test-demo`](fun/demos/test-demo)。
 
 ---
 
@@ -304,6 +179,33 @@ var parseQuery = s -> (s | split(/&/) | map(sp_eq) | fromPairs);
 
 ---
 
+## 包管理与测试
+
+一个项目就是带 `package.fun` 清单的目录：
+
+```text
+fun package init myapp          # package.fun + src/main.fun
+fun package init mylib --lib    # package.fun + src/lib.fun
+fun package tidy                # 把钉住的版本装进 ~/.fun
+fun run [args...]               # 运行清单里的 bin
+fun test                        # 运行所有 *_test.fun
+fun pack                        # 把应用与依赖库打成单个可执行文件
+```
+
+测试使用 `test.fun` 与 `*_test.fun` 文件：
+
+```fun
+use 'test.fun';
+test('adds', {
+  assert.equal(add(1, 2), 3);
+});
+```
+
+`fun test` 为每个文件启动子进程，任一失败时以非 0 退出。清单字段、依赖规则、
+断言、`skip`/`todo` 与打包选项见 [docs/tooling.zh.md](docs/tooling.zh.md)。
+
+---
+
 ## 能力阶梯
 
 Fun 的特殊之处在于，一段脚本在无需独立工具链的情况下能走多远：
@@ -318,40 +220,7 @@ Fun 的特殊之处在于，一段脚本在无需独立工具链的情况下能�
 
 例如，`lib-tcc` 加载 `libtcc.dll`（Linux 为 `libtcc.so`，macOS x64 为 `libtcc.dylib`）并暴露 `tcc_new`、`tcc_compile_string`、`tcc_get_symbol` 等，从而你可以从字符串编译 C 源码并立即调用所得到的符号。`lib-asm` 分配可执行内存、写入机器码并调用之；`lib-jit` 则根据源码形态自动选择路径（`#!c` → TCC，否则走汇编）。
 
-一段脚本可以同时混合两者：`NewJit` 在运行时编译 C **和**内联汇编，并且两者都能通过 `@toCallback` 直接回调回 Fun 函数。下面的片段对 `1..n` 求和——一次走汇编、一次走编译出的 C，两次都把结果交给 Fun 回调（完整版本见 [`test-jit-cb.fun`](fun/demos/benchmarks/test-jit-cb.fun)）：
-
-```fun
-use 'lib-jit.fun';
-fun cb(a, b)          # 由 JIT 编译出的代码回调的 Fun 函数
-  result = a * 2^32 + b;
-end fun;
-
-# 汇编路径
-var asm = `#!asm i:i
-    mov ecx, dword ptr [esp+04]
-    @sum1ton
-    push eax
-    push edx
-    mov  eax, <test>
-    call eax
-`;
-var jit = NewJit(asm, names: [test: cb.@toCallback(nil, 'ii:i', true)]);
-?. jit.Run(100000);
-
-# C 路径（用内置 TCC 在运行时编译）
-var c = `#!C ii:i
-  int sum(int n, int (*test)(int, int)) {
-    long long s = 0;
-    for (int i = 1; i <= n; i++) s += i;
-    test((int)(s >> 32), (int)(s & 0xFFFFFFFF));
-    return 1;
-  }
-`;
-jit = NewJit(c);
-?. jit.call(100000, cb.@toCallback(nil, 'ii:C', true));
-```
-
-> **平台说明**：上面的 `#!asm` 块是 32 位 x86（Windows）汇编（基于 `esp` 相对寻址、`ecx`）。`#!C` 路径可跨平台，但汇编片段与架构相关——在 Linux/ARM 上请改用 C 形式，或按目标 ABI 重写汇编。
+一段脚本可以同时混合两者：`NewJit` 在运行时编译 C **和**内联汇编，并且两者都能通过 `@toCallback` 直接回调回 Fun 函数。完整示例见 [`test-jit-cb.fun`](fun/demos/benchmarks/test-jit-cb.fun)。`#!C` 路径可跨平台，汇编片段与架构相关。
 
 ---
 
@@ -380,23 +249,7 @@ person
 
 它的定义性特点是**自描述**：`lib-fd.fun` 中的解析器是由一份用 FD 本身写成的 BNF 文法（`fd.bnf.fd`）生成的。文法文件 `src/parse/bnf/fun.ebnf` 以同样的精神记录了语言文法。
 
-FD 取值规则（解释器、`fd.js`/`fd2.js` 与 BNF 读取器一致）：
-
-- 数字采用 RFC 8259 语法，与 `getJson(json: 2)` 相同：
-  `-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?`。前导零（`03`）、
-  十六进制、`.5`、`1.`、`+1`、`1e` 都是字符串。数值跟随宿主类型：
-  Fun/Pascal 用 Int64，JS 用 IEEE-754 double，所以 JS 里超过 2^53 的
-  整数会丢精度；超出宿主类型的字面量降级成字符串（Fun 超出 Int64，
-  JS 超出 double）。需要精确往返的大 ID 请写成字符串。
-  writer 和 `toStr` 一样用 15 位有效数字，`0.1 + 0.2` 写成 `0.3`；
-  为了可读性，接受细小的浮点往返差异。
-- 只有 `true`、`false`、`null` 是字面量。`yes`/`no` 在这里是字符串；
-  Fun 源码层的字符串真值判断接受它们，但数据格式不接受。
-- 字符串默认不转义；在起始引号前加反斜杠才启用转义
-  （`\"a\nb"`、`\xHH`），未知转义按原样保留。
-- `#!kvd:<char>` 为后续文档指定自定义键值分隔符，例如 `#!kvd:=` 加
-  `key=value`。
-- 重复的命名键后者覆盖前者，与 `JSON.parse` 一致。
+FD 取值规则（解释器、`fd.js`/`fd2.js` 与 BNF 读取器一致）的完整说明见[中文手册](https://funlang.org/man-cn.htm)与 `lib-fd.fun`；要点是 RFC 8259 数字、只有 `true`/`false`/`null` 字面量、字符串默认不转义、重复键后者覆盖前者。
 
 ---
 
@@ -412,6 +265,8 @@ Fun 通过**紧凑的签名串**约定暴露原生函数。标准库中的例子
 签名依次编码每个参数类型，然后是 `:`，最后是返回类型（`i`=int、`s`=string、`v`=void、`d`=double 等）。同一机制驱动 COM（`lib-winole`）、Windows API（`lib-winapi`）与 C 运行时。
 
 `getapi` 本身按平台提供：32 位 Windows 用 `winapi.pas`，Linux / macOS / win64 用 `lffi.pas`（后端是 FPC 自带的 libffi；win64 上它对应 `ffi.dll`）。
+
+对 `p` 参数传入裸 `var x` 时，两个后端都按 OUT/INOUT 指针处理：引擎传一个指针宽度的单元，并把结果拷回 `x`。需要显式控制（或调用方自备缓冲区）时，用 `buf.toNum(-1)` 自己传地址。
 
 ---
 
@@ -461,6 +316,7 @@ fun/
 │   ├── demo/          # 语言语法演示
 │   ├── demos/         # 完整应用与基准测试
 │   └── key_*.ini      # 关键字别名包（CN / FR / PUA）
+├── docs/              # 教程、标准库、安装、构建与工具链指南
 └── LICENSE*           # 授权文件
 ```
 
@@ -468,35 +324,19 @@ fun/
 
 ## 构建
 
-Fun 核心为 Pascal，源码入口为 `src/prj/fun/funcmd.dpr`。
+原生构建：
 
-Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/fun/setenv.bat`](src/prj/fun/setenv.bat)。只需修改一次，指向你安装的 Delphi / Free Pascal；或在构建前预先设置 `FPC`、`DELPHI2006`、`DELPHI2009` 环境变量——每个 `make-*.bat` 脚本都会调用它并读取这些路径。
+```sh
+cd src/prj/fun && ./make-linux-x86_64.sh   # Linux x86_64
+cd src/prj/fun && ./make-macos.sh          # macOS（Homebrew FPC）
+```
 
-每个脚本名为 `<工具链>-<目标>`；**构建机**指脚本运行所在的机器，交叉编译各行与目标并不相同：
+```bat
+cd src\prj\fun
+make-win64.bat
+```
 
-| 目标                   | 构建机       | 脚本                                     | 工具链             |
-| ---------------------- | ------------ | ---------------------------------------- | ------------------ |
-| Windows 32 位          | Windows      | `src/prj/fun/make-2006.bat` / `-2009.bat` | Delphi 2006 / 2009 |
-| Windows 64 位          | Windows      | `make-win64.bat`                         | FPC 交叉           |
-| Windows arm64（bring-up） | Linux x86_64 | `src/prj/fun/make-win-arm64.sh`         | FPC 3.3.1 交叉 + Zig |
-| Windows CE / ARM       | Windows      | `make-wince.bat`                         | FPC 交叉           |
-| Linux（i386）          | Windows      | `make-linux.bat`                         | FPC 2.4.0 交叉     |
-| Linux / ARM            | Windows      | `make-arm-linux.bat`                     | FPC 交叉           |
-| Linux x86_64（原生）   | Linux x86_64 | `src/prj/fun/make-linux-x86_64.sh`      | FPC（本机）+ gcc   |
-| Linux aarch64（arm64） | Linux x86_64 | `src/prj/fun/make-linux-aarch64.sh`     | FPC 交叉 + Zig     |
-| Linux LoongArch64（龙芯） | Linux x86_64 | `src/prj/fun/make-linux-loongarch64.sh` | FPC 主线交叉     |
-| Linux riscv64          | Linux x86_64 | `src/prj/fun/make-linux-riscv64.sh`     | FPC 主线交叉     |
-| macOS x86_64 / aarch64 | Linux x86_64 | `src/prj/fun/make-darwin.sh`            | FPC 交叉 + Zig     |
-| macOS（原生）          | macOS        | `src/prj/fun/make-macos.sh`             | FPC（Homebrew）    |
-
-以 `-DFunDll` 编译可生成嵌入运行时 `fun.dll`，导出 `Run` 接口。构建产物已由 `.gitignore` 覆盖，不纳入版本控制。
-
-完整文法定义见 [`src/parse/bnf/fun.ebnf`](src/parse/bnf/fun.ebnf)。
-
-### 平台能力矩阵
-
-三个能力层（regex、FFI、运行时 C）加机器码层、面向不可信脚本的第二构建模式，
-以及 opt-in 的 worker 构建：
+平台能力矩阵（默认构建，另有 opt-in 的 `fun-safe` 与 `fun-mt`）：
 
 | 平台          | regex | FFI | 运行时 C (tcc) | asm | safe 构建 | worker 构建 |
 | ------------- | ----- | --- | -------------- | --- | --------- | ----------- |
@@ -508,154 +348,18 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | macos-x64     | yes   | yes | yes            | yes | yes       | yes         |
 | win-x64       | yes   | yes | yes            | yes | yes       | yes         |
 
-`safe 构建` 指独立的 `fun-safe` 二进制（`-dFunSafe`，strict 档），与默认解释器
-一起发布，默认构建的行为不受影响；`worker 构建` 是
-[`fun/lib/worker-model.md`](fun/lib/worker-model.md) 描述的 opt-in `fun-mt`
-二进制。其余列均描述默认二进制。`运行时 C` 已在 macOS x64 与 arm64 上通过
-`libtcc.dylib` 补齐；Apple Silicon 使用一个小补丁处理 Darwin ucontext 字段与
-`MAP_JIT`。release notes 与每个包里的 `capabilities.json` 都由实测探针生成，
-降级构建无法虚报能力。
-
-Windows arm64 仍处于 bring-up（FPC 代码生成崩溃，无法发布）；Win32/Windows CE
-构建属于遗留路径，均不在发布门槛内。当前状态见 [`ROADMAP.md`](ROADMAP.md)。
-
-### 交叉构建（在 Linux x86_64 上构建 macOS、Linux aarch64、龙芯与 riscv64）
-
-macOS、Linux aarch64、龙芯与 riscv64 这几行需要先搭交叉工具链。它们都在
-**Linux x86_64 构建机**上运行，产物是目标平台的原生二进制；Mach-O 与
-aarch64 的汇编器/链接器来自 Zig 0.13 自带的 clang/lld，龙芯与 riscv64
-则使用 GNU binutils（`binutils-loongarch64-linux-gnu`、
-`binutils-riscv64-linux-gnu`）：
-
-```sh
-cd src/prj/fun
-./bootstrap-darwin-cross.sh     # 一次性：FPC darwin 交叉工具链 + Zig（~/.fun/darwin-cross，约 2 GB）
-CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
-CPU=all FUN_THREADS=1 ./make-darwin.sh  # -> fun/funcmd-darwin-{x86_64,aarch64}-mt
-
-./bootstrap-linux-aarch64.sh    # 一次性：aarch64-linux RTL，复用 darwin 工具链里的 ppcrossa64 + Zig
-./make-linux-aarch64.sh         # -> fun/funcmd-linux-aarch64
-
-# 龙芯目前只有预发布：FPC 尚无稳定的 loongarch64 目标。
-./bootstrap-linux-loongarch64.sh  # 一次性：FPC 主线交叉编译器 + loongarch64 binutils
-./prepare-linux-loongarch64-sysroot.sh  # 一次性：Alpine musl/FFI/PCRE sysroot
-FULL=1 ./make-linux-loongarch64.sh      # -> fun/funcmd-linux-loongarch64-musl
-FUN_THREADS=1 FULL=1 ./make-linux-loongarch64.sh  # -> ...-musl-mt
-
-# riscv64 同样只有预发布：FPC 的后端仍在主线。
-./bootstrap-linux-riscv64.sh  # 一次性：FPC 主线交叉编译器 + riscv64 binutils
-./prepare-linux-riscv64-sysroot.sh  # 一次性：Alpine musl/FFI/PCRE sysroot
-FULL=1 ./make-linux-riscv64.sh      # -> fun/funcmd-linux-riscv64-musl
-FUN_THREADS=1 FULL=1 ./make-linux-riscv64.sh  # -> ...-musl-mt
-```
-
-- **构建机要求**：Linux x86_64、宿主 FPC 3.2.x、`make`、`curl` 或 `wget`、`tar`，约 2 GB 空闲磁盘。Zig 由 bootstrap 下载（钉在 0.13；0.14 在较旧的 glibc 上会 panic）。**不需要** macOS 真机、Apple SDK 或 `osxcross`——Zig 自带 libSystem stub。
-- `bootstrap-linux-aarch64.sh` 复用 darwin 工具链的 `ppcrossa64` 与 Zig：FPC 编译器二进制与 CPU 绑定，但只要目标 OS 的单元齐备，就能编译该 OS。
-- 龙芯路径需要 `binutils-loongarch64-linux-gnu` 2.42 或更新版本与 FPC 主线快照；它针对 Alpine musl sysroot 交叉构建，因此正则、FFI、`-lnx` 后端与 `lib-asm-loongarch64` 都可用（sysroot 随带 `libgcc_s`，提供 `__clear_cache`），仅 TinyCC 不可用。`.github/workflows/loongarch.yml` 在 main 推送时执行该构建，同时构建 `-mt` worker 二进制、在 qemu 下跑 `lib-worker-test`，并上传供 nightly 预发布使用的 stage。
-- riscv64 路径需要 `binutils-riscv64-linux-gnu` 与 FPC 主线快照，同样针对 Alpine musl sysroot 交叉构建，因此正则、FFI、`-lnx` 后端与 `lib-asm-riscv64` 都可用（sysroot 随带 `libgcc_s`，提供 `__clear_cache`），仅 TinyCC 不可用。`.github/workflows/riscv64.yml` 在 main 推送时执行该构建，同时构建 `-mt` worker 二进制、在 qemu 下跑 `lib-worker-test`，并上传供 nightly 预发布使用的 stage；`fun/test/run-riscv64-qemu.sh` 在 `qemu-riscv64` 下运行同一套 Linux 测试。
-- 可选特性照例降级：缺 PCRE → 无正则；缺 libffi 单元/stub → 无 `getapi`（win64 的 CI 两者都会备好：`pcre3.dll` 与 `ffi.dll`）。Linux aarch64 交叉产物是核心解释器（其 `-dRegex` 与 `-dLinuxFFI` 需要 libc / libffi，尚未交叉构建）；而原生 Linux arm64 构建（CI 即如此）两者都有。
-- 移植细节见 [`art/notes/macos-port.md`](art/notes/macos-port.md)。
-
-### 第三方依赖（仓库未携带）
-
-为控制体积与许可，仓库**不携带**下列第三方源码/二进制。缺失时构建脚本会**降级并打印提示**，不会中断：
-
-| 组件 | 放到哪里 | 从哪里获取 | 由谁构建 |
-| ---- | -------- | ---------- | -------- |
-| PCRE 8（8-bit） | `src/3rd/pcre-8/` | <https://www.pcre.org/>（8.x 源码，如 8.45） | Linux：`make-linux-x86_64.sh` 用 gcc 静态编译（`-dRegex`）；Windows(i386)：`src/regex/pcre/make.bat`（Borland bcc32 + make，可 `-Dpcresrc=<路径>`，产物即 `pcrd.pas` 里 `{$LINK}` 的对象）；win64：CI 用 MinGW-w64 gcc 编出 `pcre3.dll` 并动态链接（`-dRegex -dPCRE_WinDLL`） |
-| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | savannah/nongnu 的 tinycc 发行包，或 repo.or.cz 的 `release_0_9_27` tag | `make-linux-x86_64.sh` 产出 `libtcc.so`；`build-win64-deps.sh` 产出 x86-64 的 `libtcc.dll`（win64）；`build-tcc-darwin.sh` 产出 `libtcc.dylib`（macOS x86_64 与 arm64，arm64 使用 `patches/tcc-darwin-arm64.patch`） |
-| libffi（win64） | 放在 `funcmd.exe` 旁的 `ffi.dll` | MSYS2 的 `mingw-w64-x86_64-libffi`，或任意 x86_64 libffi 构建 | win64 CI 会装好它，从而让 `getapi` 可用（`-dWinFFI`）；Linux / macOS 用 FPC 自带的 libffi |
-| zlib 1.2.11（win64） | `src/3rd/zlib-1.2.11/` | <https://zlib.net/fossils/> | `build-win64-deps.sh` 产出 x86-64 的 `zlib.dll`；Linux / macOS 用系统 zlib |
-
-- 放好目录后，`cd src/prj/fun && ./make-linux-x86_64.sh` 会自动编译 PCRE 与 TCC。
-- 也可以显式指定路径：`PCRE_SRC=/path/to/pcre TCC_SRC=/path/to/tcc ./make-linux-x86_64.sh`。
-- 缺 PCRE → 构建不带正则（`-dRegex` 关闭）；缺 TCC → 无 `libtcc.so`，`lib-tcc` 不可用。两者都不影响核心解释器。
-- 便捷下载脚本：`src/prj/fun/fetch-3rd-party.sh` 会把钉住的 PCRE 8.45 与 TCC 0.9.27 发行包下载并解包到 `src/3rd/`（CI 使用）。
-
-### 回归测试与 CI
-
-构建完成后，在仓库根目录运行快照测试：
-
-```sh
-fun/test/run-linux-regression.sh     # Linux（或任意 POSIX 主机：自动识别）
-fun/test/run-macos-regression.sh     # macOS 包装脚本；跳过仅 Linux 的用例
-fun/test/run-windows-regression.bat  # Windows 对应脚本
-```
-
-runner 会识别宿主：`fun/test/regression-skip-<platform>.txt` 列出无法在该宿主上
-运行的用例（`/proc` 或 `libc.so.6` 后端、尚未移植的 JIT……），
-`fun/test/expected/<platform>/` 可存放覆盖共享 `fun/test/expected/` 的宿主专属快照。
-`--update` 写入宿主自己的快照目录；macOS 细节与当前的跳过原因见
-[`art/notes/macos-port.md`](art/notes/macos-port.md)。
-
-[`.github/workflows/regression.yml`](.github/workflows/regression.yml) 在五个平台上
-运行本套件——Linux / macOS / Windows 的 x64，加上 Linux 与 macOS 的 arm64。五个
-都基于 Free Pascal 构建并作为门槛。win64 构建的正则来自 `pcre3.dll`：CI 用 runner 的
-MinGW-w64 gcc 编出该 DLL（bcc32 的目标文件属于 32 位构建，MinGW 目标文件也无法链进
-funcmd，因此 `pcrd.pas` 以 `-dPCRE_WinDLL` 方式导入 DLL）；`run-windows-regression.bat`
-启动时仍会探测引擎，构建没有正则时把依赖正则的用例报成 SKIP，于是缺 PCRE 的工具链
-只会降级而不是失败。
-
-`linux-x64`、`linux-arm64`、`macos-x64`、`macos-arm64` 任务还会用
-`FUN_THREADS=1` 构建 `funcmd-mt` 并运行聚焦的 `lib-worker-test`；Windows 任务
-构建 `funcmd-mt.exe` 并运行同一测试。它们留在现有任务里而不是单独开
-workflow：编译器和第三方缓存已经就绪，另起 runner 只会为约一秒的编译再付一次
-checkout 与工具链安装时间。只有 MT 二进制使用独立缓存，没有 worker 的平台继续
-复用原有的 `funcmd` 缓存。
-
-
-同一个 job 还会从 runner 的 MSYS2 装 libffi，当 `ffi.dll` 落在 `funcmd.exe` 旁时就以
-`-dWinFFI` 构建 win64，这正是打开 `getapi` 的开关：FPC 自带的 `ffi` 单元本就有 WIN64
-目标，Windows 上只差这个库。两个可选特性遵循同一条规则——DLL 或单元缺失时 job 退回
-核心解释器而不是失败，另有一个探针步骤报告最终构建带上了哪些特性。
-
-有了 `getapi`，Windows 的 job 还会用同一个 MinGW gcc 把 FFI 测试辅助库
-（`fun/test/ffi/libffitest.c`）编成 `libffitest.dll`，并让四个与宿主无关的 FFI 用例
-（`ffi-int64`、`ffi-float`、`ffi-float-cb`、`ffi-callbacks`）跑共享快照——于是 64 位整数、
-float/混合参数与 `@toCallback` 闭包在 win64 上也有覆盖；`ffi-scalar` 仍限 Unix
-（它直接调 `getpid`/libm）。`lib-host.fun` 的 `DyLibWin()` 按宿主取辅助库名，runner
-会同时探测该 DLL 与可用的 `getapi`，任一缺失就把这几个用例放进跳过名单。
-
-Windows job 还会运行 `build-win64-deps.sh`（x86-64 `libtcc.dll` 与 `zlib.dll`），
-用真实的 C 编译 / deflate 调用实测两者，以同一特性集构建 `funcmd-safe.exe`，
-并运行 focused safe 测试；stage 步骤只复制探针通过的文件。
-
-`windows-arm64` **还不是发布目标**。FPC 3.2.2 没有 win64/aarch64 目标，
-而支持该目标的 FPC 3.3.1（主线）目前生成的二进制在真机 Windows ARM64 上会以
-`0xC0000005` 崩溃（连它自己的编译器也一样）。用 `-O-`、`-O1`、`-O2` 编译一个
-裸 `writeln('hello')` 都能复现，因此问题在 FPC 的 aarch64-win64 后端/RTL
-（上游 #42048、#42091），不在 Fun。`.github/workflows/winarm64.yml` 只是手动
-bring-up 工装：在 Linux 上经 Zig 的 clang 交叉构建，在 `windows-11-arm` 上跑
-便携回归；它不发布任何产物，nightly 也不会包含 win-arm64。等 FPC 修好目标后，
-`make-win-arm64.sh` 可以直接升级为正式构建。
-
-需要运行不受信任的脚本时，可以单独编译安全构建：
-
-```sh
-cd src/prj/fun && SAFE=strict ./make-linux-x86_64.sh   # 产出 funcmd-safe
-fun/test/run-safe-regression.sh strict                  # 只跑安全能力测试
-
-# Windows
-cd src\prj\fun && set SAFE=strict && make-win64.bat      # 产出 funcmd-safe.exe
-fun\test\run-safe-regression.bat strict
-```
-
-`funcmd-safe`（`-dFunSafe`）在编译期去掉本机代码（`getapi` / `@toCallback` /
-COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载代码这些路径。
-档位在构建脚本选择：`SAFE=strict` 全禁，`SAFE=readonly` 放开文件读，
-`SAFE=readwrite` 再放开文件写，`SAFE=custom SAFE_ALLOW=read,write,compile`
-按需组合。默认的 `funcmd` 与完整回归不受影响。每个 release 都同时提供 strict
-构建；CI 的 `linux-safe` job 分别验证 strict 与 readonly，Windows job 也会
-构建并运行同一套 strict 能力测试。`linux-safe` job 只在手动触发
-（`safe_only`）时运行，普通 push/PR 不会跑 safe 部分。
+macOS、Linux aarch64、龙芯与 riscv64 这几行在 Linux x86_64 上用引导好的 FPC
+交叉工具链构建。第三方源码（PCRE、TCC、zlib、libffi）不随仓库携带；缺失时
+构建降级而不是失败。交叉构建命令、工具链要求、依赖布局、安全构建与 CI 细节见
+[docs/building.zh.md](docs/building.zh.md)。
 
 ---
 
 ## 标准库
 
-标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写：约 90 个公开模块。
-目录内共 135 个 `.fun` 文件（含平台变体与内部辅助模块）；其中 6 个需要
-Windows、raw socket 或仅 macOS 的后端。
+标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写：约 90 个公开模块（含平台变体
+与内部辅助模块共 135 个 `.fun` 文件）。完整模块地图与用法说明见
+[标准库指南](docs/standard-library.zh.md)。
 
 - **数据**：`lib-json`、`lib-fd`、`csv`、`toml`、`jsonschema`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`、`lib-hmac`、`lib-url`
 - **工具**：`uuid`、`lib-utils`、`lib-param`
@@ -670,477 +374,27 @@ Windows、raw socket 或仅 macOS 的后端。
 - **沙箱**：`lib-jsbox`
 - **测试**：`test`（`fun test` 的注册与断言库）
 
-`lib-worker` 需要 opt-in 的 `funcmd-mt` 构建。5 个稳定平台发布包把它作为
-`fun/fun-mt` 附带；LoongArch64/riscv64 的 nightly 预发布 stage 也包含它。
-从源码构建使用 `src/prj/fun/make-linux-x86_64-mt.sh`、
-`FUN_THREADS=1 make-macos.sh` 或 `make-win64-mt.bat`；预发布 Linux 目标传
-`FUN_THREADS=1 FULL=1` 给对应的 `make-linux-*.sh`。默认 `funcmd` 保持
-单线程堆与性能，首次使用 worker 时会给出明确错误。
-
-worker 解析自己的模块并拥有独立的 AST 与堆，因此线程之间不共享任何 Fun
-对象。结果以字符串返回；`Shared` 与 `Channel` 在进出时复制值：
-
-```fun
-use 'lib-worker.fun';
-var w = WorkerFile('job.fun', 'sum', (new [1000]).@toJson(fd: true));
-var total = w.join(-1);
-if w.error() <> nil then raise w.error(); end if;
-
-Shared('counter').add('done', 1);          // 进程范围、按名字共享的存储
-Channel('log').send('job finished');       // 按名字共享的 FIFO
-```
-
-主线程完成回调用 `onDone` + `workerTick()`；另有常驻池
-`WorkerPool(file, size)` 与协作式 `cancel()`。隔离模型、惯用法与限制见
-[`fun/lib/worker-model.md`](fun/lib/worker-model.md)。
-
-日志在入口配置一次，之后通过命名 logger 使用：
-
-```fun
-use 'logging.fun';
-
-logging.config([level: 'debug']);   // 按名字： [levels: ['http': 'debug']]
-var logger = logging.getLogger('http');
-logger.info('request', [path: '/users']);
-```
-
-默认是 stderr + info + 文本格式，文本行包含调用点 source；`logging.config`
-可替换 handler/formatter，`newLogger` 用于测试或独立 sink，formatter 的
-`sourcePath` 选择 short/full/base 路径。
-
-运行时错误会带上失败语句位置和调用点 traceback。脚本也可以直接读取这些信息：
-
-```fun
-use 'runtime.fun';
-
-var s = runtime.source();   // [file, path, line, function, className]
-var st = runtime.stack();   // 由内到外的调用帧
-runtime.root('/app');       // short path 的根，默认是启动时 cwd
-
-try
-  risky();
-except
-  var e = runtime.lastError(); // message、file、path、line、function、stack
-end try;
-```
-
-`cron` 在同一套单线程阻塞模型上提供 cron 表达式与固定间隔：
-
-```fun
-use 'cron.fun';
-var s = CronScheduler([onError: (job, err) {
-  logger.error('cron job failed', [job: job['id'], error: err]);
-}]);
-var daily = s.addJob('0 3 * * *', cleanup);          // 5 字段 Vixie/POSIX
-var every30s = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
-s.every('1s', refresh);
-s.removeJob(daily);
-s.run();                                             // 或在循环里调用 s.tick()
-```
-
-- 每个 daemon 一个调度器；id 从 1 开始且不复用。`addJob` 支持范围、列表、
-  步长与 `@hourly`/`@daily`；Quartz/AWS 的 `?`、`L`、`W`、`#` 和年字段
-  直接拒绝。
-- `run()` 睡到最近任务（单次上限 1s），错过的周期只补一次。到期用本地墙钟，
-  间隔用单调时钟；暂不提供时区/DST 控制。
-- 要和 `HttpServer` 或其它 poll 循环共用线程，用 `tick()` 和
-  `nextWaitMs(maxMs)` 驱动单次 pass。回调同步执行，慢 handler 会拖住循环；
-  `run()` 活跃时拒绝 `tick()`。
-- 回调失败默认静默，除非传入 `onError`。
-
-上传表单直接从请求读取；客户端上传用 `HttpMultipartWriter` 生成同样的 body：
-
-```fun
-var m = req.multipart();
-var name = m.fields['name'][0];
-var file = m.files['avatar'][0];
-```
-
-cookie 可以签名，JWT 复用同一套鉴权工具：
-
-```fun
-res.signedCookie('uid', 'u1', secret, [path: '/', httpOnly: true]);
-var r = req.signedCookie('uid', secret);
-
-use 'jwt.fun';
-var token = jwt.sign([sub: 'u1', exp: jwt.now() + 3600], secret);
-var v = jwt.verify(token, secret, [issuer: 'app']);
-```
-
-环境变量也可以直接读取，不需要自己写平台 FFI：
-
-```fun
-use 'env.fun';
-var home = env.get('HOME');
-var port = env.get('PORT', '8080');
-```
-
-### 命令行程序
-
-`cli` 是一个小型命令框架。根命令持有全局 flag 与子命令，子命令同样用
-`cli.command` 创建；help、version、别名、env 回退、required、钩子和退出码都已内置。
-
-```fun
-use 'cli.fun';
-
-fun hello(ctx)
-  var times = ctx.int('times');
-  for i = 1 to times do
-    ?. 'hello ' & ctx.string('name');
-  end do;
-end fun;
-
-fun serve(ctx)
-  ?. 'serving on port ' & ctx.int('port');
-end fun;
-
-var root = cli.command('demo', [
-  usage: 'demo command-line tool',
-  version: '1.0.0'
-]);
-root.flag(cli.string('name', [aliases: ['n'], value: 'world', usage: 'who to greet']));
-root.flag(cli.int('times', [aliases: ['t'], value: 1, usage: 'repeat count']));
-root.action(hello);
-root.command(cli.command('serve', [
-  usage: 'start the server',
-  flags: [cli.int('port', [aliases: ['p'], value: 8080, usage: 'listen port'])],
-  action: serve
-]));
-
-var code = root.run();          // nil：读取进程参数
-if code <> 0 then cli.quit(code); end if;
-```
-
-```text
-$ demo --name bob -t 2
-hello bob
-hello bob
-$ demo serve -p 9000
-serving on port 9000
-$ demo --help
-$ demo --version
-```
-
-`cli.command(name, opts)` 支持 `usage`（父命令列表中的一句话说明；自身没有
-`description` 时也显示在自身 help 中）、`usageText`（替换自动生成的 usage 行）、
-`argsUsage`、`version`、`description`、`aliases`、`flags`、`commands`、`action`、
-`before`、`after`、`hidden`、`out`、`err`、`input`。
-
-flag 由 `cli.string`、`cli.bool`、`cli.int`、`cli.float`、`cli.strings` 创建；
-选项有 `aliases`、`value`（默认值）、`usage`、`env`（单个名字或名字列表）、
-`required`、`hidden`、`placeholder`。`strings` 可以重复出现；默认列表只在
-flag 未出现时使用，第一次显式赋值会替换默认值。help 会显示默认值和 env 名称。
-`required` 只接受命令行或 env，默认值不算满足；空的 `--flag=` 也算已提供（非空
-校验请放在 action 里）。flag 与命令名区分大小写，`-V` 和 `-v` 是两个不同的 flag。
-`hidden` 的 flag/命令仍可解析，但不显示在 help 中。重复的 flag/命令名或别名在
-构造时直接报错。
-
-长短选项可混用：`--name=value`、`--name value`、`-n value`、`-n=value`、
-`-ab` 这类两个 bool 的组合，以及用 `--` 终止选项解析。bool 接受
-`true/false`、`1/0`、`yes/no`、`on/off`；bool flag 不吞下一个 token，请用
-`--flag=false`。int 为十进制整数；float 支持小数和指数。非 bool 选项的下一个
-token 作为值；如果值以 `-` 开头，请用紧贴形式
-`--name=-x`/`-n=-x`（`--times -1` 这类负 int/float 仍可直接写）。全局 flag 要放在
-子命令前，子命令后的 token 由子命令解析。命令有子命令时，第一个位置参数会被当作
-命令名；根 action 需要位置参数时请用 `--`。
-
-action 收到 context：`ctx.string/bool/int/float/strings(name)`、`ctx.has(name)`
-（只有命令行或 env 显式设置才为 true）、`ctx.args()`、`ctx.arg(n)`、`ctx.narg()`、
-`ctx.command()`，以及配置好的流 `ctx.out()`/`ctx.err()`/`ctx.stdin()`。带类型的
-访问器会校验声明的 flag：未知名字或类型不匹配会报错，而不是静默返回零值；子命令仍可
-访问父命令继承下来的 flag。访问器使用 flag 的规范名而不是别名。env 值按 flag
-类型转换，`strings` 按逗号分隔；`env` 列表中先存在的名字生效。
-
-help/version 自动提供：`--help`/`-h`、`help [command...]`；命令设置 `version` 后
-还有 `-v`/`--version`。根命令和有子命令的命令提供 `help` 命令，叶子命令仍可把
-`help` 当普通位置参数。`help`/`h` 是保留 flag 名；有版本的命令上 `version`/`v`
-也是保留名，注册冲突 flag 会直接报错。子命令 help 只列自己的选项；全局选项在
-父/根命令的 help 中。
-
-钩子无需进程级初始化：`before(ctx)` 返回 nil/true/0 继续，返回 false 以退出码 1
-停止，返回非零整数则以该码停止。父命令的 `before` 在子命令 action 前执行，
-`after` 在子命令 action 后执行（action 抛异常也执行）；help/version/解析错误不会
-触发父命令钩子。`after(ctx)` 在自己的 action 返回或抛异常后执行，前提是 `before`
-已成功；`after` 的返回值会被忽略。
-
-`run(args)` 不退出进程，只返回退出码；要精确控制参数时传列表，调用 `run()`
-则读取进程参数（会丢掉开头的 `.fun`/`.foo`/`.fxx` 脚本路径；进程参数中遇到空
-参数就停止扫描）。命令结束后需要退出时调用 `cli.quit(code)`。混用 `?.` 和重定向的
-`out`/`err` 可能导致顺序错乱：`?.` 始终写进程控制台，`ctx.out()`/`ctx.err()`
-才使用指定 writer。
-
-退出码：解析错误、未知 flag/命令、非法值和缺失 required 返回 2；hook 返回 false
-或抛出异常返回 1；action 返回的整数作为退出码。action 只能返回 nil、bool 或 int，
-其他类型会报错并返回 1；`before` 同样只接受 nil、bool 或 int。
-
-help 默认写 stdout，错误默认写 stderr。默认 console writer 直接写进程句柄；需要
-捕获、重定向或非 ASCII 输出时请传 `out`/`err`。任意带 `write(s)` 的对象都可以；
-action 通过 `ctx.out()`/`ctx.err()` 访问它们；子命令自己的 writer 优先，否则继承
-根命令。框架不关闭也不 flush writer。
-
-可选的 `input` 是任意带 `read(n)` 的对象，reader 契约与 `io.fun` 相同；默认惰性
-使用 `io.stdin()`，因此读取 `ctx.stdin()` 的命令天然支持管道输入。子命令自己的
-`input` 优先，否则继承根命令；父 hook 与子 action 共享同一个输入流，hook 的读取
-会先消费输入。框架不主动读取、缓冲或关闭 reader，help/version 也不会消费输入。
-测试用 `io.buffer` 同时注入输出和输入：
-
-```fun
-use 'io.fun';
-var out = io.buffer();
-var app = cli.command('demo', [out: out, err: out]);
-app.flag(cli.string('name', [value: 'world']));
-app.flag(cli.int('times', [value: 1]));
-app.action(hello);
-
-?. app.run(['--help']) = 0;
-?. out.text().subpos('usage: demo') >= 0;
-```
-
-输入也是同样的方式：
-
-```fun
-var source = io.buffer('hello');
-var copied = io.buffer();
-fun copy(ctx)
-  ctx.out().write(io.readAll(ctx.stdin()));
-end fun;
-var cat = cli.command('cat', [input: source, out: copied]);
-cat.action(copy);
-?. cat.run([]) = 0;
-?. copied.text() = 'hello';
-```
-
-文件系统辅助覆盖目录、遍历和临时文件/目录：
-
-```fun
-use 'fs.fun';
-fs.mkdirAll('build/out');
-fs.walk('src', (p, isDir) { ... });
-fs.atomicWrite('build/out/config.json', data);
-```
-
-`walk` 与 `removeAll` 不跟随符号链接（`removeAll` 只删除链接本身，含断链）；
-`exists/isDir/isFile` 跟随目标。整文件的创建/读取/追加仍用 built-in：
-`save(data)`、`save(data, append: true)`、`load()`。
-
-分段/二进制读写用 `fs.open`，返回按字节操作的文件对象：
-
-```fun
-var f = fs.open('data.bin', 'r+');
-f.seek(16, 0);
-var head = f.read(4);
-f.write(bytes);
-f.close();
-```
-
-模式为 `r`、`w`、`a`、`r+`、`w+`、`a+`（可带 `b` 后缀）；默认 `r`，
-`a`/`a+` 的写入追加到末尾。方法为 `read(n)`、`write(data)`、
-`seek(offset, whence)`、`tell()`、`eof()`、`flush()`、`close()`；
-`whence` 可省略（默认 0 起），也可为 1 当前/2 末尾。`read` 返回字节串（字符值 0..255），
-`write` 写每个字符的低字节。打开/I/O 失败抛异常，EOF 时 `read` 返回 `''`；
-使用完必须显式 `close()`。读写切换遵循 C stdio：读→写先 `seek`；写→读可
-`seek` 或 `flush`。64 位宿主上偏移为 64 位；大值需用算术构造
-（如 `0xFFFFFFFF + 1`）。Windows 上 `fs.open` 需要 64 位构建；64 位窄字符构建
-的路径使用当前 ANSI 代码页。
-
-通用流辅助接受任何 reader/writer，不关闭句柄，并把 `''` 视为 EOF：
-
-```fun
-use 'io.fun';
-var b = io.buffer('hello');
-var text = io.readAll(b);        // 仅适合小数据
-var out = io.buffer();
-var f = fs.open('copy.bin', 'r');
-var n = io.copy(out, f);         // 按 8192 字符分块
-f.close();
-io.writeString(out, 'done');
-```
-
-`io.buffer` 是内存 reader/writer（`read/write/text/length/reset`）；
-`io.readAll` 是便捷入口，`io.copy` 才是流式复制。格式库和辅助函数接受
-`io.buffer` 作为流，`fs.open` 句柄也可直接使用；格式 reader/writer 不关闭、
-不 flush 底层 IO。
-
-`io.scanner` 按 token 遍历任意 Reader，默认按行（`\n` 或 `\r\n`，最后一行可无
-换行）。`scan()` 在 EOF 或出错时返回 false，`text()` 是当前 token，`err()`
-报告 `token too long` 或 Reader 错误。`maxToken` 默认 64 KB，`delimiter`
-可替换换行符：
-
-```fun
-use 'io.fun';
-var sc = io.scanner(io.stdin());
-while sc.scan() do ?. sc.text(); end do;
-if sc.err() <> nil then raise sc.err(); end if;
-```
-
-自定义分隔符用 `io.scanner(r, [delimiter: ','])`；扫描器不关闭 Reader，并且
-可能预读，不要和直接 `read()` 混用。
-
-进程标准流沿用同一契约：
-
-```fun
-use 'io.fun';
-var input = io.stdin();
-var output = io.stdout();
-var errors = io.stderr();
-
-var chunk = input.read(4096);     // 可能短读；'' 表示 EOF
-output.write('received ' & chunk.length() & 10.toChar());
-errors.write('warning' & 10.toChar());
-```
-
-`io.stdin` 是 Reader，`io.stdout`/`io.stderr` 是 Writer；三者都不关闭、不 flush、
-不转换换行，也不创建管道；`io.pipe` 单独创建管道，CLI stdin 仍是后续独立层。
-进程 stdio 按字节处理字符串：UTF-16 Windows 构建中每个字符写成一个字节，
-因此 ASCII 和二进制数据可原样往返；非 ASCII 文本需调用方先编码。Windows
-console 的代码页/UTF-16 不做转换。进程 stdio 依赖 `getapi`，需要启用 FFI 的
-构建；安全构建或无 FFI 构建中 `io.buffer` 仍可用，但读写进程 stdio 会报错。
-Unix 上管道关闭时进程可能按惯例收到 SIGPIPE 并退出。不要在同一个 stdin 上
-混用 `io.stdin()` 与内置 `line`/`char`/`all` 输入；输出顺序重要时也不要混用
-`io.stdout()` 和 `?.`，它们使用独立的缓冲/FFI 路径。
-
-进程管道沿用同一套 reader/writer 契约：
-
-```fun
-use 'io.fun';
-var p = io.pipe();
-p.writer.write('hello');
-p.writer.close();                  // reader 读完缓冲后看到 EOF
-var text = io.readAll(p.reader);   // 'hello'
-p.close();
-```
-
-`io.pipe()` 创建阻塞式 OS 管道；`p.reader`/`p.writer` 是 Reader/Writer，另有显式
-`close()`，`p.close()` 关闭两端并丢弃未读数据。关闭 writer 后 reader 先读完缓冲数据
-再返回 `''`；关闭 reader 后再读会报错，之后的写可能直接触发 SIGPIPE 终止进程
-（不可捕获）。管道拥有自己的句柄，必须显式关闭；`io.readAll`/`io.copy` 不会替
-调用方关闭。管道缓冲有限：单线程脚本先写入超过系统缓冲容量再读会死锁；v1 只适合
-小数据，当前没有受支持的线程/进程句柄交接，大数据需要后续的流式/进程交接层。
-管道为空且 writer 未关闭时，read（含 readAll/copy）会阻塞；没有超时/取消；
-关闭 writer 才能让空读以 EOF 结束。`p.reader`/`p.writer` 不是线程安全的：
-不要并发 read/write/close。`io.pipe` 需要启用 FFI 的构建，字节语义与进程 stdio 相同。
-
-用 `process.run` 启动子进程：
-
-```fun
-use 'process.fun';
-
-var r = process.run('git', ['status', '--short'], [timeout: 5000]);
-if r.ok then
-  ?. r.stdout;
-else
-  ?. r.stderr;
-  ?. r.exitCode;
-end if;
-```
-
-`process.run(name[, args[, opts]])` 直接执行命令，不经过 shell；尾随参数可省略，
-没有参数时也可传 `nil` 或空列表。选项为 `stdin`（字符串，默认 `''`）、
-`cwd`（空表示继承当前目录）、`timeout`（毫秒；`nil`/`0` 表示不超时）、
-`output`（字节；`nil`/`0` 表示不限）。
-返回对象包含 `ok`、`exitCode`、`signal`、`timedOut`、`outputExceeded`、
-`stdout`、`stderr`。
-非 0 退出码是正常结果；无法启动才 raise。Unix 上被信号终止时
-`exitCode` 为负信号值（例如 `-15`），同时给出信号编号；Windows 返回进程退出码，
-`signal` 为 `nil`。stdout/stderr 分开捕获为原始字节，不做编码或换行转换。
-
-调用会阻塞到子进程退出或超时。超时后终止直接子进程并等待，结果中
-`timedOut = true`、`ok = false`。实现使用单线程 stdio 泵，避免 stdout/stderr
-互相堵死；不创建语言级线程，也不杀整个进程树。设置 `output` 后 stdout 与
-stderr 共用同一字节预算，超限会终止直接子进程并置 `outputExceeded = true`、
-`ok = false`；流式/交互式 stdio 仍未支持。需要 shell 语法时显式调用
-`sh -c` / `cmd /c`。`process.run` 需要启用 FFI
-的构建。Windows v1 的 stdin 用临时文件承载（Unix 用管道），且 `CreateProcessA`
-的 ANSI 路径不能可靠处理非 ASCII 命令行/路径；32 位 Unicode/Delphi 仍需人工验证。
-如果直接子进程退出后孙进程仍持有 stdout/stderr，v1 可能在短暂宽限期后停止读取，
-迟到输出可能丢失。
-
-TOML 文档沿用同一套 reader/writer 契约：
-
-```fun
-use 'toml.fun';
-var f = fs.open('config.toml', 'r');
-var doc = toml.reader(f).read();   // 第一次读取后返回 nil
-f.close();
-
-var out = io.buffer();
-toml.writer(out).write(doc);
-```
-
-表是 set，数组是 list；日期时间、`inf` 和 `nan` 用 `TomlLiteral` 保留
-`.kind` / `.text`，writer 可以还原 TOML 语法。reader 一次返回一份文档，
-之后返回 `nil`；writer 写一份文档；二者都不关闭句柄。
-
-CSV 文件按行流式读写；reader/writer 只包装文件句柄，不负责关闭：
-
-```fun
-use 'csv.fun';
-var f = fs.open('users.csv', 'r');
-var r = csv.reader(f);
-var row = r.read();          // EOF 时返回 nil
-while row <> nil do
-  ...
-  row = r.read();
-end do;
-f.close();
-
-var g = fs.open('out.csv', 'w');
-var w = csv.writer(g);
-w.write(['name', 'age']);
-g.close();
-```
-
-字段都是字符串，列数默认严格。空行按“一个空字段的记录”处理，在多列文件中会因
-列数不一致报错；传 `[skipEmptyLines: true]` 可跳过完全空行。writer 按需加引号，
-行尾默认 `\n`，传 `[crlf: true]` 写 CRLF。reader 接受任何有 `read(n)` 的对象，
-writer 接受任何有 `write(s)` 的对象。
-
-数据可以按 JSON Schema 校验。schema 默认用 FD 写，也接受 JSON 文本或已解析的对象：
-
-```fun
-use 'jsonschema.fun';
-
-var schema = 'user.schema.fd'.load();
-var r = JsonSchema.check(data, schema);
-if not r.ok then
-  ?. r.first.path & ': ' & r.first.message;
-end if;
-```
-
-错误路径是 JSON Pointer（`/user/name`、`/tags/0`）。文本数据可以直接先解析再校验：
-`JsonSchema.checkJson(text, schema)` / `JsonSchema.checkFd(text, schema)`，
-布尔快捷方式是 `validJson` / `validFd`；解析失败会作为普通结果返回，关键字为
-`parse`。
-
-v0.x 支持 `type`（含类型列表）、`properties` / `required` /
-`additionalProperties`、`items`（单 schema 或元组）/ `additionalItems` /
-`minItems` / `maxItems` / `uniqueItems`、数值上下界、`minLength` / `maxLength`
-（按 Unicode 码点计数）、`pattern` / `patternProperties` / `propertyNames`、
-`enum`、`const`、`allOf` / `anyOf` / `oneOf` / `not`、同文档 `$ref` 与
-`$defs` / `definitions`，以及 `format` 的 `email`、`date`、`time`、
-`date-time`、`uri`、`uri-reference`、`uuid`、`ipv4`、`hostname`、`regex`。
-外部 `$ref`、`dependencies`、`if` / `then` / `else` 和 `contains` 暂未支持。
-
-> **平台拆分惯例**：Windows 实现保留原名，Unix 后端为 `<name>-unx.fun`（Linux + macOS），
-> 旧的 `<name>-lnx.fun` 名字保留为它之上的薄包装；两者共用的逻辑放在
-> `<name>-base.fun`（不计入上面的模块数）。只在 Linux 成立的后端（如读 `/proc` 的
-> `lib-proc`）继续用 `<name>-lnx`。例如 `lib-os` / `lib-os-unx`（+ `lib-os-lnx`），
-> 以及 `lib-unicode-base` + `lib-unicode` / `lib-unicode-unx`。
-> 用 `use` 时也可以直接写中性名：会按平台探测变体（macOS `-darwin`→`-unx`，Linux `-lnx`→`-unx`，变体存在才替换）。
+几个入口：
+
+- **Worker** —— `lib-worker` 需要 opt-in 的 `fun-mt` 构建。worker 拥有独立 AST 与堆；结果以字符串跨线程，`Shared`/`Channel` 复制值。见 [Worker](docs/standard-library.zh.md#worker-与-fun-mt-构建) 与 [`worker-model.md`](fun/lib/worker-model.md)。
+- **日志** —— 入口配置一次，之后用命名 logger（`logging.getLogger`）；见[日志](docs/standard-library.zh.md#日志)。
+- **运行时诊断** —— `runtime.source`、`runtime.stack`、`runtime.lastError` 提供文件、行号、函数与调用栈；见[运行时诊断](docs/standard-library.zh.md#运行时诊断)。
+- **Cron 与 HTTP** —— `CronScheduler`、`HttpMultipartWriter`、签名 cookie 与 JWT 共用同一套单线程模型；见 [Cron](docs/standard-library.zh.md#cron-调度) 与 [HTTP 辅助](docs/standard-library.zh.md#http-辅助)。
+- **CLI、文件、流与进程** —— `cli`、`fs`、`io`、`process`、TOML、CSV、JSON Schema 的用法都在[指南](docs/standard-library.zh.md)里。
 
 ---
 
 ## 示例
 
 - [`fun/demo`](fun/demo) —— 语法演示：函数、闭包、柯里化、类、对象、集合、正则与异常处理。
-- [`fun/demos`](fun/demos) —— 完整应用与基准测试：记事本 `notepad--`、`odbc-search`，以及性能 / 汇编 / JIT 基准。
-- [`fun/demos/package-demo`](fun/demos/package-demo) —— 带路径依赖的小项目：`tidy`、`run`（项目/平铺）与 `pack`。
-- [`fun/demos/test-demo`](fun/demos/test-demo) —— 只有库的包及测试：共享 helper、通过用例与失败断言示例。
-- [`fun/demos/http-cors-demo`](fun/demos/http-cors-demo) —— CORS 预检、credentials、暴露响应头与浏览器页面示例。
-- [`fun/demos/http-bearer-demo`](fun/demos/http-bearer-demo) —— Bearer token 认证、401 挑战与同源页面示例。
-- [`fun/demos/http-session-demo`](fun/demos/http-session-demo) —— cookie session 登录/登出、SID 轮换与服务端状态示例。
-- [`fun/demos/fs-demo`](fun/demos/fs-demo) —— 递归建目录、list/walk、原子写与清理示例。
-- [`fun/demos/cli-demo`](fun/demos/cli-demo) —— 命令、flag、别名、env、钩子、help/version 与可测试输出示例。
+- [`fun/demos`](fun/demos) —— 完整应用与基准：`notepad--` 编辑器、`odbc-search`，以及性能/汇编/JIT 基准。
+- [`fun/demos/package-demo`](fun/demos/package-demo) —— 带 path 依赖的小包：`tidy`、`run`（项目与平铺模式）、`pack`。
+- [`fun/demos/test-demo`](fun/demos/test-demo) —— 带测试、共享 helper 与失败断言示例的纯库包。
+- [`fun/demos/http-cors-demo`](fun/demos/http-cors-demo) —— CORS 预检、凭据、暴露头与浏览器页面。
+- [`fun/demos/http-bearer-demo`](fun/demos/http-bearer-demo) —— Bearer 鉴权、401 挑战与同源页面。
+- [`fun/demos/http-session-demo`](fun/demos/http-session-demo) —— cookie 登录/登出、SID 轮换与服务端状态。
+- [`fun/demos/fs-demo`](fun/demos/fs-demo) —— 嵌套目录、列举、遍历、原子写与清理。
+- [`fun/demos/cli-demo`](fun/demos/cli-demo) —— 命令、flag、别名、env、钩子、help/version 与可测试输出。
 
 ---
 
@@ -1157,4 +411,4 @@ Fun 采用 **双授权** 模式：
 
 ---
 
-© 2010-2026 张卫东 &lt;zwd@funlang.org>
+© 2010-2026 张卫东 &lt;zwd@funlang.org&gt;

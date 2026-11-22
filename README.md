@@ -6,11 +6,27 @@
 
 - Version: **9.5.7**
 - Website: <https://funlang.org>
-- Author: Zhang Weidong &lt;zwd@funlang.org>
+- Author: Zhang Weidong &lt;zwd@funlang.org&gt;
 - License: MIT, plus commercial terms (see [License](#license))
 - Status and roadmap: [ROADMAP.md](ROADMAP.md)
 
 > **Version 9.5.7**: this is not a toy or a prototype — a mature language refined and production-validated for over 15 years (2010–present), with a lineage that reaches back through Nuva (2006) and TemplateScript (2005).
+
+---
+
+## Documentation
+
+Start with the [tutorial](docs/tutorial.md); use the website
+[manual](https://funlang.org/man.htm) for exact language rules.
+
+| Document | What it covers |
+| -------- | -------------- |
+| [Tutorial](docs/tutorial.md) | Guided path: first script, values, collections, classes, files, packages, HTTP, workers, native code. |
+| [Standard library guide](docs/standard-library.md) | Module map and detailed usage for workers, logging, runtime, cron, HTTP, CLI, IO, formats and schema. |
+| [Installing](docs/install.md) | Release archives, one-line installer, Windows installer, runtime requirements. |
+| [Building](docs/building.md) | Native and cross builds, capability matrix, third-party dependencies, safe builds, CI. |
+| [Tooling](docs/tooling.md) | `package.fun`, `fun package`, `fun run`, `fun test`, `fun pack`. |
+| [Manual](https://funlang.org/man.htm) | Language reference, chapter by chapter. |
 
 ---
 
@@ -19,9 +35,8 @@
 - [Why Fun](#why-fun)
 - [Core features](#core-features)
 - [Quick start](#quick-start)
-- [Packages](#packages)
-- [Testing](#testing)
 - [A taste of Fun](#a-taste-of-fun)
+- [Packages and testing](#packages-and-testing)
 - [The capability ladder](#the-capability-ladder)
 - [The FD data format](#the-fd-data-format)
 - [Foreign function interface](#foreign-function-interface)
@@ -69,96 +84,35 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Runtime C & machine code** — bundled Tiny C Compiler, JIT, and inline assembly (see [the capability ladder](#the-capability-ladder)).
 - **Compact FFI** — call DLL/shared-library functions with a terse signature string (see [FFI](#foreign-function-interface)).
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
-- **Cross-platform** — Linux x64/arm64 (LoongArch64/riscv64 prerelease), macOS
-  x64/arm64, and Windows x64; legacy Win32/CE builds remain in the tree.
+- **Cross-platform** — Linux x64/arm64 (LoongArch64/riscv64 prerelease), macOS x64/arm64, and Windows x64; legacy Win32/CE builds remain in the tree.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
-- **Self-hosted standard library** — about 90 public modules written in Fun
-  itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
+- **Self-hosted standard library** — about 90 public modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
 ---
 
 ## Quick start
 
-### Prebuilt binaries
-
-Prebuilt interpreters are attached to [GitHub Releases](https://github.com/funlang/fun/releases):
-
-- Linux x64 / arm64: `.tar.gz`, with `libtcc.so`, `fun-mt` and the standard `lib/`;
-- Linux LoongArch64: `.tar.gz`, published in **nightly prereleases only**
-  while FPC's loongarch64 backend is still on mainline. The full build has
-  regex, `getapi`/FFI and the native asm backend (`lib-asm-loongarch64`), but
-  no `libtcc` (runtime C). It also ships `fun-mt`. Stable releases do not
-  include it;
-- Linux riscv64: `.tar.gz`, published in **nightly prereleases only** while
-  FPC's riscv64 backend is still on mainline. The full build has regex,
-  `getapi`/FFI, the `-lnx` backends and `lib-asm-riscv64`, but no `libtcc`
-  (runtime C). It also ships `fun-mt`. Stable releases do not include it;
-- macOS x64 / arm64: `.zip`. Both archives include `libtcc.dylib` and `fun-mt`. These
-  builds are **unsigned and not notarized**;
-  use the bundled `install.sh --local` (curl does not set the quarantine
-  attribute) or run `xattr -dr com.apple.quarantine <dir>` after extracting;
-- Windows x64: `.7z`. The build is unsigned, so SmartScreen may warn; extract
-  with 7-Zip and double-click `install.cmd` (or run
-  `powershell -ExecutionPolicy Bypass -File install.ps1`). The archive ships
-  `fun.exe`, `fun-safe.exe`, `fun-mt.exe`, the installers, and the x86-64 runtime DLLs
-  (`pcre3.dll`, `ffi.dll`, `libtcc.dll`, `zlib.dll`) that the CI built;
-  `capabilities.json` records anything a particular build could not provide.
-
-macOS / Linux one-liner (verifies `SHA256SUMS`, installs under `~/.fun`):
+Download a prebuilt archive from
+[GitHub Releases](https://github.com/funlang/fun/releases), or use the
+one-line installer (macOS / Linux; verifies `SHA256SUMS`, installs under
+`~/.fun`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/funlang/fun/main/install.sh | sh
 ```
 
-If the latest stable release has no binaries yet, the installer says so and
-falls back to the newest nightly. Pass `--tag` or `--nightly` to choose
-explicitly. The default install links `fun` into `~/.local/bin`; when that
-directory is not on `PATH`, add `--add-path` to append a marker-delimited
-block to `~/.profile` (or `~/.zshrc` for zsh), or pass `--bin-dir DIR` to put
-the links somewhere already on `PATH`.
-
-Windows install (per-user, no administrator rights):
-
-1. Extract the `.7z` archive with 7-Zip.
-2. Double-click `install.cmd` in the extracted folder.
-
-`install.cmd` copies the tree to `%LOCALAPPDATA%\Programs\Fun`, adds
-`%LOCALAPPDATA%\Programs\Fun\fun` to the user `PATH`, registers `.fun`,
-`.foo` and `.fxx` with a `Fun Script` ProgID (so double-clicking a script
-runs it), adds a Win+R `fun` entry, and appears in **Settings > Apps** for
-uninstalling. Useful options: `-AllUsers` (elevated, under `Program Files`),
-`-Dir DIR`, `-NoPath`, `-NoAssoc`, `-Portable`. Run `uninstall.cmd` from the
-install directory, or use **Settings > Apps**, to remove it. Windows may keep
-an existing per-user choice for an extension; use **Open with > Choose
-another app** once to select Fun.
-
-Each archive contains a `fun/` runtime tree: `fun/fun` (`fun/fun.exe` on
-Windows), `fun/fun-safe` (the capability-restricted build), and `fun/fun-mt`
-where the worker build is available, plus `lib/`,
-`demo/`, `demos/` and the regression suite in `test/`. Run
-`./fun/fun --help`, or run the shipped suite with
-`./fun/test/run-linux-regression.sh` on Linux/macOS and
-`fun\test\run-windows-regression.bat --portable` on Windows.
-`install.sh` is included in every Unix archive (not only macOS) and also
-creates `funcmd` and `funcmd-safe` compatibility symlinks. Both installers are
-packaged next to the runtime tree and are the supported way to get a global
-`fun` command. Run `./install.sh --local` from an extracted archive to install
-that exact tree offline; plain `./install.sh` downloads a release.
-Every release also carries `capabilities.json` and `SHA256SUMS`; optional
-features that were unavailable are listed there.
-Linux artifacts are built on Ubuntu 24.04, so they need glibc 2.34 or newer;
-when getapi/FFI is enabled they also need `libffi.so.8` at run time.
-Nightly builds are prereleases, so `releases/latest` stays on the stable
-version. `fun.dll` is a separate licensed product and is not part of these
-archives.
+On Windows, extract the `.7z` with 7-Zip and double-click `install.cmd`.
+Each archive ships `fun`, `fun-safe`, `fun-mt` where available, the standard
+`lib/`, demos and the regression suite. See [docs/install.md](docs/install.md)
+for archive details, installer options and runtime requirements.
 
 Run a script:
 
 ```text
-fun.exe <file.fun>            # run a script (.fun / .foo / .fxx)
-fun.exe -v <file.fun>         # show compile & run timing
-fun.exe -log[:log.txt] -gui   # log output / run in GUI mode
-fun.exe -key:key_cn.ini       # load a keyword alias pack
+fun <file.fun>                # run a script (.fun / .foo / .fxx)
+fun -v <file.fun>             # show compile & run timing
+fun -log[:log.txt] -gui       # log output / run in GUI mode
+fun -key:key_cn.ini           # load a keyword alias pack
 ```
 
 Hello world (canonical keywords):
@@ -185,104 +139,11 @@ end fun;
 Run:
 
 ```text
-> fun.exe fun/demo/fun.fun
+> fun fun/demo/fun.fun
 Hello, fun!
 9
 9
 ```
-
----
-
-## Packages
-
-`fun` below is the command-line binary (`fun.exe` on Windows). A project is a
-directory with a `package.fun` manifest; `fun package init` creates the
-manifest and a minimal template:
-
-```text
-fun package init myapp          # package.fun + src/main.fun
-fun package init mylib --lib    # package.fun + src/lib.fun
-```
-
-```fun
-fun package()
-  result = [
-    name: 'myapp',
-    version: '0.1.0',
-    bin: 'src/main.fun',
-    lib: '',
-    'fun': '9.5.7',
-    dependencies: [
-      'hello': [source: 'github.com/acme/hello', version: 'v1.0.0'],
-      'local': [source: '../libs/local']
-    ],
-    // >>> generated - do not edit; run 'fun package tidy' to refresh
-    resolved: []
-    // <<< generated
-  ];
-end fun;
-```
-
-- `fun package add <name> <source> [--version <v>]` and `remove <name>` edit
-  only the `dependencies` set; versions are exact tags, branches, or commits.
-- `fun package tidy` installs the declared revisions into the shared `~/.fun`
-  cache (`FUN_HOME` overrides it), verifies git tree hashes, and writes the
-  `resolved` block. Path dependencies are used in place; only git
-  dependencies need `git`.
-- `fun run [args...]` runs the manifest `bin` from the project root. Inside a
-  project, `fun <script>` is the flat mode of the same launcher: it runs the
-  given script with the project's dependencies available.
-- `fun pack` embeds the app and its dependency libraries into one executable;
-  the result runs without `~/.fun`.
-
-Runs are read-only: a missing or stale dependency reports
-`run 'fun package tidy'` instead of fetching anything. `FUN_PACKAGE_READY=1`
-skips project mode (useful for a broken manifest). See
-[`fun/demos/package-demo`](fun/demos/package-demo) for a runnable example.
-
----
-
-## Testing
-
-Test files are named `*_test.fun`; their location is free (`tests/` is the
-recommended layout). Other `.fun` files are ordinary modules, so tests can
-share helpers. A test file imports `test.fun` and registers blocks:
-
-```fun
-use 'test.fun';
-use '../src/lib.fun';
-
-test('adds', {
-  assert.equal(add(1, 2), 3);
-});
-```
-
-```text
-fun test
-```
-
-`fun test` runs every `*_test.fun` below the project root, one child process
-per file, prints `PASS`/`FAIL` per file, and exits non-zero when any test
-fails. A project only needs `package.fun` (a `bin` entry is not required);
-manifest dependencies are available through the same launcher as `fun run`.
-
-- Assertions: `assert.equal`, `not_equal`, `is_true`, `is_false`, `match`,
-  `contains`, `greater`, `less`, `is_nil`, `not_nil`, `raises`, `fail`; each
-  takes an optional trailing message.
-- `test.skip('reason')` inside a test body ends that test as skipped; the
-  reason is optional, skips are counted separately, and they do not fail the
-  run. Do not catch it in a broad `try/except`: the test is still reported as
-  skipped, but the rest of the body continues.
-- `test.todo('name', 'reason')` registers a placeholder that is not run;
-  `test.todo('name', { ... }, 'reason')` runs the body and treats a failure as
-  expected. A todo body that passes prints `todo passed: ... (remove todo)`.
-  Todos are counted separately and do not fail the run.
-- `test.fun`, the globals `test`/`assert`/`runTests`, the aliases `as test` /
-  `as assert`, and dependency keys `test`/`assert` are reserved. A third-party
-  test library can be imported under another alias.
-- `dist/`, dot-directories, and path-dependency directories are skipped.
-
-See [`fun/demos/test-demo`](fun/demos/test-demo) for a runnable example.
 
 ---
 
@@ -321,6 +182,34 @@ See [`test-high-level-language.fun`](fun/demos/benchmarks/test-high-level-langua
 
 ---
 
+## Packages and testing
+
+A project is a directory with a `package.fun` manifest:
+
+```text
+fun package init myapp          # package.fun + src/main.fun
+fun package init mylib --lib    # package.fun + src/lib.fun
+fun package tidy                # install pinned revisions into ~/.fun
+fun run [args...]               # run the manifest bin
+fun test                        # run every *_test.fun
+fun pack                        # embed app + libraries into one executable
+```
+
+Tests use `test.fun` and `*_test.fun` files:
+
+```fun
+use 'test.fun';
+test('adds', {
+  assert.equal(add(1, 2), 3);
+});
+```
+
+`fun test` runs each file in a child process and exits non-zero on failure.
+See [docs/tooling.md](docs/tooling.md) for manifest fields, dependency rules,
+assertions, `skip`/`todo`, and packing options.
+
+---
+
 ## The capability ladder
 
 What makes Fun unusual is how far a script can go without a separate toolchain:
@@ -335,40 +224,7 @@ What makes Fun unusual is how far a script can go without a separate toolchain:
 
 For example, `lib-tcc` loads `libtcc.dll` on Windows, `libtcc.so` on Linux and `libtcc.dylib` on macOS x64, and exposes `tcc_new`, `tcc_compile_string`, `tcc_get_symbol`, ... so you can compile C source from a string and call the resulting symbol immediately. `lib-asm` allocates executable memory, writes machine code, and invokes it; `lib-jit` picks the right path based on the source (`#!c` → TCC, otherwise assembly).
 
-A single script can mix both: `NewJit` compiles C **and** inline assembly at runtime, and each can call straight back into a Fun function (`@toCallback`). The snippet below sums `1..n` — once via assembly, once via compiled C — and hands the result to a Fun callback both times (full version: [`test-jit-cb.fun`](fun/demos/benchmarks/test-jit-cb.fun)):
-
-```fun
-use 'lib-jit.fun';
-fun cb(a, b)          # a Fun callback called from JIT'd code
-  result = a * 2^32 + b;
-end fun;
-
-# assembly path
-var asm = `#!asm i:i
-    mov ecx, dword ptr [esp+04]
-    @sum1ton
-    push eax
-    push edx
-    mov  eax, <test>
-    call eax
-`;
-var jit = NewJit(asm, names: [test: cb.@toCallback(nil, 'ii:i', true)]);
-?. jit.Run(100000);
-
-# C path (compiled at runtime with bundled TCC)
-var c = `#!C ii:i
-  int sum(int n, int (*test)(int, int)) {
-    long long s = 0;
-    for (int i = 1; i <= n; i++) s += i;
-    test((int)(s >> 32), (int)(s & 0xFFFFFFFF));
-    return 1;
-  }
-`;
-jit = NewJit(c);
-?. jit.call(100000, cb.@toCallback(nil, 'ii:C', true));
-```
-
-> **Platform note**: the `#!asm` block above is 32-bit x86 (Windows) assembly (`esp`-relative args, `ecx`). The `#!C` path is portable, but the assembly snippet is architecture-specific — on Linux/ARM use the C form or rewrite the assembly for the target ABI.
+A single script can mix both: `NewJit` compiles C **and** inline assembly at runtime, and each can call straight back into a Fun function (`@toCallback`). See [`test-jit-cb.fun`](fun/demos/benchmarks/test-jit-cb.fun) for a complete example. The `#!C` path is portable; assembly is architecture-specific.
 
 ---
 
@@ -397,28 +253,7 @@ person
 
 Its defining trait is that **FD is self-describing**: the parser in `lib-fd.fun` is generated from a BNF grammar written in FD itself (`fd.bnf.fd`). The grammar file `src/parse/bnf/fun.ebnf` documents the language grammar in the same spirit.
 
-FD value rules (shared by the interpreter, `fd.js`/`fd2.js`, and the BNF
-reader):
-
-- Numbers use the RFC 8259 grammar, the same as `getJson(json: 2)`:
-  `-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?`. Leading zeros (`03`),
-  hex, `.5`, `1.`, `+1` and `1e` are strings. Values follow the host number
-  type: Fun/Pascal use Int64, JS uses IEEE-754 doubles, so integers beyond
-  2^53 lose exactness in JS, and literals beyond the host type stay strings
-  (beyond Int64 in Fun, beyond a double in JS). Quote large IDs as strings
-  when they must round-trip exactly.
-  Writers use the same human-friendly 15 significant digits as `toStr`, so
-  `0.1 + 0.2` is written as `0.3`. Tiny floating-point round-trip
-  differences are accepted for readability.
-- Only `true`, `false` and `null` are literals. `yes`/`no` are strings here;
-  Fun's source-level string truthiness accepts them, but the data formats do
-  not.
-- Strings are raw by default. Prefixing the opening quote with a backslash
-  enables escapes (`\"a\nb"`, `\xHH`); an unknown escape is preserved
-  literally.
-- `#!kvd:<char>` selects a custom key/value delimiter for the rest of the
-  document (for example `#!kvd:=` and `key=value`).
-- Duplicate named keys are last-wins, matching `JSON.parse`.
+FD value rules (shared by the interpreter, `fd.js`/`fd2.js`, and the BNF reader) are documented in the [manual](https://funlang.org/man.htm) and `lib-fd.fun`; the key points are RFC 8259 numbers, `true`/`false`/`null` only, raw strings by default, and last-wins duplicate keys.
 
 ---
 
@@ -485,6 +320,7 @@ fun/
 │   ├── demo/          # Language syntax demos
 │   ├── demos/         # Full applications & benchmarks
 │   └── key_*.ini      # Keyword alias packs (CN / FR / PUA)
+├── docs/              # Tutorial, standard library, install, build and tooling guides
 └── LICENSE*           # License files
 ```
 
@@ -492,35 +328,20 @@ fun/
 
 ## Building
 
-The Fun core is Pascal; the source entry point is `src/prj/fun/funcmd.dpr`.
+Native builds:
 
-Toolchain locations for the Windows-hosted `.bat` scripts are centralized in one file: [`src/prj/fun/setenv.bat`](src/prj/fun/setenv.bat). Edit it once to point at your installed Delphi / Free Pascal, or set the `FPC`, `DELPHI2006`, `DELPHI2009` environment variables beforehand — every `make-*.bat` script calls it and picks up the paths.
+```sh
+cd src/prj/fun && ./make-linux-x86_64.sh   # Linux x86_64
+cd src/prj/fun && ./make-macos.sh          # macOS (Homebrew FPC)
+```
 
-Each script is `<toolchain>-<target>`; the **build machine** is where it runs, which differs from the target for the cross rows:
+```bat
+cd src\prj\fun
+make-win64.bat
+```
 
-| Target                  | Build machine | Script                                    | Toolchain          |
-| ----------------------- | ------------- | ----------------------------------------- | ------------------ |
-| Windows 32-bit          | Windows       | `src/prj/fun/make-2006.bat` / `-2009.bat` | Delphi 2006 / 2009 |
-| Windows 64-bit          | Windows       | `make-win64.bat`                          | FPC cross          |
-| Windows arm64 (bring-up) | Linux x86_64  | `src/prj/fun/make-win-arm64.sh`           | FPC 3.3.1 cross + Zig |
-| Windows CE / ARM        | Windows       | `make-wince.bat`                          | FPC cross          |
-| Linux (i386)            | Windows       | `make-linux.bat`                          | FPC 2.4.0 cross    |
-| Linux / ARM             | Windows       | `make-arm-linux.bat`                      | FPC cross          |
-| Linux x86_64 (native)   | Linux x86_64  | `src/prj/fun/make-linux-x86_64.sh`       | FPC + gcc          |
-| Linux aarch64 (arm64)   | Linux x86_64  | `src/prj/fun/make-linux-aarch64.sh`      | FPC cross + Zig    |
-| Linux LoongArch64       | Linux x86_64  | `src/prj/fun/make-linux-loongarch64.sh`  | FPC main cross     |
-| Linux riscv64           | Linux x86_64  | `src/prj/fun/make-linux-riscv64.sh`      | FPC main cross     |
-| macOS x86_64 / aarch64  | Linux x86_64  | `src/prj/fun/make-darwin.sh`             | FPC cross + Zig    |
-| macOS (native)          | macOS         | `src/prj/fun/make-macos.sh`              | FPC (Homebrew)     |
-
-Building with `-DFunDll` produces the embeddable runtime `fun.dll`, which exports the `Run` interface. Build artifacts are covered by `.gitignore` and are not versioned.
-
-The full grammar is defined in [`src/parse/bnf/fun.ebnf`](src/parse/bnf/fun.ebnf).
-
-### Platform capability matrix
-
-Three capability layers (regex, FFI, runtime C) plus the machine-code layer,
-a second build mode for untrusted scripts, and an opt-in worker build:
+Platform capability matrix (default build plus the opt-in `fun-safe` and
+`fun-mt` variants):
 
 | Platform       | regex | FFI | runtime C (tcc) | asm | safe build | worker build |
 | -------------- | ----- | --- | --------------- | --- | ---------- | ------------ |
@@ -532,179 +353,20 @@ a second build mode for untrusted scripts, and an opt-in worker build:
 | macos-x64      | yes   | yes | yes             | yes | yes        | yes          |
 | win-x64        | yes   | yes | yes             | yes | yes        | yes          |
 
-`safe build` is the separate `fun-safe` binary (`-dFunSafe`, strict level); it
-ships next to the default interpreter, so the default build and its behaviour
-are unchanged. `worker build` is the opt-in `fun-mt` binary described in
-[`fun/lib/worker-model.md`](fun/lib/worker-model.md). Every other column
-describes the default binary. `runtime C` is now available on both macOS
-architectures through `libtcc.dylib`. Apple
-Silicon uses a small TCC patch for the Darwin ucontext fields and `MAP_JIT`
-handling. The release notes and each archive's `capabilities.json` are
-generated from probes, so a degraded build cannot claim a capability it does
-not have.
-
-Windows arm64 is bring-up only (an FPC codegen crash blocks release), and the
-Win32/Windows CE builds are legacy; none of them is a release gate. See
-[`ROADMAP.md`](ROADMAP.md) for their current status.
-
-### Cross builds (macOS, Linux aarch64, LoongArch64 and riscv64, from Linux x86_64)
-
-The macOS, Linux aarch64, LoongArch64 and riscv64 rows are the builds that
-need a bootstrapped toolchain. They all run on a **Linux x86_64 build
-machine** and produce a native target binary; the macOS/aarch64 assembler and
-linker come from the clang/lld bundled with Zig 0.13, while LoongArch64 and
-riscv64 use GNU binutils (`binutils-loongarch64-linux-gnu`,
-`binutils-riscv64-linux-gnu`):
-
-```sh
-cd src/prj/fun
-./bootstrap-darwin-cross.sh     # once: FPC darwin cross toolchain + Zig (~/.fun/darwin-cross, ~2 GB)
-CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
-CPU=all FUN_THREADS=1 ./make-darwin.sh  # -> fun/funcmd-darwin-{x86_64,aarch64}-mt
-
-./bootstrap-linux-aarch64.sh    # once: aarch64-linux RTL, reusing ppcrossa64 + Zig from the darwin tree
-./make-linux-aarch64.sh         # -> fun/funcmd-linux-aarch64
-
-# LoongArch64 is prerelease-only: FPC has no stable loongarch64 target yet.
-./bootstrap-linux-loongarch64.sh  # once: FPC main cross compiler + loongarch64 binutils
-./prepare-linux-loongarch64-sysroot.sh  # once: Alpine musl/FFI/PCRE sysroot
-FULL=1 ./make-linux-loongarch64.sh      # -> fun/funcmd-linux-loongarch64-musl
-FUN_THREADS=1 FULL=1 ./make-linux-loongarch64.sh  # -> ...-musl-mt
-
-# riscv64 is also prerelease-only: FPC's backend is still on main.
-./bootstrap-linux-riscv64.sh  # once: FPC main cross compiler + riscv64 binutils
-./prepare-linux-riscv64-sysroot.sh  # once: Alpine musl/FFI/PCRE sysroot
-FULL=1 ./make-linux-riscv64.sh      # -> fun/funcmd-linux-riscv64-musl
-FUN_THREADS=1 FULL=1 ./make-linux-riscv64.sh  # -> ...-musl-mt
-```
-
-- **Build machine requirements**: Linux x86_64, host FPC 3.2.x, `make`, `curl` or `wget`, `tar`, and ~2 GB free disk. Zig is fetched by the bootstrap (pinned to 0.13; 0.14 panics on older glibc). No macOS host, Apple SDK, or `osxcross` is required — Zig ships a libSystem stub.
-- `bootstrap-linux-aarch64.sh` reuses the `ppcrossa64` and Zig from the darwin toolchain: an FPC compiler binary is CPU-specific but can target any OS it has units for.
-- The LoongArch64 path needs `binutils-loongarch64-linux-gnu` 2.42 or newer and an FPC main snapshot. It cross-builds against an Alpine musl sysroot, so regex, FFI and the `-lnx` backends are available, as is `lib-asm-loongarch64` (the sysroot ships `libgcc_s` for `__clear_cache`); TinyCC is not. `.github/workflows/loongarch.yml` runs this build on pushes to main, builds the `-mt` worker binary, runs `lib-worker-test` under qemu, and uploads the stage used by nightly prereleases.
-- The riscv64 path needs `binutils-riscv64-linux-gnu` and an FPC main snapshot, and uses the same Alpine musl sysroot approach, so regex, FFI, the `-lnx` backends and `lib-asm-riscv64` are available (the sysroot ships `libgcc_s` for `__clear_cache`); TinyCC is not. `.github/workflows/riscv64.yml` runs this build on pushes to main, builds the `-mt` worker binary, runs `lib-worker-test` under qemu, and uploads the stage used by nightly prereleases; `fun/test/run-riscv64-qemu.sh` runs the same Linux suite under `qemu-riscv64`.
-- Optional features degrade as usual: no PCRE -> no regex, no libffi unit/stub -> no `getapi` (the win64 CI supplies both, `pcre3.dll` and `ffi.dll`). The cross-built Linux aarch64 artifact is the core interpreter (its `-dRegex` and `-dLinuxFFI` need a libc / libffi that are not cross-built yet); a native Linux arm64 build, as in CI, has both.
-- Porting details: [`art/notes/macos-port.md`](art/notes/macos-port.md).
-
-### Third-party dependencies (not carried in the repo)
-
-To keep the repository small and license-clean, the following third-party
-sources/binaries are **not** shipped. If one is missing the build script
-**degrades and prints a notice** instead of failing:
-
-| Component | Where to put it | Where to get it | Who builds it |
-| --------- | --------------- | --------------- | ------------- |
-| PCRE 8 (8-bit) | `src/3rd/pcre-8/` | <https://www.pcre.org/> (8.x source, e.g. 8.45) | Linux: `make-linux-x86_64.sh` compiles it with gcc (static, `-dRegex`); Windows (i386): `src/regex/pcre/make.bat` (Borland bcc32 + make, `-Dpcresrc=<path>`; the objects `pcrd.pas` `{$LINK}`s); win64: the CI builds `pcre3.dll` with MinGW-w64 gcc and links it dynamically (`-dRegex -dPCRE_WinDLL`, see below) |
-| Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | the tinycc release on savannah/nongnu, or repo.or.cz tag `release_0_9_27` | `make-linux-x86_64.sh` produces `libtcc.so`; `build-win64-deps.sh` produces the x86-64 `libtcc.dll` (win64); `build-tcc-darwin.sh` produces `libtcc.dylib` (macOS x86_64 and arm64, the latter with `patches/tcc-darwin-arm64.patch`) |
-| libffi (win64) | `ffi.dll` next to `funcmd.exe` | MSYS2 `mingw-w64-x86_64-libffi`, or any x86_64 libffi build | the win64 CI installs it so `getapi` works there (`-dWinFFI`); Linux/macOS use the libffi that ships with FPC |
-| zlib 1.2.11 (win64) | `src/3rd/zlib-1.2.11/` | <https://zlib.net/fossils/> | `build-win64-deps.sh` produces the x86-64 `zlib.dll`; Linux/macOS use the system zlib |
-
-- Once the directories are in place, `cd src/prj/fun && ./make-linux-x86_64.sh` builds PCRE and TCC automatically.
-- Or point at them explicitly: `PCRE_SRC=/path/to/pcre TCC_SRC=/path/to/tcc ./make-linux-x86_64.sh`.
-- No PCRE -> the build has no regex (`-dRegex` off); no TCC -> no `libtcc.so`, so `lib-tcc` is unavailable. Neither affects the core interpreter.
-- Convenience fetcher: `src/prj/fun/fetch-3rd-party.sh` downloads and unpacks the pinned PCRE 8.45 and TCC 0.9.27 releases into `src/3rd/` (used by CI).
-
-### Regression tests and CI
-
-After building, run the snapshot suite from the repository root:
-
-```sh
-fun/test/run-linux-regression.sh     # Linux (or any POSIX host: auto-detects)
-fun/test/run-macos-regression.sh     # macOS wrapper; skips the Linux-only tests
-fun/test/run-windows-regression.bat  # Windows counterpart
-```
-
-The runner is host-aware: `fun/test/regression-skip-<platform>.txt` lists tests
-that cannot run on a host (a `/proc` or `libc.so.6` backend, an unported JIT,
-...) and `fun/test/expected/<platform>/` can hold host-specific snapshots that
-override the shared `fun/test/expected/`. `--update` writes to the host's own
-snapshot directory; macOS details and the current skip reasons are in
-[`art/notes/macos-port.md`](art/notes/macos-port.md).
-
-[`.github/workflows/regression.yml`](.github/workflows/regression.yml) runs the
-suite on five platforms - Linux, macOS and Windows on x64, plus Linux and macOS
-on arm64. All five build with Free Pascal and are a gate. The win64 build gets
-PCRE from `pcre3.dll`, which the job compiles with the runner's MinGW-w64 gcc
-(the bcc32 objects belong to the 32-bit build and MinGW objects cannot be linked
-into funcmd, so `pcrd.pas` imports the DLL under `-dPCRE_WinDLL`);
-`run-windows-regression.bat` still probes for the engine at startup and reports
-the regex-dependent tests as SKIP when a build has none, so a regex-less
-toolchain degrades instead of failing.
-
-The `linux-x64`, `linux-arm64`, `macos-x64` and `macos-arm64` jobs also build
-`funcmd-mt` (`FUN_THREADS=1`) and run the focused `lib-worker-test` suite; the
-Windows job builds `funcmd-mt.exe` and runs the same test. This stays in the
-existing jobs rather than a separate workflow: the compiler and third-party
-caches are already present, and a second runner would pay checkout and
-toolchain startup for a roughly one second compile. Only the MT binary has its
-own cache entry, so platforms without workers keep their existing `funcmd`
-cache.
-
-
-The same job installs libffi from the runner's MSYS2 and builds win64 with
-`-dWinFFI` when the resulting `ffi.dll` sits next to `funcmd.exe`, which is what
-turns on `getapi` there: FPC's bundled `ffi` unit already has a WIN64 target, so
-the only thing missing on Windows was the library. Both optional features follow
-the same rule - if the DLL or the unit is absent the job falls back to the core
-interpreter instead of failing, and a probe step reports what the build ended up
-with.
-
-With `getapi` in place, the Windows job also builds the FFI test helper
-(`fun/test/ffi/libffitest.c`) into `libffitest.dll` with the same MinGW gcc and
-runs the four host-independent FFI cases (`ffi-int64`, `ffi-float`,
-`ffi-float-cb`, `ffi-callbacks`) against the shared snapshots, so 64-bit
-integers, float/mixed arguments and `@toCallback` closures are covered on win64
-too; `ffi-scalar` stays Unix-only (it calls `getpid`/libm directly).
-
-`DyLibWin()` in `lib-host.fun` picks the helper's name per host, and the runner
-probes for both the DLL and a working `getapi`, adding those cases to its skip
-list when either is missing.
-
-The Windows job also runs `build-win64-deps.sh` (x86-64 `libtcc.dll` and
-`zlib.dll`), probes both with a real compile/deflate call, builds
-`funcmd-safe.exe` with the same feature set, and runs the focused safe test.
-The stage step copies only what those probes accepted.
-
-`windows-arm64` is **not a release target yet**. FPC 3.2.2 has no
-win64/aarch64 target, and FPC 3.3.1 (trunk), which does, currently produces
-binaries that crash with `0xC0000005` on real ARM64 Windows -- including its
-own compiler. A bare `writeln('hello')` compiled with `-O-`, `-O1` and `-O2`
-reproduces it, so the fault is in FPC's aarch64-win64 backend/RTL (upstream
-#42048, #42091), not in Fun. `.github/workflows/winarm64.yml` is a manual
-bring-up harness that cross-builds on Linux (through Zig's clang) and runs the
-portable suite on `windows-11-arm`; it publishes nothing, and nightly releases
-never include a win-arm64 asset. `make-win-arm64.sh` is ready for experiments
-and can become a real build once FPC fixes the target.
-
-For untrusted scripts, build the separate capability-restricted interpreter:
-
-```sh
-cd src/prj/fun && SAFE=strict ./make-linux-x86_64.sh   # produces funcmd-safe
-fun/test/run-safe-regression.sh strict                  # focused capability tests
-
-# Windows
-cd src\prj\fun && set SAFE=strict && make-win64.bat      # produces funcmd-safe.exe
-fun\test\run-safe-regression.bat strict
-```
-
-`funcmd-safe` (`-dFunSafe`) removes native code (`getapi` / `@toCallback` /
-COM), arbitrary-address memory access, file access, and compile-from-file or
-`inline` code loading at compile time. Pick the level in the build script:
-`SAFE=strict` blocks all of them, `SAFE=readonly` allows file reads,
-`SAFE=readwrite` also allows writes, and `SAFE=custom
-SAFE_ALLOW=read,write,compile` selects categories explicitly. The default
-`funcmd` and its full regression suite are unchanged. Every release also ships
-the strict build; a separate `linux-safe` CI job verifies strict and readonly,
-and the Windows job builds and runs the same strict capability test. The
-`linux-safe` job only runs on manual dispatch (`safe_only`), not on push/PR.
+The macOS, Linux aarch64, LoongArch64 and riscv64 rows are cross-built on Linux
+x86_64 with bootstrapped FPC toolchains. Third-party sources (PCRE, TCC, zlib,
+libffi) are not vendored; missing ones degrade the build instead of failing.
+See [docs/building.md](docs/building.md) for cross-build commands, toolchain
+requirements, dependency layout, safe builds and CI details.
 
 ---
 
 ## Standard library
 
 The standard library in [`fun/lib`](fun/lib) is written in pure Fun: about 90
-public modules. The directory has 135 `.fun` files in total, including platform
-variants and internal helpers; six modules need Windows, raw sockets, or a
-macOS-only backend.
+public modules (135 `.fun` files including platform variants and internal
+helpers). The full module map and usage notes live in the
+[standard library guide](docs/standard-library.md).
 
 - **Data**: `lib-json`, `lib-fd`, `csv`, `toml`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`, `lib-hmac`, `lib-url`
 - **Utility**: `uuid`, `lib-utils`, `lib-param`
@@ -719,525 +381,13 @@ macOS-only backend.
 - **Sandbox**: `lib-jsbox`
 - **Testing**: `test` (registration and assertions for `fun test`)
 
-`lib-worker` needs the opt-in `funcmd-mt` build. Release archives on the five
-stable platforms ship it as `fun/fun-mt`; the LoongArch64/riscv64 nightly
-prerelease stages include it too. From source use
-`src/prj/fun/make-linux-x86_64-mt.sh`, `FUN_THREADS=1 make-macos.sh`, or
-`make-win64-mt.bat`; for the prerelease Linux targets pass
-`FUN_THREADS=1 FULL=1` to their `make-linux-*.sh` script. The default `funcmd`
-stays single-threaded and reports a clear error on first use.
-
-A worker parses its own module and owns its AST and heap, so nothing Fun-visible
-is shared between threads. Results are strings; `Shared` and `Channel` copy
-values in and out:
-
-```fun
-use 'lib-worker.fun';
-var w = WorkerFile('job.fun', 'sum', (new [1000]).@toJson(fd: true));
-var total = w.join(-1);
-if w.error() <> nil then raise w.error(); end if;
-
-Shared('counter').add('done', 1);          // named, process-wide store
-Channel('log').send('job finished');       // named FIFO
-```
-
-Use `onDone` + `workerTick()` for completions on the main thread. A resident
-pool (`WorkerPool(file, size)`) and cooperative `cancel()` are also available.
-See [`fun/lib/worker-model.md`](fun/lib/worker-model.md) for the isolation
-model, idioms, and limits.
-
-Logging is configured once and then used through named loggers:
-
-```fun
-use 'logging.fun';
-
-logging.config([level: 'debug']);   // per-name: [levels: ['http': 'debug']]
-var logger = logging.getLogger('http');
-logger.info('request', [path: '/users']);
-```
-
-The default is stderr + info + text with the call-site source;
-`logging.config` replaces handlers/formatters, `newLogger` creates an
-independent sink, and a formatter's `sourcePath` selects short/full/base paths.
-
-Runtime errors include the failing statement and a call-site traceback. Scripts
-can inspect the same information directly:
-
-```fun
-use 'runtime.fun';
-
-var s = runtime.source();   // [file, path, line, function, className]
-var st = runtime.stack();   // innermost-first frames
-runtime.root('/app');       // root for the short path, default is startup cwd
-
-try
-  risky();
-except
-  var e = runtime.lastError(); // message, file, path, line, function, stack
-end try;
-```
-
-`cron` provides cron expressions and fixed intervals on the same blocking,
-single-threaded model:
-
-```fun
-use 'cron.fun';
-var s = CronScheduler([onError: (job, err) {
-  logger.error('cron job failed', [job: job['id'], error: err]);
-}]);
-var daily = s.addJob('0 3 * * *', cleanup);          // 5-field Vixie/POSIX
-var every30s = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
-s.every('1s', refresh);
-s.removeJob(daily);
-s.run();                                             // or s.tick() in a loop
-```
-
-- One scheduler per daemon; ids start at 1 and are never reused. `addJob`
-  accepts ranges, lists, steps and `@hourly`/`@daily`; Quartz/AWS extensions
-  (`?`, `L`, `W`, `#`, year) are rejected.
-- `run()` sleeps until the nearest job (capped at 1 s) and fires a missed
-  occurrence once. Due times use local wall time; intervals use a monotonic
-  clock. There is no timezone/DST control yet.
-- For an `HttpServer` or another poll loop, drive one pass with `tick()` and
-  `nextWaitMs(maxMs)` instead of `run()`. Callbacks run synchronously, so a
-  slow handler delays the loop; `tick()` is rejected while `run()` is active.
-- Callback errors are silent unless `onError` is supplied.
-
-Uploaded forms are available directly; `HttpMultipartWriter` builds the same
-bodies for client uploads:
-
-```fun
-var m = req.multipart();
-var name = m.fields['name'][0];
-var file = m.files['avatar'][0];
-```
-
-Cookies can be signed, and `jwt` signs/verifies tokens with the same helpers:
-
-```fun
-res.signedCookie('uid', 'u1', secret, [path: '/', httpOnly: true]);
-var r = req.signedCookie('uid', secret);
-
-use 'jwt.fun';
-var token = jwt.sign([sub: 'u1', exp: jwt.now() + 3600], secret);
-var v = jwt.verify(token, secret, [issuer: 'app']);
-```
-
-Environment variables need no platform-specific FFI:
-
-```fun
-use 'env.fun';
-var home = env.get('HOME');
-var port = env.get('PORT', '8080');
-```
-
-### Command-line programs
-
-`cli` is a small command framework. A root command owns global flags and
-subcommands, and every subcommand is the same `cli.command` object. Help,
-version, aliases, env fallback, required flags, hooks and exit codes are built
-in.
-
-```fun
-use 'cli.fun';
-
-fun hello(ctx)
-  var times = ctx.int('times');
-  for i = 1 to times do
-    ?. 'hello ' & ctx.string('name');
-  end do;
-end fun;
-
-fun serve(ctx)
-  ?. 'serving on port ' & ctx.int('port');
-end fun;
-
-var root = cli.command('demo', [
-  usage: 'demo command-line tool',
-  version: '1.0.0'
-]);
-root.flag(cli.string('name', [aliases: ['n'], value: 'world', usage: 'who to greet']));
-root.flag(cli.int('times', [aliases: ['t'], value: 1, usage: 'repeat count']));
-root.action(hello);
-root.command(cli.command('serve', [
-  usage: 'start the server',
-  flags: [cli.int('port', [aliases: ['p'], value: 8080, usage: 'listen port'])],
-  action: serve
-]));
-
-var code = root.run();          // nil: process arguments
-if code <> 0 then cli.quit(code); end if;
-```
-
-```text
-$ demo --name bob -t 2
-hello bob
-hello bob
-$ demo serve -p 9000
-serving on port 9000
-$ demo --help
-$ demo --version
-```
-
-`cli.command(name, opts)` accepts `usage` (a one-line summary in the parent's
-command list, also shown in its own help when `description` is empty),
-`usageText` (replace the generated usage line), `argsUsage`, `version`,
-`description`, `aliases`, `flags`, `commands`, `action`, `before`, `after`,
-`hidden`, `out`, `err` and `input`.
-
-Flags come from `cli.string`, `cli.bool`, `cli.int`, `cli.float` and
-`cli.strings`; options are `aliases`, `value` (default), `usage`, `env`
-(a name or list of names), `required`, `hidden` and `placeholder`. `strings`
-may be repeated. Its default list is used only when the flag is absent; the
-first explicit value replaces the default. Help shows default values and env
-names. A `required` flag must appear on the command line or come from env; a
-default does not satisfy it, while an empty `--flag=` still counts as supplied
-(validate non-empty values in the action). Flag and command names are
-case-sensitive, so `-V` and `-v` are different flags. Hidden flags and commands
-still parse but are omitted from help. Duplicate flag/command names and
-aliases raise at construction.
-
-Short and long forms may be mixed: `--name=value`, `--name value`, `-n value`,
-`-n=value`, combined bools such as `-ab` when both are bool flags, and `--` to
-stop option parsing. Boolean values accept `true/false`, `1/0`, `yes/no` and
-`on/off`; bool flags do not consume the next token, so use `--flag=false`.
-Integers are decimal; floats accept decimals and exponents. A non-bool option
-takes the next token as its value; when that value starts with
-`-`, use the attached form `--name=-x`/`-n=-x` (negative int/float values such
-as `--times -1` are still accepted). Global flags belong before the subcommand;
-tokens after it are parsed by the subcommand. When a command has subcommands,
-its first positional token is treated as a command name, so use `--` before
-positional arguments of the root action.
-
-The action receives a context: `ctx.string/bool/int/float/strings(name)`,
-`ctx.has(name)` (true only when set on the command line or by env),
-`ctx.args()`, `ctx.arg(n)`, `ctx.narg()`, `ctx.command()`, and the configured
-streams `ctx.out()`, `ctx.err()` and `ctx.stdin()`. Typed accessors validate the
-declared flag: unknown names or a wrong type raise instead of silently returning
-a zero value.
-Parent flags inherited by a child stay accessible. Use canonical flag names,
-not aliases, with these accessors. Env values are converted by flag type;
-`strings` values are split on commas. The first present name from `env` wins.
-
-Help and version are automatic: `--help`/`-h`, `help [command...]`, and, on a
-command with `version` set, `-v`/`--version`. The `help` command exists at the
-root and on commands with subcommands; a leaf command can still use `help` as a
-positional value. `help`/`h` are reserved flag names, and `version`/`v` are
-reserved on a command that has a version; registration raises if a flag tries
-to use them. Subcommand help lists its own options; global options are listed by
-the parent/root help.
-
-Hooks run without process-level setup: `before(ctx)` may return nil/true/0 to
-continue, false to stop with code 1, or a nonzero integer to stop with that
-code. A parent `before` runs before the child action, and a parent `after` runs
-after the child action, including when the action raises. Help, version and
-parse errors do not run parent hooks. `after(ctx)` runs after its action returns
-or raises, once `before` has succeeded; its return value is ignored.
-
-`run(args)` never exits the process; it returns an exit code. Pass a list for
-exact control, or call `run()` to read process arguments (a leading
-`.fun`/`.foo`/`.fxx` script path is dropped; an empty process argument ends the
-scan). Use `cli.quit(code)` after the command has finished when the process
-should exit. Mixing `?.` with redirected `out`/`err` can reorder output: `?.`
-always writes to the process console, while `ctx.out()`/`ctx.err()` use the
-selected writers.
-
-Exit codes: parse errors, unknown flags/commands, bad values and missing
-required flags return 2; a false hook or an exception returns 1; an integer
-returned by an action becomes the exit code. Actions must return nil, a boolean
-or an integer; other return types raise and return 1. `before` accepts nil, a
-boolean or an integer.
-
-Help goes to stdout and errors go to stderr by default. The default console
-writer uses the process handles directly; pass `out`/`err` for captured,
-redirected or non-ASCII output. Any object with `write(s)` works; actions reach
-them through `ctx.out()` and `ctx.err()`, and a child's own writers override the
-root's. Writers are not closed or flushed by the framework.
-
-The optional `input` is any object with `read(n)`, using the same reader contract
-as `io.fun`. It defaults lazily to `io.stdin()`, so a command that reads
-`ctx.stdin()` accepts piped input without extra setup. A child's own `input`
-overrides the root's; otherwise it inherits. When a child inherits, a parent hook
-and the child action share the same input stream, so a hook that reads consumes
-input before the action. The framework never reads, buffers or closes the
-reader, and help/version do not consume it. Tests use `io.buffer` for both
-output and input:
-
-```fun
-use 'io.fun';
-var out = io.buffer();
-var app = cli.command('demo', [out: out, err: out]);
-app.flag(cli.string('name', [value: 'world']));
-app.flag(cli.int('times', [value: 1]));
-app.action(hello);
-
-?. app.run(['--help']) = 0;
-?. out.text().subpos('usage: demo') >= 0;
-```
-
-Input works the same way:
-
-```fun
-var source = io.buffer('hello');
-var copied = io.buffer();
-fun copy(ctx)
-  ctx.out().write(io.readAll(ctx.stdin()));
-end fun;
-var cat = cli.command('cat', [input: source, out: copied]);
-cat.action(copy);
-?. cat.run([]) = 0;
-?. copied.text() = 'hello';
-```
-
-Filesystem helpers cover directories, walking and temporary entries:
-
-```fun
-use 'fs.fun';
-fs.mkdirAll('build/out');
-fs.walk('src', (p, isDir) { ... });
-fs.atomicWrite('build/out/config.json', data);
-```
-
-`walk` and `removeAll` do not follow symbolic links (`removeAll` deletes the
-link itself, including broken links); `exists/isDir/isFile` follow them.
-Whole-file create/read/append stays on the built-ins — `save(data)`,
-`save(data, append: true)` and `load()`.
-
-For segmented or binary I/O, `fs.open` returns a byte-oriented file handle:
-
-```fun
-var f = fs.open('data.bin', 'r+');
-f.seek(16, 0);
-var head = f.read(4);
-f.write(bytes);
-f.close();
-```
-
-Modes are `r`, `w`, `a`, `r+`, `w+`, `a+` (an optional `b` is accepted);
-mode defaults to `r`, and `a`/`a+` append writes. Methods are `read(n)`,
-`write(data)`, `seek(offset, whence)`, `tell()`, `eof()`, `flush()` and
-`close()`; `whence` defaults to 0 (start) and may be 1 (current) or 2 (end).
-`read` returns a byte string
-(characters 0..255) and `write` writes each character's low byte. Open/I/O
-failures raise; `read` at EOF returns `''`. Call `close()` explicitly.
-Read/write switching follows C stdio: `seek` before writing after reading;
-`seek` or `flush` before reading after writing. Offsets are 64-bit on 64-bit
-hosts; large literals need arithmetic construction (e.g. `0xFFFFFFFF + 1`).
-On Windows `fs.open` requires a 64-bit build; 64-bit narrow-character builds
-use the active ANSI code page for paths.
-
-Generic stream helpers accept any reader/writer, do not close the handle, and
-treat `''` as EOF:
-
-```fun
-use 'io.fun';
-var b = io.buffer('hello');
-var text = io.readAll(b);        // small data only
-var out = io.buffer();
-var f = fs.open('copy.bin', 'r');
-var n = io.copy(out, f);         // 8192-char chunks
-f.close();
-io.writeString(out, 'done');
-```
-
-`io.buffer` is the in-memory reader/writer (`read/write/text/length/reset`);
-`io.readAll` is a convenience for small data, while `io.copy` streams. Pass
-`io.buffer` where a format or helper expects a stream; `fs.open` handles work
-directly. Format readers/writers never close or flush the underlying IO.
-
-`io.scanner` walks any reader token by token, by default one line at a time
-(`\n` or `\r\n`; the final line may omit the newline). `scan()` returns false
-at EOF or on error; `text()` is the current token and `err()` reports
-`token too long` or a reader error. `maxToken` defaults to 64 KB, and
-`delimiter` replaces the newline:
-
-```fun
-use 'io.fun';
-var sc = io.scanner(io.stdin());
-while sc.scan() do ?. sc.text(); end do;
-if sc.err() <> nil then raise sc.err(); end if;
-```
-
-Use `io.scanner(r, [delimiter: ','])` for a custom separator; the scanner never
-closes the reader and may read ahead, so do not mix it with direct `read()`.
-
-Process stdio uses the same contract:
-
-```fun
-use 'io.fun';
-var input = io.stdin();
-var output = io.stdout();
-var errors = io.stderr();
-
-var chunk = input.read(4096);     // may be short; '' means EOF
-output.write('received ' & chunk.length() & 10.toChar());
-errors.write('warning' & 10.toChar());
-```
-
-`io.stdin` is a Reader and `io.stdout`/`io.stderr` are Writers. They do not
-close, flush or translate line endings, and they do not create pipes; `io.pipe`
-creates pipes separately, and CLI stdin remains a later layer. Process stdio
-treats strings as byte strings: on UTF-16 Windows builds each character is
-written as one byte, so
-ASCII and binary data round-trip unchanged; non-ASCII text must be encoded by
-the caller first. Windows console code pages and UTF-16 are not translated.
-Process stdio uses `getapi`, so an FFI-enabled build is required: `io.buffer`
-still works in safe or FFI-less builds, but reading or writing process stdio
-raises an error there. A closed pipe can terminate the process through SIGPIPE
-on Unix, as usual. Do not mix `io.stdin()` with the built-in `line`/`char`/`all`
-input helpers on the same stdin, and do not mix `io.stdout()` with `?.` when
-output order matters: they use independent buffering/FFI paths.
-
-Process pipes use the same reader/writer contract:
-
-```fun
-use 'io.fun';
-var p = io.pipe();
-p.writer.write('hello');
-p.writer.close();                  // reader sees EOF after buffered data
-var text = io.readAll(p.reader);   // 'hello'
-p.close();
-```
-
-`io.pipe()` creates a blocking OS pipe; `p.reader` and `p.writer` are Reader and
-Writer plus an explicit `close()`, and `p.close()` closes both ends. Closing the
-writer lets the reader drain buffered data and then return `''`; closing the
-reader makes later reads raise; a later write may terminate the process with
-SIGPIPE on Unix (not a catchable error).
-`p.close()` closes both ends and discards unread data.
-Pipes own their handles and must be closed explicitly; `io.readAll`/`io.copy`
-never close them. Pipe buffers are finite: writing more than the OS buffer
-before reading deadlocks a single-threaded script. v1 is for small payloads
-only; there is no supported thread/process hand-off yet, and larger transfers
-need a future streaming/process-handoff layer. Reads (including `readAll` and `copy`)
-block while the pipe is empty and the writer is open; there is no timeout or
-cancel. Close the writer to make an empty read finish with EOF. The pair is not
-thread-safe: do not read, write or close it concurrently. `io.pipe` needs an
-FFI-enabled build and uses the same byte rules as process stdio.
-
-Run a child process with `process.run`:
-
-```fun
-use 'process.fun';
-
-var r = process.run('git', ['status', '--short'], [timeout: 5000]);
-if r.ok then
-  ?. r.stdout;
-else
-  ?. r.stderr;
-  ?. r.exitCode;
-end if;
-```
-
-`process.run(name[, args[, opts]])` executes the command directly, without a
-shell. Trailing arguments are optional; pass `nil` or an empty list for no
-arguments. Options are `stdin` (a string; default `''`), `cwd` (empty
-inherits the current directory), and `timeout` in milliseconds (`nil`/`0`
-means no timeout), and `output` in bytes (`nil`/`0` means unlimited).
-The returned object has `ok`, `exitCode`, `signal`, `timedOut`, `outputExceeded`,
-`stdout`, and `stderr`. A non-zero exit is a normal result; a command that
-cannot start raises.
-On Unix a signal exit reports a negative `exitCode` (for example `-15`) and the
-signal number; Windows reports the process exit code and `signal` is `nil`.
-stdout and stderr are captured separately as raw bytes; input/output are not
-encoded or line-ending translated.
-
-The call blocks until the child exits or the timeout expires. On timeout the
-direct child is terminated and waited for, and the result has `timedOut = true`
-and `ok = false`. The implementation uses a single-threaded stdio pump, so
-stdout and stderr cannot deadlock each other; it does not create language
-threads, does not kill the whole process tree, and does not provide streaming
-or interactive stdio yet. When `output` is set, stdout and
-stderr share one byte budget; exceeding it terminates the direct child and
-sets `outputExceeded = true` and `ok = false`. Use `sh -c` / `cmd /c` explicitly
-when shell syntax is required. `process.run` needs an FFI-enabled build. On Windows
-v1 stdin is backed by a temporary file (Unix uses a pipe), and the ANSI
-`CreateProcessA` path does not reliably handle non-ASCII command lines or paths;
-the 32-bit Unicode/Delphi path remains manual. If a descendant keeps
-stdout/stderr open after the direct child exits, v1 may stop reading after a
-short grace period, so late descendant output can be lost.
-
-TOML documents use the same reader/writer contract:
-
-```fun
-use 'toml.fun';
-var f = fs.open('config.toml', 'r');
-var doc = toml.reader(f).read();   // nil after the first read
-f.close();
-
-var out = io.buffer();
-toml.writer(out).write(doc);
-```
-
-Tables are sets, arrays are lists, and values keep TOML scalars. Date/time,
-`inf` and `nan` values are `TomlLiteral` objects (`.kind` / `.text`) so the
-writer can reproduce their TOML syntax. The reader returns one document and
-then `nil`; the writer writes one document. Neither closes the handle.
-
-CSV files stream row by row. The reader and writer wrap a file handle and do
-not close it:
-
-```fun
-use 'csv.fun';
-var f = fs.open('users.csv', 'r');
-var r = csv.reader(f);
-var row = r.read();          // nil at EOF
-while row <> nil do
-  ...
-  row = r.read();
-end do;
-f.close();
-
-var g = fs.open('out.csv', 'w');
-var w = csv.writer(g);
-w.write(['name', 'age']);
-g.close();
-```
-
-Fields are strings and columns are strict. A blank line is a one-empty-field
-record by default, so it fails the column check in a multi-column file; pass
-`[skipEmptyLines: true]` to ignore completely empty lines. The writer quotes
-fields when needed and uses `\n`; pass `[crlf: true]` for CRLF. The reader
-accepts any object with `read(n)`, the writer any object with `write(s)`.
-
-Data can be validated against a JSON Schema. Schemas are written in FD by
-default, and JSON text or an already parsed value works too:
-
-```fun
-use 'jsonschema.fun';
-
-var schema = 'user.schema.fd'.load();
-var r = JsonSchema.check(data, schema);
-if not r.ok then
-  ?. r.first.path & ': ' & r.first.message;
-end if;
-```
-
-Errors carry a JSON Pointer path (`/user/name`, `/tags/0`). Text input can be
-parsed first with `JsonSchema.checkJson(text, schema)` or
-`JsonSchema.checkFd(text, schema)`; `validJson` / `validFd` are the boolean
-shortcuts, and a parse failure is reported as a normal result with keyword
-`parse`.
-
-The v0.x subset covers `type` (including lists), `properties` / `required` /
-`additionalProperties`, `items` (single schema or tuple) / `additionalItems` /
-`minItems` / `maxItems` / `uniqueItems`, numeric bounds, `minLength` /
-`maxLength` (counted in Unicode code points), `pattern` /
-`patternProperties` / `propertyNames`, `enum`, `const`, `allOf` / `anyOf` /
-`oneOf` / `not`, same-document `$ref` with `$defs` / `definitions`, and
-`format` for `email`, `date`, `time`, `date-time`, `uri`, `uri-reference`,
-`uuid`, `ipv4`, `hostname` and `regex`. External `$ref`, `dependencies`,
-`if` / `then` / `else` and `contains` are not supported yet.
-
-> **Platform-split convention**: the Windows implementation keeps the plain
-> module name, and the Unix backend is `<name>-unx.fun` (Linux + macOS); the
-> older `<name>-lnx.fun` name is kept as a thin wrapper on top of it. Logic
-> shared by both lives in `<name>-base.fun` (not counted above). Backends that
-> only work on Linux (e.g. `lib-proc`, which reads `/proc`) stay `<name>-lnx`.
-> E.g. `lib-os` / `lib-os-unx` (+ `lib-os-lnx`), and `lib-unicode-base` +
-> `lib-unicode` / `lib-unicode-unx`. A neutral name works as well: `use` probes
-> the platform variants (macOS `-darwin`→`-unx`, Linux `-lnx`→`-unx`) and picks
-> one when it exists.
+A few starting points:
+
+- **Workers** — `lib-worker` needs the opt-in `fun-mt` build. A worker owns its AST and heap; results cross as strings, and `Shared`/`Channel` copy values. See [workers](docs/standard-library.md#workers-and-the-fun-mt-build) and [`worker-model.md`](fun/lib/worker-model.md).
+- **Logging** — configure once, then use named loggers (`logging.getLogger`); see [logging](docs/standard-library.md#logging).
+- **Runtime diagnostics** — `runtime.source`, `runtime.stack` and `runtime.lastError` expose file, line, function and stack; see [runtime diagnostics](docs/standard-library.md#runtime-diagnostics).
+- **Cron and HTTP** — `CronScheduler`, `HttpMultipartWriter`, signed cookies and JWT share the same single-threaded model; see [cron](docs/standard-library.md#cron-scheduling) and [HTTP helpers](docs/standard-library.md#http-helpers).
+- **CLI, files, streams and processes** — `cli`, `fs`, `io`, `process`, TOML, CSV and JSON Schema are documented in the [guide](docs/standard-library.md).
 
 ---
 
@@ -1268,4 +418,4 @@ Fun is distributed under a **dual-license** model:
 
 ---
 
-© 2010-2026 Zhang Weidong &lt;zwd@funlang.org>
+© 2010-2026 Zhang Weidong &lt;zwd@funlang.org&gt;
