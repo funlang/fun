@@ -6,6 +6,8 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+## [9.5.7] - 2026-11-22
+
 - The opt-in worker build (`funcmd-mt`, `FUN_THREADS=1`) now covers Linux
   x64/arm64, macOS x64/arm64 and Windows x64 instead of Linux x64 only.
   `make-macos.sh` and `make-darwin.sh` add the Unix `-dUseCThreads` path;

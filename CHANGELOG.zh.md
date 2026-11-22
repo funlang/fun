@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [9.5.7] - 2026-11-22
+
 - opt-in 的 worker 构建（`funcmd-mt`，`FUN_THREADS=1`）从仅 Linux x64 扩展到
   Linux x64/arm64、macOS x64/arm64 与 Windows x64。`make-macos.sh` 与
   `make-darwin.sh` 走 Unix 的 `-dUseCThreads`；`make-win64.bat` 使用原生线程

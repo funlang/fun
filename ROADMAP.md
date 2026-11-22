@@ -5,16 +5,16 @@
 > `art/notes/` 和 `known-issues/` 是维护者本地笔记，不在公开仓库；CI 只校验仓库内路径。
 >
 > 最近更新：2026-11-22
-> 基线：Fun 9.5.6（tag `v9.5.6`）
+> 基线：Fun 9.5.7（tag `v9.5.7`）
 
 ## 0. 当前基线
 
-- **版本**：9.5.6，`src/core/version.inc` 的 `funRelease = '9.5.6'`。
-- **回归**：Linux `137/137`（`sh fun/test/run-linux-regression.sh`）。
-- **可加载性**：`81/87`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
+- **版本**：9.5.7，`src/core/version.inc` 的 `funRelease = '9.5.7'`。
+- **回归**：Linux `139/139`（`sh fun/test/run-linux-regression.sh`）。
+- **可加载性**：`84/90`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
   raw socket 或 macOS-only 后端）。
-- **标准库**：87 个候选模块（`fun/lib` 共 115 个 `.fun`，内部 `lib-base`/`lib-type`
-  与 `-unx`/`-lnx` 后端单元不计），本机可加载 81 个。
+- **标准库**：90 个候选模块（`fun/lib` 共 119 个 `.fun`，内部 `lib-base`/`lib-type`
+  与 `-unx`/`-lnx` 后端单元不计），本机可加载 84 个。
 - **平台**：Linux x86_64 / arm64、macOS x64 / arm64、Windows x64（FPC）；
   Delphi/Win32 继续人工验证。
 - **CI**：GitHub Actions 的 `regression` 工作流覆盖 6 个构建作业（4 个 POSIX 平台 +
@@ -189,3 +189,7 @@
   `fun/lib/runtime.fun` 与 logging 的 `source` 字段；新增 `fun/lib/cron.fun`
   多实例调度器；LoongArch64 nightly 资产与 asm 能力实测；`fun package tidy`
   自动修复不可用的依赖缓存。回归刷新为 `137/137`，加载检查 `81/87`。
+- 2026-11-22：发布 9.5.7。worker 构建覆盖 Linux x64/arm64、macOS x64/arm64 与
+  Windows x64，`lib-worker` 新增命名通道与主线程完成回调；新增
+  `lib-asm-riscv64` 与仅预发布 riscv64 目标；Windows arm64 仍因 FPC 崩溃不发布。
+  回归刷新为 `139/139`，加载检查 `84/90`。
