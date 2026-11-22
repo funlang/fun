@@ -57,7 +57,7 @@
 | D-03 | 数据 | P2 | OPEN | 日期/时间跨端约定未统一 | `art/notes/data-format-alignment.md` |
 | D-04 | 数据 | P2 | OPEN | Fun `Int64` 超过 2^53 传给 JS 会静默丢精度 | `art/notes/data-format-alignment.md` |
 | D-05 | 数据 | P3 | OPEN | FD/JSON 其余低风险一致性项（空键、定长前缀、kvd 空白分隔等） | `art/notes/data-format-alignment.md` |
-| P-01 | 平台/并发 | P2 | DOING | `funcmd-mt` 已覆盖 Linux x64/arm64、macOS x64/arm64、Windows x64：每个 worker 独立解析 AST/CEnv，跨线程只走字符串/FD，`Shared`/`Channel`/`onDone` 可用；各平台 CI 在同一任务内构建并跑 `lib-worker-test`，发布包附带 `fun/fun-mt`。剩余：常驻 worker 池、取消，以及 LoongArch64/riscv64 `fun-mt` | `fun/lib/worker-model.md` |
+| P-01 | 平台/并发 | P2 | DOING | `funcmd-mt` 已覆盖 Linux x64/arm64、macOS x64/arm64、Windows x64：每个 worker 独立解析 AST/CEnv，跨线程只走字符串/FD，`Shared`/`Channel`/`onDone` 可用；各平台 CI 在同一任务内构建并跑 `lib-worker-test`，发布包附带 fun-mt。剩余：常驻 worker 池、取消，以及 LoongArch64/riscv64 `fun-mt` | `fun/lib/worker-model.md` |
 | P-02 | 平台 | P2 | OPEN | `lib-os` 全量 host 分派器未做 | `art/notes/library-port-plan.md` |
 | P-03 | 平台 | P2 | OPEN | `lib-message`/`lib-async`/`lib-jsasync` 仍依赖消息泵或线程 | `art/notes/linux-capabilities.md` |
 | P-04 | 平台 | P3 | OPEN | `lib-icmp` raw socket 未做，需 root/CAP_NET_RAW | `art/notes/linux-capabilities.md` |
