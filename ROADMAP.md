@@ -11,17 +11,13 @@
 
 - **版本**：9.5.7，`src/core/version.inc` 的 `funRelease = '9.5.7'`。
 - **回归**：Linux `139/139`（`sh fun/test/run-linux-regression.sh`）。
-- **可加载性**：`84/90`（`sh fun/test/lib-loadcheck.sh`，6 个 FAIL 均为 Windows 概念、
-  raw socket 或 macOS-only 后端）。
-- **标准库**：90 个候选模块（`fun/lib` 共 119 个 `.fun`，内部 `lib-base`/`lib-type`
-  与 `-unx`/`-lnx` 后端单元不计），本机可加载 84 个。
+- **标准库**：`fun/lib` 共 119 个 `.fun`，90 个候选模块，本机可加载 84 个
+  （`sh fun/test/lib-loadcheck.sh`；6 个 FAIL 为 Windows 概念、raw socket 或 macOS 后端）。
 - **平台**：Linux x86_64 / arm64、macOS x64 / arm64、Windows x64（FPC）；
-  Delphi/Win32 继续人工验证。
-- **CI**：GitHub Actions 的 `regression` 工作流覆盖 6 个构建作业（4 个 POSIX 平台 +
-  linux-safe + windows-x64）；`linux-x64`/`linux-arm64`/`macos-x64`/`macos-arm64`
-  以及 `windows-x64` 都额外构建 `funcmd-mt` 并跑 worker 测试；`docs` 工作流检查本文件。
-  `loongarch`/`riscv64` 预发布作业同样构建 `funcmd-mt`，并在 qemu 下跑
-  `lib-worker-test`。
+  Delphi/Win32 人工验证。LoongArch64 / riscv64 为预发布目标。
+- **CI**：`regression` 覆盖 6 个构建作业（4 个 POSIX 平台 + linux-safe + windows-x64），
+  其中 5 个发布平台额外构建 `funcmd-mt` 并跑 worker 测试；`loongarch`/`riscv64`
+  预发布作业同样构建 `funcmd-mt` 并在 qemu 下跑 `lib-worker-test`；`docs` 检查本文件。
 - **能力链**：ffi → 同步文件 IO → 进程 → 网络 → 数据库；另有 C/JIT/汇编、
   HTTP/WebSocket 单线程事件循环、safe 构建。
 
@@ -41,36 +37,36 @@
 
 | ID | 事项 | 状态 | 优先级 | 验收 | 关联 |
 |---|---|---|---|---|---|
-| S-03 | `#!fun` 经 tcc 编译 | DEFERRED | P2 | 暂缓，不阻塞 9.5.6；先做数值/字符串/函数/控制流子集，再做模块导入 | `art/notes/todo.md` |
+| S-03 | `#!fun` 经 tcc 编译 | DEFERRED | P2 | 先做数值/字符串/函数/控制流子集，再做模块导入 | `art/notes/todo.md` |
 | S-05 | create-fun-app 脚手架 | OPEN | P3 | Fun 后端 + z-data 前端 + 一体发布 | `art/notes/todo.md` |
 | S-06 | 用 fun-ui 重写 funide | OPEN | P3 | 新 IDE 替代旧 funide | `art/notes/todo.md` |
 | S-07 | funcally AI agent | OPEN | P3 | 基于沙箱、CLI、HTTP 的 agent | `art/notes/todo.md` |
-| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | `io.pipe` 交接给子进程、边跑边读写（`io.pipe`、`process.run` 和 `output` 上限已完成）。进程树终止拆为 S-12，Windows Unicode 命令行拆为 S-13。与 jsbox 保持独立：jsbox 走一次性 JSON，不需要流式 stdio | `README.zh.md` 的 io 一节 |
-| S-10 | jsbox 网络与挂载隔离 | OPEN | P2 | 在 Linux 上用 bubblewrap/nsjail 提供网络与挂载命名空间隔离，`FUN_JSBOX_SANDBOX=0` 之外不放开。S-02 拆分项 | `src/prj/fun/jsbox/README.md` |
-| S-11 | jsbox Windows/macOS 沙箱验证 | OPEN | P2 | Windows Job Object 与 macOS sandbox profile 已在代码中，待 CI/真机验证；补失败路径与文档。S-02 拆分项 | `src/prj/fun/jsbox/README.md` |
-| S-12 | 子进程树终止 | OPEN | P2 | Unix 进程组与 Windows Job Object 终止整个子进程树，避免孙进程残留。S-09 拆分项 | `README.zh.md` 的 io 一节 |
-| S-13 | Windows Unicode 子进程命令行 | OPEN | P3 | 传参走宽字符命令行并正确转义，非 ANSI 代码页路径不再丢字符。S-09 拆分项 | `README.zh.md` 的 io 一节 |
+| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | 管道交给子进程并边跑边读写；进程树终止见 S-12，Windows Unicode 见 S-13 | `README.zh.md` 的 io 一节 |
+| S-10 | jsbox 网络与挂载隔离 | OPEN | P2 | Linux bubblewrap/nsjail 网络与挂载隔离（S-02 剩余） | `src/prj/fun/jsbox/README.md` |
+| S-11 | jsbox Windows/macOS 沙箱验证 | OPEN | P2 | Job Object / sandbox profile 的 CI 与真机验证（S-02 剩余） | `src/prj/fun/jsbox/README.md` |
+| S-12 | 子进程树终止 | OPEN | P2 | Unix 进程组 / Windows Job Object 终止整棵进程树（S-09 剩余） | `README.zh.md` 的 io 一节 |
+| S-13 | Windows Unicode 子进程命令行 | OPEN | P3 | 命令行走宽字符并正确转义（S-09 剩余） | `README.zh.md` 的 io 一节 |
 
 ## 4. 技术债台账
 
 | ID | 区域 | 优先级 | 状态 | 说明 | 证据 |
 |---|---|---|---|---|---|
 | K-01 | 内核 | P3 | OPEN | H-09 `_eval` 的 `$@@` 整体重扫 | 本地 hazards 清单 |
-| K-02 | 内核 | P2 | OPEN | H-05 `div/mod 0` 仍抛 RTL `EDivByZero`，脚本可捕获，按兼容保留 | 本地 hazards 清单 |
+| K-02 | 内核 | P2 | OPEN | H-05 `div/mod 0` 抛 RTL `EDivByZero`，按兼容保留 | 本地 hazards 清单 |
 | K-03 | 内核 | P2 | OPEN | H-06 Delphi/32 位与 Int64 极值边界未复测 | 本地 hazards 清单 |
-| K-05 | 内核 | P3 | OPEN | `result` 按 Pascal 语义由脚本手动初始化；同一函数重复调用会复用上次栈槽的旧值（`CVarStack.PushVar` 不清空），不是 bug，但新库必须在入口写 `result = nil` / `result = 0` | `src/core/core.pas:1058`、`src/core/base.pas:980` |
-| D-02 | 数据 | P2 | OPEN | FD fixed-length binary 类型跨端会退化成文本 | `art/notes/data-format-alignment.md` |
+| K-05 | 内核 | P3 | OPEN | `result` 由脚本手动初始化；重复调用会复用旧栈槽，新库入口需写 `result = nil` / `0` | `src/core/core.pas:1058`、`src/core/base.pas:980` |
+| D-02 | 数据 | P2 | OPEN | FD fixed-length binary 跨端退化为文本 | `art/notes/data-format-alignment.md` |
 | D-03 | 数据 | P2 | OPEN | 日期/时间跨端约定未统一 | `art/notes/data-format-alignment.md` |
-| D-04 | 数据 | P2 | OPEN | Fun `Int64` 超过 2^53 传给 JS 会静默丢精度 | `art/notes/data-format-alignment.md` |
-| D-05 | 数据 | P3 | OPEN | FD/JSON 其余低风险一致性项（空键、定长前缀、kvd 空白分隔等） | `art/notes/data-format-alignment.md` |
+| D-04 | 数据 | P2 | OPEN | Fun `Int64` 超过 2^53 传给 JS 静默丢精度 | `art/notes/data-format-alignment.md` |
+| D-05 | 数据 | P3 | OPEN | FD/JSON 其余低风险一致性项 | `art/notes/data-format-alignment.md` |
 | P-02 | 平台 | P2 | OPEN | `lib-os` 全量 host 分派器未做 | `art/notes/library-port-plan.md` |
 | P-03 | 平台 | P2 | OPEN | `lib-message`/`lib-async`/`lib-jsasync` 仍依赖消息泵或线程 | `art/notes/linux-capabilities.md` |
 | P-04 | 平台 | P3 | OPEN | `lib-icmp` raw socket 未做，需 root/CAP_NET_RAW | `art/notes/linux-capabilities.md` |
 | P-06 | 平台 | P3 | OPEN | `lib-os` B 档（GetIPs/inotify 等）未做 | `art/notes/linux-capabilities.md` |
 | P-07 | 机器码 | P2 | OPEN | `asm-list` 的 x86-64 表覆盖不全 | `art/notes/arch-machine-code-plan.md` |
-| P-15 | macOS 分发收尾 | P2 | OPEN | P-08 拆分后的未完成部分：正式 `codesign`/公证（需 Developer 证书）、Apple TCC 隐私授权（Desktop/Documents/Downloads，原 P-12）、物理机抽查 | `art/notes/macos-port.md` |
-| P-16 | LoongArch 发布与真机 | P3 | OPEN | P-09 拆分后的未完成部分。已完成：独立 `loongarch` CI 作业（交叉构建 + qemu 回归 + stage）、`package.py`/capabilities 支持、nightly 预发布资产（正式版不含龙芯）、`lib-asm-loongarch64` live 执行在 qemu 验收（sysroot 随带 `libgcc_s` 提供 `__clear_cache`，probe 实测 asm=true）。剩余：TCC 无后端策略（显式报错或 cc 回退）、整包真机验收 | `art/notes/loongarch-port-assessment.md`、`art/notes/arch-machine-code-plan.md` |
-| P-13 | Windows/ARM | P3 | OPEN | win-arm64 仍不能发布：FPC 3.3.1（main）虽支持 win64/aarch64，但其生成的二进制（含编译器自身）在真机 Windows ARM64 上以 `0xC0000005` 启动崩溃；裸 `writeln` 在 `-O-`/`-O1`/`-O2` 下均复现（FPC #42048、#42091）。已完成：Linux 交叉构建脚本 `make-win-arm64.sh`、Zig clang 汇编 shim、FPC #42091 epilogue 补丁、手动 `winarm64.yml` bring-up 工装（不发布产物）。待 FPC 修复后可接回 nightly | `src/prj/fun/make-win-arm64.sh`、`.github/workflows/winarm64.yml`、`art/notes/` |
+| P-13 | Windows/ARM | P3 | OPEN | win-arm64 因 FPC 生成物在真机 `0xC0000005` 崩溃（#42048/#42091）；已备交叉脚本与 bring-up，待 FPC 修复接回 nightly | `src/prj/fun/make-win-arm64.sh`、`.github/workflows/winarm64.yml` |
+| P-15 | macOS 分发收尾 | P2 | OPEN | 正式 `codesign`/公证、Apple TCC 授权、物理机抽查 | `art/notes/macos-port.md` |
+| P-16 | LoongArch 发布与真机 | P3 | OPEN | 已有独立 loongarch CI、打包与 nightly 资产、asm live 验收；剩余 TCC 龙芯后端策略与整包真机验收 | `art/notes/loongarch-port-assessment.md` |
 
 ## 5. 接受 / 不做 / 已完成
 
@@ -81,135 +77,50 @@
 
 | ID | 事项 | 状态 | 说明 |
 |---|---|---|---|
-| S-02 | jsbox 沙箱运行器 | DONE | 沙箱边界只由 `fun-jsbox` 承担，不以 fun `-safe` 代替。Linux seccomp-bpf、`process.run` 输出上限、Windows Job Object、macOS sandbox profile、`lib-jsbox` 桥接与测试均已交付。剩余网络/挂载隔离拆为 S-10，Windows/macOS 真机验证拆为 S-11。 |
-| P-01 | 平台/并发：worker 模型 | DONE | `funcmd-mt` 覆盖 Linux x64/arm64、macOS x64/arm64、Windows x64：每个 worker 独立解析 AST/CEnv，跨线程只走字符串/FD，`Shared`/`Channel`/`onDone`/`workerMapLimit` 可用；常驻 worker 池（`WorkerPool`）与协作式取消（`cancel`，`ECancelled` 不可被脚本捕获）已落地；各平台 CI 同一任务内构建并跑 `lib-worker-test`，发布包附带 fun-mt。新增架构见 P-17。 |
-| P-17 | 平台/并发：LoongArch64/riscv64 `fun-mt` | DONE | 交叉脚本支持 `FUN_THREADS=1`（`-dFunThreads -dUseCThreads`）并输出 `*-mt`；bootstrap 安装的 RTL 含 `cthreads`；两个架构均在 qemu 下跑通 `lib-worker-test` 72/72；CI 构建 `funcmd-mt` 并把它放进预发布 stage。32 位与 Delphi/WinCE 不在此列。 |
-| S-04 | 站点 PHP 用 Fun 重写 | DONE | 站点页面与业务接口已全部迁到 Fun 服务；PHP-FPM 已停用，旧 URL 由 nginx 反代保持。验证时修复了 `match` 未命中判断导致的空 IP 500 与订单号校验问题。迁移与部署细节见独立部署仓库。 |
-| K-04 | 循环集合深拷贝递归溢出 | DONE | `CEnv` clone 祖先栈 + `CSet.clone` 统一 set/object；循环副本保留在自己的克隆内，`@clone` 同样有栈上下文。`fun/test/clone-cycle-test.fun`、`fun/demos/benchmarks/clone-bench.md` 覆盖。 |
-| P-05 | 第二数据库后端：unixODBC | DONE | MySQL/PostgreSQL 等经驱动管理器接入，unixODBC 与 P-11 同一交付。 |
-| P-11 | unixODBC 后端 | DONE | `lib-ado-unx` 按 `odbc:`/`DRIVER=`/`DSN=` 自动分派，参数、事务、OpenSchema（SQLTables/Columns/PrimaryKeys/ForeignKeys）齐全；CI 装 `unixodbc`+`libsqliteodbc` 并跑 `run-ado-odbc.sh`。 |
-| P-09 | LoongArch 交叉构建、解释器/标准库与汇编后端 | DONE | `src/prj/fun/bootstrap-linux-loongarch64.sh`、`src/prj/fun/make-linux-loongarch64.sh` + GNU binutils 产出 funcmd；musl sysroot 跑通 FFI、PCRE（无 JIT）、zlib、OpenSSL、curl、SQLite、XML，回归 115/115；`lib-asm-loongarch64` 编码器（binutils 生成表；164 curated + 361 全表 + 1083 随机差分与 GNU as 一致，QEMU 独立编码验证）；`install.sh` 与回归平台识别已接入。未进发布矩阵，收尾见 P-16。 |
-| P-08 | macOS 运行时复验（x64/arm64） | DONE | 由 CI 原生 macOS runner 覆盖：`macos-x64`（`macos-15-intel`）与 `macos-arm64`（`macos-latest`，Apple Silicon）跑完整 macOS 套件，含 `MAP_JIT`、`sys_icache_invalidate`、FFI 回调；2026-11-10 六项回归全绿。分发签名/TCC 拆分到 P-15。 |
-| P-14 | macOS 构建与运行时接入 | DONE | x64/arm64 引擎与 Fun 层可交叉构建；`lib-proc-darwin`、`MAP_JIT`、`libtcc.dylib` 接入与 arm64 ad-hoc 签名已完成，CI 有原生 macOS 回归。剩余签名/公证与 TCC 归入 P-15（原 P-08 拆分）。 |
-| Q-01 | `lib-ado-schema.Filter` 丢外键 | DONE | ORM `@Parent`/`@Children` 直接走 OpenSchema，Windows/Unix 均恢复外键。 |
-| Q-02 | `lib-fd`/`lib-bnf` 已知功能项 | DONE | 重名组问题已修，其余功能项已关闭。 |
-| Q-03 | Windows `make-*.bat` 的 `-dRegexx` | DONE | 改为 `-dRegex -dPCRE_WinDLL`，有 pcre3.dll 时真正启用 regex。 |
-| Q-05 | safe 模式只接 Linux 构建脚本 | DONE | `SAFE=...` 已覆盖 Linux aarch64、原生 macOS、darwin 交叉与 win64。 |
+| S-02 | jsbox 沙箱运行器 | DONE | `fun-jsbox` 为唯一沙箱边界；Linux seccomp-bpf、Windows Job Object、macOS sandbox profile、桥接与测试已交付。剩余拆 S-10/S-11。 |
+| P-01 | 平台/并发：worker 模型 | DONE | worker 独立解析 AST/CEnv，跨线程只走字符串/FD；`Shared`/`Channel`/`onDone`/`workerMapLimit`、常驻池与协作式取消已落地；5 个发布平台 CI 跑 `lib-worker-test`，发布包附带 fun-mt。 |
+| P-17 | LoongArch64/riscv64 `fun-mt` | DONE | 交叉脚本支持 `FUN_THREADS=1`，两架构 qemu 下 `lib-worker-test` 72/72；CI 构建、测试并打包为 `fun-mt`。 |
+| S-04 | 站点 PHP 用 Fun 重写 | DONE | 页面与接口全部迁到 Fun，PHP-FPM 停用，nginx 反代旧 URL。 |
+| K-04 | 循环集合深拷贝递归溢出 | DONE | `CEnv` clone 栈 + `CSet.clone`；`fun/test/clone-cycle-test.fun` 覆盖。 |
+| P-05 | 第二数据库后端：unixODBC | DONE | MySQL/PostgreSQL 等经 unixODBC 接入（与 P-11 同一交付）。 |
+| P-11 | unixODBC 后端 | DONE | `lib-ado-unx` 自动分派 `odbc:`/`DRIVER=`/`DSN=`；参数、事务、OpenSchema 齐全，CI 跑 `run-ado-odbc.sh`。 |
+| P-09 | LoongArch 解释器/标准库/汇编后端 | DONE | 交叉构建与 musl 全栈跑通；`lib-asm-loongarch64` 编码器经 GNU as 差分与 QEMU 验证。收尾见 P-16。 |
+| P-08 | macOS 运行时复验 | DONE | CI 原生 macOS x64/arm64 跑完整套件，含 `MAP_JIT` 与 FFI 回调。签名/TCC 见 P-15。 |
+| P-14 | macOS 构建与运行时接入 | DONE | x64/arm64 引擎、`lib-proc-darwin`、`libtcc.dylib` 与 ad-hoc 签名完成。剩余归 P-15。 |
+| Q-01 | `lib-ado-schema.Filter` 丢外键 | DONE | ORM `@Parent`/`@Children` 走 OpenSchema，Windows/Unix 均恢复外键。 |
+| Q-02 | `lib-fd`/`lib-bnf` 已知功能项 | DONE | 重名组已修，其余功能项关闭。 |
+| Q-03 | Windows `make-*.bat` 的 `-dRegexx` | DONE | 改为 `-dRegex -dPCRE_WinDLL`。 |
+| Q-05 | safe 模式只接 Linux 构建脚本 | DONE | `SAFE=...` 覆盖 Linux aarch64、macOS 原生/交叉与 win64。 |
 
 ### 5.2 接受 / 不做 (WONTFIX / DEFERRED)
 
 | ID | 事项 | 状态 | 说明 |
 |---|---|---|---|
-| X-01 | 短期不设 Delphi 编译器 CI | WONTFIX | GitHub 不适合引入非开源 Delphi；Delphi/Win32 人工验证 |
-| X-02 | Windows UI/registry/trayicon/message 不移植 | WONTFIX | Windows 概念，Linux/macOS 无干净等价物 |
-| X-03 | `move` / `toNum(ptr:-1)` 保持不安全 | WONTFIX | 裸内存原语，由 `-safe` 按 MEM 类拦截 |
-| X-04 | H-07 递归求值栈 | WONTFIX | 16M 栈当前够用，不够再加 |
-| X-05 | writer 15 位浮点输出 | WONTFIX | 可读性优先，接受细小往返差异 |
-| X-06 | 重复键 last-wins、孤立 surrogate 不额外拒绝 | WONTFIX | 与 RFC 8259 / JSON.parse 行为一致 |
-| X-07 | `compile(inline: true)` 是词法内联 | WONTFIX | 返回模块的 parent 是调用方，`m.x` 可读写调用方状态；需要隔离时用非 inline `compile()` 或传入状态容器。不要长期持有或返回 inline 模块。 |
-| X-08 | `str.sha256()` 的 Pascal 内置实现（原 Q-04 并入） | DEFERRED | 正常构建走 libcrypto（Linux）/CryptoAPI（Windows）/CommonCrypto（macOS），不会回退；只有缺 libcrypto 或 safe 构建（getapi 被拦）才走纯 Fun。纯实现已用多块向量验证正确，只是约 12 ms/KB；需要时再仿 `funhash.pas` 补内置。 |
-| P-10 | Linux aarch64 交叉产物补齐 `-dRegex`/`-dLinuxFFI` | WONTFIX | 交叉产物只是开发者在 x86_64 上验证核心解释器的工具；正式发布用 CI 原生 `linux-arm64` 构建，regex 与 FFI 都齐全，无需补齐。 |
+| X-01 | 短期不设 Delphi 编译器 CI | WONTFIX | GitHub 不适合引入非开源 Delphi；人工验证。 |
+| X-02 | Windows UI/registry/trayicon/message 不移植 | WONTFIX | Windows 概念，Linux/macOS 无干净等价物。 |
+| X-03 | `move` / `toNum(ptr:-1)` 保持不安全 | WONTFIX | 裸内存原语，由 `-safe` 按 MEM 类拦截。 |
+| X-04 | H-07 递归求值栈 | WONTFIX | 16M 栈当前够用。 |
+| X-05 | writer 15 位浮点输出 | WONTFIX | 可读性优先，接受细小往返差异。 |
+| X-06 | 重复键 last-wins、孤立 surrogate 不额外拒绝 | WONTFIX | 与 RFC 8259 / JSON.parse 一致。 |
+| X-07 | `compile(inline: true)` 是词法内联 | WONTFIX | 可读写调用方状态；需要隔离时用非 inline 或传状态容器。 |
+| X-08 | `str.sha256()` 的 Pascal 内置实现 | DEFERRED | 正常构建走 libcrypto/CryptoAPI/CommonCrypto；纯 Fun 版正确但约 12 ms/KB。 |
+| P-10 | Linux aarch64 交叉产物补齐 regex/FFI | WONTFIX | 交叉产物只用于开发验证；正式发布用 CI 原生 linux-arm64。 |
 
 ## 6. 发版检查
 
-- [ ] `sh fun/test/run-linux-regression.sh` 全绿，更新本文第 0 节的回归数字。
-- [ ] `sh fun/test/lib-loadcheck.sh`，更新第 0 节的可加载数字。
-- [ ] `src/core/version.inc` 与 `CHANGELOG.md` 的最新版本一致。
+- [ ] `sh fun/test/run-linux-regression.sh` 全绿，更新第 0 节回归数字。
+- [ ] `sh fun/test/lib-loadcheck.sh`，更新第 0 节可加载数字。
+- [ ] `src/core/version.inc` 与 `CHANGELOG.md` 版本一致。
 - [ ] NOW/NEXT 已复核，完成项移出，技术债状态已翻转。
 - [ ] `sh src/prj/fun/check-roadmap.sh` 通过。
 - [ ] 按 `RELEASING.md` 打 annotated tag，不用裸 tag。
 
 ## 7. 变更记录
 
-- 2026-10-31：创建主控文档；把当前技术债、待办、接受项和发版检查集中到这里。
-- 2026-10-31：修复 `SHA256()` 的 Unix 快路径，别名指向错误的 `-lnx` 包装，
-  导致一直走纯 Fun；1 MB 从约 9.6 秒降到约 4 毫秒。
-- 2026-10-31：`use ... as Alias` 现在会沿转发模块的 `use` 链暴露一级名字，
-  `-lnx` 薄包装对限定访问也透明；新增 `alias-re-export.fun` 回归。
-- 2026-10-31：确认 `compile(inline: true)` 是词法内联，`m.x` 可读写调用方状态；
-  新增 `compile-inline-scope.fun` 回归，非 inline `compile()` 保持隔离。
-- 2026-10-31：发布 9.5.2；包含 io stdio 适配器、SHA256 快路径、use 别名
-  re-export、inline 语义锁定和 ROADMAP/检查脚本。
-- 2026-11-02：Q-01/Q-02/Q-03/Q-05 关闭；Q-04 降级为 DEFERRED（X-08）。
-- 2026-11-02：S-01 关闭（#44 `io.pipe` + #45 `process.run`）；流式/交互式子进程
-  stdio 拆为 S-09。
-- 2026-11-03：发布 9.5.4；`if`/条件循环新增 `{}` 块写法，`cli` 支持可选 stdin，
-  修复裸 `var` 实参的命名绑定问题。
-- 2026-11-05：发布脚本内置跨平台安装器：Unix 的 `install.sh` 增加
-  `--bin-dir` / `--add-path`（带标记、可重复执行）；Windows 压缩包新增
-  `install.cmd` / `install.ps1` / `uninstall.cmd` / `uninstall.ps1`，
-  默认按用户安装到 `%LOCALAPPDATA%\Programs\Fun`，注册 PATH、`.fun`/`.foo`/
-  `.fxx` 关联、Win+R `App Paths` 和“设置 > 应用”卸载项。技术债补记
-  unixODBC、macOS TCC 与 win-arm64 FPC target。
-- 2026-11-06：接入 unixODBC 第二数据库后端（P-05/P-11 关闭）。新增
-  `lib-ado-odbc-unx.fun`，`lib-ado-unx` 在连接串含 `odbc:`/`DRIVER=`/`DSN=`
-  时自动分派；SQLite 仍走内嵌路径，未装 unixODBC 的机器不受影响。参数按
-  ORM DataType 绑定、结果按列类型读取，支持事务和 ODBC 目录函数
-  （SQLTables/SQLColumns/SQLPrimaryKeys/SQLForeignKeys）。新增
-  `run-ado-odbc.sh`（无驱动时 SKIP）与 `unixodbc`+`libsqliteodbc` CI 步骤，
-  回归 `126/126 → 127/127`。验证时补了 `Begin`/`Commit`/`Rollback` 的隐式
-  `Open()`（ORM 先开事务再执行，未显式 Open 时曾误走 SQLite 路径）、
-  `?` 参数个数预检，以及 `Init()` 打开 ODBC 连接并安装驱动的标识符引号
-  （ORM RPC 在生成 SQL 前依赖它）；ODBC 测试补了大文本/大 BLOB 分块、
-  空串与 NULL、事务隐式打开和无驱动时的稳定 SKIP 输出。
-- 2026-11-07：D-01 JSON Schema v0.x 完成。新增 `checkJson`/`checkFd` 与
-  `validJson`/`validFd` 文本入口，补齐同文档 `$ref`/`$defs`、
-  `allOf`/`anyOf`/`oneOf`/`not`、`uniqueItems`、元组 `items` +
-  `additionalItems`、`patternProperties`、`propertyNames`、`format`。
-  JSON schema 文本改为严格解析，非法数据返回 `parse` 错误；回归
-  `127/127` 不变，schema 用例从 45 条扩到 115 条断言。
-- 2026-11-08：S-02 明确以 `fun-jsbox` 为唯一沙箱边界，不以 fun `-safe`
-  代替。Linux x86-64/arm64 的 worker 在求值前安装 seccomp-bpf 白名单，
-  越权系统调用以 `SIGSYS` 终止；响应新增 `sandbox.seccomp`，
-  `--selftest-seccomp` 验证 `openat` 被拒绝（退出 159），过滤安装失败
-  时拒绝运行。`run-jsbox-test.sh` 增加该自检，`jsbox_test.fun` 增加沙箱
-  模式断言（25/25）。`process.run` 增加 `output` 字节预算并在超限时终止
-  子进程，jsbox 桥接用它限制失控 stdout。worker 增加 Windows MSVC 构建与
-  Job Object 限制、macOS `sandbox_init`（网络/新进程拒绝），响应报告
-  `sandbox.kind`，CI 在 POSIX 矩阵和 Windows x64 上跑 jsbox 测试。剩余：
-  bubblewrap/nsjail 网络与挂载隔离，以及 Windows/macOS 真机复验。
-- 2026-11-08：S-08 关闭。fun-ui 1.0.4 的 Windows WebView2 基线、Linux
-  GTK3/WebKit2GTK 原生宿主与 macOS AppKit/WKWebView 原生宿主均已完成，
-  README 状态表标记为已完成，`fun-ui` CI 的 linux-loopback、
-  linux-webkitgtk、macos-wkwebview 全部通过。S-09 仍 OPEN：`io.pipe`、
-  `process.run` 与输出上限已就绪，但把管道交给子进程并边跑边读写、进程树
-  终止、Windows Unicode 命令行尚未实现。
-- 2026-11-08：9.5.5 发版准备。S-04 站点 PHP -> Fun 迁移完成并归档；
-  S-03 标记 DEFERRED；S-09 不并入 S-02（jsbox 是一次性 JSON，不依赖流式
-  stdio），继续独立跟踪。技术债台账的 DONE 项统一移到第 5 节
-  “接受 / 不做 / 已完成”，台账只留开放项；macOS 已完成的构建/运行时接入
-  记为 P-14，剩余真机复验、签名/公证与 TCC 合并为 P-08（原 P-12 并入）；
-  Q-04 并入 X-08。P-10 关闭：Linux aarch64 交叉产物只用于开发验证，正式
-  发布用 CI 原生 linux-arm64 构建。回归刷新为 `131/131`，加载检查
-  `77/83`。
-- 2026-11-08：发布 9.5.5。新增 `fun-jsbox` 沙箱、JSON Schema v0.x 关键字、
-  unixODBC 后端、HMAC-SHA1/URL 编码、`process.run` 输出上限与 macOS/win64
-  运行时能力；修复循环集合深拷贝栈溢出；站点 PHP 已全部迁到 Fun，并在
-  验证中修复正则未命中判断。
-- 2026-11-10：LoongArch `lib-asm-loongarch64` 编码器落地（binutils 生成的
-  指令表、与 GNU as 逐字节/随机差分、QEMU 独立交叉验证；live 执行待 qemu/真机）。
-  macOS 的 P-08 拆分：x64/arm64 运行时复验由 CI 原生 macOS runner 覆盖并标记
-  DONE，正式签名/公证与 TCC 独立为 P-15。LoongArch 同样拆分：已完成部分记为
-  P-09 DONE，发布/CI/真机收尾独立为 P-16。CI 增加 fun-jsbox 二进制缓存
-  （按 jsbox/main.c + build-jsbox.sh 哈希），并去掉 unixODBC 安装前无条件的
-  `apt-get update`（失败时回退）。回归刷新为 `133/133`，加载检查 `78/84`。
-- 2026-11-15：发布 9.5.6。运行时错误默认携带调用点 traceback，新增
-  `fun/lib/runtime.fun` 与 logging 的 `source` 字段；新增 `fun/lib/cron.fun`
-  多实例调度器；LoongArch64 nightly 资产与 asm 能力实测；`fun package tidy`
-  自动修复不可用的依赖缓存。回归刷新为 `137/137`，加载检查 `81/87`。
-- 2026-11-22：发布 9.5.7。worker 构建覆盖 Linux x64/arm64、macOS x64/arm64 与
-  Windows x64，`lib-worker` 新增命名通道与主线程完成回调；新增
-  `lib-asm-riscv64` 与仅预发布 riscv64 目标；Windows arm64 仍因 FPC 崩溃不发布。
-  回归刷新为 `139/139`，加载检查 `84/90`。
-- 2026-11-22：并发主项收尾。`lib-worker` 新增常驻 `WorkerPool`
-  （固定槽位、每任务指定入口、`poolMap`/`poolRun`）与协作式取消
-  （`Worker.cancel`、任务 `cancel`，`ECancelled` 不可被脚本 try/except
-  吞掉）；`lib-worker-test` 扩到 72 项并在 MT 构建上全绿。P-01 完成归档。
-  拆分挂起项：S-02 的网络/挂载隔离与跨平台真机验证拆为 S-10/S-11；
-  S-09 的进程树终止与 Windows Unicode 命令行拆为 S-12/S-13；新增架构
-  `fun-mt` 拆为 P-17。
-- 2026-11-22：P-17 完成。`make-linux-loongarch64.sh` 与
-  `make-linux-riscv64.sh` 支持 `FUN_THREADS=1`（`-dFunThreads -dUseCThreads`，
-  输出 `*-mt`）；LoongArch64/riscv64 的 FPC bootstrap 已带 `cthreads`，两个
-  `fun-mt` 在 qemu 下跑 `lib-worker-test` 均为 72/72。CI 构建并测试
-  `funcmd-mt`，nightly 预发布 stage 附带该二进制。
+> 详细历史见 `CHANGELOG.md` 与 git；这里只留影响当前基线的里程碑。
+
+- 2026-11-22：发布 9.5.7。P-01/P-17 完成（常驻池、协作式取消、LoongArch64/riscv64 `fun-mt`）。回归 `139/139`，加载 `84/90`。
+- 2026-11-15：发布 9.5.6。traceback、`lib-cron`、LoongArch nightly、`fun package tidy`。回归 `137/137`。
+- 2026-11-10：P-09/P-08 完成：LoongArch asm 后端与 macOS 原生 runner 复验。
+- 2026-11-08：发布 9.5.5。jsbox、JSON Schema v0.x、unixODBC、站点 PHP→Fun。
+- 2026-11-02：S-01 关闭；流式/交互式子进程 stdio 拆为 S-09。
