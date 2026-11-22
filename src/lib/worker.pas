@@ -108,6 +108,7 @@ type
     FModule: CRun;
     FEnv: CEnv;
     FThreadId: TThreadID;
+    FStarted: Boolean;
     FJobEvent: PRTLEvent;
     FExitEvent: PRTLEvent;
     FLock: TRTLCriticalSection;
@@ -558,7 +559,7 @@ begin
   FBaseEnv := aBaseEnv.clone;
   FSource := source;
   FIsFile := isFile;
-  FThreadId := 0;
+  FStarted := False;
   FJobEvent := RTLEventCreate;
   FExitEvent := RTLEventCreate;
   InitCriticalSection(FLock);
@@ -578,8 +579,9 @@ end;
 
 procedure CWorkerSlot.StartSlot;
 begin
-  if FThreadId <> 0 then raise EBase.Create('pool slot already started');
+  if FStarted then raise EBase.Create('pool slot already started');
   FThreadId := BeginThread(@SlotMain, Pointer(Self), FThreadId);
+  FStarted := True;
 end;
 
 function CWorkerSlot.IsIdle: Boolean;
@@ -617,7 +619,7 @@ begin
   finally
     LeaveCriticalSection(FLock);
   end;
-  if FThreadId = 0 then exit;
+  if not FStarted then exit;
   RTLEventSetEvent(FJobEvent);
   if not wasStopped then RTLEventWaitFor(FExitEvent);
 end;
