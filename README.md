@@ -53,8 +53,8 @@ Start with the [tutorial](docs/tutorial.md); use the website
 
 ## Highlights
 
-**Paste a C prototype and call it.** `CWin32API` parses the declaration,
-builds the FFI signature, and exposes named arguments:
+**Paste a C prototype and call it.** On Windows, `CWin32API` parses the
+declaration, builds the FFI signature, and exposes named arguments:
 
 ```fun
 use 'lib-cwinapi.fun';
@@ -307,8 +307,8 @@ a compact signature when you want full control.
 
 ### Paste a C prototype
 
-`CWin32API` takes the declaration as it appears in the C header and exposes
-named arguments:
+On Windows, `CWin32API` takes the declaration as it appears in the C header and
+exposes named arguments:
 
 ```fun
 use 'lib-cwinapi.fun';

@@ -53,7 +53,8 @@
 
 ## 亮点
 
-**贴入 C 声明，直接调用。** `CWin32API` 解析函数原型，生成 FFI 签名，并用命名参数调用：
+**贴入 C 声明，直接调用。** 在 Windows 上，`CWin32API` 解析函数原型，生成 FFI
+签名，并用命名参数调用：
 
 ```fun
 use 'lib-cwinapi.fun';
@@ -298,7 +299,7 @@ FD 取值规则（解释器、`fd.js`/`fd2.js` 与 BNF 读取器一致）的完�
 
 ### 贴入 C 原型
 
-`CWin32API` 接受 C 头文件里原样的声明，并暴露命名参数：
+在 Windows 上，`CWin32API` 接受 C 头文件里原样的声明，并暴露命名参数：
 
 ```fun
 use 'lib-cwinapi.fun';
