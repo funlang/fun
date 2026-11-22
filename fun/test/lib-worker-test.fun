@@ -216,6 +216,82 @@ else
   ?. 'SKIP worker regex: engine not built';
 end if;
 
+// 15. cooperative cancellation: a running worker stops at a loop/call safe
+// point and reports 'worker cancelled'. Script try/except must not swallow it.
+var ccw = WorkerFile(job, 'spin', '30000000');
+ccw.join(0);
+check('cancel starts', ccw.alive() and ccw.error() = nil);
+ccw.cancel();
+ccw.join(5000);
+check('cancel join', not ccw.alive());
+check('cancel error', ccw.error() <> nil
+                     and ccw.error().subpos('worker cancelled') >= 0);
+
+var ccw2 = WorkerFile(job, 'spinCatch', '30000000');
+ccw2.join(0);
+check('cancel catch starts', ccw2.alive() and ccw2.error() = nil);
+ccw2.cancel();
+ccw2.join(5000);
+check('cancel catch join', not ccw2.alive());
+check('cancel catch error', ccw2.error() <> nil
+                          and ccw2.error().subpos('worker cancelled') >= 0);
+
+var rcw = WorkerFile(job, 'waitChannel', 'worker-cancel-recv');
+rcw.join(0);
+check('cancel recv starts', rcw.alive() and rcw.error() = nil);
+rcw.cancel();
+rcw.join(5000);
+check('cancel recv', not rcw.alive() and rcw.error() <> nil
+                    and rcw.error().subpos('worker cancelled') >= 0);
+
+// 16. resident pool: fixed slots, per-job entry names, and globals that
+// survive between jobs on the same slot.
+var pool = WorkerPool(job, 2);
+check('pool size', pool.size() = 2);
+check('pool idle', pool.idle() = 2);
+
+var pt1 = pool.submit('sum', (new [1000]).@toJson(fd: true));
+var pt2 = pool.submit('echo', 'hello-pool');
+check('pool join', pt1.join(-1) = '500500');
+check('pool echo', pt2.join(-1) = 'hello-pool');
+check('pool no errors', pt1.error() = nil and pt2.error() = nil);
+check('pool idle after jobs', pool.idle() = 2);
+
+var spa = []; spa.@add(1); spa.@add(2);
+var spb = []; spb.@add(3); spb.@add(4);
+var pm = poolMap(pool, 'fdadd2', [spa, spb], -1);
+check('poolMap count', pm.@count() = 2);
+check('poolMap values', pm[0] = 3 and pm[1] = 7);
+var pr = poolRun(pool, 'fdadd2', [spa], -1);
+check('poolRun', pr[0] = 3);
+
+var pg1 = pool.submit('bumpGlobal', '');
+var pgr1 = pg1.join(-1);
+var pg2 = pool.submit('bumpGlobal', '');
+var pgr2 = pg2.join(-1);
+check('pool resident globals', pgr1 = '1' and pgr2 = '2');
+
+// 17. pool task cancellation and slot reuse after a cancelled job.
+var pc = pool.submit('spin', '30000000');
+pc.join(0);
+check('pool cancel starts', pc.alive() and pc.error() = nil);
+pc.cancel();
+pc.join(5000);
+check('pool cancel join', not pc.alive());
+check('pool cancel error', pc.error() <> nil
+                          and pc.error().subpos('worker cancelled') >= 0);
+var pafter = poolRun(pool, 'fdadd2', [spa], -1);
+check('pool after cancel', pafter[0] = 3);
+
+pool.close();
+var closedErr = nil;
+try
+  pool.submit('echo', 'x');
+except
+  closedErr = @;
+end try;
+check('pool closed refuses', closedErr <> nil);
+
 ?. 'worker tests: pass=' & pass & ' fail=' & failed;
 if failed > 0 then
   raise 'worker tests failed';

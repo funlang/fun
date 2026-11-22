@@ -93,6 +93,13 @@ type
     constructor Create;
     function accept(exp: CExp): fun.bool; override;
   end;
+
+  // Resident worker pool and pool task handles (submit/join/cancel).
+  CLpool = class(CLib)
+  public
+    constructor Create;
+    function accept(exp: CExp): fun.bool; override;
+  end;
   {$EndIf}
   
 
@@ -185,6 +192,7 @@ begin
   // worker handles (FunThreads builds only)
   libs.add(CLworker.Create());
   libs.add(CLchannel.Create());
+  libs.add(CLpool.Create());
   {$EndIf}
   
   // win api
@@ -344,6 +352,13 @@ begin
   val^ := Int64(fun.uintptr(CWorker(exp.asObj).ThreadId));
 end;
 
+procedure _workerCancel(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedWorker(exp);
+  CWorker(exp.asObj).Cancel;
+  val^ := true;
+end;
+
 procedure _sharedGet(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   e: CExp;
@@ -439,6 +454,7 @@ begin
   ids['error']  := CExp.new(nil).parse(Int64(fun.uintptr(@_workerError)));
   ids['alive']  := CExp.new(nil).parse(Int64(fun.uintptr(@_workerAlive)));
   ids['id']     := CExp.new(nil).parse(Int64(fun.uintptr(@_workerId)));
+  ids['cancel'] := CExp.new(nil).parse(Int64(fun.uintptr(@_workerCancel)));
   ids['get']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedGet)));
   ids['set']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedSet)));
   ids['has']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedHas)));
@@ -522,6 +538,122 @@ end;
 function CLchannel.accept(exp: CExp): fun.bool;
 begin
   result := exp.asObj is CChannel;
+end;
+
+//==============================================================
+// Resident worker pool handles
+//==============================================================
+procedure NeedPool(exp: CExp);
+begin
+  if not (exp.asObj is CWorkerPool) then
+    raise EBase.Create('not a worker pool');
+end;
+
+procedure NeedTask(exp: CExp);
+begin
+  if not (exp.asObj is CPoolTask) then
+    raise EBase.Create('not a worker pool task');
+end;
+
+procedure _poolSubmit(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  e: CExp;
+  entry, payload: fun.str;
+  t: CPoolTask;
+begin
+  NeedPool(exp);
+  entry := 'main';
+  e := CExps.Find(exps, '', 0);
+  if e <> nil then entry := e.asStr;
+  payload := '';
+  e := CExps.Find(exps, '', 1);
+  if e <> nil then payload := e.asStr;
+  t := CWorkerPool(exp.asObj).Submit(entry, payload);
+  try
+    setObj(val, t, VarObjNew);
+  finally
+    del(t);
+  end;
+end;
+
+procedure _poolSize(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedPool(exp);
+  val^ := CWorkerPool(exp.asObj).Size;
+end;
+
+procedure _poolIdle(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedPool(exp);
+  val^ := CWorkerPool(exp.asObj).IdleCount;
+end;
+
+procedure _poolClose(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedPool(exp);
+  CWorkerPool(exp.asObj).Close;
+  val^ := true;
+end;
+
+procedure _taskJoin(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  t: fun.int;
+begin
+  NeedTask(exp);
+  t := CExps.FindAsVal(exps, 'timeout', 0, -1);
+  if CPoolTask(exp.asObj).Join(t) then
+    val^ := CPoolTask(exp.asObj).ResultText
+  else
+    val^ := NullValue
+  ;
+end;
+
+procedure _taskResult(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedTask(exp);
+  val^ := CPoolTask(exp.asObj).ResultText;
+end;
+
+procedure _taskError(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedTask(exp);
+  if CPoolTask(exp.asObj).HasError then
+    val^ := CPoolTask(exp.asObj).ErrorText
+  else
+    val^ := NullValue
+  ;
+end;
+
+procedure _taskAlive(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedTask(exp);
+  val^ := CPoolTask(exp.asObj).Alive;
+end;
+
+procedure _taskCancel(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedTask(exp);
+  CPoolTask(exp.asObj).Cancel;
+  val^ := true;
+end;
+
+constructor CLpool.Create;
+begin
+  inherited Create;
+  ids['submit'] := CExp.new(nil).parse(Int64(fun.uintptr(@_poolSubmit)));
+  ids['size']   := CExp.new(nil).parse(Int64(fun.uintptr(@_poolSize)));
+  ids['idle']   := CExp.new(nil).parse(Int64(fun.uintptr(@_poolIdle)));
+  ids['close']  := CExp.new(nil).parse(Int64(fun.uintptr(@_poolClose)));
+  ids['join']   := CExp.new(nil).parse(Int64(fun.uintptr(@_taskJoin)));
+  ids['result'] := CExp.new(nil).parse(Int64(fun.uintptr(@_taskResult)));
+  ids['error']  := CExp.new(nil).parse(Int64(fun.uintptr(@_taskError)));
+  ids['alive']  := CExp.new(nil).parse(Int64(fun.uintptr(@_taskAlive)));
+  ids['cancel'] := CExp.new(nil).parse(Int64(fun.uintptr(@_taskCancel)));
+end;
+
+function CLpool.accept(exp: CExp): fun.bool;
+begin
+  result := (exp.asObj is CWorkerPool) or (exp.asObj is CPoolTask);
 end;
 {$EndIf}
 

@@ -175,6 +175,58 @@ workerAttach(s);       // every s.Tick() now ends with workerTick()
 - `workerTick` is a plain function, so any event loop can call it. It does not
   depend on a particular HTTP or socket loop.
 
+## Cancelling a job
+
+`w.cancel()` and `task.cancel()` ask a running job to stop at its next safe
+point. A safe point is a loop iteration (`for`, `while`, `loop`, `for..in`), a
+Fun function or method call, or a blocking `Channel.recv`. The worker then
+finishes with the error `worker cancelled`; the result is empty.
+
+```fun
+var w = WorkerFile('job.fun', 'spin', '[]');
+if w.alive() then w.cancel(); end if;
+var r = w.join(5000);          // empty string
+var e = w.error();             // "worker cancelled\n" (plus traceback)
+```
+
+Cancellation is cooperative. A job blocked inside a native call, sleeping, or
+inside a tight C loop that never calls back into Fun cannot be interrupted. The
+flag is checked, not forced.
+
+Scripts cannot catch it. `ECancelled` bypasses `try/except` (but `finally`
+blocks still run), so job code cannot turn a cancel into a normal result.
+
+## Resident pools
+
+`WorkerFile` parses the module for every job. A pool keeps `size` resident
+slots instead: each slot parses the module once and then handles jobs serially.
+
+```fun
+var p = WorkerPool('job.fun', 4);      // file, slot count
+var t = p.submit('sum', payload);      // entry name, payload string
+var r = t.join(-1);                    // raw result, nil on timeout
+if t.error() <> nil then raise t.error(); end if;
+p.close();
+```
+
+- `submit(entry, payload)` waits (in 1 ms steps) until a slot is free, so the
+  pool size is also the concurrency limit. It returns a task handle with the
+  same `join`/`result`/`error`/`alive`/`cancel` methods as a worker.
+- One pool serves one module, but each job names its own entry function.
+- Module globals persist between successful jobs on the same slot. They are
+  private to that slot, so do not assume a single shared counter. Use `Shared`
+  or `Channel` for cross-slot state.
+- A job that raises (or is cancelled) is isolated: the slot rebuilds its
+  environment by re-running the module before taking the next job.
+- `idle()` reports free slots. A slot becomes idle before its task reports
+  completion, so observing a finished task never leaves a stale busy slot.
+- `close()` stops intake and waits for running jobs, then joins every slot
+  thread. A job that was queued but never started finishes with
+  `worker pool closed`.
+- `poolMap(pool, entry, items, timeout)` and `poolRun(pool, entry, args,
+  timeout)` are the convenience wrappers; `poolMap` uses the same `[item]` FD
+  wrapping as `workerMap`.
+
 ## Idioms
 
 1. Read-only fan-out: build a list, call `workerMapLimit`, consume results in
@@ -193,9 +245,13 @@ workerAttach(s);       // every s.Tick() now ends with workerTick()
 
 ## Current limits
 
-- No cancellation. A running worker runs to completion or to its own error.
-- No resident worker pool. Every job reparses its module, so very small jobs pay
-  parse cost per job. `workerMapLimit` limits concurrency, not parsing.
+- Cancellation is cooperative: only loops, Fun calls and `Channel.recv` are
+  safe points. Native blocking calls and foreign code are not interruptible.
+- A pool is per module and per process. There is no dynamic resize, no
+  priority, and no work stealing between slots; `submit` simply waits for a
+  free slot.
+- Pool slots keep module globals between jobs, while `WorkerFile` rebuilds them
+  per job. Pick the model that matches the job's state expectations.
 - No worker-to-worker direct message object. Use `Shared` or `Channel` names.
 - No cross-process workers, no remote workers, and no distributed queues.
 - MT builds cover Linux x64/arm64, macOS x64/arm64 and Windows x64. There is

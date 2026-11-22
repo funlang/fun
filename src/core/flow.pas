@@ -236,6 +236,9 @@ procedure CLoop.run(env: CEnv);
 begin
   while (exp = nil) or exp.calcAsBool(env) do
   begin
+  {$IfDef FunThreads}
+    checkCancelled;
+  {$EndIf}
   {$IfDef IDE}
     env.traced(self, true);
   {$EndIf}
@@ -286,6 +289,9 @@ begin
   while ((si > 0) and (vi <= mi)) or
         ((si < 0) and (vi >= mi)) do
   begin
+  {$IfDef FunThreads}
+    checkCancelled;
+  {$EndIf}
     // CData
     vv.VInteger := vi;
     evar.assign(CValue(vv));
@@ -332,6 +338,9 @@ begin
     try
       while enum.Next(1, v, l) = 0 do
       begin
+      {$IfDef FunThreads}
+        checkCancelled;
+      {$EndIf}
         try
           evar.assign(v);
         {$IfDef IDE}
@@ -358,6 +367,9 @@ begin
   ii := s.count();
   for i := 0 to ii -1 do
   begin
+  {$IfDef FunThreads}
+    checkCancelled;
+  {$EndIf}
     e := s.item[i];
     if e = nil then
       evar.assign(NullValue)
@@ -417,6 +429,8 @@ begin
   {$EndIf}
       all.run(env);
     except
+      on e: ECancelled do
+        raise;
       on e: EBase do
       begin
         // Capture before the surrounding finally can overwrite lastNode.

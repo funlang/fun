@@ -200,7 +200,11 @@ fi
 
 # --- Optional FFI: Fun getapi() on Linux via FPC's bundled libffi unit ---
 FFI_FLAGS=""
-FFI_PPU="$(find "$(dirname "$FPC_BINDIR")/lib" -type d -name libffi 2>/dev/null | head -n 1)"
+# FPC units live under <prefix>/lib on Debian-style installs and under
+# <prefix>/lib64 on Fedora/RHEL (where the compiler itself is /usr/bin/ppcx64
+# -> /usr/lib64/fpc/...). Probe both so getapi() is not silently disabled.
+FFI_PPU="$(find "$(dirname "$FPC_BINDIR")/lib" "$(dirname "$FPC_BINDIR")/lib64" \
+    -type d -name libffi 2>/dev/null | head -n 1)"
 if [ -n "$FFI_PPU" ] && [ -f "$FFI_PPU/ffi.ppu" ]; then
     FFI_LIBDIR="$HERE/.ffi"
     if ! ldconfig -p 2>/dev/null | grep -q 'libffi\.so '; then

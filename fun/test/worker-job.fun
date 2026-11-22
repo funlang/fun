@@ -36,6 +36,53 @@ fun slow(payload)
   result = '' & s;
 end fun;
 
+// Long-running loop used by cancel tests. 30M iterations is a few seconds, so
+// a working cancel returns much sooner; the bound only keeps a broken cancel
+// from hanging the suite forever.
+fun spin(payload)
+  var n = 0;
+  var limit = payload.toNum();
+  if limit < 1 then limit = 30000000; end if;
+  while n < limit do n += 1; end do;
+  result = '' & n;
+end fun;
+
+// Same loop inside try/except. ECancelled is not a normal script error, so the
+// handler must not swallow it and the worker must still stop.
+fun spinCatch(payload)
+  var n = 0;
+  var limit = payload.toNum();
+  if limit < 1 then limit = 30000000; end if;
+  try
+    while n < limit do n += 1; end do;
+  except
+    // A cancel must bypass this handler.
+  end try;
+  result = '' & n;
+end fun;
+
+// Blocks in a named channel. recv(-1) is a cancellation safe point.
+fun waitChannel(payload)
+  var ch = Channel(payload);
+  var v = ch.recv(-1);
+  result = '' & (v = nil);
+end fun;
+
+// Module-level state: a pool slot keeps this across jobs, a one-shot worker
+// rebuilds it. Used to prove resident slots really are resident.
+var hits = 0;
+fun bumpGlobal(payload)
+  hits += 1;
+  result = '' & hits;
+end fun;
+
+// Smaller add pair for poolMap.
+fun fdadd2(payload)
+  var args = payload.getJson(fd: true);
+  var pair = args[0];
+  result = (new [pair[0] + pair[1]]).@toJson(fd: true);
+end fun;
+
 // Concurrent regex use: every worker shares the process-wide PCRE pattern
 // cache, so this exercises its lock (and the JIT upgrade on second use).
 fun regexHammer(payload)

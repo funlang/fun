@@ -97,7 +97,39 @@ class Worker(file, entry, payload, isFile)
   fun id()
     result = this.h.id();
   end fun;
+
+  // Ask the worker to stop at its next safe point (loop iteration or function
+  // call). The job then finishes with the error 'worker cancelled' (or its own
+  // error, whichever comes first). Script try/except cannot swallow it.
+  fun cancel()
+    result = this.h.cancel();
+  end fun;
 end class;
+
+// A resident pool of workers that share one module. Each slot parses the
+// module once and then handles jobs serially, so module globals persist
+// between jobs on that slot (unlike WorkerFile, which rebuilds them). A pool
+// bounds concurrency to its size and avoids paying parse cost per job.
+//
+//   var p = WorkerPool('job.fun', 4);
+//   var t = p.submit('sum', payload);   // entry name, payload string
+//   var out = t.join(-1);               // nil on timeout
+//   if t.error() <> nil then ... end if;
+//   p.close();
+//
+// The native pool object exposes submit(entry, payload), size(), idle() and
+// close(); each task exposes join(timeout), result(), error(), alive() and
+// cancel(). Use PoolMap for the common read-only data pattern.
+fun WorkerPool(file, size)
+  _requireThreads();
+  result = 'Pool'.open(file, size, file: true);
+end fun;
+
+// In-memory source variant, mostly for tests and generated jobs.
+fun WorkerPoolSource(source, size)
+  _requireThreads();
+  result = 'Pool'.open(source, size, file: false);
+end fun;
 
 // A named, process-wide key/value store for shared mutable data. Every thread
 // that calls Shared('same-name') gets the same store, so workers do not need
@@ -320,4 +352,43 @@ fun workerAll(workers, timeout)
     end if;
   end do;
   result = out;
+end fun;
+
+// Submit the same entry over a list of inputs through a pool, then collect the
+// results in input order. Submission blocks when every slot is busy, so the
+// pool's size is the concurrency limit and a large list never spawns more
+// threads. Each item is wrapped as [item] exactly like workerMap, and the
+// entry should return an FD list such as (new [value]).@toJson(fd: true).
+fun poolMap(pool, entry, items, timeout)
+  _requireThreads();
+  var n = items.@count();
+  var tasks = new [];
+  for i = 0 to n - 1 do
+    tasks[i] = pool.submit(entry, (new [items[i]]).@toJson(fd: true));
+  end do;
+  var out = new [];
+  out.@count(n);
+  for i = 0 to n - 1 do
+    var r = tasks[i].join(timeout);
+    var e = tasks[i].error();
+    if e <> nil then raise e; end if;
+    if r = nil then
+      out[i] = nil;
+    else
+      out[i] = r.getJson(fd: true)[0];
+    end if;
+  end do;
+  result = out;
+end fun;
+
+// One pool job with FD args in and FD result out. Raises on a job error and
+// returns nil on timeout, matching workerRun.
+fun poolRun(pool, entry, args, timeout)
+  _requireThreads();
+  var t = pool.submit(entry, args.@toJson(fd: true));
+  var r = t.join(timeout);
+  var e = t.error();
+  if e <> nil then raise e; end if;
+  if r = nil then return nil; end if;
+  result = r.getJson(fd: true);
 end fun;

@@ -6,6 +6,27 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `lib-worker` gains a resident worker pool: `WorkerPool(file, size)`,
+  per-job `submit(entry, payload)`, task handles with
+  `join`/`result`/`error`/`alive`/`cancel`, and `poolMap`/`poolRun` helpers.
+  Each slot parses the module once, keeps module globals between successful
+  jobs, and rebuilds its environment after a failed or cancelled job. The pool
+  size is the concurrency limit.
+
+- Cooperative cancellation for workers and pool tasks: `Worker.cancel()` and
+  `task.cancel()` stop at the next loop iteration, Fun call, or
+  `Channel.recv`. The job finishes with `worker cancelled`; `ECancelled`
+  bypasses script `try/except` (finally blocks still run). Cancellation is
+  cooperative, so a blocking native call is not interrupted.
+
+- `lib-worker-test` grows from 49 to 72 assertions, covering both cancel
+  paths, catch-proof cancellation, resident globals, slot reuse after a cancel,
+  and submission to a closed pool.
+
+- The Linux build script now finds FPC's bundled libffi unit under
+  `/usr/lib64` (Fedora/RHEL) as well as `/usr/lib`, so `getapi()` is enabled
+  automatically instead of silently falling back to a no-FFI build.
+
 ## [9.5.7] - 2026-11-22
 
 - The opt-in worker build (`funcmd-mt`, `FUN_THREADS=1`) now covers Linux

@@ -42,6 +42,10 @@ const
   MaxErrorStates = 8;
 
 type
+  // Cooperative cancellation of a worker thread. Scripts cannot catch it:
+  // CTry re-raises it so a `try/except` in job code cannot swallow a cancel.
+  ECancelled = class(EBase);
+
   CEnv  = class;
   CExp  = class;
   CVar  = class;
@@ -497,6 +501,11 @@ function FrameLine(const f: CCallFrame): fun.int;
 {$IfDef FunThreads}
 // With workers, each thread evaluates against its own environment.
 threadvar _ENV: CEnv;
+
+// A worker thread points this at its job's cancel flag while evaluating. It
+// stays nil on the main thread, so checkCancelled() costs one pointer test.
+threadvar _cancelFlag: PLongInt;
+procedure checkCancelled;
 {$Else}
 var _ENV: CEnv;
 {$EndIf}
@@ -512,6 +521,14 @@ implementation
 
 uses SysUtils,
      flow;
+
+{$IfDef FunThreads}
+procedure checkCancelled;
+begin
+  if (_cancelFlag <> nil) and (_cancelFlag^ <> 0) then
+    raise ECancelled.Create('worker cancelled');
+end;
+{$EndIf}
 
 //==============================================================
 constructor CNode.new(pn: CNode; isAdd: fun.bool = false);
@@ -939,6 +956,9 @@ var
   idx: fun.int;
   {$EndIf}
 begin
+  {$IfDef FunThreads}
+  checkCancelled;
+  {$EndIf}
   //env.trace(self);
   {$IfDef FunTraceback}
   // Capture the call site lazily as a node pointer. Resolving it to a file and

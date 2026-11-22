@@ -49,6 +49,9 @@ type
     FEvent: PRTLEvent;
     FThreadId: TThreadID;
     FEnv: CEnv;
+    // Cooperative cancellation. checkCancelled reads this through the worker
+    // thread's _cancelFlag pointer at loop/call safe points.
+    FCancel: LongInt;
     procedure SetResult(const s: fun.str);
     procedure SetError(const s: fun.str);
     procedure Finish;
@@ -63,11 +66,90 @@ type
     function ErrorText: fun.str;
     function HasError: Boolean;
     function Alive: Boolean;
+    procedure Cancel;
     property ThreadId: TThreadID read FThreadId;
+  end;
+
+// One submitted pool job. A task owns its result and cancel flag; a slot only
+// refers to it while the job runs, so a task can outlive slot reuse.
+  CPoolTask = class(CBase)
+  private
+    FLock: TRTLCriticalSection;
+    FEvent: PRTLEvent;
+    FDone: Boolean;
+    FCancel: LongInt;
+    FEntry: fun.str;
+    FPayload: fun.str;
+    FResult: fun.str;
+    FError: fun.str;
+    procedure SetDone(const aresult, aerror: fun.str);
+  public
+    constructor Create(const entry, payload: fun.str);
+    destructor Destroy; override;
+    // Wait for completion. timeout < 0 waits forever. Returns False on timeout.
+    function Join(timeout: fun.int): Boolean;
+    function ResultText: fun.str;
+    function ErrorText: fun.str;
+    function HasError: Boolean;
+    function Alive: Boolean;
+    procedure Cancel;
+  end;
+
+  CWorkerPool = class;
+
+// A resident slot: one OS thread with a private parsed module and CEnv. The
+// module is parsed once and runs jobs serially, so module globals persist
+// between jobs handled by the same slot.
+  CWorkerSlot = class(CBase)
+  private
+    FSource: fun.str;
+    FIsFile: Boolean;
+    FBaseEnv: CEnv;
+    FModule: CRun;
+    FEnv: CEnv;
+    FThreadId: TThreadID;
+    FJobEvent: PRTLEvent;
+    FExitEvent: PRTLEvent;
+    FLock: TRTLCriticalSection;
+    FTask: CPoolTask;
+    FStop: Boolean;
+    FStartError: fun.str;
+    procedure Execute;
+    procedure ResetEnv;
+    function RunEntry(const entry, payload: fun.str): fun.str;
+    function ErrorTextOf(e: EBase): fun.str;
+  public
+    constructor Create(aBaseEnv: CEnv; const source: fun.str; isFile: Boolean);
+    destructor Destroy; override;
+    procedure StartSlot;
+    procedure Assign(task: CPoolTask);
+    procedure Stop;
+    function IsIdle: Boolean;
+  end;
+
+// A fixed-size pool of resident slots. One pool serves one module; each job
+// names its entry function.
+  CWorkerPool = class(CBase)
+  private
+    FSlots: CList;
+    FLock: TRTLCriticalSection;
+    FSize: fun.int;
+    FClosed: Boolean;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Start(env: CEnv; const source: fun.str; isFile: Boolean; size: fun.int);
+    function Submit(const entry, payload: fun.str): CPoolTask;
+    function IdleCount: fun.int;
+    function Size: fun.int;
+    procedure Close;
   end;
 
 // 'Worker'.start(source, entry, payload, file = true)
 procedure _workerStart(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+
+// 'Pool'.open(source, size, file = true)
+procedure _poolOpen(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 
 // A named, process-wide key/value store. Workers get the same object by name,
 // so shared mutable data stays explicit and does not require sharing a Fun
@@ -246,6 +328,8 @@ begin
   try
     try
       _ENV := env;
+      // Every loop and function call inside this worker now checks FCancel.
+      _cancelFlag := @FCancel;
       if FIsFile then
         modu := CRun(CParser.ParseOrLoad(FSource, nil, CWorkerParser))
       else
@@ -267,7 +351,7 @@ begin
         raise EBase.Create('worker result must be a string or number (use .toJson(fd: true))');
       SetResult(s);
     except
-      on E: Exception do
+      on E: EBase do
       begin
         s := E.Message;
         {$IfDef FunTraceback}
@@ -280,6 +364,7 @@ begin
       end;
     end;
   finally
+    _cancelFlag := nil;
     _ENV := nil;
     del(args);
     del(modu);
@@ -350,6 +435,469 @@ begin
     result := FStarted and not FDone;
   finally
     LeaveCriticalSection(FLock);
+  end;
+end;
+
+procedure CWorker.Cancel;
+begin
+  // A plain aligned 32-bit write is atomic on every supported target. The
+  // worker reads it through checkCancelled at its next safe point.
+  InterLockedExchange(FCancel, 1);
+end;
+
+//==============================================================
+// Resident worker pool
+//==============================================================
+constructor CPoolTask.Create(const entry, payload: fun.str);
+begin
+  inherited Create;
+  InitCriticalSection(FLock);
+  FEvent := RTLEventCreate;
+  FEntry := entry;
+  FPayload := payload;
+end;
+
+destructor CPoolTask.Destroy;
+begin
+  if FEvent <> nil then RTLEventDestroy(FEvent);
+  DoneCriticalSection(FLock);
+  inherited Destroy;
+end;
+
+procedure CPoolTask.SetDone(const aresult, aerror: fun.str);
+begin
+  EnterCriticalSection(FLock);
+  try
+    FResult := aresult;
+    FError := aerror;
+    FDone := True;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+  RTLEventSetEvent(FEvent);
+end;
+
+function CPoolTask.Join(timeout: fun.int): Boolean;
+var
+  waited: fun.int;
+begin
+  if not FDone then
+  begin
+    if timeout < 0 then
+      RTLEventWaitFor(FEvent)
+    else
+    begin
+      waited := 0;
+      while (waited < timeout) and not FDone do
+      begin
+        Sleep(1);
+        Inc(waited);
+      end;
+    end;
+  end;
+  result := FDone;
+end;
+
+function CPoolTask.ResultText: fun.str;
+begin
+  EnterCriticalSection(FLock);
+  try
+    result := FResult;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+function CPoolTask.ErrorText: fun.str;
+begin
+  EnterCriticalSection(FLock);
+  try
+    result := FError;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+function CPoolTask.HasError: Boolean;
+begin
+  EnterCriticalSection(FLock);
+  try
+    result := FError <> '';
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+function CPoolTask.Alive: Boolean;
+begin
+  EnterCriticalSection(FLock);
+  try
+    result := not FDone;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+procedure CPoolTask.Cancel;
+begin
+  InterLockedExchange(FCancel, 1);
+end;
+
+//==============================================================
+function SlotMain(p: Pointer): PtrInt;
+begin
+  result := 0;
+  CWorkerSlot(p).Execute;
+end;
+
+constructor CWorkerSlot.Create(aBaseEnv: CEnv; const source: fun.str; isFile: Boolean);
+begin
+  inherited Create;
+  // Clone on the caller thread, before the slot thread starts, so two slots
+  // never read the same CEnv concurrently.
+  FBaseEnv := aBaseEnv.clone;
+  FSource := source;
+  FIsFile := isFile;
+  FThreadId := 0;
+  FJobEvent := RTLEventCreate;
+  FExitEvent := RTLEventCreate;
+  InitCriticalSection(FLock);
+end;
+
+destructor CWorkerSlot.Destroy;
+begin
+  Stop;
+  del(FEnv);
+  del(FModule);
+  del(FBaseEnv);
+  if FJobEvent <> nil then RTLEventDestroy(FJobEvent);
+  if FExitEvent <> nil then RTLEventDestroy(FExitEvent);
+  DoneCriticalSection(FLock);
+  inherited Destroy;
+end;
+
+procedure CWorkerSlot.StartSlot;
+begin
+  if FThreadId <> 0 then raise EBase.Create('pool slot already started');
+  FThreadId := BeginThread(@SlotMain, Pointer(Self), FThreadId);
+end;
+
+function CWorkerSlot.IsIdle: Boolean;
+begin
+  EnterCriticalSection(FLock);
+  try
+    result := FTask = nil;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+end;
+
+procedure CWorkerSlot.Assign(task: CPoolTask);
+begin
+  EnterCriticalSection(FLock);
+  try
+    if FStop then raise EBase.Create('pool slot is stopped');
+    if FTask <> nil then raise EBase.Create('pool slot is busy');
+    FTask := task;
+    add(FTask);
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+  RTLEventSetEvent(FJobEvent);
+end;
+
+procedure CWorkerSlot.Stop;
+var
+  wasStopped: Boolean;
+begin
+  EnterCriticalSection(FLock);
+  try
+    wasStopped := FStop;
+    FStop := True;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+  if FThreadId = 0 then exit;
+  RTLEventSetEvent(FJobEvent);
+  if not wasStopped then RTLEventWaitFor(FExitEvent);
+end;
+
+procedure CWorkerSlot.ResetEnv;
+begin
+  if FEnv <> nil then del(FEnv);
+  FEnv := FBaseEnv.clone;
+  _ENV := FEnv;
+  if FModule <> nil then FModule.run(FEnv);
+end;
+
+function CWorkerSlot.ErrorTextOf(e: EBase): fun.str;
+begin
+  result := e.Message;
+  {$IfDef FunTraceback}
+  try
+    if FEnv <> nil then result := result + #10 + FEnv.traceBack;
+  except
+  end;
+  {$EndIf}
+end;
+
+function CWorkerSlot.RunEntry(const entry, payload: fun.str): fun.str;
+var
+  v: CVar;
+  args: CExps;
+  e: CExp;
+  rv: PValue;
+begin
+  v := FModule.UID(entry);
+  if (v = nil) or not (v.asObj is CFun) then
+    raise EBase.Create('worker entry not found: ' + entry);
+  args := CExps.Create();
+  try
+    e := CExp.new(nil);
+    e.assign(payload);
+    args.Add(e);
+    _ENV := FEnv;
+    rv := CFun(v.asObj).call(FEnv, args);
+    if rv = nil then
+      result := ''
+    else if isStr(rv) or isNum(rv) then
+      result := fun.str(rv^)
+    else
+      raise EBase.Create('worker result must be a string or number (use .toJson(fd: true))');
+  finally
+    del(args);
+  end;
+end;
+
+procedure CWorkerSlot.Execute;
+var
+  t: CPoolTask;
+  r: fun.str;
+  stopped: Boolean;
+  failed: Boolean;
+begin
+  try
+    try
+      if FIsFile then
+        FModule := CRun(CParser.ParseOrLoad(FSource, nil, CWorkerParser))
+      else
+        FModule := CParser.Parse(FSource, CWorkerParser, '', nil);
+      ResetEnv;
+    except
+      on E: EBase do FStartError := ErrorTextOf(E);
+    end;
+
+    while True do
+    begin
+      RTLEventWaitFor(FJobEvent);
+      RTLEventResetEvent(FJobEvent);
+      EnterCriticalSection(FLock);
+      try
+        stopped := FStop;
+        t := FTask;
+      finally
+        LeaveCriticalSection(FLock);
+      end;
+      if stopped then
+      begin
+        if t <> nil then
+        begin
+          EnterCriticalSection(FLock);
+          try
+            FTask := nil;
+          finally
+            LeaveCriticalSection(FLock);
+          end;
+          t.SetDone('', 'worker pool closed');
+          del(t);
+        end;
+        break;
+      end;
+      if t = nil then continue;
+
+      if FStartError <> '' then
+      begin
+        EnterCriticalSection(FLock);
+        try
+          FTask := nil;
+        finally
+          LeaveCriticalSection(FLock);
+        end;
+        t.SetDone('', FStartError);
+        del(t);
+      end
+      else
+      begin
+        failed := False;
+        r := '';
+        _cancelFlag := @t.FCancel;
+        try
+          try
+            r := RunEntry(t.FEntry, t.FPayload);
+          except
+            on E: EBase do
+            begin
+              failed := True;
+              _cancelFlag := nil;
+              r := ErrorTextOf(E);
+              // A job that raised (or was cancelled) may have left module
+              // globals half-updated. Rebuild before the next job.
+              try
+                ResetEnv;
+              except
+                on E2: EBase do FStartError := ErrorTextOf(E2);
+              end;
+            end;
+          end;
+        finally
+          _cancelFlag := nil;
+        end;
+        // Release the slot before publishing the result, so a caller that
+        // observes completion also sees an idle slot (no race with idle()).
+        // The reference created by Assign moves to the local t here.
+        EnterCriticalSection(FLock);
+        try
+          FTask := nil;
+        finally
+          LeaveCriticalSection(FLock);
+        end;
+        if failed then
+          t.SetDone('', r)
+        else
+          t.SetDone(r, '')
+        ;
+        del(t);
+      end;
+    end;
+  finally
+    _cancelFlag := nil;
+    _ENV := nil;
+    del(FEnv);
+    FEnv := nil;
+    del(FModule);
+    FModule := nil;
+    RTLEventSetEvent(FExitEvent);
+  end;
+end;
+
+//==============================================================
+constructor CWorkerPool.Create;
+begin
+  inherited Create;
+  InitCriticalSection(FLock);
+  FSlots := CList.Create(True);
+end;
+
+destructor CWorkerPool.Destroy;
+begin
+  Close;
+  del(FSlots);
+  DoneCriticalSection(FLock);
+  inherited Destroy;
+end;
+
+procedure CWorkerPool.Start(env: CEnv; const source: fun.str; isFile: Boolean; size: fun.int);
+var
+  i: fun.int;
+  slot: CWorkerSlot;
+begin
+  if FSlots.Count > 0 then raise EBase.Create('worker pool already started');
+  if size < 1 then raise EBase.Create('worker pool size must be at least 1');
+  FSize := size;
+  for i := 1 to size do
+  begin
+    slot := CWorkerSlot.Create(env, source, isFile);
+    // CList owns its entries and releases them on Clear; the creation
+    // reference transfers to the list, so do not del(slot) here.
+    FSlots.Add(slot);
+    slot.StartSlot;
+  end;
+end;
+
+function CWorkerPool.Submit(const entry, payload: fun.str): CPoolTask;
+var
+  t: CPoolTask;
+  i: fun.int;
+  got: Boolean;
+begin
+  t := CPoolTask.Create(entry, payload);
+  try
+    while True do
+    begin
+      got := False;
+      EnterCriticalSection(FLock);
+      try
+        if FClosed then raise EBase.Create('worker pool is closed');
+        for i := 0 to FSlots.Count - 1 do
+          if CWorkerSlot(FSlots[i]).IsIdle then
+          begin
+            CWorkerSlot(FSlots[i]).Assign(t);
+            got := True;
+            break;
+          end;
+      finally
+        LeaveCriticalSection(FLock);
+      end;
+      if got then break;
+      Sleep(1);
+    end;
+    result := t;
+  except
+    del(t);
+    raise;
+  end;
+end;
+
+function CWorkerPool.IdleCount: fun.int;
+var
+  i: fun.int;
+begin
+  result := 0;
+  for i := 0 to FSlots.Count - 1 do
+    if CWorkerSlot(FSlots[i]).IsIdle then Inc(result);
+end;
+
+function CWorkerPool.Size: fun.int;
+begin
+  result := FSize;
+end;
+
+procedure CWorkerPool.Close;
+var
+  i: fun.int;
+begin
+  EnterCriticalSection(FLock);
+  try
+    if FClosed then exit;
+    FClosed := True;
+  finally
+    LeaveCriticalSection(FLock);
+  end;
+  for i := 0 to FSlots.Count - 1 do
+    CWorkerSlot(FSlots[i]).Stop;
+end;
+
+procedure _poolOpen(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  source: fun.str;
+  size: fun.int;
+  isFile: Boolean;
+  e: CExp;
+  p: CWorkerPool;
+begin
+  source := '';
+  e := CExps.Find(exps, '', 0);
+  if e <> nil then source := e.asStr;
+  size := 4;
+  e := CExps.Find(exps, '', 1);
+  if e <> nil then size := e.asInt;
+  isFile := CExps.FindAsVal(exps, 'file', 2, True);
+  p := CWorkerPool.Create;
+  try
+    p.Start(env, source, isFile, size);
+    setObj(val, p, VarObjNew);
+  finally
+    del(p);
   end;
 end;
 
@@ -612,6 +1160,7 @@ function CChannel.Recv(timeout: fun.int; out s: fun.str): Boolean;
 begin
   while True do
   begin
+    checkCancelled;
     if TryRecv(s) then exit(True);
     if Closed then exit(False);
     if timeout = 0 then exit(False);
@@ -678,7 +1227,9 @@ end;
 
 procedure _openNamed(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 begin
-  if exp.asStr = 'Channel' then
+  if exp.asStr = 'Pool' then
+    _poolOpen(env, exp, exps, val)
+  else if exp.asStr = 'Channel' then
     _channelOpen(env, exp, exps, val)
   else
     _sharedOpen(env, exp, exps, val)

@@ -6,6 +6,22 @@
 
 ## [Unreleased]
 
+- `lib-worker` 新增常驻 worker 池：`WorkerPool(file, size)`、按任务指定入口的
+  `submit(entry, payload)`、带 `join`/`result`/`error`/`alive`/`cancel` 的任务
+  句柄，以及 `poolMap`/`poolRun` 辅助函数。每个槽位只解析一次模块，成功任务
+  之间保留模块全局量，任务失败或被取消后重建环境。池大小即并发上限。
+
+- worker 与池任务支持协作式取消：`Worker.cancel()` 与 `task.cancel()` 在下一个
+  循环迭代、Fun 调用或 `Channel.recv` 处停止，任务以 `worker cancelled` 结束；
+  `ECancelled` 会绕过脚本 `try/except`（`finally` 仍执行）。取消是协作式的，
+  阻塞中的原生调用无法被打断。
+
+- `lib-worker-test` 从 49 项扩到 72 项，覆盖两种取消路径、取消不可被脚本捕获、
+  槽位常驻全局量、取消后的槽位复用，以及向已关闭的池提交任务。
+
+- Linux 构建脚本现在同时查找 `/usr/lib64`（Fedora/RHEL）与 `/usr/lib` 下的
+  FPC 内置 libffi 单元，`getapi()` 会自动启用，不再静默退化成无 FFI 构建。
+
 ## [9.5.7] - 2026-11-22
 
 - opt-in 的 worker 构建（`funcmd-mt`，`FUN_THREADS=1`）从仅 Linux x64 扩展到
