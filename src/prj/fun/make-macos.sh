@@ -33,6 +33,21 @@ cd "$HERE"
 . "$HERE/safe-flags.sh"
 fun_safe_parse || exit 2
 
+# FUN_THREADS=1 builds funcmd-mt, the opt-in worker-capable interpreter. It is
+# a separate binary on purpose: cthreads makes every allocation lock, which
+# costs roughly 12-15% on ordinary single-threaded scripts. Everything else is
+# the same build, so the normal funcmd keeps its exact heap and performance.
+MT_FLAGS=""
+MT_OUT=""
+if [ "${FUN_THREADS:-0}" = "1" ]; then
+    if [ -n "$FUN_SAFE_LEVEL" ]; then
+        echo "FUN_THREADS=1 cannot be combined with SAFE=...; build them separately." >&2
+        exit 2
+    fi
+    MT_FLAGS="-dFunThreads -dUseCThreads"
+    MT_OUT="-ofuncmd-mt"
+fi
+
 # --- Resolve the Free Pascal driver --------------------------------------
 if [ -n "${FPC:-}" ]; then
     FPC_BIN="$FPC"
@@ -150,6 +165,9 @@ fi
 
 # --- Build funcmd --------------------------------------------------------
 echo "Building funcmd with $FPC_BIN"
+if [ -n "$MT_FLAGS" ]; then
+    echo "FUN_THREADS=1 - building funcmd-mt (workers)."
+fi
 PACK_FLAGS="-dFunPack"
 if [ "${FUNPACK:-}" = "user" ]; then
     PACK_FLAGS="-dFunPackUser"
@@ -165,23 +183,29 @@ fi
 # Keep the two modes' .ppu/.o files apart, exactly like make-linux-x86_64.sh:
 # FPC otherwise reuses units compiled with the other define set.
 if [ -n "$FUN_SAFE_LEVEL" ]; then
-    SAFE_OUT="-o$HERE/funcmd-safe"
+    OUT_FLAG="-o$HERE/funcmd-safe"
     UNITS="$HERE/units-safe"
+elif [ -n "$MT_FLAGS" ]; then
+    OUT_FLAG="$MT_OUT"
+    UNITS="$HERE/units-mt"
 else
-    SAFE_OUT=""
+    OUT_FLAG=""
     UNITS="$HERE/units"
 fi
 mkdir -p "$UNITS"
 UNIT_FLAGS="-FU$UNITS"
 rm -f "$UNITS"/*.ppu "$UNITS"/*.o "$UNITS"/*.or 2>/dev/null || true
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -dMD5 $PACK_FLAGS $TRACEBACK_FLAGS $FUN_SAFE_FLAGS $SAFE_OUT $UNIT_FLAGS $PCRE_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -dMD5 $PACK_FLAGS $TRACEBACK_FLAGS $FUN_SAFE_FLAGS $OUT_FLAG $UNIT_FLAGS $PCRE_FLAGS $FFI_FLAGS $MT_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) ---------------------
 ROOT="$(cd "$HERE/../../.." && pwd)"
 if [ -n "$FUN_SAFE_LEVEL" ]; then
     BUILD_BIN="$HERE/funcmd-safe"
     TARGET_BIN="$ROOT/fun/funcmd-safe"
+elif [ -n "$MT_FLAGS" ]; then
+    BUILD_BIN="$HERE/funcmd-mt"
+    TARGET_BIN="$ROOT/fun/funcmd-mt"
 else
     BUILD_BIN="$HERE/funcmd"
     TARGET_BIN="$ROOT/fun/funcmd"

@@ -6,6 +6,15 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- The opt-in worker build (`funcmd-mt`, `FUN_THREADS=1`) now covers Linux
+  x64/arm64, macOS x64/arm64 and Windows x64 instead of Linux x64 only.
+  `make-macos.sh` and `make-darwin.sh` add the Unix `-dUseCThreads` path;
+  `make-win64.bat` uses the native thread driver and system heap
+  (`-dFunThreads` only). CI builds and runs `lib-worker-test` on every MT
+  platform, and release archives package `fun-mt` (or `fun-mt.exe`) wherever
+  the binary is present. `package.py` also fixes the Windows stage name so the
+  worker binary is not silently dropped from win-x64 archives.
+
 - Windows CI no longer reports a missing optional `zlib.dll` as a regression:
   `lib-zlib` stays silent when the DLL cannot be loaded, the portable runner
   probes zlib and skips the two asm-list tests that need it, and the win64

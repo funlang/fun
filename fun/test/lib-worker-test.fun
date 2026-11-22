@@ -195,14 +195,26 @@ check('workerAttach fired', tickRan = 1 and spins < 100000);
 
 // 14. concurrent regex use: the shared PCRE cache must stay consistent across
 // workers, including the second-use JIT upgrade.
-var rws = new [];
-for i = 1 to 4 do
-  rws.@add(WorkerFile(job, 'regexHammer', '500'));
-end do;
-var rout = workerAll(rws, -1);
-check('regex workers', rout.@count() = 4);
-check('regex values', rout[0] = '4786' and rout[1] = '4786'
-                    and rout[2] = '4786' and rout[3] = '4786');
+// A win64 build may ship without pcre3.dll; the portable runner skips the
+// regex tests there, so this focused test must skip them too.
+var hasRegex = false;
+try
+  hasRegex = 'a1'.replace(/\d++/g, '-') = 'a-';
+except
+  hasRegex = false;
+end try;
+if hasRegex then
+  var rws = new [];
+  for i = 1 to 4 do
+    rws.@add(WorkerFile(job, 'regexHammer', '500'));
+  end do;
+  var rout = workerAll(rws, -1);
+  check('regex workers', rout.@count() = 4);
+  check('regex values', rout[0] = '4786' and rout[1] = '4786'
+                      and rout[2] = '4786' and rout[3] = '4786');
+else
+  ?. 'SKIP worker regex: engine not built';
+end if;
 
 ?. 'worker tests: pass=' & pass & ' fail=' & failed;
 if failed > 0 then

@@ -542,10 +542,11 @@ jobs:
           pkg=$(find smoke -mindepth 1 -maxdepth 1 -type d)
           cd "$pkg"
           ./fun/test/run-linux-regression.sh
-          # The opt-in worker binary is packaged on linux-x64 only. Run its
-          # focused suite from the extracted archive, not from the build tree.
-          # A stage created before the worker build has no `mt` capability;
-          # skip those so an older tag can still be released.
+          # The opt-in worker binary is packaged wherever the stage has one;
+          # this runner can execute the linux-x64 build. Run its focused suite
+          # from the extracted archive, not from the build tree. A stage
+          # created before the worker build has no `mt` capability; skip those
+          # so an older tag can still be released.
           if python3 -c 'import json,sys; sys.exit(0 if json.load(open("capabilities.json")).get("mt") else 1)'; then
             test -x ./fun/fun-mt || {
               echo "::error title=missing fun-mt::linux-x64 archive declares mt but has no fun/fun-mt"

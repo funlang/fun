@@ -3,17 +3,18 @@
 # two where an FPC target exists.
 #
 #   linux-x64    ubuntu-24.04      native FPC + full suite + opt-in MT build
-#   linux-arm64  ubuntu-24.04-arm  native FPC + full suite (linux-aarch64 skips)
-#   macos-x64    macos-15-intel    FPC universal dmg + macOS suite
-#   macos-arm64  macos-latest      Homebrew FPC 3.2.2 bottle + macOS suite
+#   linux-arm64  ubuntu-24.04-arm  native FPC + full suite + opt-in MT build
+#   macos-x64    macos-15-intel    FPC universal dmg + macOS suite + MT build
+#   macos-arm64  macos-latest      Homebrew FPC 3.2.2 bottle + macOS suite + MT
 #   linux-safe   ubuntu-24.04      SAFE=1 build + focused capability test only
-#   windows-x64  windows-latest    FPC (ppcrossx64) + the Windows runner (portable subset)
+#   windows-x64  windows-latest    FPC (ppcrossx64) + Windows runner + MT build
 #
-# linux-x64 sets `mt: true`: it also builds `funcmd-mt` (FUN_THREADS=1) in the
-# same job and runs the focused `lib-worker-test`. A separate job would pay a
-# second runner, checkout and toolchain install for a compile that reuses the
-# caches already present here. Only the MT binary gets its own cache entry, so
-# the other platforms keep their existing funcmd cache.
+# The x64 and arm64 POSIX entries and windows-x64 build `funcmd-mt`
+# (FUN_THREADS=1) in the same job and run the focused `lib-worker-test`. A
+# separate job would pay a second runner, checkout and toolchain install for a
+# compile that reuses the caches already present here. Only the MT binary gets
+# its own cache entry, so platforms without workers keep the existing funcmd
+# cache.
 #
 # windows-arm64 is not part of this gate: FPC 3.2.2 has no win64/aarch64
 # target. .github/workflows/winarm64.yml builds and tests it natively with an
@@ -85,6 +86,7 @@ jobs:
             build: ./make-linux-x86_64.sh
             fetch_all: true
             tcc: true
+            mt: true
           - name: macos-x64
             os: macos-15-intel
             platform: macos
@@ -92,6 +94,7 @@ jobs:
             build: ./make-macos.sh
             fetch_all: true
             tcc: true
+            mt: true
           - name: macos-arm64
             os: macos-latest
             platform: macos-aarch64
@@ -99,6 +102,7 @@ jobs:
             build: ./make-macos.sh
             fetch_all: true
             tcc: true
+            mt: true
     runs-on: ${{ matrix.os }}
     # A hard ceiling: install/hdiutil steps have hung on macOS runners before,
     # and the default six-hour limit is not a useful failure mode.
@@ -129,8 +133,8 @@ jobs:
           # v2 also caches funcmd-safe (see the build step).
           key: funcmd-v2-${{ matrix.name }}-fpc-3.2.2-${{ steps.src-hash.outputs.value }}
 
-      # The worker binary is Linux x64 only, so it has its own cache instead of
-      # adding a path that never exists on macOS or linux-arm64.
+      # The worker binary is opt-in per matrix entry, so it has its own cache
+      # instead of adding a path that does not exist on non-MT platforms.
       - name: Restore built funcmd-mt (MT matrix entries)
         if: matrix.mt
         id: cache-funcmd-mt
@@ -284,7 +288,7 @@ jobs:
           key: odbc-debs-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.image-version.outputs.value }}
 
       - name: Cache FPC installer dmg (macOS Intel)
-        if: runner.os == 'macOS' && runner.arch == 'X64' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true'))
+        if: runner.os == 'macOS' && runner.arch == 'X64' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true') || (matrix.mt && steps.cache-funcmd-mt.outputs.cache-hit != 'true'))
         uses: actions/cache@v4
         with:
           path: ~/fpc-cache
@@ -294,7 +298,7 @@ jobs:
       # a hit only needs `brew link` to recreate the /opt/homebrew/bin
       # symlinks, which skips the bottle pour entirely.
       - name: Cache FPC 3.2.2 bottle install (macOS arm64)
-        if: runner.os == 'macOS' && runner.arch == 'ARM64' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true'))
+        if: runner.os == 'macOS' && runner.arch == 'ARM64' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true') || (matrix.mt && steps.cache-funcmd-mt.outputs.cache-hit != 'true'))
         id: cache-fpc-macos-arm64
         uses: actions/cache@v4
         with:
@@ -311,7 +315,7 @@ jobs:
           key: brew-downloads-${{ runner.arch }}
 
       - name: Install Free Pascal 3.2.2 (macOS)
-        if: runner.os == 'macOS' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true'))
+        if: runner.os == 'macOS' && (steps.cache-funcmd.outputs.cache-hit != 'true' || (matrix.tcc && steps.cache-libtcc.outputs.cache-hit != 'true') || (matrix.mt && steps.cache-funcmd-mt.outputs.cache-hit != 'true'))
         run: |
           set -e
           if [ "$(uname -m)" = "arm64" ]; then
@@ -424,10 +428,11 @@ jobs:
           fi
           grep -E 'SAFE=strict' "$safe_log" || true
 
-          # The opt-in worker build is Linux x64 only. It shares the compiler
-          # and third-party caches with the default build; cthreads makes the
-          # binary different, not the inputs. Building it here avoids a second
-          # runner just to compile one extra FPC target mode.
+          # The opt-in worker build shares the compiler and third-party caches
+          # with the default build; the thread-safe heap makes the binary
+          # different, not the inputs. Building it here avoids a second runner
+          # just to compile one extra FPC target mode. It is enabled per matrix
+          # entry (Linux x64/arm64, macOS x64/arm64, win64 in its own job).
           if [ "${{ matrix.mt }}" = "true" ]; then
             mt_log="$RUNNER_TEMP/build-${{ matrix.name }}-mt.log"
             if ! FUN_THREADS=1 ${{ matrix.build }} >"$mt_log" 2>&1; then
@@ -709,8 +714,9 @@ jobs:
           path: |
             src\prj\fun\funcmd.exe
             src\prj\fun\funcmd-safe.exe
+            src\prj\fun\funcmd-mt.exe
             src\prj\fun\funcmd.flags.txt
-          key: funcmd-v8-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
+          key: funcmd-v9-win64-fpc-3.2.2-${{ steps.src-hash.outputs.value }}-${{ steps.src-hash.outputs.dlls }}
 
       - name: Restore FPC cache (Windows)
         if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
@@ -1222,6 +1228,51 @@ jobs:
           }
           Write-Host "::warning title=safe build (windows-x64) ok::funcmd-safe.exe=$((Get-Item 'funcmd-safe.exe').Length) bytes"
 
+      - name: Build funcmd-mt.exe
+        if: steps.cache-funcmd-win.outputs.cache-hit != 'true'
+        working-directory: src\prj\fun
+        shell: pwsh
+        run: |
+          # Windows has no cthreads unit: -dFunThreads alone selects the native
+          # thread driver, and the system heap is already thread-safe. Reuse the
+          # optional-feature set the normal build proved it can link.
+          $log = "$env:RUNNER_TEMP\build-windows-x64-mt.log"
+          $flags = @()
+          if (Test-Path 'funcmd.flags.txt') {
+            $label = (Get-Content 'funcmd.flags.txt' -Raw).Trim()
+            if ($label -and $label -ne 'no optional features') {
+              $flags = @($label -split '\s+' | Where-Object { $_ })
+            }
+          }
+          $units = Join-Path (Get-Location) 'units-mt'
+          New-Item -ItemType Directory -Force -Path $units | Out-Null
+          Remove-Item (Join-Path $units '*.ppu'), (Join-Path $units '*.o'), `
+                      (Join-Path $units '*.or') -Force -ErrorAction SilentlyContinue
+          $argv = @('funcmd.dpr', '-B', '-Sd', '-O2', '-Ooregvar', '-Xs', '-Twin64',
+                    '-dWin64', '-d_B_', '-d_C_', '-dWinCOMx', '-dFunPack', '-dMD5', '-dFunTraceback') + $flags +
+                  @('-dFunThreads', '-ofuncmd-mt.exe', "-FU$units",
+                    "-Fu$((Resolve-Path '..\..\lib').Path)")
+          Write-Host "mt argv: $(($argv | ForEach-Object { "[$_]" }) -join ' ')"
+          "mt argv: $(($argv | ForEach-Object { "[$_]" }) -join ' ')" |
+            Out-File -FilePath $log -Encoding ascii
+          & ppcrossx64 @argv *>&1 | Tee-Object -FilePath $log -Append
+          if ($LASTEXITCODE -ne 0) {
+            $errs = (Get-Content $log |
+                       Select-String -Pattern 'Fatal:|Error:' |
+                       Select-Object -Last 8 |
+                       ForEach-Object { $_.Line }) -join ' | '
+            if ([string]::IsNullOrEmpty($errs)) {
+              $errs = ((Get-Content $log -Tail 20) -join ' | ')
+            }
+            Write-Host "::error title=mt build (windows-x64)::exit=$LASTEXITCODE $errs"
+            exit 1
+          }
+          if (-not (Test-Path 'funcmd-mt.exe')) {
+            Write-Host "::error title=mt build (windows-x64)::ppcrossx64 succeeded but funcmd-mt.exe is missing"
+            exit 1
+          }
+          Write-Host "::warning title=mt build (windows-x64) ok::funcmd-mt.exe=$((Get-Item 'funcmd-mt.exe').Length) bytes"
+
       - name: Restore fun-jsbox.exe (MinGW)
         id: cache-jsbox-win
         uses: actions/cache@v4
@@ -1422,6 +1473,30 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Worker regression (MT)
+        shell: pwsh
+        run: |
+          # funcmd-mt.exe sits next to pcre3.dll/ffi.dll, so the concurrent
+          # regex test sees the same optional features as the default build.
+          $exe = "$env:GITHUB_WORKSPACE\src\prj\fun\funcmd-mt.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Host "::error title=worker regression (windows-x64)::funcmd-mt.exe is missing"
+            exit 1
+          }
+          $out = & $exe 'fun\test\lib-worker-test.fun' 2>&1
+          $out | Write-Host
+          if ($LASTEXITCODE -ne 0) {
+            $tail = ($out | Select-Object -Last 30) -join ' | '
+            Write-Host "::error title=worker regression (windows-x64)::exit=$LASTEXITCODE $tail"
+            exit 1
+          }
+          $sum = ($out | Select-String -Pattern 'worker tests:' | Select-Object -Last 1).Line
+          if (-not $sum -or $sum -notmatch 'fail=0') {
+            Write-Host "::error title=worker regression (windows-x64)::no clean summary: $sum"
+            exit 1
+          }
+          Write-Host "::warning title=worker regression (windows-x64)::$sum"
+
       - name: Runtime C and zlib probes (win64)
         shell: pwsh
         run: |
@@ -1481,6 +1556,9 @@ jobs:
           Copy-Item 'src\prj\fun\funcmd.exe' $stage -Force
           if (Test-Path 'src\prj\fun\funcmd-safe.exe') {
             Copy-Item 'src\prj\fun\funcmd-safe.exe' $stage -Force
+          }
+          if (Test-Path 'src\prj\fun\funcmd-mt.exe') {
+            Copy-Item 'src\prj\fun\funcmd-mt.exe' $stage -Force
           }
           foreach ($dll in @('pcre3.dll', 'ffi.dll', 'libtcc.dll', 'zlib.dll')) {
             if (Test-Path "src\prj\fun\$dll") { Copy-Item "src\prj\fun\$dll" $stage -Force }

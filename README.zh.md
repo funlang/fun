@@ -491,23 +491,26 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 
 ### 平台能力矩阵
 
-三个能力层（regex、FFI、运行时 C）加机器码层，以及面向不可信脚本的第二构建模式：
+三个能力层（regex、FFI、运行时 C）加机器码层、面向不可信脚本的第二构建模式，
+以及 opt-in 的 worker 构建：
 
-| 平台          | regex | FFI | 运行时 C (tcc) | asm | safe 构建 |
-| ------------- | ----- | --- | -------------- | --- | --------- |
-| linux-arm64   | yes   | yes | yes            | yes | yes       |
-| linux-loongarch64 | yes | yes | no           | yes | yes       |
-| linux-riscv64 | yes   | yes | no             | yes | yes       |
-| linux-x64     | yes   | yes | yes            | yes | yes       |
-| macos-arm64   | yes   | yes | yes            | yes | yes       |
-| macos-x64     | yes   | yes | yes            | yes | yes       |
-| win-x64       | yes   | yes | yes            | yes | yes       |
+| 平台          | regex | FFI | 运行时 C (tcc) | asm | safe 构建 | worker 构建 |
+| ------------- | ----- | --- | -------------- | --- | --------- | ----------- |
+| linux-arm64   | yes   | yes | yes            | yes | yes       | yes         |
+| linux-loongarch64 | yes | yes | no           | yes | yes       | no          |
+| linux-riscv64 | yes   | yes | no             | yes | yes       | no          |
+| linux-x64     | yes   | yes | yes            | yes | yes       | yes         |
+| macos-arm64   | yes   | yes | yes            | yes | yes       | yes         |
+| macos-x64     | yes   | yes | yes            | yes | yes       | yes         |
+| win-x64       | yes   | yes | yes            | yes | yes       | yes         |
 
 `safe 构建` 指独立的 `fun-safe` 二进制（`-dFunSafe`，strict 档），与默认解释器
-一起发布，默认构建的行为不受影响；其余列均描述默认二进制。`运行时 C` 已在
-macOS x64 与 arm64 上通过 `libtcc.dylib` 补齐；Apple Silicon 使用一个小补丁
-处理 Darwin ucontext 字段与 `MAP_JIT`。release notes 与每个包里的
-`capabilities.json` 都由实测探针生成，降级构建无法虚报能力。
+一起发布，默认构建的行为不受影响；`worker 构建` 是
+[`fun/lib/worker-model.md`](fun/lib/worker-model.md) 描述的 opt-in `fun-mt`
+二进制。其余列均描述默认二进制。`运行时 C` 已在 macOS x64 与 arm64 上通过
+`libtcc.dylib` 补齐；Apple Silicon 使用一个小补丁处理 Darwin ucontext 字段与
+`MAP_JIT`。release notes 与每个包里的 `capabilities.json` 都由实测探针生成，
+降级构建无法虚报能力。
 
 ### 交叉构建（在 Linux x86_64 上构建 macOS、Linux aarch64、龙芯与 riscv64）
 
@@ -521,6 +524,7 @@ aarch64 的汇编器/链接器来自 Zig 0.13 自带的 clang/lld，龙芯与 ri
 cd src/prj/fun
 ./bootstrap-darwin-cross.sh     # 一次性：FPC darwin 交叉工具链 + Zig（~/.fun/darwin-cross，约 2 GB）
 CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
+CPU=all FUN_THREADS=1 ./make-darwin.sh  # -> fun/funcmd-darwin-{x86_64,aarch64}-mt
 
 ./bootstrap-linux-aarch64.sh    # 一次性：aarch64-linux RTL，复用 darwin 工具链里的 ppcrossa64 + Zig
 ./make-linux-aarch64.sh         # -> fun/funcmd-linux-aarch64
@@ -583,10 +587,12 @@ funcmd，因此 `pcrd.pas` 以 `-dPCRE_WinDLL` 方式导入 DLL）；`run-window
 启动时仍会探测引擎，构建没有正则时把依赖正则的用例报成 SKIP，于是缺 PCRE 的工具链
 只会降级而不是失败。
 
-`linux-x64` 任务还会用 `FUN_THREADS=1` 构建 `funcmd-mt`，并运行聚焦的
-`lib-worker-test`。它留在现有任务里而不是单独开 workflow：编译器和第三方缓存
-已经就绪，另起 runner 只会为约一秒的编译再付一次 checkout 与工具链安装时间。
-只有 MT 二进制使用独立缓存，其他平台继续复用原有的 `funcmd` 缓存。
+`linux-x64`、`linux-arm64`、`macos-x64`、`macos-arm64` 任务还会用
+`FUN_THREADS=1` 构建 `funcmd-mt` 并运行聚焦的 `lib-worker-test`；Windows 任务
+构建 `funcmd-mt.exe` 并运行同一测试。它们留在现有任务里而不是单独开
+workflow：编译器和第三方缓存已经就绪，另起 runner 只会为约一秒的编译再付一次
+checkout 与工具链安装时间。只有 MT 二进制使用独立缓存，没有 worker 的平台继续
+复用原有的 `funcmd` 缓存。
 
 
 同一个 job 还会从 runner 的 MSYS2 装 libffi，当 `ffi.dll` 落在 `funcmd.exe` 旁时就以
@@ -656,10 +662,12 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 - **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`、`lib-worker`
 - **测试**：`test`（`fun test` 的注册与断言库）
 
-`lib-worker` 需要 opt-in 的 `funcmd-mt` 构建。Linux x64 发布包会把它作为
-`fun/fun-mt` 附带；从源码构建使用
-`src/prj/fun/make-linux-x86_64-mt.sh`。默认 `funcmd` 保持单线程堆与性能，
-首次使用 worker 时会给出明确错误。worker 会解析自己的模块并拥有独立的 AST 与堆，
+`lib-worker` 需要 opt-in 的 `funcmd-mt` 构建。linux-x64、linux-arm64、
+macos-x64、macos-arm64 与 win-x64 发布包会把它作为 `fun/fun-mt` 附带；从源码
+构建使用 `src/prj/fun/make-linux-x86_64-mt.sh`、
+`FUN_THREADS=1 src/prj/fun/make-macos.sh`，或
+`src/prj/fun/make-win64-mt.bat`。默认 `funcmd` 保持
+单线程堆与性能，首次使用 worker 时会给出明确错误。worker 会解析自己的模块并拥有独立的 AST 与堆，
 因此线程之间不共享任何 Fun 对象。结果以字符串返回；`Shared` 与 `Channel`
 在进出时复制值：
 

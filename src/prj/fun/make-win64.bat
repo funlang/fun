@@ -105,4 +105,23 @@ if /i not "%1"=="read" if /i not "%1"=="write" if /i not "%1"=="compile" (
 exit /b 0
 
 :build
-%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %HASH% %TRACEBACK% %REGEX% %FFI% %SAFE_FLAGS% %SAFE_OUT% %SAFE_UNITS% -Fu..\..\lib
+rem FUN_THREADS=1 builds funcmd-mt.exe, the opt-in worker-capable interpreter.
+rem It is a separate binary on purpose: the thread-safe heap costs ordinary
+rem scripts throughput. Windows supplies threads and a thread-safe heap in the
+rem system RTL, so unlike Unix there is no cthreads unit to add.
+set "MT_FLAGS="
+set "MT_OUT="
+set "MT_UNITS="
+if /i not "%FUN_THREADS%"=="1" goto :mt_ready
+if defined SAFE_LEVEL (
+  echo FUN_THREADS=1 cannot be combined with SAFE=...; build them separately. 1>&2
+  exit /b 2
+)
+set "MT_FLAGS=-dFunThreads"
+set "MT_OUT=-ofuncmd-mt.exe"
+set "MT_UNITS=-FUunits-mt"
+if not exist units-mt mkdir units-mt
+del /q units-mt\*.ppu units-mt\*.o units-mt\*.or 2>nul
+echo FUN_THREADS=1 - building funcmd-mt.exe ^(workers^).
+:mt_ready
+%dcc% funcmd.dpr -B -Sd -O2 -Ooregvar -Xs -Twin64 -dWin64 -d_B_ -d_C_ -dWinCOMx %HASH% %TRACEBACK% %REGEX% %FFI% %SAFE_FLAGS% %SAFE_OUT% %SAFE_UNITS% %MT_FLAGS% %MT_OUT% %MT_UNITS% -Fu..\..\lib

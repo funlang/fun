@@ -45,6 +45,19 @@ ZIG="${ZIG:-$ROOT/zig/zig}"
 . "$HERE/safe-flags.sh"
 fun_safe_parse || exit 2
 
+# FUN_THREADS=1 builds the opt-in worker-capable interpreter (funcmd-darwin-*-mt).
+# It is a separate output on purpose: cthreads makes every allocation lock,
+# which costs roughly 12-15% on ordinary single-threaded scripts. The darwin
+# cross RTL built by bootstrap-darwin-cross.sh includes cthreads.
+MT_FLAGS=""
+if [ "${FUN_THREADS:-0}" = "1" ]; then
+    if [ -n "$FUN_SAFE_LEVEL" ]; then
+        echo "FUN_THREADS=1 cannot be combined with SAFE=...; build them separately." >&2
+        exit 2
+    fi
+    MT_FLAGS="-dFunThreads -dUseCThreads"
+fi
+
 # --- Resolve the FPC darwin cross compiler and its unit trees ---------------
 ppc_name() {
   case "$1" in
@@ -98,7 +111,7 @@ build_cpu() {
   else
     FEATURES="-dFunPack"
   fi
-  FEATURES="$FEATURES $FUN_SAFE_FLAGS"
+  FEATURES="$FEATURES $FUN_SAFE_FLAGS $MT_FLAGS"
   FU_EXTRA=""
   FL_EXTRA=""
   if [ -f "$UNITS_HASH/md5.ppu" ] && [ -f "$UNITS_HASH/sha1.ppu" ]; then
@@ -132,6 +145,9 @@ build_cpu() {
   # --- Build ----------------------------------------------------------------
   BUILD="$(mktemp -d "${TMPDIR:-/tmp}/fun-darwin-build-$cpu-XXXXXX")"
   echo "Building funcmd for darwin/$cpu with $PPCROSS"
+  if [ -n "$MT_FLAGS" ]; then
+      echo "FUN_THREADS=1 - building the worker-capable variant."
+  fi
   # -n: ignore the host fpc.cfg (its unit paths are for the build host)
   # -FD: pin clang/ld/fpcres to our shims
   # shellcheck disable=SC2086
@@ -139,7 +155,10 @@ build_cpu() {
       -Fu"$UNITS" $FU_EXTRA $FL_EXTRA -FD"$TOOLS" \
       -FU"$BUILD" -FE"$BUILD" $FEATURES "$@"
 
-  OUT="${FUN_DARWIN_OUT:-$HERE/../../../fun/funcmd-darwin-$cpu${FUN_SAFE_LEVEL:+-safe}}"
+  SUFFIX=""
+  [ -n "$FUN_SAFE_LEVEL" ] && SUFFIX="-safe"
+  [ -n "$MT_FLAGS" ] && SUFFIX="-mt"
+  OUT="${FUN_DARWIN_OUT:-$HERE/../../../fun/funcmd-darwin-$cpu$SUFFIX}"
   cp -f "$BUILD/funcmd" "$OUT"
   echo "Copied funcmd to $OUT"
   rm -rf "$BUILD"

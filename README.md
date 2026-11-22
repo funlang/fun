@@ -516,22 +516,24 @@ The full grammar is defined in [`src/parse/bnf/fun.ebnf`](src/parse/bnf/fun.ebnf
 ### Platform capability matrix
 
 Three capability layers (regex, FFI, runtime C) plus the machine-code layer,
-and a second build mode for untrusted scripts:
+a second build mode for untrusted scripts, and an opt-in worker build:
 
-| Platform       | regex | FFI | runtime C (tcc) | asm | safe build |
-| -------------- | ----- | --- | --------------- | --- | ---------- |
-| linux-arm64    | yes   | yes | yes             | yes | yes        |
-| linux-loongarch64 | yes | yes | no             | yes | yes        |
-| linux-riscv64  | yes   | yes | no              | yes | yes        |
-| linux-x64      | yes   | yes | yes             | yes | yes        |
-| macos-arm64    | yes   | yes | yes             | yes | yes        |
-| macos-x64      | yes   | yes | yes             | yes | yes        |
-| win-x64        | yes   | yes | yes             | yes | yes        |
+| Platform       | regex | FFI | runtime C (tcc) | asm | safe build | worker build |
+| -------------- | ----- | --- | --------------- | --- | ---------- | ------------ |
+| linux-arm64    | yes   | yes | yes             | yes | yes        | yes          |
+| linux-loongarch64 | yes | yes | no             | yes | yes        | no           |
+| linux-riscv64  | yes   | yes | no              | yes | yes        | no           |
+| linux-x64      | yes   | yes | yes             | yes | yes        | yes          |
+| macos-arm64    | yes   | yes | yes             | yes | yes        | yes          |
+| macos-x64      | yes   | yes | yes             | yes | yes        | yes          |
+| win-x64        | yes   | yes | yes             | yes | yes        | yes          |
 
 `safe build` is the separate `fun-safe` binary (`-dFunSafe`, strict level); it
 ships next to the default interpreter, so the default build and its behaviour
-are unchanged. Every other column describes the default binary. `runtime C` is
-now available on both macOS architectures through `libtcc.dylib`. Apple
+are unchanged. `worker build` is the opt-in `fun-mt` binary described in
+[`fun/lib/worker-model.md`](fun/lib/worker-model.md). Every other column
+describes the default binary. `runtime C` is now available on both macOS
+architectures through `libtcc.dylib`. Apple
 Silicon uses a small TCC patch for the Darwin ucontext fields and `MAP_JIT`
 handling. The release notes and each archive's `capabilities.json` are
 generated from probes, so a degraded build cannot claim a capability it does
@@ -550,6 +552,7 @@ riscv64 use GNU binutils (`binutils-loongarch64-linux-gnu`,
 cd src/prj/fun
 ./bootstrap-darwin-cross.sh     # once: FPC darwin cross toolchain + Zig (~/.fun/darwin-cross, ~2 GB)
 CPU=all ./make-darwin.sh        # -> fun/funcmd-darwin-{x86_64,aarch64}
+CPU=all FUN_THREADS=1 ./make-darwin.sh  # -> fun/funcmd-darwin-{x86_64,aarch64}-mt
 
 ./bootstrap-linux-aarch64.sh    # once: aarch64-linux RTL, reusing ppcrossa64 + Zig from the darwin tree
 ./make-linux-aarch64.sh         # -> fun/funcmd-linux-aarch64
@@ -617,12 +620,14 @@ into funcmd, so `pcrd.pas` imports the DLL under `-dPCRE_WinDLL`);
 the regex-dependent tests as SKIP when a build has none, so a regex-less
 toolchain degrades instead of failing.
 
-The `linux-x64` job also builds `funcmd-mt` (`FUN_THREADS=1`) and runs the
-focused `lib-worker-test` suite. This stays in the existing job rather than a
-separate workflow: the compiler and third-party caches are already present, and
-a second runner would pay checkout and toolchain startup for a roughly one
-second compile. Only the MT binary has its own cache entry, so the other
-platforms keep their existing `funcmd` cache.
+The `linux-x64`, `linux-arm64`, `macos-x64` and `macos-arm64` jobs also build
+`funcmd-mt` (`FUN_THREADS=1`) and run the focused `lib-worker-test` suite; the
+Windows job builds `funcmd-mt.exe` and runs the same test. This stays in the
+existing jobs rather than a separate workflow: the compiler and third-party
+caches are already present, and a second runner would pay checkout and
+toolchain startup for a roughly one second compile. Only the MT binary has its
+own cache entry, so platforms without workers keep their existing `funcmd`
+cache.
 
 
 The same job installs libffi from the runner's MSYS2 and builds win64 with
@@ -705,10 +710,12 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (81 modules)
 - **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`, `lib-worker`
 - **Testing**: `test` (registration and assertions for `fun test`)
 
-`lib-worker` needs the opt-in `funcmd-mt` build. Linux x64 release archives
-ship it as `fun/fun-mt`; from source use
-`src/prj/fun/make-linux-x86_64-mt.sh`. The default `funcmd` keeps its
-single-threaded heap and performance and reports a clear error on first use.
+`lib-worker` needs the opt-in `funcmd-mt` build. Release archives on linux-x64,
+linux-arm64, macos-x64, macos-arm64 and win-x64 ship it as `fun/fun-mt`; from
+source use `src/prj/fun/make-linux-x86_64-mt.sh`,
+`FUN_THREADS=1 src/prj/fun/make-macos.sh`, or
+`src/prj/fun/make-win64-mt.bat`. The default `funcmd` keeps its single-threaded
+heap and performance and reports a clear error on first use.
 A worker parses its own module and owns its AST and heap, so nothing Fun-visible
 is shared between threads. Results are strings; `Shared` and `Channel` copy
 values in and out:

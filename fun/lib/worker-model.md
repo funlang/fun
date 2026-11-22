@@ -1,9 +1,14 @@
 # Worker and shared-data model
 
-Status: implemented in the opt-in `funcmd-mt` build (`FUN_THREADS=1`). Linux
-x64 release archives ship it as `fun/fun-mt`; from source, use
-`src/prj/fun/make-linux-x86_64-mt.sh`. The default `funcmd` stays
-single-threaded and reports a clear error on first use of `lib-worker`.
+Status: implemented in the opt-in `funcmd-mt` build (`FUN_THREADS=1`).
+Release archives ship it as `fun/fun-mt` on linux-x64, linux-arm64,
+macos-x64, macos-arm64 and win-x64. From source, use
+`src/prj/fun/make-linux-x86_64-mt.sh` (on any Linux host),
+`FUN_THREADS=1 src/prj/fun/make-macos.sh`,
+`FUN_THREADS=1 src/prj/fun/make-darwin.sh` (cross build), or
+`src/prj/fun/make-win64-mt.bat` (`set FUN_THREADS=1` before
+`make-win64.bat` also works). The default `funcmd` stays single-threaded and
+reports a clear error on first use of `lib-worker`.
 
 ## Why a separate binary
 
@@ -19,8 +24,10 @@ The worker model avoids the problem instead of locking it:
 - A worker gets a cloned `CEnv`, and `_ENV` is a thread variable.
 - Nothing Fun-visible crosses a thread boundary by reference. Payloads and
   results are plain strings, and structured data travels as Fun Data (FD).
-- `cthreads` supplies the thread-safe FPC heap. It costs roughly 12-15% on
-  single-threaded scripts, which is why it is a separate binary.
+- On Unix (Linux and macOS), `cthreads` supplies the thread-safe FPC heap. It
+  costs roughly 12-15% on single-threaded scripts, which is why it is a
+  separate binary. Windows uses the native thread driver and system heap, so
+  its MT build needs only `-dFunThreads`, not `-dUseCThreads`.
 
 This means the same source function can run in many workers at once. The old
 "same function cannot be re-entered" limitation still applies to one shared AST
@@ -191,8 +198,8 @@ workerAttach(s);       // every s.Tick() now ends with workerTick()
   parse cost per job. `workerMapLimit` limits concurrency, not parsing.
 - No worker-to-worker direct message object. Use `Shared` or `Channel` names.
 - No cross-process workers, no remote workers, and no distributed queues.
-- No Windows or macOS MT build script yet. The only worker target is Linux
-  x86_64, shipped as `fun/fun-mt` in the linux-x64 archive.
+- MT builds cover Linux x64/arm64, macOS x64/arm64 and Windows x64. There is
+  no 32-bit, Delphi/WinCE, LoongArch64 or riscv64 `fun-mt` yet.
 - No fairness or priority control. OS scheduling decides which worker runs.
 - FFI callbacks into Fun from a thread that Fun did not create need a build with
   the thread-safe RTL and careful callback design. This model does not make

@@ -2,7 +2,8 @@
 # Run the worker/shared-store tests with the MT build.
 #
 # Build the binary first:
-#   src/prj/fun/make-linux-x86_64-mt.sh
+#   src/prj/fun/make-linux-x86_64-mt.sh        (Linux)
+#   FUN_THREADS=1 src/prj/fun/make-macos.sh   (macOS; Windows: fun\funcmd-mt.exe)
 #
 # Override the binary with FUNCMD=/path/to/funcmd-mt when needed.
 set -e

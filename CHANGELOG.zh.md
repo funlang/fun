@@ -6,6 +6,14 @@
 
 ## [Unreleased]
 
+- opt-in 的 worker 构建（`funcmd-mt`，`FUN_THREADS=1`）从仅 Linux x64 扩展到
+  Linux x64/arm64、macOS x64/arm64 与 Windows x64。`make-macos.sh` 与
+  `make-darwin.sh` 走 Unix 的 `-dUseCThreads`；`make-win64.bat` 使用原生线程
+  驱动与系统堆，只需 `-dFunThreads`。CI 在每个 MT 平台构建并运行
+  `lib-worker-test`，发布包在二进制存在时附带 `fun-mt`（Windows 为
+  `fun-mt.exe`）。`package.py` 同时修正了 Windows stage 的文件名，win-x64
+  包不会再静默丢掉 worker 二进制。
+
 - Windows CI 不再把缺少可选的 `zlib.dll` 当成回归：DLL 无法加载时
   `lib-zlib` 保持静默，便携测试集先探测 zlib 并跳过依赖它的两个汇编表测试；
   win64 运行时 DLL 缓存改为按固定的第三方构建脚本计算键，而不再随每次

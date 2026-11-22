@@ -99,10 +99,10 @@ def build_platform(platform, raw_dir, layout_root, repo_root, meta, epoch):
     # the documented command and fun.exe on Windows).
     src_exe = "funcmd.exe" if is_win else "funcmd"
     src_safe = "funcmd-safe.exe" if is_win else "funcmd-safe"
-    src_mt = "funcmd-mt"
+    src_mt = "funcmd-mt.exe" if is_win else "funcmd-mt"
     exe = "fun.exe" if is_win else "fun"
     safe_exe = "fun-safe.exe" if is_win else "fun-safe"
-    mt_exe = "fun-mt"
+    mt_exe = "fun-mt.exe" if is_win else "fun-mt"
 
     caps_path = src / "build-env.json"
     if caps_path.is_file():
@@ -526,7 +526,8 @@ def notes(meta, caps_list, archives, repo_root, previous):
         "",
         "The first five columns describe the default binary. `safe build` is the",
         "separate capability-restricted `fun-safe` binary (strict level).",
-        "`worker build` is the opt-in `fun-mt` binary (Linux x64 only).",
+        "`worker build` is the opt-in `fun-mt` binary "
+        "(linux-x64/arm64, macos-x64/arm64, win-x64).",
         "`capabilities.json` in each archive is the machine-readable table.",
         "",
         "Verify with `sha256sum -c SHA256SUMS` (Linux/macOS) or",
