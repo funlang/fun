@@ -61,7 +61,7 @@
 | D-03 | 数据 | P2 | OPEN | 日期/时间跨端约定未统一 | `art/notes/data-format-alignment.md` |
 | D-04 | 数据 | P2 | OPEN | Fun `Int64` 超过 2^53 传给 JS 会静默丢精度 | `art/notes/data-format-alignment.md` |
 | D-05 | 数据 | P3 | OPEN | FD/JSON 其余低风险一致性项（空键、定长前缀、kvd 空白分隔等） | `art/notes/data-format-alignment.md` |
-| P-17 | 平台/并发 | P3 | OPEN | P-01 拆分项：为 LoongArch64 与 riscv64 提供 `fun-mt` 构建与 CI（P-16 已有龙芯解释器与 CI 基础）。32 位与 Delphi/WinCE 不在此列 | `fun/lib/worker-model.md` |
+| P-17 | 平台/并发 | P3 | OPEN | P-01 拆分项：为 LoongArch64 与 riscv64 提供 `fun-mt`。交叉脚本加 `FUN_THREADS=1`/`-dUseCThreads` 与 `-mt` 输出名，确认目标 RTL 的 `cthreads` 已随 bootstrap 安装，CI 在 qemu 下跑 `lib-worker-test`（P-16 已有龙芯解释器与 CI 基础）。32 位与 Delphi/WinCE 不在此列 | `fun/lib/worker-model.md` |
 | P-02 | 平台 | P2 | OPEN | `lib-os` 全量 host 分派器未做 | `art/notes/library-port-plan.md` |
 | P-03 | 平台 | P2 | OPEN | `lib-message`/`lib-async`/`lib-jsasync` 仍依赖消息泵或线程 | `art/notes/linux-capabilities.md` |
 | P-04 | 平台 | P3 | OPEN | `lib-icmp` raw socket 未做，需 root/CAP_NET_RAW | `art/notes/linux-capabilities.md` |
