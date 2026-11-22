@@ -158,7 +158,8 @@ FUN_THREADS=1 FULL=1 ./make-linux-riscv64.sh  # -> ...-musl-mt
   cross-built Linux aarch64 artifact is the core interpreter (its `-dRegex` and
   `-dLinuxFFI` need a libc / libffi that are not cross-built yet); a native
   Linux arm64 build, as in CI, has both.
-- Porting details: [`art/notes/macos-port.md`](../art/notes/macos-port.md).
+- Porting details live in the maintainer-only `art/notes/macos-port.md` note
+  (the `art/` tree is not shipped in a public checkout).
 
 ## Third-party dependencies
 
@@ -220,8 +221,8 @@ The runner is host-aware: `fun/test/regression-skip-<platform>.txt` lists tests
 that cannot run on a host (a `/proc` or `libc.so.6` backend, an unported JIT,
 ...) and `fun/test/expected/<platform>/` can hold host-specific snapshots that
 override the shared `fun/test/expected/`. `--update` writes to the host's own
-snapshot directory; macOS details and the current skip reasons are in
-[`art/notes/macos-port.md`](../art/notes/macos-port.md).
+snapshot directory. macOS details and the current skip reasons are kept in the
+maintainer-only `art/notes/macos-port.md` note.
 
 [`.github/workflows/regression.yml`](../.github/workflows/regression.yml) runs
 the suite on five platforms - Linux, macOS and Windows on x64, plus Linux and

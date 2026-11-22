@@ -129,7 +129,7 @@ FUN_THREADS=1 FULL=1 ./make-linux-riscv64.sh  # -> ...-musl-mt
 - 龙芯路径需要 `binutils-loongarch64-linux-gnu` 2.42 或更新版本与 FPC 主线快照；它针对 Alpine musl sysroot 交叉构建，因此正则、FFI、`-lnx` 后端与 `lib-asm-loongarch64` 都可用（sysroot 随带 `libgcc_s`，提供 `__clear_cache`），仅 TinyCC 不可用。`.github/workflows/loongarch.yml` 在 main 推送时执行该构建，同时构建 `-mt` worker 二进制、在 qemu 下跑 `lib-worker-test`，并上传供 nightly 预发布使用的 stage。
 - riscv64 路径需要 `binutils-riscv64-linux-gnu` 与 FPC 主线快照，同样针对 Alpine musl sysroot 交叉构建，因此正则、FFI、`-lnx` 后端与 `lib-asm-riscv64` 都可用（sysroot 随带 `libgcc_s`，提供 `__clear_cache`），仅 TinyCC 不可用。`.github/workflows/riscv64.yml` 在 main 推送时执行该构建，同时构建 `-mt` worker 二进制、在 qemu 下跑 `lib-worker-test`，并上传供 nightly 预发布使用的 stage；`fun/test/run-riscv64-qemu.sh` 在 `qemu-riscv64` 下运行同一套 Linux 测试。
 - 可选特性照例降级：缺 PCRE → 无正则；缺 libffi 单元/stub → 无 `getapi`（win64 的 CI 两者都会备好：`pcre3.dll` 与 `ffi.dll`）。Linux aarch64 交叉产物是核心解释器（其 `-dRegex` 与 `-dLinuxFFI` 需要 libc / libffi，尚未交叉构建）；而原生 Linux arm64 构建（CI 即如此）两者都有。
-- 移植细节见 [`art/notes/macos-port.md`](../art/notes/macos-port.md)。
+- 移植细节见维护者本地的 `art/notes/macos-port.md`（`art/` 不随公开仓库发布）。
 
 ## 第三方依赖
 
@@ -182,8 +182,8 @@ fun/test/run-windows-regression.bat  # Windows 对应脚本
 runner 会识别宿主：`fun/test/regression-skip-<platform>.txt` 列出无法在该宿主上
 运行的用例（`/proc` 或 `libc.so.6` 后端、尚未移植的 JIT……），
 `fun/test/expected/<platform>/` 可存放覆盖共享 `fun/test/expected/` 的宿主专属快照。
-`--update` 写入宿主自己的快照目录；macOS 细节与当前的跳过原因见
-[`art/notes/macos-port.md`](../art/notes/macos-port.md)。
+`--update` 写入宿主自己的快照目录；macOS 细节与当前的跳过原因保存在维护者
+本地的 `art/notes/macos-port.md`。
 
 [`.github/workflows/regression.yml`](../.github/workflows/regression.yml) 在五个平台上
 运行本套件——Linux / macOS / Windows 的 x64，加上 Linux 与 macOS 的 arm64。五个
