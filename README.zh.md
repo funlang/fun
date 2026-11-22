@@ -1,53 +1,31 @@
 # Fun 语言
 
-> 一门轻量、可嵌入、**以数据为中心**的脚本语言，能力从 JSON/FD 数据一路延伸到运行时编译的 C 与原生机器码。
+**运行时很小，能力很深：从胶水代码到机器码。**
+
+Fun 是一门约 0.3 MB、零外部依赖的脚本语言，自 2010 年起用于生产，覆盖
+JSON/FD 数据、日常胶水代码、FFI、运行时 C、JIT 与原生机器码。
+
+**约 0.3 MB** 运行时 · **0** 外部依赖 · **Windows 95 → LoongArch64** · **15 年以上**
+
+[安装](#快速开始) · [教程](docs/tutorial.zh.md) · [中文手册](https://funlang.org/man-cn.htm) · [为什么是 Fun](#为什么是-fun)
 
 [English](README.md) · **简体中文**（本文件）
 
-- 版本：**9.5.7**
-- 官网：<https://funlang.org>
-- 作者：张卫东 &lt;zwd@funlang.org&gt;
-- 许可证：MIT，另有商业条款（见[许可证](#许可证)）
-- 状态与路线图：[ROADMAP.md](ROADMAP.md)
+- 版本：**9.5.7** · 官网：<https://funlang.org> · 许可证：MIT（[条款](#许可证)） · [路线图](ROADMAP.md)
 
-> **9.5.7**：这不是玩具或原型——一门经过 15 年以上（2010 至今）打磨与生产验证的成熟语言，其传承可追溯到 Nuva（2006）与 TemplateScript（2005）。
+```fun
+use 'lib-set.fun';
 
----
+var nums = [1, 2, 3, 4, 5];
+var doubled = nums | map(a -> a * 2);
+?. doubled.@toJson();   # [2,4,6,8,10]
 
-## 文档
-
-建议从[教程](docs/tutorial.zh.md)开始；精确语言规则查官网
-[中文手册](https://funlang.org/man-cn.htm)。
-
-| 文档 | 内容 |
-| ---- | ---- |
-| [教程](docs/tutorial.zh.md) | 上手路径：第一个脚本、值、集合、类、文件、包、HTTP、worker、原生代码。 |
-| [标准库指南](docs/standard-library.zh.md) | 模块地图，以及 worker、日志、运行时、cron、HTTP、CLI、IO、格式与 schema 的详细用法。 |
-| [安装](docs/install.zh.md) | 发布包、一行安装、Windows 安装器、运行要求。 |
-| [构建](docs/building.zh.md) | 原生与交叉构建、能力矩阵、第三方依赖、安全构建、CI。 |
-| [工具链](docs/tooling.zh.md) | `package.fun`、`fun package`、`fun run`、`fun test`、`fun pack`。 |
-| [中文手册](https://funlang.org/man-cn.htm) | 按章节组织的语言参考。 |
-
----
-
-## 目录
-
-- [亮点](#亮点)
-- [为什么是 Fun](#为什么是-fun)
-- [核心特性](#核心特性)
-- [快速开始](#快速开始)
-- [体验 Fun 语言](#体验-fun-语言)
-- [包管理与测试](#包管理与测试)
-- [能力阶梯](#能力阶梯)
-- [FD 数据格式](#fd-数据格式)
-- [外部函数接口（FFI）](#外部函数接口ffi)
-- [关键字别名](#关键字别名)
-- [嵌入运行时 fun.dll](#嵌入运行时-fundll)
-- [目录结构](#目录结构)
-- [构建](#构建)
-- [标准库](#标准库)
-- [示例](#示例)
-- [许可证](#许可证)
+class Number(me)
+  this['#'] = you -> (me + you) * me * you;
+end class;
+var n = Number(2);
+?. n .# 3;              # 30
+```
 
 ---
 
@@ -186,6 +164,22 @@ Hello, fun!
 9
 9
 ```
+
+---
+
+## 文档
+
+建议从[教程](docs/tutorial.zh.md)开始；精确语言规则查官网
+[中文手册](https://funlang.org/man-cn.htm)。
+
+| 文档 | 内容 |
+| ---- | ---- |
+| [教程](docs/tutorial.zh.md) | 上手路径：第一个脚本、值、集合、类、文件、包、HTTP、worker、原生代码。 |
+| [标准库指南](docs/standard-library.zh.md) | 模块地图，以及 worker、日志、运行时、cron、HTTP、CLI、IO、格式与 schema 的详细用法。 |
+| [安装](docs/install.zh.md) | 发布包、一行安装、Windows 安装器、运行要求。 |
+| [构建](docs/building.zh.md) | 原生与交叉构建、能力矩阵、第三方依赖、安全构建、CI。 |
+| [工具链](docs/tooling.zh.md) | `package.fun`、`fun package`、`fun run`、`fun test`、`fun pack`。 |
+| [中文手册](https://funlang.org/man-cn.htm) | 按章节组织的语言参考。 |
 
 ---
 

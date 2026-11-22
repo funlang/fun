@@ -1,53 +1,32 @@
 # Fun Language
 
-> A lightweight, embeddable, **data-centric scripting language** whose reach extends from JSON/FD data all the way down to runtime-compiled C and raw machine code.
+**Small runtime, long reach: from glue code to machine code.**
+
+Fun is a ~0.3 MB, zero-dependency scripting language, in production since
+2010, that spans JSON/FD data, daily glue code, FFI, runtime C, JIT and raw
+machine code.
+
+**~0.3 MB** runtime · **0** external deps · **Windows 95 → LoongArch64** · **15+ years**
+
+[Install](#quick-start) · [Tutorial](docs/tutorial.md) · [Manual](https://funlang.org/man.htm) · [Why Fun](#why-fun)
 
 **English** (this file) · [简体中文](README.zh.md)
 
-- Version: **9.5.7**
-- Website: <https://funlang.org>
-- Author: Zhang Weidong &lt;zwd@funlang.org&gt;
-- License: MIT, plus commercial terms (see [License](#license))
-- Status and roadmap: [ROADMAP.md](ROADMAP.md)
+- Version: **9.5.7** · Website: <https://funlang.org> · License: MIT ([terms](#license)) · [Roadmap](ROADMAP.md)
 
-> **Version 9.5.7**: this is not a toy or a prototype — a mature language refined and production-validated for over 15 years (2010–present), with a lineage that reaches back through Nuva (2006) and TemplateScript (2005).
+```fun
+use 'lib-set.fun';
 
----
+var nums = [1, 2, 3, 4, 5];
+var doubled = nums | map(a -> a * 2);
+?. doubled.@toJson();   # [2,4,6,8,10]
 
-## Documentation
-
-Start with the [tutorial](docs/tutorial.md); use the website
-[manual](https://funlang.org/man.htm) for exact language rules.
-
-| Document | What it covers |
-| -------- | -------------- |
-| [Tutorial](docs/tutorial.md) | Guided path: first script, values, collections, classes, files, packages, HTTP, workers, native code. |
-| [Standard library guide](docs/standard-library.md) | Module map and detailed usage for workers, logging, runtime, cron, HTTP, CLI, IO, formats and schema. |
-| [Installing](docs/install.md) | Release archives, one-line installer, Windows installer, runtime requirements. |
-| [Building](docs/building.md) | Native and cross builds, capability matrix, third-party dependencies, safe builds, CI. |
-| [Tooling](docs/tooling.md) | `package.fun`, `fun package`, `fun run`, `fun test`, `fun pack`. |
-| [Manual](https://funlang.org/man.htm) | Language reference, chapter by chapter. |
-
----
-
-## Table of contents
-
-- [Highlights](#highlights)
-- [Why Fun](#why-fun)
-- [Core features](#core-features)
-- [Quick start](#quick-start)
-- [A taste of Fun](#a-taste-of-fun)
-- [Packages and testing](#packages-and-testing)
-- [The capability ladder](#the-capability-ladder)
-- [The FD data format](#the-fd-data-format)
-- [Foreign function interface](#foreign-function-interface)
-- [Keyword aliasing](#keyword-aliasing)
-- [Embedding with fun.dll](#embedding-with-fundll)
-- [Repository layout](#repository-layout)
-- [Building](#building)
-- [Standard library](#standard-library)
-- [Examples](#examples)
-- [License](#license)
+class Number(me)
+  this['#'] = you -> (me + you) * me * you;
+end class;
+var n = Number(2);
+?. n .# 3;              # 30
+```
 
 ---
 
@@ -193,6 +172,22 @@ Hello, fun!
 9
 9
 ```
+
+---
+
+## Documentation
+
+Start with the [tutorial](docs/tutorial.md); use the website
+[manual](https://funlang.org/man.htm) for exact language rules.
+
+| Document | What it covers |
+| -------- | -------------- |
+| [Tutorial](docs/tutorial.md) | Guided path: first script, values, collections, classes, files, packages, HTTP, workers, native code. |
+| [Standard library guide](docs/standard-library.md) | Module map and detailed usage for workers, logging, runtime, cron, HTTP, CLI, IO, formats and schema. |
+| [Installing](docs/install.md) | Release archives, one-line installer, Windows installer, runtime requirements. |
+| [Building](docs/building.md) | Native and cross builds, capability matrix, third-party dependencies, safe builds, CI. |
+| [Tooling](docs/tooling.md) | `package.fun`, `fun package`, `fun run`, `fun test`, `fun pack`. |
+| [Manual](https://funlang.org/man.htm) | Language reference, chapter by chapter. |
 
 ---
 
