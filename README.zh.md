@@ -40,7 +40,7 @@
 一句话定位：**Fun 是一门从 JSON 一路写到机器码的脚本语言。**
 
 - 用同一个运行时，覆盖从高层数据处理（JSON/FD）到底层系统编程（FFI、运行时 C、JIT、机器码）的全谱系；
-- 自带 81 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
+- 自带约 90 个用 Fun 自身编写的标准库模块，全栈能力打包进单个可嵌入的 `fun.dll`；
 - 在信创与 AI Agent 场景中，作为连接国产 OS、数据库、芯片与业务逻辑的轻量级胶水。
 
 Fun 的设计出发点很简单：**数据与代码都应该是头等公民，而且一段脚本应该能在不离开语言的情况下一路触达机器底层。**
@@ -69,9 +69,11 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **运行时 C 与机器码** —— 内置 Tiny C 编译器、JIT 与内联汇编（见[能力阶梯](#能力阶梯)）。
 - **紧凑的 FFI** —— 用简短的签名串调用 DLL/共享库函数（见 [FFI](#外部函数接口ffi)）。
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
-- **跨平台** —— Windows（32/64 位）、Linux、ARM 与 Windows CE。
+- **跨平台** —— Linux x64/arm64（LoongArch64/riscv64 为预发布）、macOS
+  x64/arm64 与 Windows x64；旧 Win32/CE 构建仍保留在源码树中。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
-- **自托管的标准库** —— 81 个用 Fun 自身编写的模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
+- **自托管的标准库** —— 约 90 个用 Fun 自身编写的公开模块，覆盖
+  JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 
 ---
 
@@ -81,21 +83,23 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 
 预编译解释器见 [GitHub Releases](https://github.com/funlang/fun/releases)：
 
-- Linux x64 / arm64：`.tar.gz`，内含 `libtcc.so` 与标准库 `lib/`；
+- Linux x64 / arm64：`.tar.gz`，内含 `libtcc.so`、`fun-mt` 与标准库 `lib/`；
 - Linux LoongArch64：`.tar.gz`，在 FPC 龙芯后端仍位于主线期间**只随
   nightly 预发布**。完整构建含正则、`getapi`/FFI 与原生汇编后端
-  （`lib-asm-loongarch64`），但没有 `libtcc`（运行时 C）。正式版不包含该包；
+  （`lib-asm-loongarch64`），但没有 `libtcc`（运行时 C），并附带
+  `fun-mt`。正式版不包含该包；
 - Linux riscv64：`.tar.gz`，在 FPC 的 riscv64 后端仍位于主线期间**只随
   nightly 预发布**。完整构建含正则、`getapi`/FFI、`-lnx` 后端与
-  `lib-asm-riscv64`，但没有 `libtcc`（运行时 C）。正式版不包含该包；
-- macOS x64 / arm64：`.zip`。两个包都内含 `libtcc.dylib`。构建
+  `lib-asm-riscv64`，但没有 `libtcc`（运行时 C），并附带 `fun-mt`。
+  正式版不包含该包；
+- macOS x64 / arm64：`.zip`。两个包都内含 `libtcc.dylib` 与 `fun-mt`。构建
   **未签名、未公证**；请使用包内 `install.sh`
   `--local`（curl 下载不会设置隔离属性），或解压后执行
   `xattr -dr com.apple.quarantine <目录>`；
 - Windows x64：`.7z`。构建未签名，SmartScreen 可能提示；请用 7-Zip 解压，
   然后双击包内 `install.cmd`（也可以运行
   `powershell -ExecutionPolicy Bypass -File install.ps1`）。包内包含 `fun.exe`、
-  `fun-safe.exe`、安装脚本，以及 CI 构建的 x86-64 运行期 DLL（`pcre3.dll`、
+  `fun-safe.exe`、`fun-mt.exe`、安装脚本，以及 CI 构建的 x86-64 运行期 DLL（`pcre3.dll`、
   `ffi.dll`、`libtcc.dll`、`zlib.dll`）；个别构建缺失的能力由
   `capabilities.json` 记录。
 
@@ -124,8 +128,8 @@ Windows 安装（当前用户，无需管理员权限）：
 从安装目录运行 `uninstall.cmd`，或在**设置 > 应用**中卸载。Windows 可能
 保留已有的用户选择；用一次**打开方式 > 选择其他应用**选中 Fun 即可。
 
-每个压缩包内是一个 `fun/` 运行时目录：`fun/fun`（Windows 为 `fun/fun.exe`）
-与 `fun/fun-safe`（能力受限构建），以及 `lib/`、`demo/`、`demos/` 和
+每个压缩包内是一个 `fun/` 运行时目录：`fun/fun`（Windows 为 `fun/fun.exe`）、
+`fun/fun-safe`（能力受限构建），以及可用时的 `fun/fun-mt`；另有 `lib/`、`demo/`、`demos/` 和
 `test/` 回归套件。运行 `./fun/fun --help`；Linux/macOS 可用
 `./fun/test/run-linux-regression.sh` 跑自带测试，Windows 用
 `fun\test\run-windows-regression.bat --portable`。
@@ -453,7 +457,7 @@ fun/
 │   ├── utils/         # 工具函数
 │   └── prj/fun/       # 工程与构建脚本（funcmd.dpr，Delphi/FPC）
 ├── fun/
-│   ├── lib/           # 标准库（纯 Fun 编写，81 个模块）
+│   ├── lib/           # 标准库（纯 Fun 编写，约 90 个公开模块）
 │   ├── demo/          # 语言语法演示
 │   ├── demos/         # 完整应用与基准测试
 │   └── key_*.ini      # 关键字别名包（CN / FR / PUA）
@@ -497,8 +501,8 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 | 平台          | regex | FFI | 运行时 C (tcc) | asm | safe 构建 | worker 构建 |
 | ------------- | ----- | --- | -------------- | --- | --------- | ----------- |
 | linux-arm64   | yes   | yes | yes            | yes | yes       | yes         |
-| linux-loongarch64 | yes | yes | no           | yes | yes       | no          |
-| linux-riscv64 | yes   | yes | no             | yes | yes       | no          |
+| linux-loongarch64 | yes | yes | no           | yes | yes       | yes         |
+| linux-riscv64 | yes   | yes | no             | yes | yes       | yes         |
 | linux-x64     | yes   | yes | yes            | yes | yes       | yes         |
 | macos-arm64   | yes   | yes | yes            | yes | yes       | yes         |
 | macos-x64     | yes   | yes | yes            | yes | yes       | yes         |
@@ -511,6 +515,9 @@ Windows 端 `.bat` 脚本的工具链路径集中在一个文件里：[`src/prj/
 `libtcc.dylib` 补齐；Apple Silicon 使用一个小补丁处理 Darwin ucontext 字段与
 `MAP_JIT`。release notes 与每个包里的 `capabilities.json` 都由实测探针生成，
 降级构建无法虚报能力。
+
+Windows arm64 仍处于 bring-up（FPC 代码生成崩溃，无法发布）；Win32/Windows CE
+构建属于遗留路径，均不在发布门槛内。当前状态见 [`ROADMAP.md`](ROADMAP.md)。
 
 ### 交叉构建（在 Linux x86_64 上构建 macOS、Linux aarch64、龙芯与 riscv64）
 
@@ -533,17 +540,19 @@ CPU=all FUN_THREADS=1 ./make-darwin.sh  # -> fun/funcmd-darwin-{x86_64,aarch64}-
 ./bootstrap-linux-loongarch64.sh  # 一次性：FPC 主线交叉编译器 + loongarch64 binutils
 ./prepare-linux-loongarch64-sysroot.sh  # 一次性：Alpine musl/FFI/PCRE sysroot
 FULL=1 ./make-linux-loongarch64.sh      # -> fun/funcmd-linux-loongarch64-musl
+FUN_THREADS=1 FULL=1 ./make-linux-loongarch64.sh  # -> ...-musl-mt
 
 # riscv64 同样只有预发布：FPC 的后端仍在主线。
 ./bootstrap-linux-riscv64.sh  # 一次性：FPC 主线交叉编译器 + riscv64 binutils
 ./prepare-linux-riscv64-sysroot.sh  # 一次性：Alpine musl/FFI/PCRE sysroot
 FULL=1 ./make-linux-riscv64.sh      # -> fun/funcmd-linux-riscv64-musl
+FUN_THREADS=1 FULL=1 ./make-linux-riscv64.sh  # -> ...-musl-mt
 ```
 
 - **构建机要求**：Linux x86_64、宿主 FPC 3.2.x、`make`、`curl` 或 `wget`、`tar`，约 2 GB 空闲磁盘。Zig 由 bootstrap 下载（钉在 0.13；0.14 在较旧的 glibc 上会 panic）。**不需要** macOS 真机、Apple SDK 或 `osxcross`——Zig 自带 libSystem stub。
 - `bootstrap-linux-aarch64.sh` 复用 darwin 工具链的 `ppcrossa64` 与 Zig：FPC 编译器二进制与 CPU 绑定，但只要目标 OS 的单元齐备，就能编译该 OS。
-- 龙芯路径需要 `binutils-loongarch64-linux-gnu` 2.42 或更新版本与 FPC 主线快照；它针对 Alpine musl sysroot 交叉构建，因此正则、FFI、`-lnx` 后端与 `lib-asm-loongarch64` 都可用（sysroot 随带 `libgcc_s`，提供 `__clear_cache`），仅 TinyCC 不可用。`.github/workflows/loongarch.yml` 在 main 推送时执行该构建，并上传供 nightly 预发布使用的 stage。
-- riscv64 路径需要 `binutils-riscv64-linux-gnu` 与 FPC 主线快照，同样针对 Alpine musl sysroot 交叉构建，因此正则、FFI、`-lnx` 后端与 `lib-asm-riscv64` 都可用（sysroot 随带 `libgcc_s`，提供 `__clear_cache`），仅 TinyCC 不可用。`.github/workflows/riscv64.yml` 在 main 推送时执行该构建，并上传供 nightly 预发布使用的 stage；`fun/test/run-riscv64-qemu.sh` 在 `qemu-riscv64` 下运行同一套 Linux 测试。
+- 龙芯路径需要 `binutils-loongarch64-linux-gnu` 2.42 或更新版本与 FPC 主线快照；它针对 Alpine musl sysroot 交叉构建，因此正则、FFI、`-lnx` 后端与 `lib-asm-loongarch64` 都可用（sysroot 随带 `libgcc_s`，提供 `__clear_cache`），仅 TinyCC 不可用。`.github/workflows/loongarch.yml` 在 main 推送时执行该构建，同时构建 `-mt` worker 二进制、在 qemu 下跑 `lib-worker-test`，并上传供 nightly 预发布使用的 stage。
+- riscv64 路径需要 `binutils-riscv64-linux-gnu` 与 FPC 主线快照，同样针对 Alpine musl sysroot 交叉构建，因此正则、FFI、`-lnx` 后端与 `lib-asm-riscv64` 都可用（sysroot 随带 `libgcc_s`，提供 `__clear_cache`），仅 TinyCC 不可用。`.github/workflows/riscv64.yml` 在 main 推送时执行该构建，同时构建 `-mt` worker 二进制、在 qemu 下跑 `lib-worker-test`，并上传供 nightly 预发布使用的 stage；`fun/test/run-riscv64-qemu.sh` 在 `qemu-riscv64` 下运行同一套 Linux 测试。
 - 可选特性照例降级：缺 PCRE → 无正则；缺 libffi 单元/stub → 无 `getapi`（win64 的 CI 两者都会备好：`pcre3.dll` 与 `ffi.dll`）。Linux aarch64 交叉产物是核心解释器（其 `-dRegex` 与 `-dLinuxFFI` 需要 libc / libffi，尚未交叉构建）；而原生 Linux arm64 构建（CI 即如此）两者都有。
 - 移植细节见 [`art/notes/macos-port.md`](art/notes/macos-port.md)。
 
@@ -644,58 +653,45 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 
 ## 标准库
 
-标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写（81 个模块）：
+标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写：约 90 个公开模块。
+目录内共 135 个 `.fun` 文件（含平台变体与内部辅助模块）；其中 6 个需要
+Windows、raw socket 或仅 macOS 的后端。
 
-> 81 个可加载模块合计约 15,100 行逻辑代码（不含注释）。`fun/lib` 共
-> 131 个 `.fun` 文件（含平台变体与内部辅助模块），合计约 22,800 行逻辑
-> 代码。
-
-- **数据**：`lib-json`、`csv`、`toml`、`jsonschema`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`、`lib-hmac`、`lib-url`
-- **工具**：`uuid`
-- **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`
+- **数据**：`lib-json`、`lib-fd`、`csv`、`toml`、`jsonschema`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`、`lib-hmac`、`lib-url`
+- **工具**：`uuid`、`lib-utils`、`lib-param`
+- **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`、`lib-bnf`
 - **文本**：`lib-string`、`lib-regex`、`lib-match`、`lib-unicode`
-- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`env`、`cli`、`fs`、`io`、`process`、`logging`、`runtime`、`cron`、`lib-time`、`lib-cmdline`、`lib-proc`
-- **网络**：`lib-winsock`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-multipart`、`http-session`、`jwt`
+- **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`lib-stream`、`lib-input`、`lib-zlib`、`lib-sse-compress`、`env`、`cli`、`fs`、`io`、`process`、`logging`、`runtime`、`cron`、`lib-time`、`lib-cmdline`、`lib-proc`
+- **网络**：`lib-winsock`、`lib-netif`、`lib-icmp`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-multipart`、`http-session`、`jwt`
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
-- **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`
+- **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-registry`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`、`lib-eval`
 - **UI**：`lib-ui`、`lib-ui-base`、`lib-dialog`、`lib-trayicon`
 - **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`、`lib-worker`
+- **沙箱**：`lib-jsbox`
 - **测试**：`test`（`fun test` 的注册与断言库）
 
-`lib-worker` 需要 opt-in 的 `funcmd-mt` 构建。linux-x64、linux-arm64、
-macos-x64、macos-arm64 与 win-x64 发布包会把它作为 `fun/fun-mt` 附带；
-linux-loongarch64 与 linux-riscv64 的 nightly 预发布 stage 也包含它。从源码
-构建使用 `src/prj/fun/make-linux-x86_64-mt.sh`、
-`FUN_THREADS=1 src/prj/fun/make-macos.sh`，或
-`src/prj/fun/make-win64-mt.bat`；预发布 Linux 目标传
-`FUN_THREADS=1 FULL=1` 给 `make-linux-loongarch64.sh` 或
-`make-linux-riscv64.sh`。默认 `funcmd` 保持
-单线程堆与性能，首次使用 worker 时会给出明确错误。worker 会解析自己的模块并拥有独立的 AST 与堆，
-因此线程之间不共享任何 Fun 对象。结果以字符串返回；`Shared` 与 `Channel`
-在进出时复制值：
+`lib-worker` 需要 opt-in 的 `funcmd-mt` 构建。5 个稳定平台发布包把它作为
+`fun/fun-mt` 附带；LoongArch64/riscv64 的 nightly 预发布 stage 也包含它。
+从源码构建使用 `src/prj/fun/make-linux-x86_64-mt.sh`、
+`FUN_THREADS=1 make-macos.sh` 或 `make-win64-mt.bat`；预发布 Linux 目标传
+`FUN_THREADS=1 FULL=1` 给对应的 `make-linux-*.sh`。默认 `funcmd` 保持
+单线程堆与性能，首次使用 worker 时会给出明确错误。
+
+worker 解析自己的模块并拥有独立的 AST 与堆，因此线程之间不共享任何 Fun
+对象。结果以字符串返回；`Shared` 与 `Channel` 在进出时复制值：
 
 ```fun
 use 'lib-worker.fun';
-
-// 文件、入口函数、FD 负载；-1 表示一直等待
 var w = WorkerFile('job.fun', 'sum', (new [1000]).@toJson(fd: true));
 var total = w.join(-1);
 if w.error() <> nil then raise w.error(); end if;
 
-// 进程范围、按名字共享的存储与 FIFO 队列
-Shared('counter').add('done', 1);
-Channel('log').send('job finished');
-
-// 在主线程执行完成回调（事件循环中调用 workerTick）
-var w2 = WorkerFile('job.fun', 'sum', (new [1000]).@toJson(fd: true));
-w2.onDone(fun (result, error) {
-  ?. 'worker returned ' & result;
-});
-// ... 之后在事件循环中：
-workerTick();
+Shared('counter').add('done', 1);          // 进程范围、按名字共享的存储
+Channel('log').send('job finished');       // 按名字共享的 FIFO
 ```
 
-隔离模型、共享数据惯用法与当前限制见
+主线程完成回调用 `onDone` + `workerTick()`；另有常驻池
+`WorkerPool(file, size)` 与协作式 `cancel()`。隔离模型、惯用法与限制见
 [`fun/lib/worker-model.md`](fun/lib/worker-model.md)。
 
 日志在入口配置一次，之后通过命名 logger 使用：
@@ -703,14 +699,14 @@ workerTick();
 ```fun
 use 'logging.fun';
 
-logging.config([level: 'debug']);
+logging.config([level: 'debug']);   // 按名字： [levels: ['http': 'debug']]
 var logger = logging.getLogger('http');
 logger.info('request', [path: '/users']);
 ```
 
-默认是 stderr + info + 文本格式，文本行包含调用点 source；`logging.config` 可替换
-handler/formatter，`logging.newLogger` 用于测试或需要独立 sink 的组件。formatter 的
-`sourcePath: 'short' | 'full' | 'base'` 分别选择相对路径、绝对路径或文件名。
+默认是 stderr + info + 文本格式，文本行包含调用点 source；`logging.config`
+可替换 handler/formatter，`newLogger` 用于测试或独立 sink，formatter 的
+`sourcePath` 选择 short/full/base 路径。
 
 运行时错误会带上失败语句位置和调用点 traceback。脚本也可以直接读取这些信息：
 
@@ -728,106 +724,31 @@ except
 end try;
 ```
 
-定时任务使用同一套单线程阻塞模型：
+`cron` 在同一套单线程阻塞模型上提供 cron 表达式与固定间隔：
 
 ```fun
 use 'cron.fun';
-
-var s = CronScheduler();
-var daily = s.addJob('0 3 * * *', cleanup);                // 5 字段 Vixie/POSIX
-var every30s = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
-var refreshId = s.every('1s', refresh);                    // 固定间隔
-
-s.removeJob(daily);           // 取消一个任务
-?. s.jobs();                  // 任务快照，可用于监控
-?. s.nextRun(daily);          // 下次执行时间（Fun time）
-s.run();
-```
-
-每个 `CronScheduler` 独立持有任务和 run/stop 状态，不存在进程级全局调度器。
-`addJob` 和 `every` 返回实例内唯一 id；`removeJob(id)` 删除单个任务，
-`jobs()` 返回已注册任务的快照。id 从 1 开始，删除后不复用。批量清空用
-`for j in s.jobs() do s.removeJob(j['id']); end do`。`addJob` 支持标准 `*`、
-范围、列表、步长和 `@hourly`/`@daily` 宏。6 字段表达式必须显式传
-`withSeconds: true`；Quartz/AWS 的 `?`、`L`、`W`、`#` 和年字段会直接报错，
-不做猜测。
-
-调度器睡到最近任务的到期时间（单次上限 1s、下限 10ms），不再固定每 50ms
-轮询；小于 10ms 的间隔实际按约 10ms 触发。`nextRun(id)` 返回该时间；未知 id
-返回 nil。如果进程被阻塞越过一次触发，只执行一次，下一次从醒来的时间重新计算。
-
-cron 到期使用本地墙钟，等待和 `every` 间隔使用单调时钟。墙钟与单调钟推进差
-超过 2 秒时，`run()` 会重算 cron 的下次执行时间，并把已过期任务只触发一次。
-两次 pass 之间墙钟回拨不会提前触发；本 pass 已经选中的任务仍按 pass 入口时刻
-执行。cron 回调返回后，从回调结束时的墙钟计算下一次。`every` 的间隔锚定在
-pass 起点：回调短于间隔时保持原时间表，回调跨过间隔时从回调结束时刻重新开始
-一个完整间隔。两种模式都不会补跑错过的周期。
-
-内部用按下次执行时间排序的最小堆 + id 映射；空闲唤醒只看最近到期任务，不再
-遍历全部任务。删除的任务惰性跳过，死条目累积到阈值会压缩索引。几千到一万级
-任务可用，但回调仍由调度线程串行执行；如果几千个任务在同一时刻一起到期，
-这一波本身会阻塞循环。
-
-回调里新增的任务下一 tick 生效；回调里删除的任务本 tick 后续不再触发。这与
-`stop()` 的行为一致，也符合单线程模型；APScheduler/Quartz 这类批处理调度器
-则会把本轮已经收集的任务跑完。
-
-回调失败默认是静默的，除非传入 `onError`：
-
-```fun
 var s = CronScheduler([onError: (job, err) {
   logger.error('cron job failed', [job: job['id'], error: err]);
 }]);
-```
-
-`job` 与 `jobs()` 返回的是同一种公开快照；`err` 是 `runtime.lastError()`。
-
-`run()` 是阻塞循环，适合独立脚本/daemon。要和 `HttpServer` 或其它 poll 循环
-共用线程，可以用 `tick()` 和 `nextWaitMs(maxMs)` 协作驱动：
-
-```fun
-use 'cron.fun';
-use 'http-server.fun';
-
-var s = CronScheduler();
-s.addJob('0 3 * * *', cleanup);
+var daily = s.addJob('0 3 * * *', cleanup);          // 5 字段 Vixie/POSIX
+var every30s = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
 s.every('1s', refresh);
-
-var web = HttpServer(':8080');
-var running = true;
-web.get('/health', health);
-web.get('/quit', (req, res) {
-  running = false;
-  res.text('bye');
-});
-web.listen();
-while running do
-  s.tick();
-  if running then
-    var wait = s.nextWaitMs(200);
-    if wait < 1 then wait = 1; end if;
-    web.runOnce(wait);
-  end if;
-end do;
-web.stop();
+s.removeJob(daily);
+s.run();                                             // 或在循环里调用 s.tick()
 ```
 
-`tick()` 执行一次不 sleep 的调度 pass，返回本次触发的回调数。`nextWaitMs(maxMs)`
-只是查询：任务到期时返回 `0`，否则最多返回 `maxMs` 毫秒（nil 或省略表示
-1000）；负数按 0，空调度器或已停止返回上限。它不执行回调，也不修改任务的下次
-执行时间。`nextRun(id)` 不同：它接收 id，返回绝对 Fun time。
+- 每个 daemon 一个调度器；id 从 1 开始且不复用。`addJob` 支持范围、列表、
+  步长与 `@hourly`/`@daily`；Quartz/AWS 的 `?`、`L`、`W`、`#` 和年字段
+  直接拒绝。
+- `run()` 睡到最近任务（单次上限 1s），错过的周期只补一次。到期用本地墙钟，
+  间隔用单调时钟；暂不提供时区/DST 控制。
+- 要和 `HttpServer` 或其它 poll 循环共用线程，用 `tick()` 和
+  `nextWaitMs(maxMs)` 驱动单次 pass。回调同步执行，慢 handler 会拖住循环；
+  `run()` 活跃时拒绝 `tick()`。
+- 回调失败默认静默，除非传入 `onError`。
 
-poll 间隔决定任务最坏延迟和墙钟跳变的检测延迟；小于 poll 间隔的任务会按
-poll 粒度合并。`tick()` 同步执行回调：慢 cron 回调会推迟 HTTP 请求，慢 HTTP
-handler 也会推迟 cron。`run()` 活跃或回调内调用 `tick()` 会被拒绝。`stop()`
-是给 `run()` 用的；tick 驱动的循环应使用自己的 running 标志，`stop()` 后
-`tick()` 返回 0，直到再次调用 `run()`。现有 `HttpServer.runOnce(0)` 会被当作
-200ms，所以 recipe 把到期等待钳到至少 1ms。`runOnce()` 目前 Linux/macOS 可用。
-调度器使用本地时间，暂不提供时区/DST 控制。回调异常会被隔离、不停止循环；
-没有 `onError` 时不会上报，所以要么传入上面的处理器，要么在回调内部处理预期
-错误。
-
-上传表单直接从请求读取，无需额外引入：
+上传表单直接从请求读取；客户端上传用 `HttpMultipartWriter` 生成同样的 body：
 
 ```fun
 var m = req.multipart();
@@ -835,36 +756,15 @@ var name = m.fields['name'][0];
 var file = m.files['avatar'][0];
 ```
 
-客户端上传用 `HttpMultipartWriter` 生成同样的 body：
-
-```fun
-use 'http-multipart.fun';
-
-var w = HttpMultipartWriter();
-w.field('name', 'alice');
-w.file('avatar', 'a.txt', data, [contentType: 'text/plain']);
-var body = w.body();
-var ct = w.contentType();
-```
-
-把 `body` 和 `Content-Type: <ct>` 传给 `HttpClient` 即可发送。
-
-cookie 可以签名，篡改会被拒绝：
+cookie 可以签名，JWT 复用同一套鉴权工具：
 
 ```fun
 res.signedCookie('uid', 'u1', secret, [path: '/', httpOnly: true]);
 var r = req.signedCookie('uid', secret);
-if r.ok then ?. r.value; end if;
-```
 
-JWT 复用同一套鉴权工具：
-
-```fun
 use 'jwt.fun';
-
 var token = jwt.sign([sub: 'u1', exp: jwt.now() + 3600], secret);
-var r = jwt.verify(token, secret, [issuer: 'app']);
-if r.ok then ?. r.claims['sub']; end if;
+var v = jwt.verify(token, secret, [issuer: 'app']);
 ```
 
 环境变量也可以直接读取，不需要自己写平台 FFI：

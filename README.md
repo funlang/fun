@@ -40,7 +40,7 @@
 In one sentence: **Fun is a scripting language that goes all the way from JSON to machine code.**
 
 - One runtime spans the whole spectrum, from high-level data work (JSON/FD) down to low-level system programming (FFI, C at runtime, JIT, machine code);
-- 81 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
+- about 90 standard-library modules written in Fun itself ship together as one embeddable `fun.dll`;
 - in AI-agent and domestic-IT scenarios, it is the lightweight glue connecting OSes, databases, chips, and business logic.
 
 Fun is designed around a simple premise: **data and code should be equally first-class, and a script should be able to reach down to the machine without leaving the language.**
@@ -69,9 +69,11 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Runtime C & machine code** — bundled Tiny C Compiler, JIT, and inline assembly (see [the capability ladder](#the-capability-ladder)).
 - **Compact FFI** — call DLL/shared-library functions with a terse signature string (see [FFI](#foreign-function-interface)).
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
-- **Cross-platform** — Windows (32/64-bit), Linux, ARM, and Windows CE.
+- **Cross-platform** — Linux x64/arm64 (LoongArch64/riscv64 prerelease), macOS
+  x64/arm64, and Windows x64; legacy Win32/CE builds remain in the tree.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
-- **Self-hosted standard library** — 81 modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
+- **Self-hosted standard library** — about 90 public modules written in Fun
+  itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 
 ---
 
@@ -81,23 +83,24 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 
 Prebuilt interpreters are attached to [GitHub Releases](https://github.com/funlang/fun/releases):
 
-- Linux x64 / arm64: `.tar.gz`, with `libtcc.so` and the standard `lib/`;
+- Linux x64 / arm64: `.tar.gz`, with `libtcc.so`, `fun-mt` and the standard `lib/`;
 - Linux LoongArch64: `.tar.gz`, published in **nightly prereleases only**
   while FPC's loongarch64 backend is still on mainline. The full build has
   regex, `getapi`/FFI and the native asm backend (`lib-asm-loongarch64`), but
-  no `libtcc` (runtime C). Stable releases do not include it;
+  no `libtcc` (runtime C). It also ships `fun-mt`. Stable releases do not
+  include it;
 - Linux riscv64: `.tar.gz`, published in **nightly prereleases only** while
   FPC's riscv64 backend is still on mainline. The full build has regex,
   `getapi`/FFI, the `-lnx` backends and `lib-asm-riscv64`, but no `libtcc`
-  (runtime C). Stable releases do not include it;
-- macOS x64 / arm64: `.zip`. Both archives include `libtcc.dylib`. These
+  (runtime C). It also ships `fun-mt`. Stable releases do not include it;
+- macOS x64 / arm64: `.zip`. Both archives include `libtcc.dylib` and `fun-mt`. These
   builds are **unsigned and not notarized**;
   use the bundled `install.sh --local` (curl does not set the quarantine
   attribute) or run `xattr -dr com.apple.quarantine <dir>` after extracting;
 - Windows x64: `.7z`. The build is unsigned, so SmartScreen may warn; extract
   with 7-Zip and double-click `install.cmd` (or run
   `powershell -ExecutionPolicy Bypass -File install.ps1`). The archive ships
-  `fun.exe`, `fun-safe.exe`, the installers, and the x86-64 runtime DLLs
+  `fun.exe`, `fun-safe.exe`, `fun-mt.exe`, the installers, and the x86-64 runtime DLLs
   (`pcre3.dll`, `ffi.dll`, `libtcc.dll`, `zlib.dll`) that the CI built;
   `capabilities.json` records anything a particular build could not provide.
 
@@ -130,7 +133,8 @@ an existing per-user choice for an extension; use **Open with > Choose
 another app** once to select Fun.
 
 Each archive contains a `fun/` runtime tree: `fun/fun` (`fun/fun.exe` on
-Windows) and `fun/fun-safe` (the capability-restricted build), plus `lib/`,
+Windows), `fun/fun-safe` (the capability-restricted build), and `fun/fun-mt`
+where the worker build is available, plus `lib/`,
 `demo/`, `demos/` and the regression suite in `test/`. Run
 `./fun/fun --help`, or run the shipped suite with
 `./fun/test/run-linux-regression.sh` on Linux/macOS and
@@ -477,7 +481,7 @@ fun/
 │   ├── utils/         # Utility functions
 │   └── prj/fun/       # Projects & build scripts (funcmd.dpr, Delphi/FPC)
 ├── fun/
-│   ├── lib/           # Standard library (pure Fun, 81 modules)
+│   ├── lib/           # Standard library (pure Fun, ~90 public modules)
 │   ├── demo/          # Language syntax demos
 │   ├── demos/         # Full applications & benchmarks
 │   └── key_*.ini      # Keyword alias packs (CN / FR / PUA)
@@ -521,8 +525,8 @@ a second build mode for untrusted scripts, and an opt-in worker build:
 | Platform       | regex | FFI | runtime C (tcc) | asm | safe build | worker build |
 | -------------- | ----- | --- | --------------- | --- | ---------- | ------------ |
 | linux-arm64    | yes   | yes | yes             | yes | yes        | yes          |
-| linux-loongarch64 | yes | yes | no             | yes | yes        | no           |
-| linux-riscv64  | yes   | yes | no              | yes | yes        | no           |
+| linux-loongarch64 | yes | yes | no             | yes | yes        | yes          |
+| linux-riscv64  | yes   | yes | no              | yes | yes        | yes          |
 | linux-x64      | yes   | yes | yes             | yes | yes        | yes          |
 | macos-arm64    | yes   | yes | yes             | yes | yes        | yes          |
 | macos-x64      | yes   | yes | yes             | yes | yes        | yes          |
@@ -538,6 +542,10 @@ Silicon uses a small TCC patch for the Darwin ucontext fields and `MAP_JIT`
 handling. The release notes and each archive's `capabilities.json` are
 generated from probes, so a degraded build cannot claim a capability it does
 not have.
+
+Windows arm64 is bring-up only (an FPC codegen crash blocks release), and the
+Win32/Windows CE builds are legacy; none of them is a release gate. See
+[`ROADMAP.md`](ROADMAP.md) for their current status.
 
 ### Cross builds (macOS, Linux aarch64, LoongArch64 and riscv64, from Linux x86_64)
 
@@ -561,17 +569,19 @@ CPU=all FUN_THREADS=1 ./make-darwin.sh  # -> fun/funcmd-darwin-{x86_64,aarch64}-
 ./bootstrap-linux-loongarch64.sh  # once: FPC main cross compiler + loongarch64 binutils
 ./prepare-linux-loongarch64-sysroot.sh  # once: Alpine musl/FFI/PCRE sysroot
 FULL=1 ./make-linux-loongarch64.sh      # -> fun/funcmd-linux-loongarch64-musl
+FUN_THREADS=1 FULL=1 ./make-linux-loongarch64.sh  # -> ...-musl-mt
 
 # riscv64 is also prerelease-only: FPC's backend is still on main.
 ./bootstrap-linux-riscv64.sh  # once: FPC main cross compiler + riscv64 binutils
 ./prepare-linux-riscv64-sysroot.sh  # once: Alpine musl/FFI/PCRE sysroot
 FULL=1 ./make-linux-riscv64.sh      # -> fun/funcmd-linux-riscv64-musl
+FUN_THREADS=1 FULL=1 ./make-linux-riscv64.sh  # -> ...-musl-mt
 ```
 
 - **Build machine requirements**: Linux x86_64, host FPC 3.2.x, `make`, `curl` or `wget`, `tar`, and ~2 GB free disk. Zig is fetched by the bootstrap (pinned to 0.13; 0.14 panics on older glibc). No macOS host, Apple SDK, or `osxcross` is required — Zig ships a libSystem stub.
 - `bootstrap-linux-aarch64.sh` reuses the `ppcrossa64` and Zig from the darwin toolchain: an FPC compiler binary is CPU-specific but can target any OS it has units for.
-- The LoongArch64 path needs `binutils-loongarch64-linux-gnu` 2.42 or newer and an FPC main snapshot. It cross-builds against an Alpine musl sysroot, so regex, FFI and the `-lnx` backends are available, as is `lib-asm-loongarch64` (the sysroot ships `libgcc_s` for `__clear_cache`); TinyCC is not. `.github/workflows/loongarch.yml` runs this build on pushes to main and uploads the stage used by nightly prereleases.
-- The riscv64 path needs `binutils-riscv64-linux-gnu` and an FPC main snapshot, and uses the same Alpine musl sysroot approach, so regex, FFI, the `-lnx` backends and `lib-asm-riscv64` are available (the sysroot ships `libgcc_s` for `__clear_cache`); TinyCC is not. `.github/workflows/riscv64.yml` runs this build on pushes to main and uploads the stage used by nightly prereleases; `fun/test/run-riscv64-qemu.sh` runs the same Linux suite under `qemu-riscv64`.
+- The LoongArch64 path needs `binutils-loongarch64-linux-gnu` 2.42 or newer and an FPC main snapshot. It cross-builds against an Alpine musl sysroot, so regex, FFI and the `-lnx` backends are available, as is `lib-asm-loongarch64` (the sysroot ships `libgcc_s` for `__clear_cache`); TinyCC is not. `.github/workflows/loongarch.yml` runs this build on pushes to main, builds the `-mt` worker binary, runs `lib-worker-test` under qemu, and uploads the stage used by nightly prereleases.
+- The riscv64 path needs `binutils-riscv64-linux-gnu` and an FPC main snapshot, and uses the same Alpine musl sysroot approach, so regex, FFI, the `-lnx` backends and `lib-asm-riscv64` are available (the sysroot ships `libgcc_s` for `__clear_cache`); TinyCC is not. `.github/workflows/riscv64.yml` runs this build on pushes to main, builds the `-mt` worker binary, runs `lib-worker-test` under qemu, and uploads the stage used by nightly prereleases; `fun/test/run-riscv64-qemu.sh` runs the same Linux suite under `qemu-riscv64`.
 - Optional features degrade as usual: no PCRE -> no regex, no libffi unit/stub -> no `getapi` (the win64 CI supplies both, `pcre3.dll` and `ffi.dll`). The cross-built Linux aarch64 artifact is the core interpreter (its `-dRegex` and `-dLinuxFFI` need a libc / libffi that are not cross-built yet); a native Linux arm64 build, as in CI, has both.
 - Porting details: [`art/notes/macos-port.md`](art/notes/macos-port.md).
 
@@ -691,77 +701,64 @@ and the Windows job builds and runs the same strict capability test. The
 
 ## Standard library
 
-The standard library in [`fun/lib`](fun/lib) is written in pure Fun (81 modules):
+The standard library in [`fun/lib`](fun/lib) is written in pure Fun: about 90
+public modules. The directory has 135 `.fun` files in total, including platform
+variants and internal helpers; six modules need Windows, raw sockets, or a
+macOS-only backend.
 
-> The 81 modules that load on this platform total roughly 15,100 lines of
-> logical code (excluding comments). `fun/lib` contains 131 `.fun` files in
-> total, including platform variants and internal helpers — about 22,800
-> logical lines.
-
-- **Data**: `lib-json`, `csv`, `toml`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`, `lib-hmac`, `lib-url`
-- **Utility**: `uuid`
-- **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`
+- **Data**: `lib-json`, `lib-fd`, `csv`, `toml`, `jsonschema`, `lib-yaml`, `lib-xml`, `lib-base64`, `lib-cstruct`, `lib-md5`, `lib-crypt`, `lib-hmac`, `lib-url`
+- **Utility**: `uuid`, `lib-utils`, `lib-param`
+- **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`, `lib-bnf`
 - **Text**: `lib-string`, `lib-regex`, `lib-match`, `lib-unicode`
-- **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `env`, `cli`, `fs`, `io`, `process`, `logging`, `runtime`, `cron`, `lib-time`, `lib-cmdline`, `lib-proc`
-- **Network**: `lib-winsock`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`, `http-multipart`, `http-session`, `jwt`
+- **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `lib-stream`, `lib-input`, `lib-zlib`, `lib-sse-compress`, `env`, `cli`, `fs`, `io`, `process`, `logging`, `runtime`, `cron`, `lib-time`, `lib-cmdline`, `lib-proc`
+- **Network**: `lib-winsock`, `lib-netif`, `lib-icmp`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`, `http-multipart`, `http-session`, `jwt`
 - **Databases**: `lib-orm`, `lib-orm-pro`, `lib-orm-gen`, `lib-orm-rpc`, `lib-orm-cte`, `lib-ado`, `lib-ado-schema`
-- **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`
+- **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-registry`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`, `lib-eval`
 - **UI**: `lib-ui`, `lib-ui-base`, `lib-dialog`, `lib-trayicon`
 - **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`, `lib-worker`
+- **Sandbox**: `lib-jsbox`
 - **Testing**: `test` (registration and assertions for `fun test`)
 
-`lib-worker` needs the opt-in `funcmd-mt` build. Release archives on linux-x64,
-linux-arm64, macos-x64, macos-arm64 and win-x64 ship it as `fun/fun-mt`, and
-the nightly prerelease stages for linux-loongarch64 and linux-riscv64 include
-it too. From source use `src/prj/fun/make-linux-x86_64-mt.sh`,
-`FUN_THREADS=1 src/prj/fun/make-macos.sh`, or
-`src/prj/fun/make-win64-mt.bat`; for the prerelease Linux targets pass
-`FUN_THREADS=1 FULL=1` to `make-linux-loongarch64.sh` or
-`make-linux-riscv64.sh`. The default `funcmd` keeps its single-threaded heap and
-performance and reports a clear error on first use.
+`lib-worker` needs the opt-in `funcmd-mt` build. Release archives on the five
+stable platforms ship it as `fun/fun-mt`; the LoongArch64/riscv64 nightly
+prerelease stages include it too. From source use
+`src/prj/fun/make-linux-x86_64-mt.sh`, `FUN_THREADS=1 make-macos.sh`, or
+`make-win64-mt.bat`; for the prerelease Linux targets pass
+`FUN_THREADS=1 FULL=1` to their `make-linux-*.sh` script. The default `funcmd`
+stays single-threaded and reports a clear error on first use.
+
 A worker parses its own module and owns its AST and heap, so nothing Fun-visible
 is shared between threads. Results are strings; `Shared` and `Channel` copy
 values in and out:
 
 ```fun
 use 'lib-worker.fun';
-
-// file, entry function, FD payload; -1 waits forever
 var w = WorkerFile('job.fun', 'sum', (new [1000]).@toJson(fd: true));
 var total = w.join(-1);
 if w.error() <> nil then raise w.error(); end if;
 
-// named, process-wide store and FIFO; workers open them by the same name
-Shared('counter').add('done', 1);
-Channel('log').send('job finished');
-
-// completion callback on the main thread (call workerTick in an event loop)
-var w2 = WorkerFile('job.fun', 'sum', (new [1000]).@toJson(fd: true));
-w2.onDone(fun (result, error) {
-  ?. 'worker returned ' & result;
-});
-// ... later, in the event loop:
-workerTick();
+Shared('counter').add('done', 1);          // named, process-wide store
+Channel('log').send('job finished');       // named FIFO
 ```
 
+Use `onDone` + `workerTick()` for completions on the main thread. A resident
+pool (`WorkerPool(file, size)`) and cooperative `cancel()` are also available.
 See [`fun/lib/worker-model.md`](fun/lib/worker-model.md) for the isolation
-model, shared-data idioms, and current limits.
+model, idioms, and limits.
 
 Logging is configured once and then used through named loggers:
 
 ```fun
 use 'logging.fun';
 
-logging.config([level: 'debug']);
+logging.config([level: 'debug']);   // per-name: [levels: ['http': 'debug']]
 var logger = logging.getLogger('http');
 logger.info('request', [path: '/users']);
 ```
 
-The default is stderr + info + text, and the text line includes the call-site
-source. `logging.config` can replace handlers and formatters; `logging.newLogger`
-creates an independent logger for tests or a dedicated sink. Set
-`sourcePath: 'short' | 'full' | 'base'` on a formatter to choose relative,
-absolute, or basename paths.
+The default is stderr + info + text with the call-site source;
+`logging.config` replaces handlers/formatters, `newLogger` creates an
+independent sink, and a formatter's `sourcePath` selects short/full/base paths.
 
 Runtime errors include the failing statement and a call-site traceback. Scripts
 can inspect the same information directly:
@@ -780,124 +777,34 @@ except
 end try;
 ```
 
-Scheduled jobs use the same blocking, single-threaded model:
+`cron` provides cron expressions and fixed intervals on the same blocking,
+single-threaded model:
 
 ```fun
 use 'cron.fun';
-
-var s = CronScheduler();
-var daily = s.addJob('0 3 * * *', cleanup);                // 5-field Vixie/POSIX
-var every30s = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
-var refreshId = s.every('1s', refresh);                    // fixed interval
-
-s.removeJob(daily);           // cancel one job
-?. s.jobs();                  // snapshot for monitoring
-?. s.nextRun(daily);          // next run as a Fun time
-s.run();
-```
-
-Each `CronScheduler` owns its jobs and run/stop state; there is no
-process-global scheduler. `addJob` and `every` return a per-instance id;
-`removeJob(id)` removes one job and `jobs()` returns a snapshot of the
-registered jobs. Ids start at 1 and are never reused. Batch removal is
-`for j in s.jobs() do s.removeJob(j['id']); end do`. `addJob` accepts the
-standard `*`, ranges, lists, steps and `@hourly`/`@daily` descriptors.
-Six-field expressions require `withSeconds: true`; Quartz/AWS extensions such
-as `?`, `L`, `W`, `#` and a year field are rejected instead of being guessed.
-
-The scheduler sleeps until the nearest job's next run (capped at 1 s, with a
-10 ms minimum) instead of polling every 50 ms; intervals below 10 ms are
-effectively capped at about 10 ms. `nextRun(id)` returns that time; unknown ids
-return nil. If a run is missed while the process is blocked, it fires once and
-the next occurrence is computed from the wake-up time.
-
-Cron due times use local wall time; waits and `every` intervals use a monotonic
-clock. If wall and monotonic time drift by more than 2 seconds, `run()` rebases
-cron next-run times and fires an overdue job once. Between passes, moving the
-wall clock backward does not fire early; a job already selected in the current
-pass still follows that pass's start time. A cron job's next occurrence is
-computed from the wall time after its callback returns. An `every` job's interval
-is anchored at the pass start: a callback shorter than the interval keeps the
-original schedule, and a callback that overruns it starts the next interval from
-the callback's end. Neither mode catches up missed periods.
-
-Internally jobs are kept in a min-heap keyed by next run time plus an id map;
-an idle wake only looks at the earliest job instead of scanning all jobs.
-Removed jobs are skipped lazily and the index is compacted when stale entries
-accumulate. That keeps thousands of registered jobs practical, but callbacks
-still run serially; if thousands of jobs become due in the same instant, that
-burst itself can block the loop.
-
-A job added from a callback starts on the next tick; a job removed from a
-callback does not run later in the current tick. This follows the
-single-threaded model and matches `stop()`; batch schedulers such as
-APScheduler and Quartz instead finish the jobs already collected for the
-current pass.
-
-Callback failures are silent unless a handler is supplied:
-
-```fun
 var s = CronScheduler([onError: (job, err) {
   logger.error('cron job failed', [job: job['id'], error: err]);
 }]);
-```
-
-`job` is the same public snapshot returned by `jobs()`; `err` is
-`runtime.lastError()`.
-
-`run()` is a blocking loop, so use it from a standalone script or daemon. To
-share the thread with an `HttpServer` or another poll loop, drive the scheduler
-cooperatively with `tick()` and `nextWaitMs(maxMs)`:
-
-```fun
-use 'cron.fun';
-use 'http-server.fun';
-
-var s = CronScheduler();
-s.addJob('0 3 * * *', cleanup);
+var daily = s.addJob('0 3 * * *', cleanup);          // 5-field Vixie/POSIX
+var every30s = s.addJob('0-30 * * * * *', cleanup, [withSeconds: true]);
 s.every('1s', refresh);
-
-var web = HttpServer(':8080');
-var running = true;
-web.get('/health', health);
-web.get('/quit', (req, res) {
-  running = false;
-  res.text('bye');
-});
-web.listen();
-while running do
-  s.tick();
-  if running then
-    var wait = s.nextWaitMs(200);
-    if wait < 1 then wait = 1; end if;
-    web.runOnce(wait);
-  end if;
-end do;
-web.stop();
+s.removeJob(daily);
+s.run();                                             // or s.tick() in a loop
 ```
 
-`tick()` performs one scheduling pass without sleeping and returns the number of
-callbacks it fired. `nextWaitMs(maxMs)` is a query only: it returns `0` when a
-job is due, otherwise at most `maxMs` milliseconds (`nil` or omitted means
-1000); negative values are treated as 0, and an empty or stopped scheduler
-returns the cap. It does not execute a callback or change the next run time.
-`nextRun(id)` is different: it takes an id and returns an absolute Fun time.
+- One scheduler per daemon; ids start at 1 and are never reused. `addJob`
+  accepts ranges, lists, steps and `@hourly`/`@daily`; Quartz/AWS extensions
+  (`?`, `L`, `W`, `#`, year) are rejected.
+- `run()` sleeps until the nearest job (capped at 1 s) and fires a missed
+  occurrence once. Due times use local wall time; intervals use a monotonic
+  clock. There is no timezone/DST control yet.
+- For an `HttpServer` or another poll loop, drive one pass with `tick()` and
+  `nextWaitMs(maxMs)` instead of `run()`. Callbacks run synchronously, so a
+  slow handler delays the loop; `tick()` is rejected while `run()` is active.
+- Callback errors are silent unless `onError` is supplied.
 
-The poll interval bounds how late a job can fire and how late a wall-clock jump
-can be noticed. Jobs shorter than the poll interval are coalesced at the poll
-granularity. `tick()` runs callbacks synchronously: a slow callback delays HTTP
-requests, and a slow HTTP handler delays cron. `tick()` is rejected while
-`run()` is active or inside a callback. `stop()` is intended for `run()`; a
-tick-driven loop should use its own running flag, and after `stop()` `tick()`
-returns 0 until `run()` is called again. `HttpServer.runOnce(0)` is treated as
-200 ms by the existing HTTP loop, so the recipe clamps a due wait to 1 ms.
-`runOnce()` is currently available on Linux and macOS. The scheduler uses local
-time and does not yet provide timezone/DST control. Callback exceptions are
-contained so the loop keeps running; without `onError` they are not reported,
-so either supply the handler above or handle expected failures inside the
-callback.
-
-Uploaded forms are read from the request directly:
+Uploaded forms are available directly; `HttpMultipartWriter` builds the same
+bodies for client uploads:
 
 ```fun
 var m = req.multipart();
@@ -905,39 +812,18 @@ var name = m.fields['name'][0];
 var file = m.files['avatar'][0];
 ```
 
-`HttpMultipartWriter` builds the same bodies for client uploads:
-
-```fun
-use 'http-multipart.fun';
-
-var w = HttpMultipartWriter();
-w.field('name', 'alice');
-w.file('avatar', 'a.txt', data, [contentType: 'text/plain']);
-var body = w.body();
-var ct = w.contentType();
-```
-
-Pass `body` and `Content-Type: <ct>` to `HttpClient` to send it.
-
-Cookies can be signed so tampering is rejected:
+Cookies can be signed, and `jwt` signs/verifies tokens with the same helpers:
 
 ```fun
 res.signedCookie('uid', 'u1', secret, [path: '/', httpOnly: true]);
 var r = req.signedCookie('uid', secret);
-if r.ok then ?. r.value; end if;
-```
 
-JWT tokens use the same auth helpers:
-
-```fun
 use 'jwt.fun';
-
 var token = jwt.sign([sub: 'u1', exp: jwt.now() + 3600], secret);
-var r = jwt.verify(token, secret, [issuer: 'app']);
-if r.ok then ?. r.claims['sub']; end if;
+var v = jwt.verify(token, secret, [issuer: 'app']);
 ```
 
-Environment variables are available without platform-specific FFI:
+Environment variables need no platform-specific FFI:
 
 ```fun
 use 'env.fun';
