@@ -22,6 +22,7 @@
 # Usage:
 #   ./make-linux-riscv64.sh
 #   RISCV_FPC_ROOT=/opt/riscv ./make-linux-riscv64.sh
+#   FUN_THREADS=1 FULL=1 ./make-linux-riscv64.sh   # funcmd-mt (worker model)
 #   ./make-linux-riscv64.sh -dMyFlag ...   # extra FPC switches
 #
 # Needs: bootstrap-linux-riscv64.sh run first (or RISCV_FPC_ROOT pointing
@@ -97,13 +98,27 @@ else
 fi
 [ -d "$UNITS_OBJPAS" ] && FU_EXTRA="$FU_EXTRA -Fu$UNITS_OBJPAS"
 [ -n "$UNITS_FFI" ] && FU_EXTRA="$FU_EXTRA -Fu$UNITS_FFI"
-if [ "$FULL" = "1" ]; then
+if [ "$FULL" = "1" ] || [ "${FUN_THREADS:-0}" = "1" ]; then
     FU_EXTRA="$FU_EXTRA -Fu$HERE/../../lib"
 fi
 
 # -dFunNoRes: the cross toolchain has no riscv64 fpcres, so skip the
 # Windows version resource. It is not used on Linux.
 FEATURES="$FEATURES -dFunNoRes"
+
+# FUN_THREADS=1 builds funcmd-mt (the worker model). Unix needs the
+# cthreads unit for the thread-safe heap; it comes from the RTL units that
+# bootstrap-linux-riscv64.sh installs.
+MT_FLAGS=""
+MT_SUFFIX=""
+if [ "${FUN_THREADS:-0}" = "1" ]; then
+    [ -f "$UNITS/cthreads.ppu" ] || {
+        echo "FUN_THREADS=1 needs $UNITS/cthreads.ppu; rerun the bootstrap." >&2
+        exit 1
+    }
+    MT_FLAGS="-dFunThreads -dUseCThreads"
+    MT_SUFFIX="-mt"
+fi
 
 BUILD="$(mktemp -d "${TMPDIR:-/tmp}/fun-lin-riscv-build-XXXXXX")"
 trap 'rm -rf "$BUILD"' EXIT
@@ -116,12 +131,12 @@ echo "Building funcmd for linux/riscv64 with $PPCROSS"
 "$PPCROSS" funcmd.dpr -n -B -Sd -O2 -Xs -Tlinux -dLinux \
     -XPriscv64-linux- -Xr \
     -Fu"$UNITS" $FU_EXTRA -FD"$TOOLS" $LINK_FLAGS \
-    -FU"$BUILD" -FE"$BUILD" $FEATURES "$@"
+    -FU"$BUILD" -FE"$BUILD" $FEATURES $MT_FLAGS "$@"
 
 FULL_SUFFIX=""
 if [ "$FULL" = "1" ]; then
     FULL_SUFFIX="-musl"
 fi
-OUT="${FUN_RISCV_OUT:-$HERE/../../../fun/funcmd-linux-riscv64${FULL_SUFFIX}${FUN_SAFE_LEVEL:+-safe}}"
+OUT="${FUN_RISCV_OUT:-$HERE/../../../fun/funcmd-linux-riscv64${FULL_SUFFIX}${MT_SUFFIX}${FUN_SAFE_LEVEL:+-safe}}"
 cp -f "$BUILD/funcmd" "$OUT"
 echo "Copied funcmd to $OUT"

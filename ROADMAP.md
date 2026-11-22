@@ -20,6 +20,8 @@
 - **CI**：GitHub Actions 的 `regression` 工作流覆盖 6 个构建作业（4 个 POSIX 平台 +
   linux-safe + windows-x64）；`linux-x64`/`linux-arm64`/`macos-x64`/`macos-arm64`
   以及 `windows-x64` 都额外构建 `funcmd-mt` 并跑 worker 测试；`docs` 工作流检查本文件。
+  `loongarch`/`riscv64` 预发布作业同样构建 `funcmd-mt`，并在 qemu 下跑
+  `lib-worker-test`。
 - **能力链**：ffi → 同步文件 IO → 进程 → 网络 → 数据库；另有 C/JIT/汇编、
   HTTP/WebSocket 单线程事件循环、safe 构建。
 
@@ -61,7 +63,6 @@
 | D-03 | 数据 | P2 | OPEN | 日期/时间跨端约定未统一 | `art/notes/data-format-alignment.md` |
 | D-04 | 数据 | P2 | OPEN | Fun `Int64` 超过 2^53 传给 JS 会静默丢精度 | `art/notes/data-format-alignment.md` |
 | D-05 | 数据 | P3 | OPEN | FD/JSON 其余低风险一致性项（空键、定长前缀、kvd 空白分隔等） | `art/notes/data-format-alignment.md` |
-| P-17 | 平台/并发 | P3 | OPEN | P-01 拆分项：为 LoongArch64 与 riscv64 提供 `fun-mt`。交叉脚本加 `FUN_THREADS=1`/`-dUseCThreads` 与 `-mt` 输出名，确认目标 RTL 的 `cthreads` 已随 bootstrap 安装，CI 在 qemu 下跑 `lib-worker-test`（P-16 已有龙芯解释器与 CI 基础）。32 位与 Delphi/WinCE 不在此列 | `fun/lib/worker-model.md` |
 | P-02 | 平台 | P2 | OPEN | `lib-os` 全量 host 分派器未做 | `art/notes/library-port-plan.md` |
 | P-03 | 平台 | P2 | OPEN | `lib-message`/`lib-async`/`lib-jsasync` 仍依赖消息泵或线程 | `art/notes/linux-capabilities.md` |
 | P-04 | 平台 | P3 | OPEN | `lib-icmp` raw socket 未做，需 root/CAP_NET_RAW | `art/notes/linux-capabilities.md` |
@@ -81,7 +82,8 @@
 | ID | 事项 | 状态 | 说明 |
 |---|---|---|---|
 | S-02 | jsbox 沙箱运行器 | DONE | 沙箱边界只由 `fun-jsbox` 承担，不以 fun `-safe` 代替。Linux seccomp-bpf、`process.run` 输出上限、Windows Job Object、macOS sandbox profile、`lib-jsbox` 桥接与测试均已交付。剩余网络/挂载隔离拆为 S-10，Windows/macOS 真机验证拆为 S-11。 |
-| P-01 | 平台/并发：worker 模型 | DONE | `funcmd-mt` 覆盖 Linux x64/arm64、macOS x64/arm64、Windows x64：每个 worker 独立解析 AST/CEnv，跨线程只走字符串/FD，`Shared`/`Channel`/`onDone`/`workerMapLimit` 可用；常驻 worker 池（`WorkerPool`）与协作式取消（`cancel`，`ECancelled` 不可被脚本捕获）已落地；各平台 CI 同一任务内构建并跑 `lib-worker-test`，发布包附带 fun-mt。新增架构拆为 P-17。 |
+| P-01 | 平台/并发：worker 模型 | DONE | `funcmd-mt` 覆盖 Linux x64/arm64、macOS x64/arm64、Windows x64：每个 worker 独立解析 AST/CEnv，跨线程只走字符串/FD，`Shared`/`Channel`/`onDone`/`workerMapLimit` 可用；常驻 worker 池（`WorkerPool`）与协作式取消（`cancel`，`ECancelled` 不可被脚本捕获）已落地；各平台 CI 同一任务内构建并跑 `lib-worker-test`，发布包附带 fun-mt。新增架构见 P-17。 |
+| P-17 | 平台/并发：LoongArch64/riscv64 `fun-mt` | DONE | 交叉脚本支持 `FUN_THREADS=1`（`-dFunThreads -dUseCThreads`）并输出 `*-mt`；bootstrap 安装的 RTL 含 `cthreads`；两个架构均在 qemu 下跑通 `lib-worker-test` 72/72；CI 构建 `funcmd-mt` 并把它放进预发布 stage。32 位与 Delphi/WinCE 不在此列。 |
 | S-04 | 站点 PHP 用 Fun 重写 | DONE | 站点页面与业务接口已全部迁到 Fun 服务；PHP-FPM 已停用，旧 URL 由 nginx 反代保持。验证时修复了 `match` 未命中判断导致的空 IP 500 与订单号校验问题。迁移与部署细节见独立部署仓库。 |
 | K-04 | 循环集合深拷贝递归溢出 | DONE | `CEnv` clone 祖先栈 + `CSet.clone` 统一 set/object；循环副本保留在自己的克隆内，`@clone` 同样有栈上下文。`fun/test/clone-cycle-test.fun`、`fun/demos/benchmarks/clone-bench.md` 覆盖。 |
 | P-05 | 第二数据库后端：unixODBC | DONE | MySQL/PostgreSQL 等经驱动管理器接入，unixODBC 与 P-11 同一交付。 |
@@ -206,3 +208,8 @@
   拆分挂起项：S-02 的网络/挂载隔离与跨平台真机验证拆为 S-10/S-11；
   S-09 的进程树终止与 Windows Unicode 命令行拆为 S-12/S-13；新增架构
   `fun-mt` 拆为 P-17。
+- 2026-11-22：P-17 完成。`make-linux-loongarch64.sh` 与
+  `make-linux-riscv64.sh` 支持 `FUN_THREADS=1`（`-dFunThreads -dUseCThreads`，
+  输出 `*-mt`）；LoongArch64/riscv64 的 FPC bootstrap 已带 `cthreads`，两个
+  `fun-mt` 在 qemu 下跑 `lib-worker-test` 均为 72/72。CI 构建并测试
+  `funcmd-mt`，nightly 预发布 stage 附带该二进制。

@@ -663,10 +663,13 @@ COM）、任意地址读写、文件访问、以及从文件或 `inline` 加载�
 - **测试**：`test`（`fun test` 的注册与断言库）
 
 `lib-worker` 需要 opt-in 的 `funcmd-mt` 构建。linux-x64、linux-arm64、
-macos-x64、macos-arm64 与 win-x64 发布包会把它作为 `fun/fun-mt` 附带；从源码
+macos-x64、macos-arm64 与 win-x64 发布包会把它作为 `fun/fun-mt` 附带；
+linux-loongarch64 与 linux-riscv64 的 nightly 预发布 stage 也包含它。从源码
 构建使用 `src/prj/fun/make-linux-x86_64-mt.sh`、
 `FUN_THREADS=1 src/prj/fun/make-macos.sh`，或
-`src/prj/fun/make-win64-mt.bat`。默认 `funcmd` 保持
+`src/prj/fun/make-win64-mt.bat`；预发布 Linux 目标传
+`FUN_THREADS=1 FULL=1` 给 `make-linux-loongarch64.sh` 或
+`make-linux-riscv64.sh`。默认 `funcmd` 保持
 单线程堆与性能，首次使用 worker 时会给出明确错误。worker 会解析自己的模块并拥有独立的 AST 与堆，
 因此线程之间不共享任何 Fun 对象。结果以字符串返回；`Shared` 与 `Channel`
 在进出时复制值：

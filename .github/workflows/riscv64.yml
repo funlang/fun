@@ -156,6 +156,13 @@ jobs:
           FUN_RISCV_OUT="$PWD/fun/funcmd-linux-riscv64-musl-safe" \
             ./src/prj/fun/make-linux-riscv64.sh
 
+          # Opt-in worker build. The RTL bootstrap installs cthreads, which
+          # the Unix MT build needs for the thread-safe heap.
+          RISCV_FPC_ROOT="$TOOLCHAIN_ROOT" \
+          RISCV_SYSROOT="$SYSROOT" \
+          FULL=1 FUN_THREADS=1 \
+            ./src/prj/fun/make-linux-riscv64.sh
+
       - name: Cache Zig (libffitest for the qemu suite)
         id: cache-zig
         uses: actions/cache@v4
@@ -193,6 +200,27 @@ jobs:
           echo "::error title=qemu regression failed::$summary"
           exit 1
 
+      - name: Worker test under qemu-user
+        env:
+          RISCV_SYSROOT: ${{ env.SYSROOT }}
+        run: |
+          set -euo pipefail
+          qemu=$(command -v qemu-riscv64-static || command -v qemu-riscv64)
+          if ! out=$(QEMU_LD_PREFIX="$RISCV_SYSROOT" "$qemu" \
+            "$PWD/fun/funcmd-linux-riscv64-musl-mt" \
+            fun/test/lib-worker-test.fun 2>&1); then
+            printf '%s\n' "$out"
+            echo "::error title=worker test crashed"
+            exit 1
+          fi
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -q 'fail=0' || {
+            echo "::error title=worker test failed::$out"; exit 1; }
+          if printf '%s\n' "$out" | grep -q 'SKIP worker'; then
+            echo "::error title=worker test skipped::MT binary reported no threads"
+            exit 1
+          fi
+
       # Release artifacts are built only from a green run. release.yml looks
       # up this artifact by commit on nightly runs; a missing or failed run
       # simply means that night's prerelease has no RISC-V asset.
@@ -202,11 +230,13 @@ jobs:
           stage=dist-stage
           exe=fun/funcmd-linux-riscv64-musl
           safe=fun/funcmd-linux-riscv64-musl-safe
+          mt=fun/funcmd-linux-riscv64-musl-mt
           qemu=$(command -v qemu-riscv64-static || command -v qemu-riscv64)
 
           mkdir -p "$stage"
           cp -f "$exe" "$stage/funcmd"
           [ -f "$safe" ] && cp -f "$safe" "$stage/funcmd-safe"
+          [ -f "$mt" ] && cp -f "$mt" "$stage/funcmd-mt"
 
           # probe.sh executes the binaries it describes. Wrap the target
           # binary in qemu so the capabilities come from the actual build.

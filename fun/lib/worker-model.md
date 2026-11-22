@@ -2,12 +2,15 @@
 
 Status: implemented in the opt-in `funcmd-mt` build (`FUN_THREADS=1`).
 Release archives ship it as `fun/fun-mt` on linux-x64, linux-arm64,
-macos-x64, macos-arm64 and win-x64. From source, use
+macos-x64, macos-arm64 and win-x64; the nightly prerelease stages for
+linux-loongarch64 and linux-riscv64 also carry it. From source, use
 `src/prj/fun/make-linux-x86_64-mt.sh` (on any Linux host),
 `FUN_THREADS=1 src/prj/fun/make-macos.sh`,
 `FUN_THREADS=1 src/prj/fun/make-darwin.sh` (cross build), or
 `src/prj/fun/make-win64-mt.bat` (`set FUN_THREADS=1` before
-`make-win64.bat` also works). The default `funcmd` stays single-threaded and
+`make-win64.bat` also works). For the prerelease Linux targets, pass
+`FUN_THREADS=1 FULL=1` to `make-linux-loongarch64.sh` or
+`make-linux-riscv64.sh`. The default `funcmd` stays single-threaded and
 reports a clear error on first use of `lib-worker`.
 
 ## Why a separate binary
@@ -254,8 +257,8 @@ p.close();
   per job. Pick the model that matches the job's state expectations.
 - No worker-to-worker direct message object. Use `Shared` or `Channel` names.
 - No cross-process workers, no remote workers, and no distributed queues.
-- MT builds cover Linux x64/arm64, macOS x64/arm64 and Windows x64. There is
-  no 32-bit, Delphi/WinCE, LoongArch64 or riscv64 `fun-mt` yet.
+- MT builds cover Linux x64/arm64/loongarch64/riscv64, macOS x64/arm64 and
+  Windows x64. There is no 32-bit or Delphi/WinCE `fun-mt`.
 - No fairness or priority control. OS scheduling decides which worker runs.
 - FFI callbacks into Fun from a thread that Fun did not create need a build with
   the thread-safe RTL and careful callback design. This model does not make

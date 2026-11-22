@@ -23,6 +23,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
   paths, catch-proof cancellation, resident globals, slot reuse after a cancel,
   and submission to a closed pool.
 
+- `fun-mt` now builds for linux-loongarch64 and linux-riscv64:
+  `FUN_THREADS=1 FULL=1` adds `-dFunThreads -dUseCThreads` and writes a
+  `*-musl-mt` binary. Both run `lib-worker-test` 72/72 under qemu-user, and the
+  prerelease CI stages build, test and package `fun/funcmd-mt`.
+
 - The Linux build script now finds FPC's bundled libffi unit under
   `/usr/lib64` (Fedora/RHEL) as well as `/usr/lib`, so `getapi()` is enabled
   automatically instead of silently falling back to a no-FFI build.

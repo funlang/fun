@@ -19,6 +19,11 @@
 - `lib-worker-test` 从 49 项扩到 72 项，覆盖两种取消路径、取消不可被脚本捕获、
   槽位常驻全局量、取消后的槽位复用，以及向已关闭的池提交任务。
 
+- `fun-mt` 现在也支持 linux-loongarch64 与 linux-riscv64：
+  `FUN_THREADS=1 FULL=1` 会加上 `-dFunThreads -dUseCThreads` 并输出
+  `*-musl-mt`。两个架构在 qemu-user 下跑 `lib-worker-test` 均为 72/72，
+  预发布 CI 会构建、测试并打包 `fun/funcmd-mt`。
+
 - Linux 构建脚本现在同时查找 `/usr/lib64`（Fedora/RHEL）与 `/usr/lib` 下的
   FPC 内置 libffi 单元，`getapi()` 会自动启用，不再静默退化成无 FFI 构建。
 

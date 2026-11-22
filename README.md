@@ -711,11 +711,14 @@ The standard library in [`fun/lib`](fun/lib) is written in pure Fun (81 modules)
 - **Testing**: `test` (registration and assertions for `fun test`)
 
 `lib-worker` needs the opt-in `funcmd-mt` build. Release archives on linux-x64,
-linux-arm64, macos-x64, macos-arm64 and win-x64 ship it as `fun/fun-mt`; from
-source use `src/prj/fun/make-linux-x86_64-mt.sh`,
+linux-arm64, macos-x64, macos-arm64 and win-x64 ship it as `fun/fun-mt`, and
+the nightly prerelease stages for linux-loongarch64 and linux-riscv64 include
+it too. From source use `src/prj/fun/make-linux-x86_64-mt.sh`,
 `FUN_THREADS=1 src/prj/fun/make-macos.sh`, or
-`src/prj/fun/make-win64-mt.bat`. The default `funcmd` keeps its single-threaded
-heap and performance and reports a clear error on first use.
+`src/prj/fun/make-win64-mt.bat`; for the prerelease Linux targets pass
+`FUN_THREADS=1 FULL=1` to `make-linux-loongarch64.sh` or
+`make-linux-riscv64.sh`. The default `funcmd` keeps its single-threaded heap and
+performance and reports a clear error on first use.
 A worker parses its own module and owns its AST and heap, so nothing Fun-visible
 is shared between threads. Results are strings; `Shared` and `Channel` copy
 values in and out:
