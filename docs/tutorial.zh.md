@@ -295,6 +295,10 @@ Fun 不局限于自己的运行时。能力阶梯是：
 这些能力很强，也与宿主平台相关。先读 `lib-tcc` / `lib-jit` 的模块头再使用；
 不要把原生调用放进不可信脚本：独立的 `fun-safe` 构建会移除整个层级。
 
+如果手上已有 C 头文件，`CWin32API` 可以接受几乎原样的函数原型，`CStruct`
+可以接受 `struct` 声明并计算布局。见
+[C 声明与结构体](standard-library.zh.md#c-声明与结构体)。
+
 继续深入：手册附录与 [`docs/building.zh.md`](building.zh.md)（能力矩阵与安全构建）。
 
 ## 12. 下一步

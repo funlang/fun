@@ -25,6 +25,7 @@ Windows、raw socket 或仅 macOS 的后端。
 - [TOML](#toml)
 - [CSV](#csv)
 - [JSON Schema](#json-schema)
+- [C 声明与结构体](#c-声明与结构体)
 - [平台拆分惯例](#平台拆分惯例)
 
 ---
@@ -38,7 +39,7 @@ Windows、raw socket 或仅 macOS 的后端。
 - **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`lib-stream`、`lib-input`、`lib-zlib`、`lib-sse-compress`、`env`、`cli`、`fs`、`io`、`process`、`logging`、`runtime`、`cron`、`lib-time`、`lib-cmdline`、`lib-proc`
 - **网络**：`lib-winsock`、`lib-netif`、`lib-icmp`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-multipart`、`http-session`、`jwt`
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
-- **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-registry`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`、`lib-eval`
+- **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-registry`、`lib-cwinapi`、`lib-cstruct`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`、`lib-eval`
 - **UI**：`lib-ui`、`lib-ui-base`、`lib-dialog`、`lib-trayicon`
 - **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`、`lib-worker`
 - **沙箱**：`lib-jsbox`
@@ -520,6 +521,37 @@ v0.x 支持 `type`（含类型列表）、`properties` / `required` /
 `$defs` / `definitions`，以及 `format` 的 `email`、`date`、`time`、
 `date-time`、`uri`、`uri-reference`、`uuid`、`ipv4`、`hostname`、`regex`。
 外部 `$ref`、`dependencies`、`if` / `then` / `else` 和 `contains` 暂未支持。
+
+## C 声明与结构体
+
+`lib-cwinapi` 与 `lib-cstruct` 可以把 C 声明直接变成 Fun 对象。
+
+`CWin32API(dll, prototype, defaults)` 解析函数原型，并用命名参数调用：
+
+```fun
+use 'lib-cwinapi.fun';
+
+var msgBox = CWin32API('user32.dll',
+  'int MessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType);');
+msgBox.args.lpText = 'Hello';
+msgBox.call([lpCaption: 'Fun', uType: 0]);
+```
+
+`CStruct(decl, init)` 解析 `struct Name { ... }` 声明，计算字段偏移与对齐，
+返回布局兼容的缓冲区：
+
+```fun
+use 'lib-cstruct.fun';
+
+var point = CStruct('struct Point { int x; int y; };', [x: 3, y: 4]);
+?. point.@totalSize;    // 8
+?. point.@toPtr() != 0; // true
+```
+
+支持的字段包括整数/char 类型、数组、字符串指针与定长字符串、结构体指针和
+回调字段。解析器刻意保持精简：只处理直接的 `struct Name { ... }` 声明，不处理
+C 预处理器或多文件头文件。指针宽度字段沿用 `lib-cwinapi` 的 32 位 Win32 布局；
+指针较多的 64 位 API 建议用带 `p` 的显式 `getapi` 签名。
 
 ## 平台拆分惯例
 

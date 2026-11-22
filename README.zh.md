@@ -32,6 +32,7 @@
 
 ## 目录
 
+- [亮点](#亮点)
 - [为什么是 Fun](#为什么是-fun)
 - [核心特性](#核心特性)
 - [快速开始](#快速开始)
@@ -47,6 +48,44 @@
 - [标准库](#标准库)
 - [示例](#示例)
 - [许可证](#许可证)
+
+---
+
+## 亮点
+
+**贴入 C 声明，直接调用。** `CWin32API` 解析函数原型，生成 FFI 签名，并用命名参数调用：
+
+```fun
+use 'lib-cwinapi.fun';
+
+var msgBox = CWin32API('user32.dll',
+  'int MessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType);');
+msgBox.call([lpText: 'Hello from Fun', lpCaption: 'Fun', uType: 0]);
+```
+
+**贴入 C 结构体声明，直接拿到布局。** `CStruct` 计算字段偏移、数组与对齐，
+返回可按指针传递的缓冲区：
+
+```fun
+use 'lib-cstruct.fun';
+var point = CStruct('struct Point { int x; int y; };', [x: 3, y: 4]);
+?. point.@totalSize;    # 8
+?. point.@toPtr() != 0; # true
+```
+
+**需要时继续下沉。** 同一段脚本可以用内置 TCC 编译 C、JIT，或写内联汇编；
+原生代码还能通过 `@toCallback` 回调回 Fun。见[能力阶梯](#能力阶梯)。
+
+**打成一个文件，或锁进沙箱。** `fun pack` 把应用与依赖库打成单个可执行文件；
+`fun-safe` 是独立构建，移除原生代码、任意内存访问与文件/编译加载，适合插件与
+不可信脚本。
+
+**电池自带，而不是外挂。** 同一套库包含 HTTP server/client（CORS、JWT、
+session、multipart）、cron、日志、运行时 traceback、ORM、YAML/XML/TOML/CSV、
+JSON Schema、桌面 UI 与 worker pool。
+
+**三行代码嵌入。** `Run(PChar('script.fun')); Run(source); Run(-1);`
+把整个运行时变成可嵌入的 `fun.dll`。
 
 ---
 
@@ -82,7 +121,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **正则作为值类型** —— 内嵌 PCRE 引擎，支持行内正则字面量（`/.../`）与匹配运算符（`=~`、`!~`）。
 - **内置数据格式** —— JSON 与 **FD**，一种兼容 JSON、对人类与 AI 都友好的类 Markdown 格式（见[下文](#fd-数据格式)）。
 - **运行时 C 与机器码** —— 内置 Tiny C 编译器、JIT 与内联汇编（见[能力阶梯](#能力阶梯)）。
-- **紧凑的 FFI** —— 用简短的签名串调用 DLL/共享库函数（见 [FFI](#外部函数接口ffi)）。
+- **C 级 FFI** —— 贴入 C 声明，或用简短签名串调用 DLL/共享库函数（见 [FFI](#外部函数接口ffi)）。
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
 - **跨平台** —— Linux x64/arm64（LoongArch64/riscv64 为预发布）、macOS x64/arm64 与 Windows x64；旧 Win32/CE 构建仍保留在源码树中。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
@@ -255,7 +294,27 @@ FD 取值规则（解释器、`fd.js`/`fd2.js` 与 BNF 读取器一致）的完�
 
 ## 外部函数接口（FFI）
 
-Fun 通过**紧凑的签名串**约定暴露原生函数。标准库中的例子：
+有两个入口：贴入 C 原型获得可读绑定，或用紧凑签名获得完全控制。
+
+### 贴入 C 原型
+
+`CWin32API` 接受 C 头文件里原样的声明，并暴露命名参数：
+
+```fun
+use 'lib-cwinapi.fun';
+
+var msgBox = CWin32API('user32.dll',
+  'int MessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType);');
+msgBox.call([lpText: 'Hello from Fun', lpCaption: 'Fun', uType: 0]);
+```
+
+`CStruct` 把同样的思路用在数据上：贴入 `struct` 声明即可得到字段偏移、对齐与
+布局兼容的缓冲区。支持的类型与限制见
+[标准库指南](docs/standard-library.zh.md#c-声明与结构体)。
+
+### 紧凑签名
+
+其余场景用**紧凑的签名串**约定暴露原生函数。标准库中的例子：
 
 ```fun
 'kernel32'.getapi('VirtualAlloc', 'iiii:i');  // 4 个 int 参数 -> int
@@ -368,7 +427,7 @@ macOS、Linux aarch64、龙芯与 riscv64 这几行在 Linux x86_64 上用引导
 - **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`lib-stream`、`lib-input`、`lib-zlib`、`lib-sse-compress`、`env`、`cli`、`fs`、`io`、`process`、`logging`、`runtime`、`cron`、`lib-time`、`lib-cmdline`、`lib-proc`
 - **网络**：`lib-winsock`、`lib-netif`、`lib-icmp`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-multipart`、`http-session`、`jwt`
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
-- **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-registry`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`、`lib-eval`
+- **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-registry`、`lib-cwinapi`、`lib-cstruct`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`、`lib-eval`
 - **UI**：`lib-ui`、`lib-ui-base`、`lib-dialog`、`lib-trayicon`
 - **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`、`lib-worker`
 - **沙箱**：`lib-jsbox`

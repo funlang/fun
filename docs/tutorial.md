@@ -311,6 +311,10 @@ These are powerful and host-specific. Start with `lib-tcc` or `lib-jit` after
 reading their module headers, and keep native calls out of untrusted scripts:
 the separate `fun-safe` build removes this entire layer.
 
+If you have a C header, `CWin32API` accepts the function prototype almost
+verbatim, and `CStruct` accepts a `struct` declaration and computes its layout.
+See [C declarations and structures](standard-library.md#c-declarations-and-structures).
+
 Go deeper: manual appendix and [`docs/building.md`](building.md) (capability
 matrix and safe builds).
 

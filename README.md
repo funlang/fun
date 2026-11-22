@@ -32,6 +32,7 @@ Start with the [tutorial](docs/tutorial.md); use the website
 
 ## Table of contents
 
+- [Highlights](#highlights)
 - [Why Fun](#why-fun)
 - [Core features](#core-features)
 - [Quick start](#quick-start)
@@ -47,6 +48,48 @@ Start with the [tutorial](docs/tutorial.md); use the website
 - [Standard library](#standard-library)
 - [Examples](#examples)
 - [License](#license)
+
+---
+
+## Highlights
+
+**Paste a C prototype and call it.** `CWin32API` parses the declaration,
+builds the FFI signature, and exposes named arguments:
+
+```fun
+use 'lib-cwinapi.fun';
+
+var msgBox = CWin32API('user32.dll',
+  'int MessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType);');
+msgBox.call([lpText: 'Hello from Fun', lpCaption: 'Fun', uType: 0]);
+```
+
+**Paste a C struct and get the layout.** `CStruct` computes field offsets,
+arrays and padding, and gives you a pointer-addressable buffer:
+
+```fun
+use 'lib-cstruct.fun';
+var point = CStruct('struct Point { int x; int y; };', [x: 3, y: 4]);
+?. point.@totalSize;    # 8
+?. point.@toPtr() != 0; # true
+```
+
+**Go below the FFI when you need to.** The same script can compile C with the
+bundled Tiny C Compiler, JIT it, or emit inline assembly, and native code can
+call back into Fun through `@toCallback`. See
+[the capability ladder](#the-capability-ladder).
+
+**Ship one file, or lock it down.** `fun pack` embeds the app and its
+libraries into one executable. `fun-safe` is a separate build with native
+code, arbitrary memory access and file/compile access removed, for plugins and
+untrusted scripts.
+
+**Batteries included, not bolted on.** The same library ships an HTTP
+server/client (CORS, JWT, sessions, multipart), cron, logging, runtime traces,
+an ORM, YAML/XML/TOML/CSV, JSON Schema, desktop UI and a worker pool.
+
+**Embed in three lines.** `Run(PChar('script.fun')); Run(source); Run(-1);`
+turns the whole runtime into an embeddable `fun.dll`.
 
 ---
 
@@ -82,7 +125,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Regex as a value type** — bundled PCRE engine with inline regex literals (`/.../`) and match operators (`=~`, `!~`).
 - **Built-in data formats** — JSON and **FD**, a JSON-compatible, Markdown-like format friendly to humans and to AI (see [below](#the-fd-data-format)).
 - **Runtime C & machine code** — bundled Tiny C Compiler, JIT, and inline assembly (see [the capability ladder](#the-capability-ladder)).
-- **Compact FFI** — call DLL/shared-library functions with a terse signature string (see [FFI](#foreign-function-interface)).
+- **C-level FFI** — paste a C prototype or use a compact signature string to call DLL/shared-library functions (see [FFI](#foreign-function-interface)).
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
 - **Cross-platform** — Linux x64/arm64 (LoongArch64/riscv64 prerelease), macOS x64/arm64, and Windows x64; legacy Win32/CE builds remain in the tree.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
@@ -259,7 +302,31 @@ FD value rules (shared by the interpreter, `fd.js`/`fd2.js`, and the BNF reader)
 
 ## Foreign function interface
 
-Fun exposes native functions through a compact **signature-string** convention. Examples drawn from the standard library:
+There are two entry points: paste a C prototype for readable bindings, or use
+a compact signature when you want full control.
+
+### Paste a C prototype
+
+`CWin32API` takes the declaration as it appears in the C header and exposes
+named arguments:
+
+```fun
+use 'lib-cwinapi.fun';
+
+var msgBox = CWin32API('user32.dll',
+  'int MessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType);');
+msgBox.call([lpText: 'Hello from Fun', lpCaption: 'Fun', uType: 0]);
+```
+
+`CStruct` applies the same idea to data: paste a `struct` declaration and get
+field offsets, padding and a layout-compatible buffer. See the
+[standard library guide](docs/standard-library.md#c-declarations-and-structures)
+for the supported types and limits.
+
+### Compact signatures
+
+For everything else, Fun exposes native functions through a compact
+**signature-string** convention. Examples drawn from the standard library:
 
 ```fun
 'kernel32'.getapi('VirtualAlloc', 'iiii:i');  // 4 int args -> int
@@ -375,7 +442,7 @@ helpers). The full module map and usage notes live in the
 - **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `lib-stream`, `lib-input`, `lib-zlib`, `lib-sse-compress`, `env`, `cli`, `fs`, `io`, `process`, `logging`, `runtime`, `cron`, `lib-time`, `lib-cmdline`, `lib-proc`
 - **Network**: `lib-winsock`, `lib-netif`, `lib-icmp`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`, `http-multipart`, `http-session`, `jwt`
 - **Databases**: `lib-orm`, `lib-orm-pro`, `lib-orm-gen`, `lib-orm-rpc`, `lib-orm-cte`, `lib-ado`, `lib-ado-schema`
-- **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-registry`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`, `lib-eval`
+- **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-registry`, `lib-cwinapi`, `lib-cstruct`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`, `lib-eval`
 - **UI**: `lib-ui`, `lib-ui-base`, `lib-dialog`, `lib-trayicon`
 - **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`, `lib-worker`
 - **Sandbox**: `lib-jsbox`

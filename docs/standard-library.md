@@ -28,6 +28,7 @@ to get wrong. For syntax and language semantics, see the
 - [TOML](#toml)
 - [CSV](#csv)
 - [JSON Schema](#json-schema)
+- [C declarations and structures](#c-declarations-and-structures)
 - [Platform-split convention](#platform-split-convention)
 
 ---
@@ -41,7 +42,7 @@ to get wrong. For syntax and language semantics, see the
 - **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `lib-stream`, `lib-input`, `lib-zlib`, `lib-sse-compress`, `env`, `cli`, `fs`, `io`, `process`, `logging`, `runtime`, `cron`, `lib-time`, `lib-cmdline`, `lib-proc`
 - **Network**: `lib-winsock`, `lib-netif`, `lib-icmp`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`, `http-multipart`, `http-session`, `jwt`
 - **Databases**: `lib-orm`, `lib-orm-pro`, `lib-orm-gen`, `lib-orm-rpc`, `lib-orm-cte`, `lib-ado`, `lib-ado-schema`
-- **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-registry`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`, `lib-eval`
+- **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-registry`, `lib-cwinapi`, `lib-cstruct`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`, `lib-eval`
 - **UI**: `lib-ui`, `lib-ui-base`, `lib-dialog`, `lib-trayicon`
 - **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`, `lib-worker`
 - **Sandbox**: `lib-jsbox`
@@ -582,6 +583,40 @@ The v0.x subset covers `type` (including lists), `properties` / `required` /
 `format` for `email`, `date`, `time`, `date-time`, `uri`, `uri-reference`,
 `uuid`, `ipv4`, `hostname` and `regex`. External `$ref`, `dependencies`,
 `if` / `then` / `else` and `contains` are not supported yet.
+
+## C declarations and structures
+
+`lib-cwinapi` and `lib-cstruct` turn C declarations into Fun objects.
+
+`CWin32API(dll, prototype, defaults)` parses a function prototype and exposes
+named arguments:
+
+```fun
+use 'lib-cwinapi.fun';
+
+var msgBox = CWin32API('user32.dll',
+  'int MessageBoxA(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType);');
+msgBox.args.lpText = 'Hello';
+msgBox.call([lpCaption: 'Fun', uType: 0]);
+```
+
+`CStruct(decl, init)` parses a `struct Name { ... }` declaration, computes
+field offsets and padding, and returns a layout-compatible buffer:
+
+```fun
+use 'lib-cstruct.fun';
+
+var point = CStruct('struct Point { int x; int y; };', [x: 3, y: 4]);
+?. point.@totalSize;    // 8
+?. point.@toPtr() != 0; // true
+```
+
+Supported fields include integer and char types, arrays, string pointers and
+fixed strings, struct pointers, and callback fields. The parser is deliberately
+small: it handles direct `struct Name { ... }` declarations, not the C
+preprocessor or multi-file headers. Pointer-sized fields follow the 32-bit
+Win32 layout used by `lib-cwinapi`; for pointer-heavy 64-bit APIs prefer an
+explicit `getapi` signature with `p`.
 
 ## Platform-split convention
 
