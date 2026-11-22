@@ -27,7 +27,7 @@
 
 | ID | 事项 | 状态 | 优先级 | 验收 | 关联 |
 |---|---|---|---|---|---|
-| S-02 | jsbox 沙箱运行器 | DOING | P1 | 沙箱边界只由 `fun-jsbox` 承担，不以 fun `-safe` 代替。Linux seccomp-bpf、`process.run` 输出上限、Windows Job Object、macOS sandbox profile 已实现（后两者待 CI/真机验证）；剩余 bubblewrap/nsjail 网络与挂载隔离 | `src/prj/fun/jsbox/README.md` |
+| （空） | | | | | |
 
 ## 2. 下一步 (NEXT)
 
@@ -43,7 +43,11 @@
 | S-05 | create-fun-app 脚手架 | OPEN | P3 | Fun 后端 + z-data 前端 + 一体发布 | `art/notes/todo.md` |
 | S-06 | 用 fun-ui 重写 funide | OPEN | P3 | 新 IDE 替代旧 funide | `art/notes/todo.md` |
 | S-07 | funcally AI agent | OPEN | P3 | 基于沙箱、CLI、HTTP 的 agent | `art/notes/todo.md` |
-| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | `io.pipe` 交接给子进程、边跑边读写、进程树终止、Windows Unicode 命令行（`io.pipe`、`process.run` 和 `output` 上限已完成）。与 S-02 保持独立：jsbox 走一次性 JSON，不需要流式 stdio | `README.zh.md` 的 io 一节 |
+| S-09 | 流式/交互式子进程 stdio | OPEN | P2 | `io.pipe` 交接给子进程、边跑边读写（`io.pipe`、`process.run` 和 `output` 上限已完成）。进程树终止拆为 S-12，Windows Unicode 命令行拆为 S-13。与 jsbox 保持独立：jsbox 走一次性 JSON，不需要流式 stdio | `README.zh.md` 的 io 一节 |
+| S-10 | jsbox 网络与挂载隔离 | OPEN | P2 | 在 Linux 上用 bubblewrap/nsjail 提供网络与挂载命名空间隔离，`FUN_JSBOX_SANDBOX=0` 之外不放开。S-02 拆分项 | `src/prj/fun/jsbox/README.md` |
+| S-11 | jsbox Windows/macOS 沙箱验证 | OPEN | P2 | Windows Job Object 与 macOS sandbox profile 已在代码中，待 CI/真机验证；补失败路径与文档。S-02 拆分项 | `src/prj/fun/jsbox/README.md` |
+| S-12 | 子进程树终止 | OPEN | P2 | Unix 进程组与 Windows Job Object 终止整个子进程树，避免孙进程残留。S-09 拆分项 | `README.zh.md` 的 io 一节 |
+| S-13 | Windows Unicode 子进程命令行 | OPEN | P3 | 传参走宽字符命令行并正确转义，非 ANSI 代码页路径不再丢字符。S-09 拆分项 | `README.zh.md` 的 io 一节 |
 
 ## 4. 技术债台账
 
@@ -57,7 +61,7 @@
 | D-03 | 数据 | P2 | OPEN | 日期/时间跨端约定未统一 | `art/notes/data-format-alignment.md` |
 | D-04 | 数据 | P2 | OPEN | Fun `Int64` 超过 2^53 传给 JS 会静默丢精度 | `art/notes/data-format-alignment.md` |
 | D-05 | 数据 | P3 | OPEN | FD/JSON 其余低风险一致性项（空键、定长前缀、kvd 空白分隔等） | `art/notes/data-format-alignment.md` |
-| P-01 | 平台/并发 | P2 | DOING | `funcmd-mt` 已覆盖 Linux x64/arm64、macOS x64/arm64、Windows x64：每个 worker 独立解析 AST/CEnv，跨线程只走字符串/FD，`Shared`/`Channel`/`onDone` 可用；各平台 CI 在同一任务内构建并跑 `lib-worker-test`，发布包附带 fun-mt。剩余：常驻 worker 池、取消，以及 LoongArch64/riscv64 `fun-mt` | `fun/lib/worker-model.md` |
+| P-17 | 平台/并发 | P3 | OPEN | P-01 拆分项：为 LoongArch64 与 riscv64 提供 `fun-mt` 构建与 CI（P-16 已有龙芯解释器与 CI 基础）。32 位与 Delphi/WinCE 不在此列 | `fun/lib/worker-model.md` |
 | P-02 | 平台 | P2 | OPEN | `lib-os` 全量 host 分派器未做 | `art/notes/library-port-plan.md` |
 | P-03 | 平台 | P2 | OPEN | `lib-message`/`lib-async`/`lib-jsasync` 仍依赖消息泵或线程 | `art/notes/linux-capabilities.md` |
 | P-04 | 平台 | P3 | OPEN | `lib-icmp` raw socket 未做，需 root/CAP_NET_RAW | `art/notes/linux-capabilities.md` |
@@ -76,6 +80,8 @@
 
 | ID | 事项 | 状态 | 说明 |
 |---|---|---|---|
+| S-02 | jsbox 沙箱运行器 | DONE | 沙箱边界只由 `fun-jsbox` 承担，不以 fun `-safe` 代替。Linux seccomp-bpf、`process.run` 输出上限、Windows Job Object、macOS sandbox profile、`lib-jsbox` 桥接与测试均已交付。剩余网络/挂载隔离拆为 S-10，Windows/macOS 真机验证拆为 S-11。 |
+| P-01 | 平台/并发：worker 模型 | DONE | `funcmd-mt` 覆盖 Linux x64/arm64、macOS x64/arm64、Windows x64：每个 worker 独立解析 AST/CEnv，跨线程只走字符串/FD，`Shared`/`Channel`/`onDone`/`workerMapLimit` 可用；常驻 worker 池（`WorkerPool`）与协作式取消（`cancel`，`ECancelled` 不可被脚本捕获）已落地；各平台 CI 同一任务内构建并跑 `lib-worker-test`，发布包附带 fun-mt。新增架构拆为 P-17。 |
 | S-04 | 站点 PHP 用 Fun 重写 | DONE | 站点页面与业务接口已全部迁到 Fun 服务；PHP-FPM 已停用，旧 URL 由 nginx 反代保持。验证时修复了 `match` 未命中判断导致的空 IP 500 与订单号校验问题。迁移与部署细节见独立部署仓库。 |
 | K-04 | 循环集合深拷贝递归溢出 | DONE | `CEnv` clone 祖先栈 + `CSet.clone` 统一 set/object；循环副本保留在自己的克隆内，`@clone` 同样有栈上下文。`fun/test/clone-cycle-test.fun`、`fun/demos/benchmarks/clone-bench.md` 覆盖。 |
 | P-05 | 第二数据库后端：unixODBC | DONE | MySQL/PostgreSQL 等经驱动管理器接入，unixODBC 与 P-11 同一交付。 |
@@ -193,3 +199,10 @@
   Windows x64，`lib-worker` 新增命名通道与主线程完成回调；新增
   `lib-asm-riscv64` 与仅预发布 riscv64 目标；Windows arm64 仍因 FPC 崩溃不发布。
   回归刷新为 `139/139`，加载检查 `84/90`。
+- 2026-11-22：并发主项收尾。`lib-worker` 新增常驻 `WorkerPool`
+  （固定槽位、每任务指定入口、`poolMap`/`poolRun`）与协作式取消
+  （`Worker.cancel`、任务 `cancel`，`ECancelled` 不可被脚本 try/except
+  吞掉）；`lib-worker-test` 扩到 72 项并在 MT 构建上全绿。P-01 完成归档。
+  拆分挂起项：S-02 的网络/挂载隔离与跨平台真机验证拆为 S-10/S-11；
+  S-09 的进程树终止与 Windows Unicode 命令行拆为 S-12/S-13；新增架构
+  `fun-mt` 拆为 P-17。
