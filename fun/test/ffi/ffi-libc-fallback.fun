@@ -30,13 +30,21 @@ var slen3 = 'libc.so'.getapi('strlen', 's:i');
 ?. slen3('abc');               ?. ' <- libc.so normalization expect 3';
 
 # A name that merely starts with a C-library stem must not be routed to the
-# process image: 'libc.something' is not libc.
+# process image by IsGlobalLibName. musl's own loader treats any 'libc.*'
+# name as libc before Fun sees the failure, so on musl this probe resolves by
+# design; the platform snapshots record which answer the host gives. On
+# glibc it must raise.
+var prefix_aliased = false;
 try
   'libc.something'.getapi('strlen', 's:i');
-  ?. 'unexpected';
+  prefix_aliased = true;
 except
-  ?. 'raised libc.something';
 end try;
+if prefix_aliased then
+  ?. 'libc.* aliased by loader';
+else
+  ?. 'raised libc.something';
+end if;
 
 try
   'libdefinitely_missing.so.9'.getapi('strlen', 's:i');
