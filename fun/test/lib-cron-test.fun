@@ -923,3 +923,124 @@ nw.stop();
 ?. nw.nextWaitMs(250) = 250;
 ?. nw.nextWaitMs(nil) = 1000;
 ?. nw.tick() = 0;
+
+// --- per-job statistics --------------------------------------------------
+var statASt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 1000, time: 6000.0];
+var statA = CronScheduler();
+statA._clock = fakeClock(statASt);
+var statAHits = 0;
+var statAMidRunAt = nil;
+var statAMidSuccess = nil;
+var statAMidErrors = -1;
+var statAId = statA.addJob('* * * * *', () {
+  statAHits += 1;
+  var mid = statA.jobs()[0]['stats'];
+  statAMidRunAt = mid['lastRunAt'];
+  statAMidSuccess = mid['lastSuccessAt'];
+  statAMidErrors = mid['errors'];
+  statASt['mono'] += 123;
+  statASt['time'] += 0.5;
+});
+makeDue(statA, statAId, at(2026, 11, 12, 0, 0, 0), 1000);
+?. statA._tick(at(2026, 11, 12, 0, 0, 0), 1000) = 1;
+?. statAHits = 1;
+?. statAMidRunAt = 6000;
+?. statAMidSuccess.type() = 0;
+?. statAMidErrors = 0;
+var statAView = statA.jobs()[0];
+?. statAView['stats']['lastRunAt'] = 6000;
+?. statAView['stats']['lastSuccessAt'] > 6000;
+?. statAView['stats']['errors'] = 0;
+?. statAView['stats']['lastErrorMessage'].type() = 0;
+statAView['stats']['errors'] = 99;
+statAView['stats']['lastErrorMessage'] = 'mutated';
+?. statA.jobs()[0]['stats']['errors'] = 0;
+?. statA.jobs()[0]['stats']['lastErrorMessage'].type() = 0;
+
+var statFSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 7000.0];
+var statFJob = nil;
+var statFErr = nil;
+var statF = CronScheduler([onError: (job, err) {
+  statFJob = job;
+  statFErr = err;
+}]);
+statF._clock = fakeClock(statFSt);
+var statFId = statF.addJob('* * * * *', () { raise 'boom'; });
+makeDue(statF, statFId, at(2026, 11, 12, 0, 0, 0), 0);
+?. statF._tick(at(2026, 11, 12, 0, 0, 0), 0) = 1;
+var statFView = statF.jobs()[0]['stats'];
+?. statFView['lastRunAt'] <> nil;
+?. statFView['lastSuccessAt'].type() = 0;
+?. statFView['errors'] = 1;
+?. statFView['lastErrorMessage'].subpos('boom') >= 0;
+?. statFJob['stats']['errors'] = 1;
+?. statFJob['stats']['lastErrorMessage'].subpos('boom') >= 0;
+?. statFErr['message'].subpos('boom') >= 0;
+
+var statCSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 7500.0];
+var statC = CronScheduler();
+statC._clock = fakeClock(statCSt);
+var statCId = statC.addJob('* * * * *', () { raise 'boom'; });
+makeDue(statC, statCId, at(2026, 11, 12, 0, 0, 0), 0);
+?. statC._tick(at(2026, 11, 12, 0, 0, 0), 0) = 1;
+makeDue(statC, statCId, at(2026, 11, 12, 0, 0, 0), 0);
+?. statC._tick(at(2026, 11, 12, 0, 0, 0), 0) = 1;
+?. statC.jobs()[0]['stats']['errors'] = 2;
+?. statC.jobs()[0]['stats']['lastErrorMessage'].subpos('boom') >= 0;
+
+var statRSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 8000.0];
+var statRFail = true;
+var statR = CronScheduler();
+statR._clock = fakeClock(statRSt);
+var statRId = statR.addJob('* * * * *', () {
+  if statRFail then
+    statRFail = false;
+    raise 'boom';
+  end if;
+});
+makeDue(statR, statRId, at(2026, 11, 12, 0, 0, 0), 0);
+?. statR._tick(at(2026, 11, 12, 0, 0, 0), 0) = 1;
+makeDue(statR, statRId, at(2026, 11, 12, 0, 0, 0), 0);
+?. statR._tick(at(2026, 11, 12, 0, 0, 0), 0) = 1;
+?. statR.jobs()[0]['stats']['errors'] = 1;
+?. statR.jobs()[0]['stats']['lastErrorMessage'].type() = 0;
+?. statR.jobs()[0]['stats']['lastSuccessAt'] <> nil;
+
+var statESt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 9000.0];
+var statE = CronScheduler();
+statE._clock = fakeClock(statESt);
+var statEId = statE.every('1s', () {});
+makeDue(statE, statEId, at(2026, 11, 12, 0, 0, 0), 0);
+?. statE._tick(at(2026, 11, 12, 0, 0, 0), 0) = 1;
+?. statE.jobs()[0]['stats']['lastRunAt'] <> nil;
+?. statE.jobs()[0]['stats']['lastSuccessAt'] <> nil;
+?. statE.jobs()[0]['stats']['errors'] = 0;
+
+var statEFSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 9500.0];
+var statEF = CronScheduler();
+statEF._clock = fakeClock(statEFSt);
+var statEFId = statEF.every('1s', () { raise 'boom'; });
+makeDue(statEF, statEFId, at(2026, 11, 12, 0, 0, 0), 0);
+?. statEF._tick(at(2026, 11, 12, 0, 0, 0), 0) = 1;
+?. statEF.jobs()[0]['stats']['errors'] = 1;
+?. statEF.jobs()[0]['stats']['lastErrorMessage'].subpos('boom') >= 0;
+
+var statU = CronScheduler();
+var statUId = statU.addJob('* * * * *', () {});
+var statUView = statU.jobs()[0]['stats'];
+?. statUView['errors'] = 0;
+?. statUView['lastRunAt'].type() = 0;
+?. statUView['lastSuccessAt'].type() = 0;
+?. statUView['lastErrorMessage'].type() = 0;
+
+var statBSt = new [wall: at(2026, 11, 12, 0, 0, 0), mono: 0, time: 10000.0];
+var statB = CronScheduler();
+statB._clock = fakeClock(statBSt);
+var statBA = statB.addJob('* * * * *', () { statB.stop(); });
+var statBB = statB.addJob('* * * * *', () {});
+makeDue(statB, statBA, at(2026, 11, 12, 0, 0, 0), 0);
+makeDue(statB, statBB, at(2026, 11, 12, 0, 0, 0), 0);
+?. statB._tick(at(2026, 11, 12, 0, 0, 0), 0) = 1;
+var statBViews = statB.jobs();
+?. statBViews[0]['stats']['lastRunAt'] <> nil;
+?. statBViews[1]['stats']['lastRunAt'].type() = 0;

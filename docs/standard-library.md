@@ -138,7 +138,13 @@ s.run();                                             // or s.tick() in a loop
 - For an `HttpServer` or another poll loop, drive one pass with `tick()` and
   `nextWaitMs(maxMs)` instead of `run()`. Callbacks run synchronously, so a
   slow handler delays the loop; `tick()` is rejected while `run()` is active.
-- Callback errors are silent unless `onError` is supplied.
+- `jobs()` items carry a `stats` sub-map: `lastRunAt`, `lastSuccessAt`,
+  `errors` and `lastErrorMessage`. `lastRunAt` updates when a callback starts;
+  success clears `lastErrorMessage` and updates `lastSuccessAt`, while `errors`
+  stays cumulative. Statistics update even without `onError`, and `onError`
+  sees the updated snapshot.
+- Callback errors are not actively reported without `onError`, but the failure
+  statistics remain visible in `jobs()`.
 
 ## HTTP helpers
 

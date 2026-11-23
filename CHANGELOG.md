@@ -6,6 +6,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `CronScheduler.jobs()` now includes a per-job `stats` sub-map with
+  `lastRunAt`, `lastSuccessAt`, `errors` and `lastErrorMessage`. Statistics
+  update even without `onError`; success clears `lastErrorMessage` and updates
+  `lastSuccessAt`, and `onError` receives the updated snapshot.
+
 - The linux-x64 release artifact is now built in a manylinux2014 container
   (CentOS 7, glibc 2.17) instead of on the Ubuntu 24.04 runner. The old build
   inherited a GLIBC_2.34 floor, which excluded Kylin V10 / UOS 20 and other

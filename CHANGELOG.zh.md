@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+- `CronScheduler.jobs()` 现在包含 per-job `stats` 子 map：`lastRunAt`、
+  `lastSuccessAt`、`errors`、`lastErrorMessage`。没有 `onError` 时统计仍会更新；
+  成功后清空 `lastErrorMessage` 并更新 `lastSuccessAt`，`onError` 收到的是
+  更新后的快照。
+
 - linux-x64 发布产物改为在 manylinux2014 容器（CentOS 7，glibc 2.17）中构建，
   不再直接用 Ubuntu 24.04 runner。旧构建继承了 GLIBC_2.34 地板，把麒麟 V10 /
   统信 UOS 20 等 glibc 2.28~2.31 的国产系统挡在门外；容器构建把地板降到

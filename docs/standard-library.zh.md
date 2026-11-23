@@ -129,7 +129,11 @@ s.run();                                             // 或在循环里调用 s.
 - 要和 `HttpServer` 或其它 poll 循环共用线程，用 `tick()` 和
   `nextWaitMs(maxMs)` 驱动单次 pass。回调同步执行，慢 handler 会拖住循环；
   `run()` 活跃时拒绝 `tick()`。
-- 回调失败默认静默，除非传入 `onError`。
+- `jobs()` 的每一项带一个 `stats` 子 map：`lastRunAt`、`lastSuccessAt`、
+  `errors`、`lastErrorMessage`。回调开始时更新 `lastRunAt`；成功后清空
+  `lastErrorMessage` 并更新 `lastSuccessAt`，`errors` 累计不清零。没有 `onError`
+  时统计仍会更新，`onError` 看到的是更新后的快照。
+- 没有 `onError` 时不会主动上报，但失败统计仍可在 `jobs()` 中看到。
 
 ## HTTP 辅助
 
