@@ -72,7 +72,9 @@ end fun;
 // The C library: glibc's stable runtime soname on Linux; macOS folds libc
 // (and much else) into libSystem; the Windows counterpart is msvcrt, which is
 // what the FPC/win64 build and MinGW both link against by default. Only the
-// Unix callers use it today, but the name is honest on every host.
+// Unix callers use it today, but the name is honest on every host. musl has no
+// libc.so.6, but lffi resolves C-library aliases from the process image, so
+// the glibc spelling keeps working on Alpine too (the musl release targets).
 fun LibC()
   if _isWindows then result = 'msvcrt.dll';
   elsif _isMac then result = 'libSystem.B.dylib';

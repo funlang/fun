@@ -99,8 +99,16 @@ to get a global `fun` command.
 
 ## Runtime requirements
 
-- Linux artifacts are built on Ubuntu 24.04, so they need glibc 2.34 or newer.
-- When `getapi`/FFI is enabled, Linux also needs `libffi.so.8` at run time.
+- `linux-x64` artifacts are built in a glibc 2.17 container, so they run on
+  Kylin V10 / UOS 20 (glibc 2.28-2.31) and anything newer. `linux-arm64` is
+  built on Ubuntu 24.04 and needs glibc 2.34 or newer.
+- PCRE and libffi are linked into the binary, so no `libpcre.so.1` or
+  `libffi.so.N` runtime package is needed; both musl and glibc hosts resolve
+  C-library names through the process image (see below).
+- On musl (the LoongArch64/riscv64 artifacts) `getapi` resolves libc-style
+  names such as `libc.so.6` from the process image, so no glibc compatibility
+  symlink is needed; bare names also probe the versioned sonames distro
+  packages ship (`libz` finds `libz.so.1`).
 - Nightly builds are prereleases, so `releases/latest` stays on the stable
   version.
 - `fun.dll` is a separate licensed product and is not part of these archives.

@@ -1,0 +1,7 @@
+5
+ <- libc alias fallback expect 5
+4
+ <- alias on another cpu name expect 4
+3
+ <- bare libm -> libm.so.6 expect 3
+raised

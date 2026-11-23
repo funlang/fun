@@ -52,6 +52,10 @@ type
     extra: array[1..16] of Byte;
   end;
 
+  // NUL-terminated UCS-4 buffer for the Unix wide-string ('w') FFI path; each
+  // element is one wchar_t (4 bytes on Linux and macOS).
+  TUCS4 = array of LongWord;
+
   // Handler added to env.libs: routes calls on a getapi() result object.
   CLffiApi = class(CLib)
   public
@@ -85,6 +89,7 @@ type
     FCif: TCif;             // kept alive for the whole closure lifetime
     FAt: array of Pffi_type;// closure arg types (persisted for the cif)
     FStr: AnsiString;       // keeps the last string return alive
+    FWide: TUCS4;             // keeps the last wchar_t* return alive
     function Build: Pointer;
     function GetProc: Pointer;
   protected
@@ -103,6 +108,164 @@ implementation
 uses SysUtils;
 
 type PValue = base.PValue;
+
+{$IfDef Linux}
+// dlopen(NULL, ...) returns a handle for the main program, whose symbol scope
+// includes libc and every dependency the executable already loaded. This is
+// the portable fallback for a C-library name that has no shared object on the
+// host: musl ships no libc.so.6 (only libc.musl-<cpu>.so.1), so the stdlib's
+// `'libc.so.6'.getapi(...)` would otherwise fail on Alpine even though libc is
+// linked in. FPC's dynlibs takes a file name ('' is not NULL), so call the
+// loader directly; FPC's RTL already imports dlopen, so no extra -l is needed.
+function c_dlopen(filename: PAnsiChar; flags: Integer): Pointer; cdecl; external name 'dlopen';
+const
+  C_RTLD_NOW = 2;
+var
+  _selflib: TLibHandle = NilHandle;
+  _selflibTried: Boolean = False;
+
+function ResolveGlobal(const name: string): fun.ptr;
+begin
+  result := nil;
+  if name = '' then exit;
+  if not _selflibTried then
+  begin
+    _selflibTried := True;
+    _selflib := TLibHandle(c_dlopen(nil, C_RTLD_NOW));
+  end;
+  if _selflib <> NilHandle then
+    result := fun.ptr(GetProcedureAddress(_selflib, name));
+end;
+
+// Only names whose symbols live in the process image may fall back to the
+// global scope. An arbitrary missing library still reports the load error
+// instead of silently using a same-named symbol from somewhere else.
+function IsGlobalLibName(const name: string): Boolean;
+begin
+  result := (name = '')
+         or (name = 'libc') or (Copy(name, 1, 7) = 'libc.so')
+         or (Copy(name, 1, 10) = 'libc.musl-') or (Copy(name, 1, 8) = 'ld-musl-')
+         or (name = 'libm') or (Copy(name, 1, 7) = 'libm.so')
+         or (name = 'libdl') or (Copy(name, 1, 7) = 'libdl.so')
+         or (name = 'libpthread') or (Copy(name, 1, 12) = 'libpthread.so')
+         or (name = 'librt') or (Copy(name, 1, 7) = 'librt.so')
+         or (name = 'libutil') or (Copy(name, 1, 10) = 'libutil.so');
+end;
+{$EndIf}
+
+{$IfNDef MSWINDOWS}
+// Extensions tried for a bare name (no path and no known extension). A runtime
+// package usually carries only the versioned soname (libz.so.1; libz.so lives
+// in the -dev package), so 'libz' must find libz.so.1 as well.
+function LoadLibCandidates(const base: string): TLibHandle;
+const
+  {$IfDef Darwin}
+  exts: array[0..5] of string = ('', '.dylib', '.1.dylib', '.2.dylib', '.3.dylib', '.4.dylib');
+  {$Else}
+  exts: array[0..9] of string = ('', '.so', '.so.1', '.so.0', '.so.2', '.so.3',
+                                 '.so.4', '.so.5', '.so.6', '.so.8');
+  {$EndIf}
+var
+  i: Integer;
+begin
+  for i := Low(exts) to High(exts) do
+  begin
+    result := LoadLibrary(base + exts[i]);
+    if result <> NilHandle then exit;
+  end;
+  result := NilHandle;
+end;
+{$EndIf}
+
+// Fun strings are UTF-8 bytes on every Unix host, while wchar_t is a 4-byte
+// UCS-4 code unit on both Linux and macOS. The 'w' signature converts at the
+// boundary, so wide C APIs (wcslen, wcscmp, ...) get a real wchar_t* instead
+// of a char* reinterpreted as one. Win64's lffi keeps the old narrow
+// behaviour: there wchar_t is 2-byte UTF-16, which needs a different encoder.
+function Utf8ToUCS4(const s: AnsiString): TUCS4;
+var
+  i, j, n, k, need: Integer;
+  c: LongWord;
+  b: Byte;
+  ok: Boolean;
+begin
+  n := Length(s);
+  SetLength(result, n + 1);
+  i := 1;
+  j := 0;
+  while i <= n do
+  begin
+    b := Byte(s[i]);
+    if b < $80 then
+    begin
+      c := b; need := 0; inc(i);
+    end
+    else if (b and $E0) = $C0 then
+    begin
+      c := b and $1F; need := 1; inc(i);
+    end
+    else if (b and $F0) = $E0 then
+    begin
+      c := b and $0F; need := 2; inc(i);
+    end
+    else if (b and $F8) = $F0 then
+    begin
+      c := b and $07; need := 3; inc(i);
+    end
+    else
+    begin
+      c := $FFFD; need := 0; inc(i);
+    end;
+    ok := True;
+    for k := 1 to need do
+    begin
+      if (i > n) or ((Byte(s[i]) and $C0) <> $80) then
+      begin
+        ok := False;
+        break;
+      end;
+      c := (c shl 6) or (Byte(s[i]) and $3F);
+      inc(i);
+    end;
+    if (not ok) or (c > $10FFFF) or ((c >= $D800) and (c <= $DFFF)) then
+      c := $FFFD;
+    result[j] := c;
+    inc(j);
+  end;
+  result[j] := 0;
+  SetLength(result, j + 1);
+end;
+
+function UCS4ToUtf8(p: PLongWord): AnsiString;
+var
+  c: LongWord;
+  i: Integer;
+  s: AnsiString;
+begin
+  s := '';
+  if p <> nil then
+  begin
+    i := 0;
+    while True do
+    begin
+      c := PLongWord(PByte(p) + i * SizeOf(LongWord))^;
+      if c = 0 then break;
+      inc(i);
+      if (c > $10FFFF) or ((c >= $D800) and (c <= $DFFF)) then c := $FFFD;
+      if c < $80 then
+        s := s + AnsiChar(c)
+      else if c < $800 then
+        s := s + AnsiChar($C0 or (c shr 6)) + AnsiChar($80 or (c and $3F))
+      else if c < $10000 then
+        s := s + AnsiChar($E0 or (c shr 12)) + AnsiChar($80 or ((c shr 6) and $3F))
+               + AnsiChar($80 or (c and $3F))
+      else
+        s := s + AnsiChar($F0 or (c shr 18)) + AnsiChar($80 or ((c shr 12) and $3F))
+               + AnsiChar($80 or ((c shr 6) and $3F)) + AnsiChar($80 or (c and $3F));
+    end;
+  end;
+  result := s;
+end;
 
 // FPC 3.2.2's bundled ffi unit hardcodes the pre-3.4 libffi enum, where
 // x86_64-linux FFI_UNIX64 = 1. libffi >= 3.4 (Debian 12+, Ubuntu 22.04+,
@@ -167,11 +330,7 @@ begin
       {$IfDef MSWINDOWS}
       hlib := LoadLibrary(libname + '.dll')
       {$Else}
-        {$IfDef Darwin}
-        hlib := LoadLibrary(libname + '.dylib')
-        {$Else}
-        hlib := LoadLibrary(libname + '.so')
-        {$EndIf}
+      hlib := LoadLibCandidates(libname)
       {$EndIf};
   end;
 
@@ -189,22 +348,38 @@ begin
 
   if hfun = nil then
   begin
-    if hlib = NilHandle then
-      raise EBase.Create('getapi: cannot load library "' + libname + '"');
     if name = '' then
+    begin
+      if hlib = NilHandle then
+        raise EBase.Create('getapi: cannot load library "' + libname + '"');
       raise EBase.Create('getapi: no symbol name for library "' + libname + '"');
-    hfun := fun.ptr(GetProcedureAddress(hlib, name));
-    {$IfDef MSWINDOWS}
-    // Windows exports most of these with an A/W suffix (GetCommandLineA) while
-    // the Fun-side names are unsuffixed (GetCommandLine), which is exactly what
-    // io.GetProc handles for the Delphi path: retry with the suffix before
-    // giving up. The narrow 's'/'i' convention means the ANSI entry point is
-    // the one wanted, and an explicit 'nameW' still resolves directly.
+    end;
+    if hlib <> NilHandle then
+    begin
+      hfun := fun.ptr(GetProcedureAddress(hlib, name));
+      {$IfDef MSWINDOWS}
+      // Windows exports most of these with an A/W suffix (GetCommandLineA) while
+      // the Fun-side names are unsuffixed (GetCommandLine), which is exactly what
+      // io.GetProc handles for the Delphi path: retry with the suffix before
+      // giving up. The narrow 's'/'i' convention means the ANSI entry point is
+      // the one wanted, and an explicit 'nameW' still resolves directly.
+      if hfun = nil then
+        hfun := fun.ptr(GetProcedureAddress(hlib, name + 'A'));
+      {$EndIf}
+    end
+    {$IfDef Linux}
+    else if IsGlobalLibName(libname) then
+      // No shared object with this name (musl has no libc.so.6): the symbol is
+      // already in the process image, so resolve it from there.
+      hfun := ResolveGlobal(name)
+    {$EndIf};
     if hfun = nil then
-      hfun := fun.ptr(GetProcedureAddress(hlib, name + 'A'));
-    {$EndIf}
-    if hfun = nil then
-      raise EBase.Create('getapi: symbol "' + name + '" not found in "' + libname + '"');
+    begin
+      if hlib = NilHandle then
+        raise EBase.Create('getapi: cannot load library "' + libname + '"')
+      else
+        raise EBase.Create('getapi: symbol "' + name + '" not found in "' + libname + '"');
+    end;
   end;
 
   // 'variadic: <n>' marks a variadic symbol: n arguments are fixed, the rest
@@ -260,6 +435,7 @@ var
   refs: array of QWord;
   byref: array of Boolean;
   strs: array of AnsiString;
+  wstrs: array of TUCS4;
   ch, rt: Char;
   ret: QWord;
   rtype: Pffi_type;
@@ -274,6 +450,7 @@ begin
   SetLength(at, n); SetLength(av, n); SetLength(slots, n);
   SetLength(refs, n); SetLength(byref, n);
   SetLength(strs, n);
+  SetLength(wstrs, n);
 
   // Build one 8-byte slot per argument; libffi reads from it. Integer/pointer
   // and the string forms pass as GPR values (ffi_type_pointer), doubles route
@@ -300,13 +477,25 @@ begin
       Continue;
     end;
     case ch of
-      's', 'a', 'w':
-        // 'w' degrades to narrow char* on Linux (wchar_t is 4-byte UTF-32, not
-        // UTF-16), so wide-string FFI calls fall back to the 's' behaviour.
+      's', 'a', 'r':
         begin
           strs[i] := AnsiString(e.asStr);
           if strs[i] <> '' then slots[i] := QWord(fun.uintptr(@strs[i][1]));
         end;
+      'w':
+        // Win64's lffi keeps passing the string bytes (wchar_t is UTF-16
+        // there); on Unix wchar_t is 4-byte UCS-4, so convert explicitly.
+        {$IfDef MSWINDOWS}
+        begin
+          strs[i] := AnsiString(e.asStr);
+          if strs[i] <> '' then slots[i] := QWord(fun.uintptr(@strs[i][1]));
+        end;
+        {$Else}
+        begin
+          wstrs[i] := Utf8ToUCS4(AnsiString(e.asStr));
+          slots[i] := QWord(fun.uintptr(@wstrs[i][0]));
+        end;
+        {$EndIf}
       'c': // callback: pass a Fun callback's native entry point
         begin
           if e.asObj is CFFICallback then slots[i] := QWord(fun.uintptr(CFFICallback(e.asObj).Proc))
@@ -377,7 +566,12 @@ begin
   case rt of
     'f': p_val^ := PSingle(@ret)^;
     'd': p_val^ := PDouble(@ret)^;
-    's', 'a', 'w': p_val^ := fun.str(PAnsiChar(fun.uintptr(ret)));
+    's', 'a', 'r': p_val^ := fun.str(PAnsiChar(fun.uintptr(ret)));
+    {$IfDef MSWINDOWS}
+    'w': p_val^ := fun.str(PAnsiChar(fun.uintptr(ret)));
+    {$Else}
+    'w': p_val^ := fun.str(UCS4ToUtf8(PLongWord(fun.uintptr(ret))));
+    {$EndIf}
     'i'     : p_val^ := fun.int(LongInt(ret));      // C int (low 32 bits / eax)
     'l', 'n': p_val^ := Int64(ret);                 // C long / 64-bit number
     'v'     : p_val^ := NullValue;
@@ -393,9 +587,11 @@ end;
 //==============================================================
 // f.fn.@toCallback(obj, type, ptr)
 //   type -> '<argchars...>:<retchar>', e.g. ':i', 'ii:i', 'd:d'
-//   arg chars: i(nt32) l(ong64)/n(umber64) f(loat32) d(ouble) s/a(char*) p/c(pointer)
-//   ret chars: same plus v(void). 'w' (wide-string) is accepted on Linux but
-//   degrades to the narrow 's' semantics (wchar_t is 4-byte UTF-32, not UTF-16).
+//   arg chars: i(nt32) l(ong64)/n(umber64) f(loat32) d(ouble) s/a/r(char*)
+//              w(ide char*, converted to wchar_t on Unix) p/c(pointer)
+//   ret chars: same plus v(void). Fun strings are UTF-8 on Unix, so a 'w'
+//   argument is converted to a NUL-terminated UCS-4 buffer (wchar_t is 4 bytes
+//   on Linux and macOS) and a 'w' return is converted back to UTF-8.
 //   'C' is the Win32 cdecl convention marker; the SysV ABI is always cdecl, so
 //   here it is accepted as an alias for 'i' (callbacks written for the Windows
 //   lffi, such as lib-tcc's tcc_set_error_func, keep their int return).
@@ -465,7 +661,7 @@ begin
       'l', 'n': FAt[i - 1] := @ffi_type_sint64;
       'f': FAt[i - 1] := @ffi_type_float;
       'd': FAt[i - 1] := @ffi_type_double;
-    else FAt[i - 1] := @ffi_type_pointer; // p/c/s/a/w (w degrades to char*)
+    else FAt[i - 1] := @ffi_type_pointer; // p/c/s/a/r/w
     end;
 
   case FRet of
@@ -475,7 +671,7 @@ begin
     'l', 'n': rtype := @ffi_type_sint64;
     'f': rtype := @ffi_type_float;
     'd': rtype := @ffi_type_double;
-    'c', 'p', 's', 'a', 'w': rtype := @ffi_type_pointer; // 'w' degrades to char*
+    'c', 'p', 's', 'a', 'r', 'w': rtype := @ffi_type_pointer;
   else rtype := @ffi_type_void; // 'v'
   end;
 
@@ -519,7 +715,12 @@ begin
         'l', 'n': e.assign(PInt64(args[i])^);
         'f': e.assign(PSingle(args[i])^);
         'd': e.assign(PDouble(args[i])^);
-        'w', 's', 'a': e.assign(fun.str(PAnsiChar(PPointer(args[i])^)));
+        's', 'a', 'r': e.assign(fun.str(PAnsiChar(PPointer(args[i])^)));
+        {$IfDef MSWINDOWS}
+        'w': e.assign(fun.str(PAnsiChar(PPointer(args[i])^)));
+        {$Else}
+        'w': e.assign(fun.str(UCS4ToUtf8(PLongWord(PPointer(args[i])^))));
+        {$EndIf}
         'c', 'p': e.assign(Int64(fun.uintptr(PPointer(args[i])^)));
       else e.assign(0);
       end;
@@ -547,6 +748,13 @@ begin
           if FStr <> '' then PPointer(resp)^ := PAnsiChar(@FStr[1])
           else PPointer(resp)^ := nil;
         end;
+      {$IfNDef MSWINDOWS}
+      'w':
+        begin
+          FWide := Utf8ToUCS4(AnsiString(fun.str(rv^))); // keep it alive
+          PPointer(resp)^ := @FWide[0];
+        end;
+      {$EndIf}
     end;
   finally
     del(es);

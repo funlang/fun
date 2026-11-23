@@ -12,6 +12,7 @@
 raw-address-getapi.fun	Linux .so helper + atoi/raw-address probe
 lib-os-dispatch-prototype.fun	Linux libc.so.6 backend prototype
 libc-outbuf.fun	Linux libc.so.6 out-buffer probe
+ffi-libc-fallback.fun	Linux musl/soname name-resolution probe
 # --- FFI suite -----------------------------------------------------------
 # The ffi-*.fun tests are host-aware now (LibC()/DyLib() from lib-host, and
 # libffitest is built as .dylib by fun/test/ffi/build.sh), so they run on macOS

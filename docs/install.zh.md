@@ -89,8 +89,14 @@ Windows 安装（当前用户，无需管理员权限）：
 
 ## 运行要求
 
-- Linux 产物在 Ubuntu 24.04 上构建，需要 glibc 2.34 或更新版本。
-- 启用 `getapi`/FFI 时，Linux 运行时还需要 `libffi.so.8`。
+- `linux-x64` 产物在 glibc 2.17 容器中构建，可在麒麟 V10 / 统信 UOS 20
+  （glibc 2.28~2.31）及更新的系统上运行；`linux-arm64` 仍在 Ubuntu 24.04
+  上构建，需要 glibc 2.34 或更新版本。
+- PCRE 与 libffi 已静态链入二进制，运行时不再需要 `libpcre.so.1` 或
+  `libffi.so.N`；glibc 与 musl 上的 C 库名字都从进程自身解析（见下）。
+- 在 musl 上（LoongArch64/riscv64 产物），`getapi` 会从进程自身解析
+  `libc.so.6` 这类 libc 名字，无需 glibc 兼容符号链接；裸库名也会依次探测
+  发行版实际提供的带版本 soname（`libz` 能找到 `libz.so.1`）。
 - nightly 是预发布，`releases/latest` 仍指向稳定版。
 - `fun.dll` 是单独授权的产品，不包含在这些包里。
 

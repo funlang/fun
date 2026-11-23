@@ -2,7 +2,9 @@
 # on five platforms - Linux / macOS / Windows, x64 for each, arm64 for the
 # two where an FPC target exists.
 #
-#   linux-x64    ubuntu-24.04      native FPC + full suite + opt-in MT build
+#   linux-x64-modern ubuntu-24.04  native FPC + full suite + opt-in MT build
+#   linux-legacy ubuntu-24.04      container build (glibc 2.17) + same suite;
+#                                  produces the linux-x64 release stage
 #   linux-arm64  ubuntu-24.04-arm  native FPC + full suite + opt-in MT build
 #   macos-x64    macos-15-intel    FPC universal dmg + macOS suite + MT build
 #   macos-arm64  macos-latest      Homebrew FPC 3.2.2 bottle + macOS suite + MT
@@ -71,7 +73,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: linux-x64
+          - name: linux-x64-modern
             os: ubuntu-24.04
             platform: linux
             fpc_tar: fpc-3.2.2.x86_64-linux.tar
@@ -542,6 +544,93 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fun-stage-${{ matrix.name }}
+          path: dist-stage/
+          retention-days: 90
+          if-no-files-found: error
+
+  # ------------------------------------------------------ linux-x64 legacy ---
+  # Kylin V10 / UOS 20 ship glibc 2.28-2.31, below the 2.34 floor an Ubuntu
+  # 24.04 build inherits. This job builds the release binary inside
+  # manylinux2014 (CentOS 7, glibc 2.17), with PCRE and libffi linked
+  # statically, then runs the same regression suite on the host against that
+  # binary. It produces the `linux-x64` stage; the matrix job above keeps the
+  # modern build (and its modern toolchain coverage) as linux-x64-modern.
+  linux-legacy:
+    name: linux-x64-legacy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache the FPC tarball
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/fun-fpc
+          key: fpc-3.2.2-x86_64-linux-tarball-v1
+
+      - name: Cache third-party sources
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/fun-legacy-third
+          key: third-party-v2-linux-legacy-${{ hashFiles('src/prj/fun/fetch-3rd-party.sh') }}
+
+      - name: Build in a glibc 2.17 container
+        run: |
+          set -e
+          work="$RUNNER_TEMP/legacy-src"
+          third="$HOME/.cache/fun-legacy-third"
+          fpc="$HOME/.cache/fun-fpc"
+          mkdir -p "$work" "$third" "$fpc"
+          # A clean tracked-file copy keeps the root-owned container writes
+          # out of the checked-out workspace.
+          git archive HEAD | tar -x -C "$work"
+          docker run --rm \
+            -v "$work:/work" -w /work \
+            -v "$third:/work/src/3rd" \
+            -v "$fpc:/fpc-cache" \
+            -e FPC_CACHE=/fpc-cache/fpc-3.2.2.tar \
+            quay.io/pypa/manylinux2014_x86_64 \
+            ./src/prj/fun/build-linux-legacy.sh
+
+      - name: Stage the legacy binaries
+        run: |
+          set -e
+          # src/prj/fun is what the suite and the shell tests invoke by
+          # default; fun/ is where probe.sh expects libtcc.so and lib/ to sit
+          # next to the interpreter. Both copies are the legacy build.
+          mkdir -p fun src/prj/fun
+          cp "$RUNNER_TEMP/legacy-src/dist-legacy/"* src/prj/fun/
+          cp "$RUNNER_TEMP/legacy-src/dist-legacy/"* fun/
+          chmod +x src/prj/fun/funcmd src/prj/fun/funcmd-safe src/prj/fun/funcmd-mt
+          chmod +x fun/funcmd fun/funcmd-safe fun/funcmd-mt
+          ls -l src/prj/fun/funcmd src/prj/fun/libtcc.so fun/funcmd fun/libtcc.so
+
+      # Fail before the suite if a future change re-introduces a newer-glibc
+      # symbol or a dynamic PCRE/libffi dependency.
+      - name: Verify the glibc floor and static dependencies
+        run: |
+          src/prj/fun/check-linux-floor.sh --max 2.28 \
+            fun/funcmd fun/funcmd-safe fun/funcmd-mt fun/libtcc.so
+
+      - name: Regression (legacy binary)
+        run: fun/test/run-linux-regression.sh
+
+      - name: Worker regression (MT)
+        run: fun/funcmd-mt fun/test/lib-worker-test.fun
+
+      - name: Stage release build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p dist-stage
+          cp -f fun/funcmd fun/funcmd-safe fun/funcmd-mt fun/libtcc.so dist-stage/
+          src/prj/fun/release/probe.sh linux-x64 dist-stage/build-env.json \
+            fun/funcmd fun/funcmd-safe fun/libtcc.so
+
+      - name: Upload release stage
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fun-stage-linux-x64
           path: dist-stage/
           retention-days: 90
           if-no-files-found: error

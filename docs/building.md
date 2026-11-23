@@ -72,6 +72,39 @@ make-win64.bat
 The Linux script also probes for FPC's `libffi` unit under both `lib/` and
 `lib64/`, so `getapi`/FFI turns on automatically on Fedora/RHEL-style layouts.
 
+### Linux compatibility floor
+
+The released linux-x64 artifact is built inside **manylinux2014** (CentOS 7,
+glibc 2.17) instead of on the Ubuntu 24.04 runner. This is what makes it run on
+Kylin V10 / UOS 20 and other domestic distributions, whose glibc is usually
+2.28-2.31 - below the 2.34 floor an Ubuntu 24.04 build inherits. The build
+itself is unchanged:
+
+```sh
+src/prj/fun/build-linux-legacy.sh   # inside the old container
+
+# or, from the repo root on a normal host:
+docker run --rm -v "$PWD:/work" -w /work \
+  quay.io/pypa/manylinux2014_x86_64 \
+  ./src/prj/fun/build-linux-legacy.sh
+```
+
+Two related changes keep the artifact self-contained:
+
+- `make-linux-x86_64.sh` links the fetched PCRE and libffi **statically** when
+  `src/3rd/pcre-8` and `src/3rd/libffi` are present (the CI fetches both). The
+  binary no longer records `libpcre.so.1` or `libffi.so.N` as `DT_NEEDED`, so
+  the target only has to provide the C runtime.
+- `src/prj/fun/check-linux-floor.sh --max 2.28 funcmd libtcc.so` reports the
+  highest `GLIBC_*` symbol version a binary needs and fails when it exceeds
+  the target or when an unexpected shared library appears. The CI runs it on
+  every Linux x64 build.
+
+The CI job `linux-legacy` produces the `linux-x64` release stage after running
+the same regression suite against the container-built binaries; the Ubuntu
+24.04 build remains available as `linux-x64-modern`. Pass `FFI_SYSTEM=1` to
+`make-linux-x86_64.sh` to keep the old dynamic-libffi behaviour for debugging.
+
 ## Platform capability matrix
 
 Three capability layers (regex, FFI, runtime C) plus the machine-code layer,
@@ -190,7 +223,8 @@ sources/binaries are **not** shipped. If one is missing the build script
 | --------- | --------------- | --------------- | ------------- |
 | PCRE 8 (8-bit) | `src/3rd/pcre-8/` | <https://www.pcre.org/> (8.x source, e.g. 8.45) | Linux: `make-linux-x86_64.sh` compiles it with gcc (static, `-dRegex`); Windows (i386): `src/regex/pcre/make.bat` (Borland bcc32 + make, `-Dpcresrc=<path>`; the objects `pcrd.pas` `{$LINK}`s); win64: the CI builds `pcre3.dll` with MinGW-w64 gcc and links it dynamically (`-dRegex -dPCRE_WinDLL`, see below) |
 | Tiny C Compiler 0.9.27 | `src/3rd/tcc/` | the tinycc release on savannah/nongnu, or repo.or.cz tag `release_0_9_27` | `make-linux-x86_64.sh` produces `libtcc.so`; `build-win64-deps.sh` produces the x86-64 `libtcc.dll` (win64); `build-tcc-darwin.sh` produces `libtcc.dylib` (macOS x86_64 and arm64, the latter with `patches/tcc-darwin-arm64.patch`) |
-| libffi (win64) | `ffi.dll` next to `funcmd.exe` | MSYS2 `mingw-w64-x86_64-libffi`, or any x86_64 libffi build | the win64 CI installs it so `getapi` works there (`-dWinFFI`); Linux/macOS use the libffi that ships with FPC |
+| libffi (win64) | `ffi.dll` next to `funcmd.exe` | MSYS2 `mingw-w64-x86_64-libffi`, or any x86_64 libffi build | the win64 CI installs it so `getapi` works there (`-dWinFFI`); macOS uses the libffi that ships with FPC |
+| libffi (Linux static) | `src/3rd/libffi/` | <https://github.com/libffi/libffi/releases> (3.4.6) | `make-linux-x86_64.sh` builds `libffi.a` and links it statically, so the artifact needs no `libffi.so.N`; `src/prj/fun/fetch-3rd-party.sh` downloads the source |
 | zlib 1.2.11 (win64) | `src/3rd/zlib-1.2.11/` | <https://zlib.net/fossils/> | `build-win64-deps.sh` produces the x86-64 `zlib.dll`; Linux/macOS use the system zlib |
 
 - Once the directories are in place, `cd src/prj/fun && ./make-linux-x86_64.sh`

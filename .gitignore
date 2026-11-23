@@ -51,6 +51,7 @@ src/prj/fun/units/
 src/prj/fun/units-safe/
 src/prj/fun/units-mt/
 src/prj/fun/.ffi/
+src/prj/fun/.libffi-static/
 
 # Convenience copy of the Linux build in the runtime folder (make-linux-x86_64.sh),
 # plus any scratch copies kept alongside it while comparing builds.
@@ -98,6 +99,12 @@ src/3rd/pcre-8/
 
 # Vendored Tiny C Compiler source (builds libtcc.so for lib-tcc.fun; not tracked)
 src/3rd/tcc/
+
+# Vendored libffi source (make-linux-x86_64.sh builds libffi.a for static FFI)
+src/3rd/libffi/
+
+# Vendored zlib source (win64 zlib.dll; not tracked)
+src/3rd/zlib-1.2.11/
 
 # Vendored QuickJS-ng source (builds fun/fun-jsbox on demand; not tracked)
 src/3rd/quickjs-ng/

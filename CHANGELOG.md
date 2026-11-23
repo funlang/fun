@@ -6,6 +6,34 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- The linux-x64 release artifact is now built in a manylinux2014 container
+  (CentOS 7, glibc 2.17) instead of on the Ubuntu 24.04 runner. The old build
+  inherited a GLIBC_2.34 floor, which excluded Kylin V10 / UOS 20 and other
+  domestic distributions on glibc 2.28-2.31; the container build lowers the
+  floor to 2.17. The Ubuntu build is still produced as `linux-x64-modern`.
+
+- PCRE and libffi are linked statically when their fetched sources are present
+  and libtcc is rebuilt in the same container, so the linux-x64 artifact no
+  longer requires `libpcre.so.1`, `libffi.so.8`, or a newer libtcc build at run
+  time. `src/prj/fun/check-linux-floor.sh` reports the highest `GLIBC_*`
+  symbol version and fails CI if it exceeds 2.28 or an unexpected shared
+  library appears.
+
+- `getapi` now works on musl: when a requested C-library name has no shared
+  object on the host (musl ships no `libc.so.6`, only
+  `libc.musl-<cpu>.so.1`), a known libc/libm/libdl/libpthread/librt alias is
+  resolved from the process image instead. Bare library names also probe the
+  versioned sonames runtime packages actually ship (`libz` finds `libz.so.1`),
+  and unknown libraries still raise instead of silently borrowing a symbol.
+  This makes `io`, `process`, `lib-asm*`, `lib-proc` and the FFI suite work on
+  the LoongArch64/riscv64 musl artifacts without compatibility symlinks.
+
+- Unix `getapi`/`@toCallback` `'w'` is now a real wide-string type: Fun's UTF-8
+  text is converted to a NUL-terminated UCS-4 buffer and back (`wchar_t` is
+  4 bytes on Linux and macOS), instead of passing a `char*` that a wide C API
+  would misinterpret. The `'r'` raw-string type now behaves like `'s'` on Unix
+  as it already did on Windows.
+
 - `lib-worker` gains a resident worker pool: `WorkerPool(file, size)`,
   per-job `submit(entry, payload)`, task handles with
   `join`/`result`/`error`/`alive`/`cancel`, and `poolMap`/`poolRun` helpers.

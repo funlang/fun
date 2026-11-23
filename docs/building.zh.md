@@ -68,6 +68,35 @@ make-win64.bat
 Linux 脚本会同时在 `lib/` 与 `lib64/` 下探测 FPC 的 `libffi` 单元，因此在
 Fedora/RHEL 风格的布局上 `getapi`/FFI 也会自动启用。
 
+### Linux 兼容性地板
+
+正式发布的 linux-x64 产物在 **manylinux2014**（CentOS 7，glibc 2.17）里构建，
+不再直接用 Ubuntu 24.04 runner。这样它才能跑在麒麟 V10 / 统信 UOS 20 等
+国产系统上——这些系统的 glibc 通常只有 2.28~2.31，低于 Ubuntu 24.04 构建
+继承的 2.34 地板。构建方式本身不变：
+
+```sh
+src/prj/fun/build-linux-legacy.sh   # 在旧容器内执行
+
+# 或在普通主机上从仓库根目录执行：
+docker run --rm -v "$PWD:/work" -w /work \
+  quay.io/pypa/manylinux2014_x86_64 \
+  ./src/prj/fun/build-linux-legacy.sh
+```
+
+配套两点让产物自包含：
+
+- 当 `src/3rd/pcre-8` 与 `src/3rd/libffi` 存在时（CI 会拉取），
+  `make-linux-x86_64.sh` 会把 PCRE 与 libffi **静态链入**。产物不再把
+  `libpcre.so.1` / `libffi.so.N` 记为 `DT_NEEDED`，目标机只需提供 C 运行库。
+- `src/prj/fun/check-linux-floor.sh --max 2.28 funcmd libtcc.so` 会报告二进制
+  需要的最高 `GLIBC_*` 符号版本，并在超过目标版本或出现意外共享库时失败。
+  CI 每次构建 linux-x64 都会跑它。
+
+CI 的 `linux-legacy` 作业用容器构建的二进制跑同一套回归，然后产出
+`linux-x64` 发布 stage；Ubuntu 24.04 构建保留为 `linux-x64-modern`。调试时
+可以给 `make-linux-x86_64.sh` 传 `FFI_SYSTEM=1` 回到旧的动态 libffi 行为。
+
 ## 平台能力矩阵
 
 三个能力层（regex、FFI、运行时 C）加机器码层、面向不可信脚本的第二构建模式，

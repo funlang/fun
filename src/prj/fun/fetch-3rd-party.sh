@@ -7,6 +7,7 @@
 #
 #   src/3rd/pcre-8/   PCRE 8.45   -> regex (-dRegex)
 #   src/3rd/tcc/      TCC 0.9.27  -> libtcc.so, runtime C compile (lib-tcc.fun)
+#   src/3rd/libffi/   libffi 3.4.6 -> static FFI (getapi) on Linux
 #   src/3rd/zlib-1.2.11/ zlib    -> zlib.dll on win64 (lib-zlib.fun)
 #
 # A missing dependency only degrades the build, so this script is a convenience
@@ -18,6 +19,7 @@
 #   src/prj/fun/fetch-3rd-party.sh --force      # re-fetch even if present
 #   src/prj/fun/fetch-3rd-party.sh --pcre-only
 #   src/prj/fun/fetch-3rd-party.sh --tcc-only
+#   src/prj/fun/fetch-3rd-party.sh --ffi-only
 #   src/prj/fun/fetch-3rd-party.sh --zlib-only
 #   src/prj/fun/fetch-3rd-party.sh --win64-deps   # TCC + zlib, no PCRE
 #
@@ -30,26 +32,30 @@ THIRD="$(cd "$HERE/../../.." && pwd)/src/3rd"
 
 PCRE_URL="https://downloads.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz"
 TCC_URL="https://download.savannah.gnu.org/releases/tinycc/tcc-0.9.27.tar.bz2"
+LIBFFI_URL="https://github.com/libffi/libffi/releases/download/v3.4.6/libffi-3.4.6.tar.gz"
 ZLIB_URL="https://zlib.net/fossils/zlib-1.2.11.tar.gz"
 # Pinned SHA256 of the upstream release archives. A mirror that serves a
 # different file (or a truncated/HTML error page) must not become a build
 # input: the release pipeline ships interned binaries, not just source.
 PCRE_SHA256="4e6ce03e0336e8b4a3d6c2b70b1c5e18590a5673a98186da90d4f33c23defc09"
 TCC_SHA256="de23af78fca90ce32dff2dd45b3432b2334740bb9bb7b05bf60fdbfc396ceb9c"
+LIBFFI_SHA256="b0dea9df23c863a7a50e825440f3ebffabd65df1497108e5d437747843895a4e"
 ZLIB_SHA256="c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1"
 
 force=0
 want_pcre=1
 want_tcc=1
+want_ffi=1
 want_zlib=1
 for a in "$@"; do
     case "$a" in
         --force)     force=1 ;;
-        --pcre-only) want_tcc=0; want_zlib=0 ;;
-        --tcc-only)  want_pcre=0; want_zlib=0 ;;
-        --zlib-only) want_pcre=0; want_tcc=0 ;;
-        --win64-deps) want_pcre=0 ;;
-        *) echo "usage: $0 [--force|--pcre-only|--tcc-only|--zlib-only|--win64-deps]" >&2; exit 2 ;;
+        --pcre-only) want_tcc=0; want_zlib=0; want_ffi=0 ;;
+        --tcc-only)  want_pcre=0; want_zlib=0; want_ffi=0 ;;
+        --ffi-only)  want_pcre=0; want_tcc=0; want_zlib=0 ;;
+        --zlib-only) want_pcre=0; want_tcc=0; want_ffi=0 ;;
+        --win64-deps) want_pcre=0; want_ffi=0 ;;
+        *) echo "usage: $0 [--force|--pcre-only|--tcc-only|--ffi-only|--zlib-only|--win64-deps]" >&2; exit 2 ;;
     esac
 done
 
@@ -58,7 +64,11 @@ fetch() {
     if command -v curl >/dev/null 2>&1; then
         # --retry-all-errors also covers DNS/connect failures, which plain
         # --retry does not; runners occasionally lose name resolution.
-        curl -fSL --retry 5 --retry-all-errors --retry-delay 5 -o "$out" "$url"
+        # CentOS 7 / manylinux2014 ship curl 7.29, which predates that flag,
+        # so fall back to the plain retry form instead of failing the fetch.
+        if ! curl -fSL --retry 5 --retry-all-errors --retry-delay 5 -o "$out" "$url"; then
+            curl -fSL --retry 5 --retry-delay 5 -o "$out" "$url"
+        fi
     elif command -v wget >/dev/null 2>&1; then
         wget --tries=5 --waitretry=5 -O "$out" "$url"
     else
@@ -120,6 +130,9 @@ if [ "$want_pcre" -eq 1 ]; then
 fi
 if [ "$want_tcc" -eq 1 ]; then
     install_dir tcc "$TCC_URL" tcc-0.9.27.tar.bz2 "$TCC_SHA256"
+fi
+if [ "$want_ffi" -eq 1 ]; then
+    install_dir libffi "$LIBFFI_URL" libffi-3.4.6.tar.gz "$LIBFFI_SHA256"
 fi
 if [ "$want_zlib" -eq 1 ]; then
     install_dir zlib-1.2.11 "$ZLIB_URL" zlib-1.2.11.tar.gz "$ZLIB_SHA256"

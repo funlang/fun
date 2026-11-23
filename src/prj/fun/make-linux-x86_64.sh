@@ -70,6 +70,16 @@ set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
 cd "$HERE"
 
+# FPC passes `-L.` to the linker, so an archive copied into this directory
+# wins over a system libfoo.so of the same name. That is how PCRE and libffi
+# stay inside the shipped binary instead of becoming DT_NEEDED entries tied to
+# the build host's glibc. Remove the copies on exit, including on failure.
+STATIC_LINK_LIBS=""
+cleanup_static_libs() {
+    for f in $STATIC_LINK_LIBS; do rm -f "$f"; done
+}
+trap cleanup_static_libs EXIT INT TERM
+
 # --- Optional: refresh src/core/version.inc (written in Fun) ----------------
 # The numeric version stamp is generated, not compiled in, so it only changes
 # when you regenerate it. Off by default to keep builds reproducible; set
@@ -155,6 +165,12 @@ if [ -n "$PCRE_SRC" ] && [ -f "$PCRE_SRC/pcre_compile.c" ]; then
         # libpcre.a, so an archive listed there is normally scanned too early
         # to satisfy a later reference. -u makes __clear_cache undefined from
         # the start, which pulls its member from libgcc regardless of order.
+        # Copy the archive next to the build: FPC's -L. then resolves the
+        # implicit -lpcre to this static archive instead of a distro
+        # libpcre.so.1. Without this the binary silently depends on the
+        # build host's shared PCRE (and inherits its glibc floor).
+        cp -f "$PCRE_LIB/libpcre.a" "$HERE/libpcre.a"
+        STATIC_LINK_LIBS="$STATIC_LINK_LIBS $HERE/libpcre.a"
         PCRE_FLAGS="-dRegex -Fl$PCRE_LIB -k-lc $LIBGCC_FLAG -k--undefined=__clear_cache -k--gc-sections"
         echo "Regex enabled (PCRE 8)."
     else
@@ -206,21 +222,55 @@ FFI_FLAGS=""
 FFI_PPU="$(find "$(dirname "$FPC_BINDIR")/lib" "$(dirname "$FPC_BINDIR")/lib64" \
     -type d -name libffi 2>/dev/null | head -n 1)"
 if [ -n "$FFI_PPU" ] && [ -f "$FFI_PPU/ffi.ppu" ]; then
-    FFI_LIBDIR="$HERE/.ffi"
-    if ! ldconfig -p 2>/dev/null | grep -q 'libffi\.so '; then
-        # no libffi.so (dev symlink); point -lffi at the runtime .so.N
-        real="$(ldconfig -p 2>/dev/null | awk '/libffi\.so/{print $NF; exit}')"
-        if [ -n "$real" ]; then
-            mkdir -p "$FFI_LIBDIR"
-            ln -sf "$real" "$FFI_LIBDIR/libffi.so"
-            FFI_FLAGS="-dLinuxFFI -Fu$FFI_PPU -Fu$HERE/../../lib -Fl$FFI_LIBDIR"
-        else
-            echo "libffi runtime not found - building WITHOUT FFI (getapi disabled)." >&2
+    # Prefer a static libffi: the dynamic route records libffi.so.N as a hard
+    # dependency, and older distros (Kylin V10 / UOS carry libffi.so.7 or omit
+    # the dev symlink) would fail at startup. With the fetched source present
+    # the archive is copied next to the build so `-L.` resolves -lffi to it.
+    # FFI_SYSTEM=1 keeps the old dynamic behaviour.
+    FFI_STATIC=""
+    if [ -z "${FFI_SYSTEM:-}" ]; then
+        LIBFFI_SRC="${LIBFFI_SRC:-}"
+        if [ -z "$LIBFFI_SRC" ] && [ -d "$HERE/../../3rd/libffi" ]; then
+            LIBFFI_SRC="$(cd "$HERE/../../3rd/libffi" && pwd)"
         fi
-    else
-        FFI_FLAGS="-dLinuxFFI -Fu$FFI_PPU -Fu$HERE/../../lib"
+        if [ -n "$LIBFFI_SRC" ] && [ -f "$LIBFFI_SRC/configure" ] && command -v make >/dev/null 2>&1; then
+            FFI_BUILD="$HERE/.libffi-static"
+            if [ ! -f "$FFI_BUILD/libffi.a" ] || [ "$LIBFFI_SRC/configure" -nt "$FFI_BUILD/libffi.a" ]; then
+                echo "Building static libffi from $LIBFFI_SRC"
+                mkdir -p "$FFI_BUILD"
+                if [ ! -f "$FFI_BUILD/Makefile" ]; then
+                    ( cd "$FFI_BUILD" && "$LIBFFI_SRC/configure" --disable-shared --enable-static --disable-docs ) >/dev/null
+                fi
+                ( cd "$FFI_BUILD" && make -j"${JOBS:-$(nproc 2>/dev/null || echo 2)}" ) >/dev/null
+                built="$(find "$FFI_BUILD" -name libffi.a -type f ! -path "$FFI_BUILD/libffi.a" | head -n 1)"
+                [ -n "$built" ] || { echo "static libffi build failed" >&2; exit 1; }
+                cp -f "$built" "$FFI_BUILD/libffi.a"
+            fi
+            FFI_STATIC="$FFI_BUILD/libffi.a"
+        fi
     fi
-    [ -n "$FFI_FLAGS" ] && echo "FFI enabled (getapi via libffi)."
+    if [ -n "$FFI_STATIC" ] && [ -f "$FFI_STATIC" ]; then
+        cp -f "$FFI_STATIC" "$HERE/libffi.a"
+        STATIC_LINK_LIBS="$STATIC_LINK_LIBS $HERE/libffi.a"
+        FFI_FLAGS="-dLinuxFFI -Fu$FFI_PPU -Fu$HERE/../../lib"
+        echo "FFI enabled (getapi via static libffi)."
+    else
+        FFI_LIBDIR="$HERE/.ffi"
+        if ! ldconfig -p 2>/dev/null | grep -q 'libffi\.so '; then
+            # no libffi.so (dev symlink); point -lffi at the runtime .so.N
+            real="$(ldconfig -p 2>/dev/null | awk '/libffi\.so/{print $NF; exit}')"
+            if [ -n "$real" ]; then
+                mkdir -p "$FFI_LIBDIR"
+                ln -sf "$real" "$FFI_LIBDIR/libffi.so"
+                FFI_FLAGS="-dLinuxFFI -Fu$FFI_PPU -Fu$HERE/../../lib -Fl$FFI_LIBDIR"
+            else
+                echo "libffi runtime not found - building WITHOUT FFI (getapi disabled)." >&2
+            fi
+        else
+            FFI_FLAGS="-dLinuxFFI -Fu$FFI_PPU -Fu$HERE/../../lib"
+        fi
+        [ -n "$FFI_FLAGS" ] && echo "FFI enabled (getapi via system libffi)."
+    fi
 else
     echo "FPC libffi binding not found - building WITHOUT FFI (getapi disabled on Linux)." >&2
 fi

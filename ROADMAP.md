@@ -10,7 +10,7 @@
 ## 0. 当前基线
 
 - **版本**：9.5.7，`src/core/version.inc` 的 `funRelease = '9.5.7'`。
-- **回归**：Linux `139/139`（`sh fun/test/run-linux-regression.sh`）。
+- **回归**：Linux `141/141`（`sh fun/test/run-linux-regression.sh`）。
 - **标准库**：`fun/lib` 共 119 个 `.fun`，90 个候选模块，本机可加载 84 个
   （`sh fun/test/lib-loadcheck.sh`；6 个 FAIL 为 Windows 概念、raw socket 或 macOS 后端）。
 - **平台**：Linux x86_64 / arm64、macOS x64 / arm64、Windows x64（FPC）；
@@ -119,6 +119,9 @@
 
 > 详细历史见 `CHANGELOG.md` 与 git；这里只留影响当前基线的里程碑。
 
+- 2026-11-23：linux-x64 发布产物的 glibc 地板从 2.34 降到 2.17（manylinux2014
+  容器构建，PCRE/libffi 静态链入），覆盖麒麟 V10 / 统信 UOS；`getapi` 支持
+  musl 库名解析与 Unix 宽字符串 `'w'`。回归 `141/141`。
 - 2026-11-22：发布 9.5.7。P-01/P-17 完成（常驻池、协作式取消、LoongArch64/riscv64 `fun-mt`）。回归 `139/139`，加载 `84/90`。
 - 2026-11-15：发布 9.5.6。traceback、`lib-cron`、LoongArch nightly、`fun package tidy`。回归 `137/137`。
 - 2026-11-10：P-09/P-08 完成：LoongArch asm 后端与 macOS 原生 runner 复验。

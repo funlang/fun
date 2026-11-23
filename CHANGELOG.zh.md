@@ -6,6 +6,28 @@
 
 ## [Unreleased]
 
+- linux-x64 发布产物改为在 manylinux2014 容器（CentOS 7，glibc 2.17）中构建，
+  不再直接用 Ubuntu 24.04 runner。旧构建继承了 GLIBC_2.34 地板，把麒麟 V10 /
+  统信 UOS 20 等 glibc 2.28~2.31 的国产系统挡在门外；容器构建把地板降到
+  2.17。Ubuntu 构建仍保留为 `linux-x64-modern`。
+
+- 当第三方源码存在时，PCRE 与 libffi 改为静态链入，libtcc 也在同一容器内重建，
+  因此 linux-x64 产物运行时不再需要 `libpcre.so.1`、`libffi.so.8` 或更新版本的
+  libtcc。`src/prj/fun/check-linux-floor.sh` 会报告二进制需要的最高 `GLIBC_*`
+  符号版本，超过 2.28 或出现意外共享库时 CI 直接失败。
+
+- `getapi` 在 musl 上可用：请求的 C 库在本机没有对应共享对象时（musl 没有
+  `libc.so.6`，只有 `libc.musl-<cpu>.so.1`），已知的
+  libc/libm/libdl/libpthread/librt 别名会改从进程自身解析。裸库名也会依次探测
+  发行版实际提供的带版本 soname（`libz` 能找到 `libz.so.1`），未知库仍然报错，
+  不会静默借用别的同名符号。于是 LoongArch64/riscv64 的 musl 产物无需兼容符号
+  链接即可使用 `io`、`process`、`lib-asm*`、`lib-proc` 与 FFI 套件。
+
+- Unix 的 `getapi`/`@toCallback` 中 `'w'` 现在是真正的宽字符串类型：Fun 的
+  UTF-8 文本会转换成 NUL 结尾的 UCS-4 缓冲区并在返回时转回（Linux/macOS 上
+  `wchar_t` 为 4 字节），不再把 `char*` 当作宽字符指针交给 C。`'r'` 原始字符串
+  类型在 Unix 上也与 Windows 一样等同于 `'s'`。
+
 - `lib-worker` 新增常驻 worker 池：`WorkerPool(file, size)`、按任务指定入口的
   `submit(entry, payload)`、带 `join`/`result`/`error`/`alive`/`cancel` 的任务
   句柄，以及 `poolMap`/`poolRun` 辅助函数。每个槽位只解析一次模块，成功任务

@@ -1,0 +1,14 @@
+5
+ <- wcslen("hello") expect 5
+2
+ <- wcslen("中文") expect 2
+0
+ <- wcscmp equal expect 0
+True
+ <- wcscmp abc<abd expect true
+True
+ <- wcscmp abd>abc expect true
+llo
+ <- wcschr("hello", l) expect llo
+True
+ <- wcschr("hello", z) expect true
