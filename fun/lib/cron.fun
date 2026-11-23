@@ -22,7 +22,8 @@
 // and jobs() returns a snapshot. Ids start at 1 and are never reused.
 //
 // CronScheduler([onError: (job, err) { ... }]) reports callback exceptions with
-// a job snapshot and runtime.lastError(); without it, they stay silent.
+// a job snapshot and runtime.lastError(); without it, they stay silent in the
+// callback but jobs() still records the failure statistics.
 //
 // Jobs are scheduled by next occurrence: nextRun(id) returns the next time and
 // run() sleeps until the nearest one (capped at 1s); missed runs fire once.
@@ -461,6 +462,12 @@ fun _cronJobView(j)
   else
     item['intervalMs'] = j['intervalMs'];
   end if;
+  var st = new [];
+  st['lastRunAt'] = j['lastRunAt'];
+  st['lastSuccessAt'] = j['lastSuccessAt'];
+  st['errors'] = j['errors'];
+  st['lastErrorMessage'] = j['lastErrorMessage'];
+  item['stats'] = st;
   result = item;
 end fun;
 
@@ -627,6 +634,10 @@ class CronScheduler(opts)
     j['nextWall'] = nx;
     j['nextMs'] = c['mono']() + _cronDiffSec(n, nx) * 1000;
     j['removed'] = false;
+    j['errors'] = 0;
+    j['lastRunAt'] = nil;
+    j['lastSuccessAt'] = nil;
+    j['lastErrorMessage'] = nil;
     _jobs.@add(j);
     _byId['id:' & j['id']] = j;
     this._heapPush(j);
@@ -644,6 +655,10 @@ class CronScheduler(opts)
     j['nextMs'] = c['mono']() + ms;
     j['fn'] = fn;
     j['removed'] = false;
+    j['errors'] = 0;
+    j['lastRunAt'] = nil;
+    j['lastSuccessAt'] = nil;
+    j['lastErrorMessage'] = nil;
     _jobs.@add(j);
     _byId['id:' & j['id']] = j;
     this._heapPush(j);
@@ -807,13 +822,38 @@ class CronScheduler(opts)
     end if;
   end fun;
 
-  fun _reportError(j)
-    if _onError = nil then return; end if;
+  fun _invoke(j)
+    var c = this._clk();
+    j['lastRunAt'] = c['time']();
+    var failed = false;
     var e = nil;
     try
-      e = runtime.lastError();
+      j['fn']();
     except
+      failed = true;
+      try
+        e = runtime.lastError();
+      except
+      end try;
     end try;
+    if failed then
+      j['errors'] += 1;
+      if e <> nil and e['message'] <> nil then
+        var msg = '' & e['message'];
+        if msg.length() > 1024 then msg = msg.substr(0, 1024) & '...'; end if;
+        j['lastErrorMessage'] = msg;
+      else
+        j['lastErrorMessage'] = nil;
+      end if;
+      this._reportError(j, e);
+    else
+      j['lastErrorMessage'] = nil;
+      j['lastSuccessAt'] = c['time']();
+    end if;
+  end fun;
+
+  fun _reportError(j, e)
+    if _onError = nil then return; end if;
     try
       _onError(_cronJobView(j), e);
     except
@@ -848,11 +888,7 @@ class CronScheduler(opts)
         if j['kind'] = 'cron' then
           if j['nextWall'] <> nil and _cronDiffSec(j['nextWall'], n) >= 0 then
             fired += 1;
-            try
-              j['fn']();
-            except
-              this._reportError(j);
-            end try;
+            this._invoke(j);
             if not j['removed'] then
               var after = c['wall']();
               var nx = _cronNext(j, after);
@@ -875,11 +911,7 @@ class CronScheduler(opts)
           fired += 1;
           var interval = j['intervalMs'];
           var nextAt = nowMs + interval;
-          try
-            j['fn']();
-          except
-            this._reportError(j);
-          end try;
+          this._invoke(j);
           if not j['removed'] then
             var afterMs = c['mono']();
             if nextAt <= afterMs then nextAt = afterMs + interval; end if;

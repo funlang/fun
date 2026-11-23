@@ -6,6 +6,11 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `CronScheduler.jobs()` now includes a per-job `stats` sub-map with
+  `lastRunAt`, `lastSuccessAt`, `errors` and `lastErrorMessage`. Statistics
+  update even without `onError`; success clears `lastErrorMessage` and updates
+  `lastSuccessAt`, and `onError` receives the updated snapshot.
+
 - `lib-worker` gains a resident worker pool: `WorkerPool(file, size)`,
   per-job `submit(entry, payload)`, task handles with
   `join`/`result`/`error`/`alive`/`cancel`, and `poolMap`/`poolRun` helpers.

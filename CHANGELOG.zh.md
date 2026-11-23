@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+- `CronScheduler.jobs()` 现在包含 per-job `stats` 子 map：`lastRunAt`、
+  `lastSuccessAt`、`errors`、`lastErrorMessage`。没有 `onError` 时统计仍会更新；
+  成功后清空 `lastErrorMessage` 并更新 `lastSuccessAt`，`onError` 收到的是
+  更新后的快照。
+
 - `lib-worker` 新增常驻 worker 池：`WorkerPool(file, size)`、按任务指定入口的
   `submit(entry, payload)`、带 `join`/`result`/`error`/`alive`/`cancel` 的任务
   句柄，以及 `poolMap`/`poolRun` 辅助函数。每个槽位只解析一次模块，成功任务
