@@ -461,7 +461,10 @@ class HttpReq()
   end fun;
 
   fun query(k)
-    result = queryS[k];
+    // Always read the table installed by onGet for this request. Reading it
+    // through `this` keeps the lookup explicit and cannot pick up a stale
+    // module-level binding.
+    result = this.queryS[k];
   end fun;
 
   fun cookie(k)

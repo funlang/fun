@@ -24,6 +24,7 @@ traversal 404: True
 boom 500: True
 boom message: True
 query decoded: True
+query fresh: True
 form decoded: True
 cookies parsed: True
 cookie set sid: True

@@ -175,6 +175,13 @@ begin
       exit(Copy(name, 1, i - 1));
 end;
 
+// True for an explicit ABI version ('.so.<digits>'), as opposed to the
+// unversioned '.so' linker name or a bare stem.
+function HasSoVersion(const name: string): Boolean;
+begin
+  result := (Length(name) - Length(StripSoSuffix(name))) > Length('.so');
+end;
+
 function IsGlobalLibName(const name: string): Boolean;
 begin
   result := (name = '')
@@ -210,6 +217,21 @@ begin
   stem := StripSoSuffix(base);
   {$Else}
   stem := base;
+  {$EndIf}
+  // An explicit ABI version is a hard requirement. Only the exact soname the
+  // caller named, or the plain stem and the unversioned '.so' link, may
+  // satisfy it; probing the rest of exts would silently substitute another
+  // major version.
+  {$IfDef Linux}
+  if HasSoVersion(base) then
+  begin
+    result := LoadLibrary(base);
+    if result <> NilHandle then exit;
+    result := LoadLibrary(stem);
+    if result <> NilHandle then exit;
+    result := LoadLibrary(stem + '.so');
+    exit;
+  end;
   {$EndIf}
   for i := Low(exts) to High(exts) do
   begin
@@ -365,8 +387,10 @@ begin
   begin
     hlib := LoadLibrary(libname);
     // bare name, e.g. 'libc' on Unix or 'kernel32' on Windows: try the
-    // platform's library suffix. A versioned spelling ('libz.so.1') is
-    // normalized inside LoadLibCandidates, so it does not become libz.so.1.so.
+    // platform's library suffix. On Linux a versioned spelling ('libz.so.1')
+    // is normalized inside LoadLibCandidates, where an explicit version only
+    // falls back to the plain stem and '.so', never to another major. Other
+    // Unix hosts treat a '.so' spelling as exact.
     if (hlib = NilHandle) and (Pos('/', libname) = 0) and (Pos('\', libname) = 0)
        and (Pos('.dylib', libname) = 0) and (Pos('.dll', libname) = 0)
        {$IfNDef Linux} and (Pos('.so', libname) = 0) {$EndIf} then

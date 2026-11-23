@@ -344,6 +344,13 @@ var r14 = RecvSome(c14, 4096);
 ?. 'query decoded: ' & hasRe(r14, %\r\n\r\nq=hello\x20world;z=a\x20b$%);
 CloseSocket(c14);
 
+// A second request must parse its own query table, not the previous one.
+var c14b = getReq(p, '/query?q=second&z=b');
+pump(s, 5);
+var r14b = RecvSome(c14b, 4096);
+?. 'query fresh: ' & hasRe(r14b, %\r\n\r\nq=second;z=b$%);
+CloseSocket(c14b);
+
 var fbody = 'a=1&b=hello%20world';
 var c15 = rq(p, 'POST /form HTTP/1.1\r\nHost: t\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: ' & fbody.length() & '\r\n\r\n' & fbody);
 pump(s, 5);
