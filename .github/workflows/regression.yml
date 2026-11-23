@@ -717,6 +717,8 @@ jobs:
             cat "$RUNNER_TEMP/glibc-floor.json"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Regression (legacy binary)
+        env:
+          FUNREG_PLATFORM: linux-aarch64
         run: fun/test/run-linux-regression.sh
 
       - name: Worker regression (MT)
