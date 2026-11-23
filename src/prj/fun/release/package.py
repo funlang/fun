@@ -529,6 +529,28 @@ def notes(meta, caps_list, archives, repo_root, previous):
         "`worker build` is the opt-in `fun-mt` binary "
         "(linux-x64/arm64, macos-x64/arm64, win-x64).",
         "`capabilities.json` in each archive is the machine-readable table.",
+    ]
+    floors = [c for c in caps_list if c.get("glibc_floor")]
+    if floors:
+        lines += [
+            "",
+            "### Linux runtime floor",
+            "",
+            "Measured from the shipped binaries with `check-linux-floor.sh`:",
+            "",
+            "| platform | glibc floor | DT_NEEDED |",
+            "|---|---|---|",
+        ]
+        for c in floors:
+            needed = ", ".join(c.get("needed") or []) or "(none)"
+            lines.append(f"| {c['platform']} | {c['glibc_floor']} | {needed} |")
+        lines += [
+            "",
+            "The floor is the highest `GLIBC_*` symbol version the binaries",
+            "reference; older C runtimes cannot load them. `needed` lists the",
+            "shared libraries that are not bundled.",
+        ]
+    lines += [
         "",
         "Verify with `sha256sum -c SHA256SUMS` (Linux/macOS) or",
         "`Get-FileHash` (Windows).",

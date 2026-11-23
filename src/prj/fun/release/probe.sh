@@ -202,6 +202,20 @@ done
 SAFE_PRESENT=false
 [ -n "$SAFE" ] && [ -f "$SAFE" ] && SAFE_PRESENT=true
 
+# Optional Linux runtime-floor evidence, produced by check-linux-floor.sh
+# --json. Folding it into the capability file makes the floor a visible
+# property of the shipped binary instead of a fact that only lives in CI logs.
+FLOOR_FIELDS=""
+if [ -n "${FUN_GLIBC_FLOOR_JSON:-}" ] && [ -f "$FUN_GLIBC_FLOOR_JSON" ]; then
+    FLOOR=$(sed -n 's/.*"glibc_floor":[[:space:]]*"\([^"]*\)".*/\1/p' "$FUN_GLIBC_FLOOR_JSON")
+    NEEDED=$(sed -n 's/.*"needed":[[:space:]]*\[\(.*\)\].*/\1/p' "$FUN_GLIBC_FLOOR_JSON")
+    if [ -n "$FLOOR" ]; then
+        FLOOR_FIELDS="
+  \"glibc_floor\": \"$FLOOR\",
+  \"needed\": [$NEEDED],"
+    fi
+fi
+
 json_bool() { if [ "$1" = true ]; then printf 'true'; else printf 'false'; fi; }
 
 # Build flags are inferred from the probes, not copied from the script, so a
@@ -230,7 +244,7 @@ cat > "$OUT" <<EOF
   "safe": $(json_bool "$SAFE_PRESENT"),
   "safe_level": "strict",
   "libtcc_present": $(json_bool "$LIBTCC_PRESENT"),
-  "zlib_present": $(json_bool "$ZLIB_PRESENT"),
+  "zlib_present": $(json_bool "$ZLIB_PRESENT"),$FLOOR_FIELDS
   "notes": "$NOTES"
 }
 EOF

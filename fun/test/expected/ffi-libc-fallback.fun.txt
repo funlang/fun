@@ -4,4 +4,7 @@
  <- alias on another cpu name expect 4
 3
  <- bare libm -> libm.so.6 expect 3
+3
+ <- libc.so normalization expect 3
+raised libc.something
 raised

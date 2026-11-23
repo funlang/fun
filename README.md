@@ -112,7 +112,7 @@ Fun is written in Pascal (Delphi / Free Pascal). The core is a small tree-walkin
 - **Runtime C & machine code** — bundled Tiny C Compiler, JIT, and inline assembly (see [the capability ladder](#the-capability-ladder)).
 - **C-level FFI** — paste a C prototype or use a compact signature string to call DLL/shared-library functions (see [FFI](#foreign-function-interface)).
 - **Keyword aliasing** — a canonical English keyword set with pluggable alias packs (Chinese, French, custom) selected at runtime (see [below](#keyword-aliasing)).
-- **Cross-platform** — Linux x64/arm64 (LoongArch64/riscv64 prerelease), macOS x64/arm64, and Windows x64; the 32-bit build still runs on Windows 95 OSR2 and NT 3.5 (see [legacy Win32](docs/building.md#legacy-win32)). The linux-x64 artifact is built in a glibc 2.17 container, so Kylin V10 / UOS 20 and other old-glibc distributions run it out of the box.
+- **Cross-platform** — Linux x64/arm64 (LoongArch64/riscv64 prerelease), macOS x64/arm64, and Windows x64; the 32-bit build still runs on Windows 95 OSR2 and NT 3.5 (see [legacy Win32](docs/building.md#legacy-win32)). The linux-x64 artifact is built in a glibc 2.17 container and linux-arm64 in a glibc 2.28 container, so Kylin V10 / UOS 20 and other old-glibc distributions run them out of the box.
 - **Dual distribution** — command-line `fun.exe` and embeddable runtime `fun.dll` exporting a simple `Run` interface.
 - **Self-hosted standard library** — about 90 public modules written in Fun itself, from JSON/YAML/XML to ORM, async, UI, and native bindings.
 

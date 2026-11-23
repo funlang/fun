@@ -21,15 +21,29 @@ This project records notable changes in the style of [Keep a Changelog](https://
   and libtcc is rebuilt in the same container, so the linux-x64 artifact no
   longer requires `libpcre.so.1`, `libffi.so.8`, or a newer libtcc build at run
   time. `src/prj/fun/check-linux-floor.sh` reports the highest `GLIBC_*`
-  symbol version and fails CI if it exceeds 2.28 or an unexpected shared
-  library appears.
+  symbol version and fails CI if it exceeds 2.17 or an unexpected shared
+  library appears. The measured floor and `DT_NEEDED` list are also written
+  into `capabilities.json` and the release notes.
+
+- The manylinux build now installs FPC's `utils-fpcmkcfg` package and links the
+  `ppc*` compiler into `bin/`, so a clean CentOS 7 container can generate
+  `fpc.cfg` and run the compiler. Downloads probe for `--retry-all-errors`
+  instead of assuming a modern curl, and `FPC_ARCH` selects the container's
+  native compiler archive.
+
+- linux-arm64 is now built in a glibc 2.28 (manylinux_2_28) container too, so
+  Kylin V10 / UOS 20 ARM hosts can run the release artifact; the Ubuntu 24.04
+  arm64 build remains available as `linux-arm64-modern`.
 
 - `getapi` now works on musl: when a requested C-library name has no shared
   object on the host (musl ships no `libc.so.6`, only
   `libc.musl-<cpu>.so.1`), a known libc/libm/libdl/libpthread/librt alias is
   resolved from the process image instead. Bare library names also probe the
   versioned sonames runtime packages actually ship (`libz` finds `libz.so.1`),
-  and unknown libraries still raise instead of silently borrowing a symbol.
+  and a name that already ends in `.so`/`.so.N` is normalized before probing
+  instead of producing `libz.so.so`. Unknown libraries still raise instead of
+  silently borrowing a symbol, and only exact `.so`/`.so.N` suffixes count as
+  libc aliases (`libc.something` no longer matches `libc.so`).
   This makes `io`, `process`, `lib-asm*`, `lib-proc` and the FFI suite work on
   the LoongArch64/riscv64 musl artifacts without compatibility symlinks.
 

@@ -19,14 +19,26 @@
 - 当第三方源码存在时，PCRE 与 libffi 改为静态链入，libtcc 也在同一容器内重建，
   因此 linux-x64 产物运行时不再需要 `libpcre.so.1`、`libffi.so.8` 或更新版本的
   libtcc。`src/prj/fun/check-linux-floor.sh` 会报告二进制需要的最高 `GLIBC_*`
-  符号版本，超过 2.28 或出现意外共享库时 CI 直接失败。
+  符号版本，超过 2.17 或出现意外共享库时 CI 直接失败。实测地板与 `DT_NEEDED`
+  清单也会写入 `capabilities.json` 和发布说明。
+
+- manylinux 构建现在会安装 FPC 的 `utils-fpcmkcfg` 包，并把 `ppc*` 编译器
+  链接进 `bin/`，干净 CentOS 7 容器才能生成 `fpc.cfg` 并运行编译器。下载会
+  先探测 `--retry-all-errors`，不再假定 curl 足够新；`FPC_ARCH` 选择容器原生
+  的编译器归档。
+
+- linux-arm64 也改为在 glibc 2.28（manylinux_2_28）容器中构建，麒麟 V10 /
+  统信 UOS 20 的 ARM 机器可直接运行发布产物；Ubuntu 24.04 的 arm64 构建
+  保留为 `linux-arm64-modern`。
 
 - `getapi` 在 musl 上可用：请求的 C 库在本机没有对应共享对象时（musl 没有
   `libc.so.6`，只有 `libc.musl-<cpu>.so.1`），已知的
   libc/libm/libdl/libpthread/librt 别名会改从进程自身解析。裸库名也会依次探测
-  发行版实际提供的带版本 soname（`libz` 能找到 `libz.so.1`），未知库仍然报错，
-  不会静默借用别的同名符号。于是 LoongArch64/riscv64 的 musl 产物无需兼容符号
-  链接即可使用 `io`、`process`、`lib-asm*`、`lib-proc` 与 FFI 套件。
+  发行版实际提供的带版本 soname（`libz` 能找到 `libz.so.1`）；已经带
+  `.so`/`.so.N` 后缀的名字会先归一化再探测，不会拼出 `libz.so.so`。未知库仍然
+  报错，不会静默借用别的同名符号；只有精确的 `.so`/`.so.N` 后缀才算 libc 别名
+  （`libc.something` 不再被当成 `libc.so`）。于是 LoongArch64/riscv64 的 musl
+  产物无需兼容符号链接即可使用 `io`、`process`、`lib-asm*`、`lib-proc` 与 FFI 套件。
 
 - Unix 的 `getapi`/`@toCallback` 中 `'w'` 现在是真正的宽字符串类型：Fun 的
   UTF-8 文本会转换成 NUL 结尾的 UCS-4 缓冲区并在返回时转回（Linux/macOS 上

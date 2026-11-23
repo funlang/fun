@@ -101,7 +101,10 @@ to get a global `fun` command.
 
 - `linux-x64` artifacts are built in a glibc 2.17 container, so they run on
   Kylin V10 / UOS 20 (glibc 2.28-2.31) and anything newer. `linux-arm64` is
-  built on Ubuntu 24.04 and needs glibc 2.34 or newer.
+  built in a manylinux_2_28 container (glibc 2.28), so the same distributions
+  run the arm64 build as well.
+- `capabilities.json` in each archive records the measured `glibc_floor` and
+  the `needed` shared libraries; the release notes repeat both.
 - PCRE and libffi are linked into the binary, so no `libpcre.so.1` or
   `libffi.so.N` runtime package is needed; both musl and glibc hosts resolve
   C-library names through the process image (see below).
@@ -114,4 +117,5 @@ to get a global `fun` command.
 - `fun.dll` is a separate licensed product and is not part of these archives.
 
 Every release also carries `capabilities.json` and `SHA256SUMS`; optional
-features that were unavailable are listed there.
+features that were unavailable are listed there, as are the measured Linux
+`glibc_floor` and the `needed` shared libraries.

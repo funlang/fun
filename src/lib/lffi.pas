@@ -140,16 +140,51 @@ end;
 // Only names whose symbols live in the process image may fall back to the
 // global scope. An arbitrary missing library still reports the load error
 // instead of silently using a same-named symbol from somewhere else.
+
+// True for the tail that may follow a library stem: nothing, '.so' or
+// '.so.<digits>'. A plain prefix test on 'libc.so' would also accept
+// 'libc.something' and route an unrelated library into the process-image
+// fallback.
+function IsSoSuffix(const tail: string): Boolean;
+var
+  i: Integer;
+begin
+  if (tail = '') or (tail = '.so') then exit(True);
+  if (Copy(tail, 1, 4) <> '.so.') or (Length(tail) = 4) then exit(False);
+  for i := 5 to Length(tail) do
+    if not (tail[i] in ['0'..'9']) then exit(False);
+  result := True;
+end;
+
+function IsLibSoName(const name, stem: string): Boolean;
+begin
+  result := (Copy(name, 1, Length(stem)) = stem)
+        and IsSoSuffix(Copy(name, Length(stem) + 1, MaxInt));
+end;
+
+// Drop a trailing '.so' / '.so.N' so LoadLibCandidates re-adds the versioned
+// soname instead of trying names like libz.so.so.
+function StripSoSuffix(const name: string): string;
+var
+  i: Integer;
+begin
+  result := name;
+  for i := Length(name) - 2 downto 1 do
+    if (name[i] = '.') and (name[i + 1] = 's') and (name[i + 2] = 'o')
+       and IsSoSuffix(Copy(name, i, MaxInt)) then
+      exit(Copy(name, 1, i - 1));
+end;
+
 function IsGlobalLibName(const name: string): Boolean;
 begin
   result := (name = '')
-         or (name = 'libc') or (Copy(name, 1, 7) = 'libc.so')
+         or IsLibSoName(name, 'libc')
          or (Copy(name, 1, 10) = 'libc.musl-') or (Copy(name, 1, 8) = 'ld-musl-')
-         or (name = 'libm') or (Copy(name, 1, 7) = 'libm.so')
-         or (name = 'libdl') or (Copy(name, 1, 7) = 'libdl.so')
-         or (name = 'libpthread') or (Copy(name, 1, 12) = 'libpthread.so')
-         or (name = 'librt') or (Copy(name, 1, 7) = 'librt.so')
-         or (name = 'libutil') or (Copy(name, 1, 10) = 'libutil.so');
+         or IsLibSoName(name, 'libm')
+         or IsLibSoName(name, 'libdl')
+         or IsLibSoName(name, 'libpthread')
+         or IsLibSoName(name, 'librt')
+         or IsLibSoName(name, 'libutil');
 end;
 {$EndIf}
 
@@ -167,10 +202,18 @@ const
   {$EndIf}
 var
   i: Integer;
+  stem: string;
 begin
+  // 'libz.so'/'libz.so.1' are common spellings of a bare name; probing them
+  // as-is would append another suffix and try libz.so.so.
+  {$IfDef Linux}
+  stem := StripSoSuffix(base);
+  {$Else}
+  stem := base;
+  {$EndIf}
   for i := Low(exts) to High(exts) do
   begin
-    result := LoadLibrary(base + exts[i]);
+    result := LoadLibrary(stem + exts[i]);
     if result <> NilHandle then exit;
   end;
   result := NilHandle;
@@ -322,11 +365,11 @@ begin
   begin
     hlib := LoadLibrary(libname);
     // bare name, e.g. 'libc' on Unix or 'kernel32' on Windows: try the
-    // platform's library suffix. Fun-side names usually carry their extension
-    // ('zlib.dll', 'libc.so.6'), so this only fires for a bare name.
+    // platform's library suffix. A versioned spelling ('libz.so.1') is
+    // normalized inside LoadLibCandidates, so it does not become libz.so.1.so.
     if (hlib = NilHandle) and (Pos('/', libname) = 0) and (Pos('\', libname) = 0)
-       and (Pos('.so', libname) = 0) and (Pos('.dylib', libname) = 0)
-       and (Pos('.dll', libname) = 0) then
+       and (Pos('.dylib', libname) = 0) and (Pos('.dll', libname) = 0)
+       {$IfNDef Linux} and (Pos('.so', libname) = 0) {$EndIf} then
       {$IfDef MSWINDOWS}
       hlib := LoadLibrary(libname + '.dll')
       {$Else}

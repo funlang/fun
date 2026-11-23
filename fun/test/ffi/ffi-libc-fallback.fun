@@ -24,6 +24,20 @@ var slen2 = 'libc.musl-aarch64.so.1'.getapi('strlen', 's:i');
 var sqrt = 'libm'.getapi('sqrt', 'd:d');
 ?. sqrt(9.0);                  ?. ' <- bare libm -> libm.so.6 expect 3';
 
+# An unversioned soname is normalized before suffix probing, so 'libc.so'
+# resolves even where only libc.so.6 (or no libc.so at all on musl) exists.
+var slen3 = 'libc.so'.getapi('strlen', 's:i');
+?. slen3('abc');               ?. ' <- libc.so normalization expect 3';
+
+# A name that merely starts with a C-library stem must not be routed to the
+# process image: 'libc.something' is not libc.
+try
+  'libc.something'.getapi('strlen', 's:i');
+  ?. 'unexpected';
+except
+  ?. 'raised libc.something';
+end try;
+
 try
   'libdefinitely_missing.so.9'.getapi('strlen', 's:i');
   ?. 'unexpected';

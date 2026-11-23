@@ -22,10 +22,11 @@
 #
 # Environment:
 #   OUT_DIR      output directory          (default: <repo>/dist-legacy)
-#   FLOOR_MAX    maximum GLIBC_ version    (default: 2.28)
+#   FLOOR_MAX    maximum GLIBC_ version    (default: 2.17)
 #   FPC_PREFIX   compiler install prefix   (default: /opt/fpc-3.2.2)
 #   FPC_CACHE    downloaded tarball        (default: /tmp/fpc-3.2.2.tar)
 #   FPC_VERSION  compiler version          (default: 3.2.2)
+#   FPC_ARCH     compiler target arch       (default: uname -m)
 #
 # The script is intentionally POSIX sh + coreutils: CentOS 7 and Debian 10
 # both have everything it uses.
@@ -37,8 +38,9 @@ ROOT="$(cd "$HERE/../../.." && pwd)"
 cd "$ROOT"
 
 FPC_VERSION="${FPC_VERSION:-3.2.2}"
+FPC_ARCH="${FPC_ARCH:-$(uname -m)}"
 OUT_DIR="${OUT_DIR:-$ROOT/dist-legacy}"
-FLOOR_MAX="${FLOOR_MAX:-2.28}"
+FLOOR_MAX="${FLOOR_MAX:-2.17}"
 FPC_PREFIX="${FPC_PREFIX:-/opt/fpc-$FPC_VERSION}"
 FPC_CACHE="${FPC_CACHE:-/tmp/fpc-$FPC_VERSION.tar}"
 
@@ -67,27 +69,41 @@ if [ -x "$FPC_PREFIX/bin/fpc" ] && [ "$("$FPC_PREFIX/bin/fpc" -iV 2>/dev/null)" 
     need_fpc=0
 fi
 if [ "$need_fpc" -eq 1 ]; then
-    say "Installing FPC $FPC_VERSION into $FPC_PREFIX"
+    say "Installing FPC $FPC_VERSION ($FPC_ARCH) into $FPC_PREFIX"
     if [ ! -f "$FPC_CACHE" ]; then
-        url="https://downloads.sourceforge.net/project/freepascal/Linux/$FPC_VERSION/fpc-$FPC_VERSION.x86_64-linux.tar"
+        url="https://downloads.sourceforge.net/project/freepascal/Linux/$FPC_VERSION/fpc-$FPC_VERSION.$FPC_ARCH-linux.tar"
         say "  downloading $url"
-        # CentOS 7's curl 7.29 has no --retry-all-errors.
-        if ! curl -fSL --retry 5 --retry-all-errors --retry-delay 5 -o "$FPC_CACHE" "$url"; then
+        # CentOS 7's curl 7.29 predates --retry-all-errors; probe instead of
+        # letting the unsupported flag turn into a noisy failed attempt.
+        if curl --help 2>&1 | grep -q -- '--retry-all-errors'; then
+            curl -fSL --retry 5 --retry-all-errors --retry-delay 5 -o "$FPC_CACHE" "$url"
+        else
             curl -fSL --retry 5 --retry-delay 5 -o "$FPC_CACHE" "$url"
         fi
     fi
     work="$(mktemp -d "${TMPDIR:-/tmp}/fun-fpc-XXXXXX")"
     trap 'rm -rf "$work"' EXIT INT TERM
     tar xf "$FPC_CACHE" -C "$work"
-    pkgdir="$work/fpc-$FPC_VERSION.x86_64-linux"
-    [ -f "$pkgdir/binary.x86_64-linux.tar" ] || die "unexpected FPC tarball layout"
+    pkgdir="$work/fpc-$FPC_VERSION.$FPC_ARCH-linux"
+    [ -f "$pkgdir/binary.$FPC_ARCH-linux.tar" ] || die "unexpected FPC tarball layout"
     inner="$work/inner"
     mkdir -p "$inner"
-    tar xf "$pkgdir/binary.x86_64-linux.tar" -C "$inner"
+    tar xf "$pkgdir/binary.$FPC_ARCH-linux.tar" -C "$inner"
     mkdir -p "$FPC_PREFIX"
-    tar xzf "$inner/base.x86_64-linux.tar.gz" -C "$FPC_PREFIX"
-    for t in "$inner"/units-*.tar.gz; do
+    tar xzf "$inner/base.$FPC_ARCH-linux.tar.gz" -C "$FPC_PREFIX"
+    # units-* are the RTL/packages; utils-fpcmkcfg ships the fpcmkcfg binary
+    # that samplecfg invokes. install.sh installs all three groups, so do the
+    # same instead of leaving config generation without a tool.
+    for t in "$inner"/units-*.tar.gz "$inner"/utils-*.tar.gz; do
+        [ -f "$t" ] || continue
         tar xzf "$t" -C "$FPC_PREFIX"
+    done
+    # install.sh links the compiler driver (ppcx64/ppca64/...) from
+    # lib/fpc/<version> into bin/; without it the fpc wrapper exits with
+    # "ppcx64 can't be executed, error code: 127".
+    for ppc in "$FPC_PREFIX/lib/fpc/$FPC_VERSION"/ppc*; do
+        [ -f "$ppc" ] || continue
+        ln -sf "$ppc" "$FPC_PREFIX/bin/$(basename "$ppc")"
     done
     rm -rf "$work"
     trap - EXIT INT TERM
@@ -95,16 +111,17 @@ fi
 
 FPC_HOME="${FPC_HOME:-/tmp/fun-fpc-home}"
 mkdir -p "$FPC_HOME"
+# samplecfg calls fpcmkcfg, which ships in $FPC_PREFIX/bin; put it on PATH
+# first or config generation fails on a clean container (CentOS 7 has no
+# /usr/bin/fpcmkcfg).
+export PATH="$FPC_PREFIX/bin:$PATH"
 HOME="$FPC_HOME" "$FPC_PREFIX/lib/fpc/$FPC_VERSION/samplecfg" \
     "$FPC_PREFIX/lib/fpc/$FPC_VERSION" >"$FPC_HOME/samplecfg.log" 2>&1 || true
-# samplecfg writes /etc/fpc.cfg when it can (the container runs as root) and
-# falls back to ~/.fpc.cfg otherwise; both are read by the compiler.
 if [ ! -f /etc/fpc.cfg ] && [ ! -f "$FPC_HOME/.fpc.cfg" ]; then
     cat "$FPC_HOME/samplecfg.log" >&2 || true
     die "FPC config generation failed"
 fi
 export HOME="$FPC_HOME"
-export PATH="$FPC_PREFIX/bin:$PATH"
 export FPC="$FPC_PREFIX/bin/fpc"
 say "FPC $("$FPC" -iV) at $FPC_PREFIX"
 

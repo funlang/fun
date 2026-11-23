@@ -90,8 +90,10 @@ Windows 安装（当前用户，无需管理员权限）：
 ## 运行要求
 
 - `linux-x64` 产物在 glibc 2.17 容器中构建，可在麒麟 V10 / 统信 UOS 20
-  （glibc 2.28~2.31）及更新的系统上运行；`linux-arm64` 仍在 Ubuntu 24.04
-  上构建，需要 glibc 2.34 或更新版本。
+  （glibc 2.28~2.31）及更新的系统上运行；`linux-arm64` 在 manylinux_2_28
+  容器（glibc 2.28）中构建，同一批国产系统也能直接运行 arm64 版本。
+- 每个归档里的 `capabilities.json` 记录实测 `glibc_floor` 与 `needed` 共享库
+  清单，发布说明中也会重复展示。
 - PCRE 与 libffi 已静态链入二进制，运行时不再需要 `libpcre.so.1` 或
   `libffi.so.N`；glibc 与 musl 上的 C 库名字都从进程自身解析（见下）。
 - 在 musl 上（LoongArch64/riscv64 产物），`getapi` 会从进程自身解析
@@ -101,4 +103,4 @@ Windows 安装（当前用户，无需管理员权限）：
 - `fun.dll` 是单独授权的产品，不包含在这些包里。
 
 每个发布还带有 `capabilities.json` 与 `SHA256SUMS`；缺失的可选能力会列在
-其中。
+其中，实测的 Linux `glibc_floor` 与 `needed` 共享库清单也会写入。

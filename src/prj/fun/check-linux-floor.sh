@@ -10,8 +10,13 @@
 #
 # Usage:
 #   src/prj/fun/check-linux-floor.sh funcmd libtcc.so
-#   src/prj/fun/check-linux-floor.sh --max 2.28 funcmd
+#   src/prj/fun/check-linux-floor.sh --max 2.17 funcmd
 #   src/prj/fun/check-linux-floor.sh --max 2.17 --allow libz.so.1 funcmd
+#   src/prj/fun/check-linux-floor.sh --json floor.json funcmd libtcc.so
+#
+# --json writes the measured result as {"glibc_floor": "2.17",
+# "needed": ["libc.so.6"]} for capabilities.json, so the floor is visible to
+# users instead of living only in CI logs.
 #
 # Exit status: 0 = within the floor and self-contained, 1 = violation,
 #              2 = usage error.
@@ -24,16 +29,18 @@ set -u
 
 max=""
 allows="libc.so.6 libm.so.6 libdl.so.2 libpthread.so.0 librt.so.1 libgcc_s.so.1 libutil.so.1"
+json=""
 files=""
 
 usage() {
-    sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --max)   [ $# -ge 2 ] || { usage >&2; exit 2; }; max="${2#GLIBC_}"; shift 2 ;;
         --allow) [ $# -ge 2 ] || { usage >&2; exit 2; }; allows="$allows $2"; shift 2 ;;
+        --json)  [ $# -ge 2 ] || { usage >&2; exit 2; }; json="$2"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         --) shift; break ;;
         -*) echo "check-linux-floor: unknown option: $1" >&2; exit 2 ;;
@@ -47,6 +54,8 @@ command -v objdump >/dev/null 2>&1 || { echo "check-linux-floor: objdump not fou
 command -v readelf >/dev/null 2>&1 || { echo "check-linux-floor: readelf not found (install binutils)" >&2; exit 2; }
 
 status=0
+all_floor="none"
+all_needed=""
 for f in $files; do
     if [ ! -f "$f" ]; then
         echo "FAIL $f: not found"
@@ -70,6 +79,12 @@ for f in $files; do
     fi
 
     needed="$(readelf -d "$f" 2>/dev/null | sed -n 's/.*Shared library: \[\(.*\)\]/\1/p')"
+    all_needed="$all_needed $needed"
+    if [ "$floor" != "none" ]; then
+        if [ "$all_floor" = "none" ] || [ "$(printf '%s\n%s\n' "$floor" "$all_floor" | sort -V | tail -n 1)" = "$floor" ]; then
+            all_floor="$floor"
+        fi
+    fi
     for lib in $needed; do
         ok=0
         for a in $allows; do
@@ -81,6 +96,18 @@ for f in $files; do
         fi
     done
 done
+
+if [ -n "$json" ]; then
+    needed_json=""
+    for lib in $(printf '%s\n' $all_needed | sort -u); do
+        [ -n "$lib" ] || continue
+        [ -z "$needed_json" ] || needed_json="$needed_json, "
+        needed_json="$needed_json\"$lib\""
+    done
+    printf '{\n  "glibc_floor": "%s",\n  "needed": [%s]\n}\n' \
+        "$all_floor" "$needed_json" > "$json"
+    echo "wrote $json"
+fi
 
 if [ "$status" -eq 0 ]; then
     echo "floor check passed"

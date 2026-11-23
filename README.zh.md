@@ -107,7 +107,7 @@ Fun 使用 Pascal（Delphi / Free Pascal）编写。核心是一个小巧的树�
 - **运行时 C 与机器码** —— 内置 Tiny C 编译器、JIT 与内联汇编（见[能力阶梯](#能力阶梯)）。
 - **C 级 FFI** —— 贴入 C 声明，或用简短签名串调用 DLL/共享库函数（见 [FFI](#外部函数接口ffi)）。
 - **关键字别名** —— 规范英文关键字 + 可插拔的别名包（中文、法文、自定义），运行时选择（见[下文](#关键字别名)）。
-- **跨平台** —— Linux x64/arm64（LoongArch64/riscv64 为预发布）、macOS x64/arm64 与 Windows x64；32 位构建仍能在 Windows 95 OSR2 与 NT 3.5 上运行（见[老 Win32](docs/building.zh.md#老-win32)）。linux-x64 产物在 glibc 2.17 容器中构建，麒麟 V10 / 统信 UOS 20 等旧 glibc 系统可直接运行。
+- **跨平台** —— Linux x64/arm64（LoongArch64/riscv64 为预发布）、macOS x64/arm64 与 Windows x64；32 位构建仍能在 Windows 95 OSR2 与 NT 3.5 上运行（见[老 Win32](docs/building.zh.md#老-win32)）。linux-x64 产物在 glibc 2.17 容器、linux-arm64 在 glibc 2.28 容器中构建，麒麟 V10 / 统信 UOS 20 等旧 glibc 系统可直接运行。
 - **双形态分发** —— 命令行 `fun.exe` 与嵌入运行时 `fun.dll`（导出简单的 `Run` 接口）。
 - **自托管的标准库** —— 约 90 个用 Fun 自身编写的公开模块，覆盖 JSON/YAML/XML 到 ORM、异步、UI 与原生绑定。
 

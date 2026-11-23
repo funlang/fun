@@ -71,9 +71,10 @@ Fedora/RHEL 风格的布局上 `getapi`/FFI 也会自动启用。
 ### Linux 兼容性地板
 
 正式发布的 linux-x64 产物在 **manylinux2014**（CentOS 7，glibc 2.17）里构建，
-不再直接用 Ubuntu 24.04 runner。这样它才能跑在麒麟 V10 / 统信 UOS 20 等
-国产系统上——这些系统的 glibc 通常只有 2.28~2.31，低于 Ubuntu 24.04 构建
-继承的 2.34 地板。构建方式本身不变：
+linux-arm64 则在 **manylinux_2_28**（glibc 2.28）里构建，不再直接用 Ubuntu
+24.04 runner。这样它们才能跑在麒麟 V10 / 统信 UOS 20 等国产系统上——这些系统
+的 glibc 通常只有 2.28~2.31，低于 Ubuntu 24.04 构建继承的 2.34 地板（arm64
+runner 是 2.39）。构建方式本身不变：
 
 ```sh
 src/prj/fun/build-linux-legacy.sh   # 在旧容器内执行
@@ -82,20 +83,30 @@ src/prj/fun/build-linux-legacy.sh   # 在旧容器内执行
 docker run --rm -v "$PWD:/work" -w /work \
   quay.io/pypa/manylinux2014_x86_64 \
   ./src/prj/fun/build-linux-legacy.sh
+
+# arm64 发布 stage：
+docker run --rm -v "$PWD:/work" -w /work \
+  -e FLOOR_MAX=2.28 quay.io/pypa/manylinux_2_28_aarch64 \
+  ./src/prj/fun/build-linux-legacy.sh
 ```
+
+脚本按 `FPC_ARCH`（默认 `uname -m`）安装容器原生 FPC，并补上
+`utils-fpcmkcfg` 包与 `ppc*` 编译器链接，干净容器才能生成 `fpc.cfg`。
 
 配套两点让产物自包含：
 
 - 当 `src/3rd/pcre-8` 与 `src/3rd/libffi` 存在时（CI 会拉取），
   `make-linux-x86_64.sh` 会把 PCRE 与 libffi **静态链入**。产物不再把
   `libpcre.so.1` / `libffi.so.N` 记为 `DT_NEEDED`，目标机只需提供 C 运行库。
-- `src/prj/fun/check-linux-floor.sh --max 2.28 funcmd libtcc.so` 会报告二进制
+- `src/prj/fun/check-linux-floor.sh --max 2.17 funcmd libtcc.so` 会报告二进制
   需要的最高 `GLIBC_*` 符号版本，并在超过目标版本或出现意外共享库时失败。
-  CI 每次构建 linux-x64 都会跑它。
+  CI 每次构建 Linux 都会跑它（arm64 用 `--max 2.28`）；`--json` 会把实测
+  地板与 `needed` 清单写入 `capabilities.json`，并展示在发布页。
 
-CI 的 `linux-legacy` 作业用容器构建的二进制跑同一套回归，然后产出
-`linux-x64` 发布 stage；Ubuntu 24.04 构建保留为 `linux-x64-modern`。调试时
-可以给 `make-linux-x86_64.sh` 传 `FFI_SYSTEM=1` 回到旧的动态 libffi 行为。
+CI 的 `linux-legacy` 与 `linux-arm64-legacy` 作业用容器构建的二进制跑同一套
+回归，然后分别产出 `linux-x64`、`linux-arm64` 发布 stage；Ubuntu 构建保留为
+`linux-x64-modern`、`linux-arm64-modern`。调试时可以给
+`make-linux-x86_64.sh` 传 `FFI_SYSTEM=1` 回到旧的动态 libffi 行为。
 
 ## 平台能力矩阵
 

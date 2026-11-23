@@ -75,10 +75,11 @@ The Linux script also probes for FPC's `libffi` unit under both `lib/` and
 ### Linux compatibility floor
 
 The released linux-x64 artifact is built inside **manylinux2014** (CentOS 7,
-glibc 2.17) instead of on the Ubuntu 24.04 runner. This is what makes it run on
-Kylin V10 / UOS 20 and other domestic distributions, whose glibc is usually
-2.28-2.31 - below the 2.34 floor an Ubuntu 24.04 build inherits. The build
-itself is unchanged:
+glibc 2.17) instead of on the Ubuntu 24.04 runner, and linux-arm64 inside
+**manylinux_2_28** (glibc 2.28) instead of on the Ubuntu 24.04 arm64 runner.
+This is what makes them run on Kylin V10 / UOS 20 and other domestic
+distributions, whose glibc is usually 2.28-2.31 - below the 2.34 floor an
+Ubuntu 24.04 build inherits (2.39 on arm64). The build itself is unchanged:
 
 ```sh
 src/prj/fun/build-linux-legacy.sh   # inside the old container
@@ -87,7 +88,16 @@ src/prj/fun/build-linux-legacy.sh   # inside the old container
 docker run --rm -v "$PWD:/work" -w /work \
   quay.io/pypa/manylinux2014_x86_64 \
   ./src/prj/fun/build-linux-legacy.sh
+
+# arm64 release stage:
+docker run --rm -v "$PWD:/work" -w /work \
+  -e FLOOR_MAX=2.28 quay.io/pypa/manylinux_2_28_aarch64 \
+  ./src/prj/fun/build-linux-legacy.sh
 ```
+
+The script installs the container's native FPC archive (`FPC_ARCH` defaults to
+`uname -m`), including the `utils-fpcmkcfg` package and the `ppc*` compiler
+link, so a clean CentOS 7 container can generate `fpc.cfg`.
 
 Two related changes keep the artifact self-contained:
 
@@ -95,14 +105,17 @@ Two related changes keep the artifact self-contained:
   `src/3rd/pcre-8` and `src/3rd/libffi` are present (the CI fetches both). The
   binary no longer records `libpcre.so.1` or `libffi.so.N` as `DT_NEEDED`, so
   the target only has to provide the C runtime.
-- `src/prj/fun/check-linux-floor.sh --max 2.28 funcmd libtcc.so` reports the
+- `src/prj/fun/check-linux-floor.sh --max 2.17 funcmd libtcc.so` reports the
   highest `GLIBC_*` symbol version a binary needs and fails when it exceeds
   the target or when an unexpected shared library appears. The CI runs it on
-  every Linux x64 build.
+  every Linux build; the arm64 job uses `--max 2.28`. With `--json` the
+  measured floor and `needed` list are folded into `capabilities.json` and
+  shown on the release page.
 
-The CI job `linux-legacy` produces the `linux-x64` release stage after running
-the same regression suite against the container-built binaries; the Ubuntu
-24.04 build remains available as `linux-x64-modern`. Pass `FFI_SYSTEM=1` to
+The CI jobs `linux-legacy` and `linux-arm64-legacy` produce the `linux-x64`
+and `linux-arm64` release stages after running the same regression suite
+against the container-built binaries; the Ubuntu builds remain available as
+`linux-x64-modern` and `linux-arm64-modern`. Pass `FFI_SYSTEM=1` to
 `make-linux-x86_64.sh` to keep the old dynamic-libffi behaviour for debugging.
 
 ## Platform capability matrix

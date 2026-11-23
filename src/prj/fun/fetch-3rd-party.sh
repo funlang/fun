@@ -65,8 +65,10 @@ fetch() {
         # --retry-all-errors also covers DNS/connect failures, which plain
         # --retry does not; runners occasionally lose name resolution.
         # CentOS 7 / manylinux2014 ship curl 7.29, which predates that flag,
-        # so fall back to the plain retry form instead of failing the fetch.
-        if ! curl -fSL --retry 5 --retry-all-errors --retry-delay 5 -o "$out" "$url"; then
+        # so probe for it instead of emitting a failed attempt first.
+        if curl --help 2>&1 | grep -q -- '--retry-all-errors'; then
+            curl -fSL --retry 5 --retry-all-errors --retry-delay 5 -o "$out" "$url"
+        else
             curl -fSL --retry 5 --retry-delay 5 -o "$out" "$url"
         fi
     elif command -v wget >/dev/null 2>&1; then
