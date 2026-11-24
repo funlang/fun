@@ -20,6 +20,7 @@
 // for diagnostics.
 
 use 'ontology.fun';
+use 'stdlib.fun';
 use 'lib-path.fun';
 use 'lib-set.fun';
 use 'process.fun';
@@ -30,6 +31,7 @@ var ROOT     = PathDir(TOOL_DIR);
 var REPO     = PathDir(ROOT);
 var DATA     = PathJoin([ROOT, 'data', 'fun.ontology.fd']);
 var O        = load(DATA);
+var STD      = stdlibIndex(PathJoin([REPO, 'fun', 'lib']), O.meta.funVersion);
 
 fun send(obj)
   ?. obj.@toJson(json: true);
@@ -88,12 +90,21 @@ fun toolList()
     properties: new [code: new [type: 'string', description: 'Fun source to parse']],
     required: ['code']
   ];
+  var stdlibSchema = new [
+    type: 'object',
+    properties: new [
+      query: new [type: 'string', description: 'Module, function or class name fragment'],
+      limit: new [type: 'integer', description: 'Maximum modules, default 10']
+    ],
+    required: ['query']
+  ];
   result = new [tools: [
     new [name: 'ontology_search', description: 'Search the Fun language ontology by intent, identifier or keyword.', inputSchema: searchSchema],
     new [name: 'ontology_get', description: 'Return one concept with summary, syntax, transfer notes and runnable examples.', inputSchema: getSchema],
     new [name: 'fun_context', description: 'Compile a token-budgeted Fun context pack for a task.', inputSchema: contextSchema],
     new [name: 'fun_run', description: 'Run Fun code in a child process and return exitCode, stdout and stderr.', inputSchema: runSchema],
-    new [name: 'fun_check', description: 'Parse Fun code without running its top-level statements.', inputSchema: checkSchema]
+    new [name: 'fun_check', description: 'Parse Fun code without running its top-level statements.', inputSchema: checkSchema],
+    new [name: 'stdlib_search', description: 'Search the pure-Fun standard library index by module, function or class name.', inputSchema: stdlibSchema]
   ]];
 end fun;
 
@@ -153,12 +164,52 @@ fun doCheck(a)
   end if;
 end fun;
 
+fun doStdlib(a)
+  var q = (a.query or '').lower();
+  var limit = a.limit or 10;
+  var scored = new [];
+  for m in STD.modules do
+    var score = 0;
+    var hits = new [];
+    if q = '' or m.name.lower().subpos(q) >= 0 then score += 10; end if;
+    if q <> '' and m.summary.lower().subpos(q) >= 0 then score += 3; end if;
+    for e in m.exports do
+      if q <> '' and e.name.lower().subpos(q) >= 0 then
+        score += 6;
+        if hits.@count() < 8 then hits.@add(e.signature); end if;
+      end if;
+    end do;
+    if score > 0 then
+      scored.@add(new [score: score, name: m.name, platform: m.platform, summary: m.summary, matches: hits]);
+    end if;
+  end do;
+  var out = new [];
+  var used = new [];
+  var n = 0;
+  while n < limit and n < scored.@count() do
+    var best = nil;
+    var bestScore = -1;
+    for x in scored do
+      if used[x.name] = nil and x.score > bestScore then
+        bestScore = x.score;
+        best = x;
+      end if;
+    end do;
+    if best = nil then exit; end if;
+    used[best.name] = true;
+    out.@add(best);
+    n += 1;
+  end do;
+  result = textResult(out.@toJson(json: true));
+end fun;
+
 fun callTool(name, a)
   if name = 'ontology_search' then result = doSearch(a); return; end if;
   if name = 'ontology_get' then result = doGet(a); return; end if;
   if name = 'fun_context' then result = doContext(a); return; end if;
   if name = 'fun_run' then result = doRun(a); return; end if;
   if name = 'fun_check' then result = doCheck(a); return; end if;
+  if name = 'stdlib_search' then result = doStdlib(a); return; end if;
   result = new [isError: true, content: [new [type: 'text', text: 'Unknown tool: ' & name]]];
 end fun;
 
@@ -170,7 +221,7 @@ fun handle(msg)
       protocolVersion: '2024-11-05',
       capabilities: new [tools: new [listChanged: false]],
       serverInfo: new [name: 'fun-ontology', version: O.meta.version],
-      instructions: 'Fun is a small Pascal-family scripting language. Call fun_context before writing code, then fun_check or fun_run.'
+      instructions: 'Fun is a small Pascal-family scripting language. Call fun_context before writing code, stdlib_search to find library entry points, then fun_check or fun_run.'
     ];
     reply(id, r);
   elsif method = 'notifications/initialized' then

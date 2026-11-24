@@ -5,8 +5,8 @@ It is not a second manual. It is the machine-facing projection of the manual,
 the grammar, the standard library, the regression suite and the pitfalls that
 models actually hit.
 
-Status: **seed (v0.1.0)**. 71 concepts, 70 executed examples, zero stale
-relations. The design rationale is in
+Status: **seed (v0.1.0)**. 71 concepts, 70 executed examples, 119 indexed
+stdlib modules, zero stale relations. The design rationale is in
 [`docs/ai-ontology.md`](../docs/ai-ontology.md) and
 [`docs/ai-ontology.zh.md`](../docs/ai-ontology.zh.md).
 
@@ -38,6 +38,7 @@ ontology/
     fun.ontology.json
     fun.ontology.jsonld
     index.json
+    stdlib.json
     llms.txt
     llms-full.txt
     AGENTS.md
@@ -91,6 +92,7 @@ The server speaks newline-delimited JSON-RPC 2.0. It exposes:
 | `fun_context` | `task`, `budget`, `detail` | a budgeted prompt pack |
 | `fun_run` | `code`, `stdin`, `timeoutMs` | exit code, stdout, stderr |
 | `fun_check` | `code` | parses code without running top-level statements |
+| `stdlib_search` | `query`, `limit` | modules and exported signatures |
 
 Register it with an MCP client as `fun ontology/tools/mcp-server.fun`.
 
@@ -153,8 +155,8 @@ silently rot.
 
 ## Growth path
 
-- M1: generate the standard-library symbol index from `fun/lib` and link it to
-  `module.*` concepts.
+- M1 (in progress): the stdlib index and `stdlib_search` are in place; next
+  are richer signatures, doctests and the `fun check` / `fun explain` CLI.
 - M2: `FunBench`, a hidden-test benchmark with first-shot pass rate, repair
   turns and token cost.
 - M3: ingest failed generations (opt-in) as `pitfall` proposals.

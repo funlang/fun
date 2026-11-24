@@ -327,14 +327,15 @@ flowchart LR
 - 71 个概念，70 个可执行示例，0 失败；
 - FD 源文件、JSON Schema、构建工具；
 - `level0/1/2` 卡片、`llms.txt`、`llms-full.txt`、`AGENTS.md`、JSON-LD；
-- MCP 服务：search / get / context / run / check；
+- MCP 服务：search / get / context / run / check，以及 `stdlib_search`；
+- 标准库索引：119 个模块，含顶层函数、类和单例方法签名；
 - FunBench 种子：5 个任务、10 个测试，参考解 10/10。
 
 验收：`fun ontology/tools/build.fun --check` 全绿；MCP 客户端能完成一次“查 -> 生成 -> 检查 -> 运行”。
 
 ### M1：补全库与工具
 
-- 从 `fun/lib/*.fun` 生成符号索引，补齐 `module.*` 和 `symbol.*`；
+- 标准库符号索引已在 M0 落地；继续补签名细节、模块级示例和 `module.*` 关联；
 - 给常用模块加 3 到 5 个任务级示例；
 - 加 `fun check`、`fun explain`、`fun context` CLI；
 - MCP 增加 `stdlib_symbol`、`explain_error`；

@@ -21,6 +21,7 @@
 //   cards/pitfalls.md      the anti-pattern sheet
 
 use 'ontology.fun';
+use 'stdlib.fun';
 use 'lib-path.fun';
 use 'lib-set.fun';
 use 'process.fun';
@@ -346,6 +347,10 @@ var o = load(DATA);
 ?. 'ontology: ' & o.concepts.@count() & ' concepts, v' & o.meta.version;
 var ids = validate(o);
 ?. 'ontology: relations OK';
+
+var si = stdlibIndex(PathJoin([REPO, 'fun', 'lib']), o.meta.funVersion);
+PathJoin([DIST, 'stdlib.json']).save(si.@toJson(json: true));
+?. 'ontology: stdlib ' & si.moduleCount & ' modules';
 
 PathJoin([DIST, 'fun.ontology.json']).save(o.@toJson(json: true));
 PathJoin([DIST, 'fun.ontology.jsonld']).save(renderJsonLd(o).@toJson(json: true));

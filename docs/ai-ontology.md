@@ -154,9 +154,11 @@ caching.
 ## 7. Roadmap
 
 - **M0 (this change)**: 71 concepts, 70 executed examples, validator, cards,
-  `llms.txt`, JSON-LD, MCP server, and a 5-task FunBench seed.
-- **M1**: generate the stdlib symbol index, add `fun check` / `fun explain` /
-  `fun context`, add doctests for the docs.
+  `llms.txt`, JSON-LD, MCP server, a 119-module stdlib index, and a 5-task
+  FunBench seed.
+- **M1 (in progress)**: the stdlib index and `stdlib_search` exist; next are
+  richer signatures, module examples, doctests and the `fun check` /
+  `fun explain` CLI.
 - **M2**: expand FunBench to 30 to 50 hidden-test tasks, add a canary and a
   public leaderboard.
 - **M3**: mine failed generations (opt-in) into pitfall candidates, community
