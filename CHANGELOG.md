@@ -6,6 +6,10 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `lib-url` gains `UrlParse()` and `UrlBuild()` for absolute and relative URLs,
+  including userinfo, ports, IPv6 hosts, raw query/fragment preservation and
+  empty-authority URLs such as `file:///`.
+
 - `CronScheduler.jobs()` now includes a per-job `stats` sub-map with
   `lastRunAt`, `lastSuccessAt`, `errors` and `lastErrorMessage`. Statistics
   update even without `onError`; success clears `lastErrorMessage` and updates

@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+- `lib-url` 新增 `UrlParse()` 与 `UrlBuild()`，支持绝对/相对 URL、userinfo、
+  端口、IPv6、原始 query/fragment 保留，以及 `file:///` 这类空 authority URL。
+
 - `CronScheduler.jobs()` 现在包含 per-job `stats` 子 map：`lastRunAt`、
   `lastSuccessAt`、`errors`、`lastErrorMessage`。没有 `onError` 时统计仍会更新；
   成功后清空 `lastErrorMessage` 并更新 `lastSuccessAt`，`onError` 收到的是

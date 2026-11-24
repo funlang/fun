@@ -135,6 +135,26 @@ s.run();                                             // 或在循环里调用 s.
   时统计仍会更新，`onError` 看到的是更新后的快照。
 - 没有 `onError` 时不会主动上报，但失败统计仍可在 `jobs()` 中看到。
 
+## URL 解析
+
+`lib-url` 可以拆分和重建 URL，组件保持原始文本、不做 decode：
+
+```fun
+use 'lib-url.fun';
+
+var u = UrlParse('https://user:pass@example.com:8080/a/b?x=1#frag');
+u['scheme'];    // https
+u['host'];      // example.com
+u['port'];      // 8080
+u['path'];      // /a/b
+u['query'];     // x=1
+u['fragment'];  // frag
+UrlBuild(u);    // 还原同一个 URL
+```
+
+query/fragment 是原始字符串；需要编码时用 `PercentEncode`/`UrlEncode`。
+`UrlBuild` 接受同样的字段，并保留空的 `?`/`#`。
+
 ## HTTP 辅助
 
 上传表单直接从请求读取；客户端上传用 `HttpMultipartWriter` 生成同样的 body：
