@@ -197,6 +197,7 @@ begin
   Println('  ' + exeName + ' package init [dir] [--bin|--lib]           create package.fun and a template');
   Println('  ' + exeName + ' run [args]                              run the package bin');
   Println('  ' + exeName + ' test                                    run the package tests');
+  Println('  ' + exeName + ' explain <symbol|topic>                   look up a language or stdlib name');
 {$EndIf}
   Println('');
 end;

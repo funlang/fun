@@ -5,7 +5,7 @@ It is not a second manual. It is the machine-facing projection of the manual,
 the grammar, the standard library, the regression suite and the pitfalls that
 models actually hit.
 
-Status: **seed (v0.1.0)**. 71 concepts, 70 executed examples, 119 indexed
+Status: **seed (v0.1.0)**. 76 concepts, 89 executed examples, 119 indexed
 stdlib modules, zero stale relations. The design rationale is in
 [`docs/ai-ontology.md`](../docs/ai-ontology.md) and
 [`docs/ai-ontology.zh.md`](../docs/ai-ontology.zh.md).
@@ -32,6 +32,7 @@ ontology/
   data/fun.ontology.fd            source of truth (FD, commented)
   tools/ontology.fun              loader, search, context compiler
   tools/build.fun                 validate + project + execute examples
+  tools/explain.fun               symbol/topic lookup (ontology + stdlib)
   tools/mcp-server.fun            MCP stdio server
   bench/                          FunBench seed (5 tasks, 10 tests)
   dist/                           generated, safe to delete
@@ -55,6 +56,7 @@ From the repository root:
 ```text
 fun ontology/tools/build.fun              # validate and write dist/
 fun ontology/tools/build.fun --check      # execute every example
+fun ontology/tools/explain.fun json       # one symbol or topic
 fun ontology/tools/mcp-server.fun         # MCP server over stdio
 fun ontology/bench/run.fun --all          # reference solutions: 10/10
 ```
@@ -62,11 +64,16 @@ fun ontology/bench/run.fun --all          # reference solutions: 10/10
 Typical output:
 
 ```text
-ontology: 71 concepts, v0.1.0
+ontology: 76 concepts, v0.1.0
 ontology: relations OK
 ontology: wrote ontology/dist
-examples: 70 run, 0 failed
+examples: 89 run, 0 failed
 ```
+
+`fun explain <symbol-or-topic>` is the same lookup at the binary level. It
+prints ranked concepts with runnable cards, then matching stdlib modules and
+exports; the wrapper forwards to `ontology/tools/explain.fun` in the source
+tree.
 
 ## Using the projections
 
