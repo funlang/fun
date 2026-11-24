@@ -14,11 +14,11 @@ Fun 9.5.7, ontology v0.1.0.
 - `f = a -> a * 2;` (syntax.lambda): The arrow forms `a -> expr` and `(a, b) -> expr` return an expression. For a block body use `fun (a, b) { ... }` with `return` or `result`; a bare `{ ... }` is a zero-argument block function.
 - `if c then ... end if; / if c { ... }` (syntax.if): The form `if c then ... elsif c2 then ... else ... end if;` supports branches. The shorthand `if c { ... }` is a single branch only and takes no `elsif` or `else`.
 - `case x is when 1 do ... else ... end case;` (syntax.case): The form `case expr is when v do ... else ... end case;` matches values.
-- `for i = 1 to 3 do ... end do;` (syntax.loop): Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c { ... }` and `for ... { ... }` are shorthands. `next when c;` skips.
+- `for i = 1 to 3 do ... end do;` (syntax.loop): Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c loop ... end loop;` and `for ... loop ... end loop;` are accepted equivalents; `while c { ... }` and `for ... { ... }` are single-block shorthands. `next when c;` skips.
 - `try ... except ... end try;` (syntax.try): The form `try ... except ... finally ... end try;` catches `raise` and runtime errors. `runtime.lastError()` exposes message, file, line and stack.
 - `class C(x) var x = x; fun get() result = x; end fun; end class;` (syntax.class): A `class Name(params) ... end class;` body runs as the constructor; `var` fields become members, `fun` declarations become methods, `this` is the instance and `base` the parent. Inherit with `class Child = Parent()`.
 - `use 'lib-set.fun';` (syntax.use): The statement `use 'lib-set.fun';` links a module by file name; `use 'x.fun' as ns;` namespaces it. Paths resolve relative to the script and the runtime `lib/` directory.
-- `var xs = [1,2]; var m = new [a: 1];` (syntax.collection): A list literal `[1, 2, 3]` is a list. `new [k: v]` is a string-keyed map (called a set in Fun). Both support `@count`, `@has`, `@add`, and JSON conversion.
+- `var xs = [1,2]; var m = new [a: 1];` (syntax.collection): A list literal `[1, 2, 3]` is a list. `new [k: v]` is a string-keyed map (called a set in Fun); `new []` is an empty map, while `new [1, 2]` builds a fresh list. Both support `@count`, `@has`, `@add`, and JSON conversion.
 - `obj.key / obj['key'] / a?.k?` (syntax.member): Forms `obj.key`, `obj['key']` and `obj.['1']` read members; a missing member compares equal to nil. Postfix `?` makes a member or its base optional: `x?.k?`.
 - `value.@builtin(); obj.userMethod();` (syntax.method): Engine-provided methods use `@`: `x.@toJson()`, `s.@count()`, `m.@('group')`. Methods you write in a class are called without `@`.
 - `xs | map(f) | filter(p)` (syntax.pipe): The pipe `value | f` passes the value as the last argument of `f`. `map(f)` takes the list last, so it composes; `filter(list, f)` takes the list first, so call it directly.
@@ -59,7 +59,7 @@ Fun 9.5.7, ontology v0.1.0.
 - `a = 1; b = 2;` (pit.newline-is-not-a-statement): A newline is whitespace. Put `;` between statements; a continuation line can silently join the previous expression.
 - `'a\nb'.escape()` (pit.backslash-escape): The literal `'\n'` is a backslash followed by `n`, not a newline. Call `.escape()` to decode it, or use `10.toChar()` or a multiline backtick string.
 - `m.@has('k')` (pit.missing-key-accumulate): A missing value compares equal to nil and to 0, so `if x = 0` cannot tell "absent" from "zero". Use `.@has(key)` when presence matters.
-- `[1,2,3] / new [k: v]` (pit.array-vs-map): A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map. Do not use `{}` for either.
+- `[1,2,3] / new [k: v]` (pit.array-vs-map): A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map and `new []` is an empty map, but `new [1, 2]` is a list. Do not use `{}` for either.
 - `result = expr; or return expr;` (pit.return-keyword): Inside `fun`, assigning `result` sets the return value; `return expr;` returns immediately. A bare `return;` returns the current `result`, which may be stale.
 
 ## Tooling

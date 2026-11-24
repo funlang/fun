@@ -116,7 +116,7 @@ True
 
 ## [] is a list, new [] is a map (pit.array-vs-map)
 
-A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map. Do not use `{}` for either.
+A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map and `new []` is an empty map, but `new [1, 2]` is a list. Do not use `{}` for either.
 
 - Do not: `[1,2,3] / new [k: v]`
 
@@ -131,6 +131,20 @@ Output:
 ```text
 20
 10
+```
+
+```fun
+var m = new [];
+m.k = 1;
+?. m.@toJson();
+var xs = new [1, 2];
+?. xs.@toJson();
+```
+Output:
+
+```text
+[k:1]
+[1,2]
 ```
 
 ## result vs return (pit.return-keyword)

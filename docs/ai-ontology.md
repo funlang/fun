@@ -56,7 +56,7 @@ standard library, the regression suite, the docs and changelog, the platform
 capability matrix. The rule is: the ontology does not duplicate facts, it
 cites them.
 
-**L1 graph** currently has 71 concepts: constructs, semantics, built-ins,
+**L1 graph** currently has 78 concepts: constructs, semantics, built-ins,
 modules, idioms, pitfalls, tools, platforms and tasks. Types drive projection
 and ranking; levels drive token budgets; edges drive expansion.
 
@@ -153,7 +153,7 @@ caching.
 
 ## 7. Roadmap
 
-- **M0 (this change)**: 71 concepts, 70 executed examples, validator, cards,
+- **M0 (this change)**: 78 concepts, 93 executed examples, validator, cards,
   `llms.txt`, JSON-LD, MCP server, a 119-module stdlib index, and a 5-task
   FunBench seed.
 - **M1 (in progress)**: the stdlib index and `stdlib_search` exist; next are

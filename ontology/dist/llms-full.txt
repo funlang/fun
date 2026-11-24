@@ -241,7 +241,7 @@ two
 
 ### Loops (`syntax.loop`)
 
-Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c { ... }` and `for ... { ... }` are shorthands. `next when c;` skips.
+Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c loop ... end loop;` and `for ... loop ... end loop;` are accepted equivalents; `while c { ... }` and `for ... { ... }` are single-block shorthands. `next when c;` skips.
 
 Transfer: js `for (let i = 0; i < n; i++) {}`; py `for i in range(n):`;
 
@@ -268,6 +268,22 @@ var i = 0;
 while i < 2 { i += 1; }
 ?. i;
 for j = 1 to 2 { ?. j; }
+```
+Expected output:
+```text
+2
+1
+2
+```
+```fun
+var i = 0;
+while i < 2 loop
+  i += 1;
+end loop;
+?. i;
+for j = 1 to 2 loop
+  ?. j;
+end loop;
 ```
 Expected output:
 ```text
@@ -482,7 +498,7 @@ Expected output:
 
 ### Lists and maps (`syntax.collection`)
 
-A list literal `[1, 2, 3]` is a list. `new [k: v]` is a string-keyed map (called a set in Fun). Both support `@count`, `@has`, `@add`, and JSON conversion.
+A list literal `[1, 2, 3]` is a list. `new [k: v]` is a string-keyed map (called a set in Fun); `new []` is an empty map, while `new [1, 2]` builds a fresh list. Both support `@count`, `@has`, `@add`, and JSON conversion.
 
 Transfer: js `[1, 2]; {a: 1}`; py `[1, 2]; {'a': 1}`; c `int a[2] = {1, 2};`;
 
@@ -550,6 +566,42 @@ Expected output:
 ```text
 3
 [1,2,3]
+```
+
+### By-reference arguments (`syntax.ref-arg`)
+
+At the call site `f(var x)` passes a variable by reference, so assignments in `f` update the caller. The declaration stays `fun f(x)`; only the call adds `var`.
+
+Transfer: js `no direct equivalent; objects are shared, rebinding is local`; py `no direct equivalent; rebinding is local`; c `f(&x)`;
+
+```fun
+fun bump(x)
+  x += 1;
+end fun;
+var n = 1;
+bump(var n);
+?. n;
+```
+Expected output:
+```text
+2
+```
+
+### Time literals (`syntax.time`)
+
+A time literal is `@'YYYY-MM-DD'` or `@'YYYY-MM-DD HH:MM:SS'`; its type is 7. Use `.format(pattern)` for a stable string: the default text is short, with the year last.
+
+Transfer: js `new Date('2026-11-24')`; py `datetime.date(2026, 11, 24)`;
+
+```fun
+var d = @'2026-11-24 12:34:56';
+?. d.type();
+?. d.format('yyyy-MM-dd');
+```
+Expected output:
+```text
+7
+2026-11-24
 ```
 
 ### Pipe (`syntax.pipe`)
@@ -1315,7 +1367,7 @@ True
 
 ### [] is a list, new [] is a map (`pit.array-vs-map`)
 
-A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map. Do not use `{}` for either.
+A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map and `new []` is an empty map, but `new [1, 2]` is a list. Do not use `{}` for either.
 
 Transfer: js `[] / {}`; py `[] / {}`;
 
@@ -1329,6 +1381,18 @@ Expected output:
 ```text
 20
 10
+```
+```fun
+var m = new [];
+m.k = 1;
+?. m.@toJson();
+var xs = new [1, 2];
+?. xs.@toJson();
+```
+Expected output:
+```text
+[k:1]
+[1,2]
 ```
 
 ### result vs return (`pit.return-keyword`)

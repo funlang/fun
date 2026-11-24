@@ -5,7 +5,7 @@ It is not a second manual. It is the machine-facing projection of the manual,
 the grammar, the standard library, the regression suite and the pitfalls that
 models actually hit.
 
-Status: **seed (v0.1.0)**. 76 concepts, 89 executed examples, 119 indexed
+Status: **seed (v0.1.0)**. 78 concepts, 93 executed examples, 119 indexed
 stdlib modules, zero stale relations. The design rationale is in
 [`docs/ai-ontology.md`](../docs/ai-ontology.md) and
 [`docs/ai-ontology.zh.md`](../docs/ai-ontology.zh.md).
@@ -64,10 +64,10 @@ fun ontology/bench/run.fun --all          # reference solutions: 10/10
 Typical output:
 
 ```text
-ontology: 76 concepts, v0.1.0
+ontology: 78 concepts, v0.1.0
 ontology: relations OK
 ontology: wrote ontology/dist
-examples: 89 run, 0 failed
+examples: 93 run, 0 failed
 ```
 
 `fun explain <symbol-or-topic>` is the same lookup at the binary level. It

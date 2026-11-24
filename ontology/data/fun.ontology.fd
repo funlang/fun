@@ -389,7 +389,7 @@ end case;
     id syntax.loop
     type construct
     name Loops
-    summary Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c { ... }` and `for ... { ... }` are shorthands. `next when c;` skips.
+    summary Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c loop ... end loop;` and `for ... loop ... end loop;` are accepted equivalents; `while c { ... }` and `for ... { ... }` are single-block shorthands. `next when c;` skips.
     level 0
     tags
       - core
@@ -433,6 +433,20 @@ end loop;
 while i < 2 { i += 1; }
 ?. i;
 for j = 1 to 2 { ?. j; }
+`
+        expect `2
+1
+2
+`
+      -
+        code `var i = 0;
+while i < 2 loop
+  i += 1;
+end loop;
+?. i;
+for j = 1 to 2 loop
+  ?. j;
+end loop;
 `
         expect `2
 1
@@ -750,7 +764,7 @@ var xs = [1, 2, 3];
     id syntax.collection
     type construct
     name Lists and maps
-    summary A list literal `[1, 2, 3]` is a list. `new [k: v]` is a string-keyed map (called a set in Fun). Both support `@count`, `@has`, `@add`, and JSON conversion.
+    summary A list literal `[1, 2, 3]` is a list. `new [k: v]` is a string-keyed map (called a set in Fun); `new []` is an empty map, while `new [1, 2]` builds a fresh list. Both support `@count`, `@has`, `@add`, and JSON conversion.
     level 0
     tags
       - core
@@ -865,6 +879,71 @@ one
 `
         expect `3
 [1,2,3]
+`
+
+  -
+    id syntax.ref-arg
+    type construct
+    name By-reference arguments
+    summary At the call site `f(var x)` passes a variable by reference, so assignments in `f` update the caller. The declaration stays `fun f(x)`; only the call adds `var`.
+    level 2
+    tags
+      - core
+      - function
+    card `f(var x);`
+    intent
+      - by reference
+      - out parameter
+      - var argument
+      - 引用参数
+    from
+      js `no direct equivalent; objects are shared, rebinding is local`
+      py `no direct equivalent; rebinding is local`
+      c `f(&x)`
+    relations
+      seeAlso
+        - syntax.function
+    examples
+      -
+        code `fun bump(x)
+  x += 1;
+end fun;
+var n = 1;
+bump(var n);
+?. n;
+`
+        expect `2
+`
+
+  -
+    id syntax.time
+    type construct
+    name Time literals
+    summary A time literal is `@'YYYY-MM-DD'` or `@'YYYY-MM-DD HH:MM:SS'`; its type is 7. Use `.format(pattern)` for a stable string: the default text is short, with the year last.
+    level 2
+    tags
+      - core
+      - data
+    card `var d = @'2026-11-24'; d.format('yyyy-MM-dd');`
+    intent
+      - date
+      - time
+      - 时间
+      - 日期
+    from
+      js `new Date('2026-11-24')`
+      py `datetime.date(2026, 11, 24)`
+    relations
+      seeAlso
+        - sem.type
+    examples
+      -
+        code `var d = @'2026-11-24 12:34:56';
+?. d.type();
+?. d.format('yyyy-MM-dd');
+`
+        expect `7
+2026-11-24
 `
 
   -
@@ -1781,7 +1860,7 @@ True
     id pit.array-vs-map
     type pitfall
     name [] is a list, new [] is a map
-    summary A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map. Do not use `{}` for either.
+    summary A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map and `new []` is an empty map, but `new [1, 2]` is a list. Do not use `{}` for either.
     level 0
     tags
       - pitfall
@@ -1807,6 +1886,16 @@ var m = new [a: 10];
 `
         expect `20
 10
+`
+      -
+        code `var m = new [];
+m.k = 1;
+?. m.@toJson();
+var xs = new [1, 2];
+?. xs.@toJson();
+`
+        expect `[k:1]
+[1,2]
 `
 
   -

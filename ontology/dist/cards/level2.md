@@ -89,7 +89,7 @@ case x is
   else ?. 'other';
 end case;
 ```
-- `for i = 1 to 3 do ... end do;` (syntax.loop): Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c { ... }` and `for ... { ... }` are shorthands. `next when c;` skips.
+- `for i = 1 to 3 do ... end do;` (syntax.loop): Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c loop ... end loop;` and `for ... loop ... end loop;` are accepted equivalents; `while c { ... }` and `for ... { ... }` are single-block shorthands. `next when c;` skips.
 
 ```fun
 var total = 0;
@@ -171,7 +171,7 @@ use 'lib-set.fun';
 var xs = [1, 2, 3];
 ?. (xs | map(a -> a * 2)).@toJson();
 ```
-- `var xs = [1,2]; var m = new [a: 1];` (syntax.collection): A list literal `[1, 2, 3]` is a list. `new [k: v]` is a string-keyed map (called a set in Fun). Both support `@count`, `@has`, `@add`, and JSON conversion.
+- `var xs = [1,2]; var m = new [a: 1];` (syntax.collection): A list literal `[1, 2, 3]` is a list. `new [k: v]` is a string-keyed map (called a set in Fun); `new []` is an empty map, while `new [1, 2]` builds a fresh list. Both support `@count`, `@has`, `@add`, and JSON conversion.
 
 ```fun
 var xs = [1, 2, 3];
@@ -198,6 +198,23 @@ var none = nil;
 var xs = [1, 2, 3];
 ?. xs.@count();
 ?. xs.@toJson();
+```
+- `f(var x);` (syntax.ref-arg): At the call site `f(var x)` passes a variable by reference, so assignments in `f` update the caller. The declaration stays `fun f(x)`; only the call adds `var`.
+
+```fun
+fun bump(x)
+  x += 1;
+end fun;
+var n = 1;
+bump(var n);
+?. n;
+```
+- `var d = @'2026-11-24'; d.format('yyyy-MM-dd');` (syntax.time): A time literal is `@'YYYY-MM-DD'` or `@'YYYY-MM-DD HH:MM:SS'`; its type is 7. Use `.format(pattern)` for a stable string: the default text is short, with the year last.
+
+```fun
+var d = @'2026-11-24 12:34:56';
+?. d.type();
+?. d.format('yyyy-MM-dd');
 ```
 - `xs | map(f) | filter(p)` (syntax.pipe): The pipe `value | f` passes the value as the last argument of `f`. `map(f)` takes the list last, so it composes; `filter(list, f)` takes the list first, so call it directly.
 
@@ -558,7 +575,7 @@ var m = new [];
 m.k = 0;
 ?. m.@has('k');
 ```
-- `[1,2,3] / new [k: v]` (pit.array-vs-map): A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map. Do not use `{}` for either.
+- `[1,2,3] / new [k: v]` (pit.array-vs-map): A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map and `new []` is an empty map, but `new [1, 2]` is a list. Do not use `{}` for either.
 
 ```fun
 var xs = [10, 20];
