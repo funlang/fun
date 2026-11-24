@@ -9,7 +9,7 @@ Fun 9.5.7, ontology v0.1.0.
 ```fun
 ?. 'Hello, Fun!';
 ```
-- `stmt; block ... end block` (syntax.statement): Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional. Newlines are not statement boundaries.
+- `stmt; block ... end block` (syntax.statement): Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional, and the last statement before `}` may omit it. Newlines are not statement boundaries.
 
 ```fun
 var a = 1;
@@ -43,14 +43,14 @@ x = x + 2;
 ?. x = 3;
 ?. x <> 4;
 ```
-- `?. value;` (syntax.print): The `?.` operator prints with a newline, `?,` prints with a space, and `?:` prints with a tab. All three accept any value.
+- `? value; ?. value;` (syntax.print): Bare `?` prints with no separator, `?.` with a newline, `?,` with a space, and `?:` with a tab. All four accept any value.
 
 ```fun
 ?, 'a';
 ?: 'b';
 ?. 'c';
 ```
-- `fun f(a, b) result = a + b; end fun;` (syntax.function): A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. `result` is not reset on entry, so initialize it explicitly.
+- `fun f(a, b) result = a + b; end fun;` (syntax.function): A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. A one-expression function can also be written `var name(a, b) = expr;`. `result` is not reset on entry, so initialize it explicitly.
 
 ```fun
 fun add(a, b)
@@ -58,7 +58,7 @@ fun add(a, b)
 end fun;
 ?. add(2, 3);
 ```
-- `f = a -> a * 2;` (syntax.lambda): A lambda `a -> expr` takes one argument; `(a, b) -> expr` takes several. A braced body is a block that must assign `result`.
+- `f = a -> a * 2;` (syntax.lambda): The arrow forms `a -> expr` and `(a, b) -> expr` return an expression. For a block body use `fun (a, b) { ... }` with `return` or `result`; a bare `{ ... }` is a zero-argument block function.
 
 ```fun
 use 'lib-set.fun';
@@ -67,7 +67,7 @@ var f = a -> a * 2;
 var nums = [1, 2, 3];
 ?. (nums | map(a -> a + 1)).@toJson();
 ```
-- `if c then ... elsif c2 then ... else ... end if;` (syntax.if): The form `if c then ... elsif c2 then ... else ... end if;` uses Fun truthiness; use explicit comparisons for clarity.
+- `if c then ... end if; / if c { ... }` (syntax.if): The form `if c then ... elsif c2 then ... else ... end if;` supports branches. The shorthand `if c { ... }` is a single branch only and takes no `elsif` or `else`.
 
 ```fun
 var n = 2;
@@ -89,7 +89,7 @@ case x is
   else ?. 'other';
 end case;
 ```
-- `for i = 1 to 3 do ... end do;` (syntax.loop): Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `next when c;` skips.
+- `for i = 1 to 3 do ... end do;` (syntax.loop): Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c { ... }` and `for ... { ... }` are shorthands. `next when c;` skips.
 
 ```fun
 var total = 0;
@@ -103,6 +103,45 @@ loop
   exit when m >= 2;
 end loop;
 ?. m;
+```
+- `if c { ... } / while c { ... } / for ... { ... }` (syntax.brace-block): The forms `if c { ... }`, `while c { ... }` and `for ... { ... }` are shorthand for a single block. The brace `if` takes no `elsif` or `else`; use `then ... end if` when you need branches.
+
+```fun
+var n = 2;
+if n = 2 { ?. 'if'; }
+```
+- `for v, i in xs / for k: v, i in map` (syntax.for-in): Four forms: `for v in xs` gives the value, `for v, i in xs` gives value and index, `for k: v in map` gives key and value, and `for k: v, i in map` adds the index. Numeric `for` accepts `step`.
+
+```fun
+var xs = ['a', 'b'];
+for v in xs do ?. v; end do;
+for v, i in xs do ?. v & i; end do;
+var m = new [a: 1, b: 2];
+for k: v, i in m do ?. k & v & i; end do;
+```
+- `exit when c; next when c;` (syntax.loop-control): The commands `exit` and `next` leave the innermost loop or skip to the next iteration. Add `when c` to make either conditional.
+
+```fun
+var n = 0;
+loop
+  n += 1;
+  next when n = 1;
+  exit when n >= 3;
+end loop;
+?. n;
+```
+- `^ div mod in bit and/or/xor << >>` (syntax.operators): Arithmetic `+ - * / ^ div mod`; comparison `= <> != < <= > >=`; logic `and or not`; string `&`; membership `in`; bitwise `bit and/or/xor`, `bit not`, `<< >>`; regex `=~ !~`. `^` is power, and `div`/`mod` are integer division and remainder.
+
+```fun
+?. (2 ^ 3);
+?. (7 div 2);
+?. (7 mod 2);
+?. (2 in [1, 2, 3]);
+?. (6 bit and 3);
+?. (6 bit or 3);
+?. (6 bit xor 3);
+?. (1 << 3);
+?. (8 >> 2);
 ```
 - `try ... except ... end try;` (syntax.try): The form `try ... except ... finally ... end try;` catches `raise` and runtime errors. `runtime.lastError()` exposes message, file, line and stack.
 

@@ -20,7 +20,7 @@ Hello, Fun!
 
 ### Statements and semicolons (`syntax.statement`)
 
-Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional. Newlines are not statement boundaries.
+Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional, and the last statement before `}` may omit it. Newlines are not statement boundaries.
 
 Transfer: js `statement;`; py `one statement per line (Fun does not use indentation)`;
 
@@ -44,6 +44,15 @@ Expected output:
 ```text
 ok
 done
+```
+```fun
+var z = 0;
+if true { z = 1 }
+?. z;
+```
+Expected output:
+```text
+1
 ```
 
 ### Comments (`syntax.comment`)
@@ -104,7 +113,7 @@ True
 
 ### Print and output (`syntax.print`)
 
-The `?.` operator prints with a newline, `?,` prints with a space, and `?:` prints with a tab. All three accept any value.
+Bare `?` prints with no separator, `?.` with a newline, `?,` with a space, and `?:` with a tab. All four accept any value.
 
 Transfer: js `console.log(value)`; py `print(value)`; c `printf("%v\n", value);`;
 
@@ -117,10 +126,19 @@ Expected output:
 ```text
 a b	c
 ```
+```fun
+? 'A';
+? 'B';
+?. '';
+```
+Expected output:
+```text
+AB
+```
 
 ### Named functions (`syntax.function`)
 
-A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. `result` is not reset on entry, so initialize it explicitly.
+A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. A one-expression function can also be written `var name(a, b) = expr;`. `result` is not reset on entry, so initialize it explicitly.
 
 Transfer: js `function f(a, b) { return a + b; }`; py `def f(a, b): return a + b`; c `int f(int a, int b) { return a + b; }`;
 
@@ -134,10 +152,18 @@ Expected output:
 ```text
 5
 ```
+```fun
+var add(a, b) = a + b;
+?. add(2, 3);
+```
+Expected output:
+```text
+5
+```
 
 ### Lambdas (`syntax.lambda`)
 
-A lambda `a -> expr` takes one argument; `(a, b) -> expr` takes several. A braced body is a block that must assign `result`.
+The arrow forms `a -> expr` and `(a, b) -> expr` return an expression. For a block body use `fun (a, b) { ... }` with `return` or `result`; a bare `{ ... }` is a zero-argument block function.
 
 Transfer: js `a => a * 2`; py `lambda a: a * 2`;
 
@@ -153,10 +179,21 @@ Expected output:
 6
 [2,3,4]
 ```
+```fun
+var g = fun (a, b) { return a * b; };
+?. g(2, 3);
+var h = { return 9; };
+?. h();
+```
+Expected output:
+```text
+6
+9
+```
 
 ### Conditionals (`syntax.if`)
 
-The form `if c then ... elsif c2 then ... else ... end if;` uses Fun truthiness; use explicit comparisons for clarity.
+The form `if c then ... elsif c2 then ... else ... end if;` supports branches. The shorthand `if c { ... }` is a single branch only and takes no `elsif` or `else`.
 
 Transfer: js `if (c) { } else { }`; py `if c: ... else: ...`;
 
@@ -169,6 +206,14 @@ elsif n = 2 then
 else
   ?. 'other';
 end if;
+```
+Expected output:
+```text
+two
+```
+```fun
+var n = 2;
+if n = 2 { ?. 'two'; }
 ```
 Expected output:
 ```text
@@ -196,7 +241,7 @@ two
 
 ### Loops (`syntax.loop`)
 
-Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `next when c;` skips.
+Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c { ... }` and `for ... { ... }` are shorthands. `next when c;` skips.
 
 Transfer: js `for (let i = 0; i < n; i++) {}`; py `for i in range(n):`;
 
@@ -218,6 +263,131 @@ Expected output:
 6
 2
 ```
+```fun
+var i = 0;
+while i < 2 { i += 1; }
+?. i;
+for j = 1 to 2 { ?. j; }
+```
+Expected output:
+```text
+2
+1
+2
+```
+
+### Brace blocks (`syntax.brace-block`)
+
+The forms `if c { ... }`, `while c { ... }` and `for ... { ... }` are shorthand for a single block. The brace `if` takes no `elsif` or `else`; use `then ... end if` when you need branches.
+
+Transfer: js `if (c) { }`; py `if c: ...`;
+
+```fun
+var n = 2;
+if n = 2 { ?. 'if'; }
+```
+Expected output:
+```text
+if
+```
+```fun
+var i = 0;
+while i < 2 { i += 1; }
+?. i;
+```
+Expected output:
+```text
+2
+```
+```fun
+for j = 1 to 2 { ?. j; }
+```
+Expected output:
+```text
+1
+2
+```
+
+### for-in forms (`syntax.for-in`)
+
+Four forms: `for v in xs` gives the value, `for v, i in xs` gives value and index, `for k: v in map` gives key and value, and `for k: v, i in map` adds the index. Numeric `for` accepts `step`.
+
+Transfer: js `for (const [i, v] of xs.entries())`; py `for i, v in enumerate(xs)`;
+
+```fun
+var xs = ['a', 'b'];
+for v in xs do ?. v; end do;
+for v, i in xs do ?. v & i; end do;
+var m = new [a: 1, b: 2];
+for k: v, i in m do ?. k & v & i; end do;
+```
+Expected output:
+```text
+a
+b
+a0
+b1
+a10
+b21
+```
+```fun
+for j = 1 to 3 step 2 do ?. j; end do;
+```
+Expected output:
+```text
+1
+3
+```
+
+### exit and next (`syntax.loop-control`)
+
+The commands `exit` and `next` leave the innermost loop or skip to the next iteration. Add `when c` to make either conditional.
+
+Transfer: js `break; continue;`; py `break; continue`;
+
+```fun
+var n = 0;
+loop
+  n += 1;
+  next when n = 1;
+  exit when n >= 3;
+end loop;
+?. n;
+```
+Expected output:
+```text
+3
+```
+
+### Operators (`syntax.operators`)
+
+Arithmetic `+ - * / ^ div mod`; comparison `= <> != < <= > >=`; logic `and or not`; string `&`; membership `in`; bitwise `bit and/or/xor`, `bit not`, `<< >>`; regex `=~ !~`. `^` is power, and `div`/`mod` are integer division and remainder.
+
+Transfer: js `** % & | ^ << >>`; py `** // % & | ^ << >>`;
+
+```fun
+?. (2 ^ 3);
+?. (7 div 2);
+?. (7 mod 2);
+?. (2 in [1, 2, 3]);
+?. (6 bit and 3);
+?. (6 bit or 3);
+?. (6 bit xor 3);
+?. (1 << 3);
+?. (8 >> 2);
+```
+Expected output:
+```text
+8
+3
+1
+True
+2
+7
+5
+8
+2
+```
 
 ### Errors (`syntax.try`)
 
@@ -235,6 +405,18 @@ end try;
 Expected output:
 ```text
 caught
+```
+```fun
+try
+  ?. 'body';
+finally
+  ?. 'cleanup';
+end try;
+```
+Expected output:
+```text
+body
+cleanup
 ```
 
 ### Classes (`syntax.class`)
@@ -258,6 +440,21 @@ Expected output:
 5
 2
 ```
+```fun
+class Animal(name)
+  var name = name;
+  fun speak() result = name & ' makes a sound'; end fun;
+end class;
+class Dog = Animal()
+  fun speak() result = base.speak() & ' woof'; end fun;
+end class;
+var d = Dog('Rex');
+?. d.speak();
+```
+Expected output:
+```text
+Rex makes a sound woof
+```
 
 ### Modules (`syntax.use`)
 
@@ -273,6 +470,14 @@ var xs = [1, 2, 3];
 Expected output:
 ```text
 [2,4,6]
+```
+```fun
+use 'lib-set.fun' as s;
+?. s.filter([1, 2, 3], a -> a > 1).@toJson();
+```
+Expected output:
+```text
+[2,3]
 ```
 
 ### Lists and maps (`syntax.collection`)
@@ -318,6 +523,16 @@ Ada
 Ada
 True
 True
+```
+```fun
+var m = new ['1': 'one'];
+?. m['1'] = nil;
+?. m.['1'];
+```
+Expected output:
+```text
+True
+one
 ```
 
 ### Built-in methods (`syntax.method`)

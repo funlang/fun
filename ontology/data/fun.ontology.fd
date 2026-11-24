@@ -53,7 +53,7 @@ concepts
     id syntax.statement
     type construct
     name Statements and semicolons
-    summary Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional. Newlines are not statement boundaries.
+    summary Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional, and the last statement before `}` may omit it. Newlines are not statement boundaries.
     level 0
     tags
       - core
@@ -87,6 +87,13 @@ end if
 `
         expect `ok
 done
+`
+      -
+        code `var z = 0;
+if true { z = 1 }
+?. z;
+`
+        expect `1
 `
 
   -
@@ -190,12 +197,12 @@ True
     id syntax.print
     type construct
     name Print and output
-    summary The `?.` operator prints with a newline, `?,` prints with a space, and `?:` prints with a tab. All three accept any value.
+    summary Bare `?` prints with no separator, `?.` with a newline, `?,` with a space, and `?:` with a tab. All four accept any value.
     level 0
     tags
       - core
       - io
-    card `?. value;`
+    card `? value; ?. value;`
     intent
       - print
       - output
@@ -218,12 +225,19 @@ True
 `
         expect `a b	c
 `
+      -
+        code `? 'A';
+? 'B';
+?. '';
+`
+        expect `AB
+`
 
   -
     id syntax.function
     type construct
     name Named functions
-    summary A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. `result` is not reset on entry, so initialize it explicitly.
+    summary A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. A one-expression function can also be written `var name(a, b) = expr;`. `result` is not reset on entry, so initialize it explicitly.
     level 0
     tags
       - core
@@ -252,12 +266,18 @@ end fun;
 `
         expect `5
 `
+      -
+        code `var add(a, b) = a + b;
+?. add(2, 3);
+`
+        expect `5
+`
 
   -
     id syntax.lambda
     type construct
     name Lambdas
-    summary A lambda `a -> expr` takes one argument; `(a, b) -> expr` takes several. A braced body is a block that must assign `result`.
+    summary The arrow forms `a -> expr` and `(a, b) -> expr` return an expression. For a block body use `fun (a, b) { ... }` with `return` or `result`; a bare `{ ... }` is a zero-argument block function.
     level 0
     tags
       - core
@@ -285,17 +305,26 @@ var nums = [1, 2, 3];
         expect `6
 [2,3,4]
 `
+      -
+        code `var g = fun (a, b) { return a * b; };
+?. g(2, 3);
+var h = { return 9; };
+?. h();
+`
+        expect `6
+9
+`
 
   -
     id syntax.if
     type construct
     name Conditionals
-    summary The form `if c then ... elsif c2 then ... else ... end if;` uses Fun truthiness; use explicit comparisons for clarity.
+    summary The form `if c then ... elsif c2 then ... else ... end if;` supports branches. The shorthand `if c { ... }` is a single branch only and takes no `elsif` or `else`.
     level 0
     tags
       - core
       - control
-    card `if c then ... elsif c2 then ... else ... end if;`
+    card `if c then ... end if; / if c { ... }`
     intent
       - if
       - condition
@@ -306,6 +335,7 @@ var nums = [1, 2, 3];
     relations
       seeAlso
         - syntax.case
+        - syntax.brace-block
     examples
       -
         code `var n = 2;
@@ -316,6 +346,12 @@ elsif n = 2 then
 else
   ?. 'other';
 end if;
+`
+        expect `two
+`
+      -
+        code `var n = 2;
+if n = 2 { ?. 'two'; }
 `
         expect `two
 `
@@ -353,7 +389,7 @@ end case;
     id syntax.loop
     type construct
     name Loops
-    summary Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `next when c;` skips.
+    summary Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c { ... }` and `for ... { ... }` are shorthands. `next when c;` skips.
     level 0
     tags
       - core
@@ -372,6 +408,9 @@ end case;
     relations
       seeAlso
         - syntax.collection
+        - syntax.for-in
+        - syntax.loop-control
+        - syntax.brace-block
     examples
       -
         code `var total = 0;
@@ -387,6 +426,193 @@ end loop;
 ?. m;
 `
         expect `6
+2
+`
+      -
+        code `var i = 0;
+while i < 2 { i += 1; }
+?. i;
+for j = 1 to 2 { ?. j; }
+`
+        expect `2
+1
+2
+`
+
+  -
+    id syntax.brace-block
+    type construct
+    name Brace blocks
+    summary The forms `if c { ... }`, `while c { ... }` and `for ... { ... }` are shorthand for a single block. The brace `if` takes no `elsif` or `else`; use `then ... end if` when you need branches.
+    level 1
+    tags
+      - core
+      - syntax
+      - control
+    card `if c { ... } / while c { ... } / for ... { ... }`
+    intent
+      - brace block
+      - shorthand
+      - 大括号
+      - 简写
+    from
+      js `if (c) { }`
+      py `if c: ...`
+    relations
+      seeAlso
+        - syntax.if
+        - syntax.loop
+        - syntax.statement
+    examples
+      -
+        code `var n = 2;
+if n = 2 { ?. 'if'; }
+`
+        expect `if
+`
+      -
+        code `var i = 0;
+while i < 2 { i += 1; }
+?. i;
+`
+        expect `2
+`
+      -
+        code `for j = 1 to 2 { ?. j; }
+`
+        expect `1
+2
+`
+
+  -
+    id syntax.for-in
+    type construct
+    name for-in forms
+    summary Four forms: `for v in xs` gives the value, `for v, i in xs` gives value and index, `for k: v in map` gives key and value, and `for k: v, i in map` adds the index. Numeric `for` accepts `step`.
+    level 1
+    tags
+      - core
+      - control
+      - data
+    card `for v, i in xs / for k: v, i in map`
+    intent
+      - iterate
+      - for in
+      - index
+      - key value
+      - 遍历
+      - 索引
+    from
+      js `for (const [i, v] of xs.entries())`
+      py `for i, v in enumerate(xs)`
+    relations
+      seeAlso
+        - syntax.loop
+        - syntax.brace-block
+    examples
+      -
+        code `var xs = ['a', 'b'];
+for v in xs do ?. v; end do;
+for v, i in xs do ?. v & i; end do;
+var m = new [a: 1, b: 2];
+for k: v, i in m do ?. k & v & i; end do;
+`
+        expect `a
+b
+a0
+b1
+a10
+b21
+`
+      -
+        code `for j = 1 to 3 step 2 do ?. j; end do;
+`
+        expect `1
+3
+`
+
+  -
+    id syntax.loop-control
+    type construct
+    name exit and next
+    summary The commands `exit` and `next` leave the innermost loop or skip to the next iteration. Add `when c` to make either conditional.
+    level 1
+    tags
+      - core
+      - control
+    card `exit when c; next when c;`
+    intent
+      - break
+      - continue
+      - exit
+      - next
+      - 跳出循环
+      - 继续
+    from
+      js `break; continue;`
+      py `break; continue`
+    relations
+      seeAlso
+        - syntax.loop
+    examples
+      -
+        code `var n = 0;
+loop
+  n += 1;
+  next when n = 1;
+  exit when n >= 3;
+end loop;
+?. n;
+`
+        expect `3
+`
+
+  -
+    id syntax.operators
+    type construct
+    name Operators
+    summary Arithmetic `+ - * / ^ div mod`; comparison `= <> != < <= > >=`; logic `and or not`; string `&`; membership `in`; bitwise `bit and/or/xor`, `bit not`, `<< >>`; regex `=~ !~`. `^` is power, and `div`/`mod` are integer division and remainder.
+    level 1
+    tags
+      - core
+      - syntax
+      - operators
+    card `^ div mod in bit and/or/xor << >>`
+    intent
+      - operator
+      - power
+      - modulo
+      - bitwise
+      - 运算符
+      - 位运算
+    from
+      js `** % & | ^ << >>`
+      py `** // % & | ^ << >>`
+    relations
+      seeAlso
+        - syntax.assignment
+        - syntax.pipe
+        - syntax.regex
+    examples
+      -
+        code `?. (2 ^ 3);
+?. (7 div 2);
+?. (7 mod 2);
+?. (2 in [1, 2, 3]);
+?. (6 bit and 3);
+?. (6 bit or 3);
+?. (6 bit xor 3);
+?. (1 << 3);
+?. (8 >> 2);
+`
+        expect `8
+3
+1
+True
+2
+7
+5
+8
 2
 `
 
@@ -420,6 +646,16 @@ except
 end try;
 `
         expect `caught
+`
+      -
+        code `try
+  ?. 'body';
+finally
+  ?. 'cleanup';
+end try;
+`
+        expect `body
+cleanup
 `
 
   -
@@ -458,6 +694,19 @@ var p = Point(2, 3);
         expect `5
 2
 `
+      -
+        code `class Animal(name)
+  var name = name;
+  fun speak() result = name & ' makes a sound'; end fun;
+end class;
+class Dog = Animal()
+  fun speak() result = base.speak() & ' woof'; end fun;
+end class;
+var d = Dog('Rex');
+?. d.speak();
+`
+        expect `Rex makes a sound woof
+`
 
   -
     id syntax.use
@@ -489,6 +738,12 @@ var xs = [1, 2, 3];
 ?. (xs | map(a -> a * 2)).@toJson();
 `
         expect `[2,4,6]
+`
+      -
+        code `use 'lib-set.fun' as s;
+?. s.filter([1, 2, 3], a -> a > 1).@toJson();
+`
+        expect `[2,3]
 `
 
   -
@@ -570,6 +825,14 @@ var none = nil;
 Ada
 True
 True
+`
+      -
+        code `var m = new ['1': 'one'];
+?. m['1'] = nil;
+?. m.['1'];
+`
+        expect `True
+one
 `
 
   -

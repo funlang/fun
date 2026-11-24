@@ -31,7 +31,7 @@ general Fun development
 
 ### Named functions (`syntax.function`)
 
-A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. `result` is not reset on entry, so initialize it explicitly.
+A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. A one-expression function can also be written `var name(a, b) = expr;`. `result` is not reset on entry, so initialize it explicitly.
 
 ```fun
 fun f(a, b) result = a + b; end fun;```
@@ -89,15 +89,11 @@ Transfer: js `console.log('Hello')`; py `print('Hello')`; c `puts("Hello");`;
 
 - `stmt; block ... end block` (syntax.statement)
 
-### Lambdas (`syntax.lambda`)
+- `f = a -> a * 2;` (syntax.lambda)
 
-A lambda `a -> expr` takes one argument; `(a, b) -> expr` takes several. A braced body is a block that must assign `result`.
+- `class C(x) var x = x; fun get() result = x; end fun; end class;` (syntax.class)
 
-```fun
-f = a -> a * 2;```
-
-Transfer: js `a => a * 2`; py `lambda a: a * 2`;
-
+- `use 'lib-set.fun';` (syntax.use)
 
 ## Pitfalls
 

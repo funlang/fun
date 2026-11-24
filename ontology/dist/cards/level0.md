@@ -5,16 +5,16 @@ Fun 9.5.7, ontology v0.1.0.
 ## Syntax
 
 - `?. 'Hello, Fun!';` (syntax.hello): A Fun script is a sequence of statements; `?.` prints a value and a newline.
-- `stmt; block ... end block` (syntax.statement): Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional. Newlines are not statement boundaries.
+- `stmt; block ... end block` (syntax.statement): Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional, and the last statement before `}` may omit it. Newlines are not statement boundaries.
 - `# line / // line / #* block #` (syntax.comment): Both `#` and `//` start a line comment. `#* ... #` is a block comment; the next `#` closes it.
 - `var x = expr;` (syntax.var): Declare with `var name = expr;` or `var name;` (nil). There is no `let` or `const`; identifiers are case-insensitive.
 - `x = value; if a = b then ...` (syntax.assignment): A statement `x = expr;` assigns; the same `=` inside an expression compares. `<>` and `!=` both mean not-equal. Compound assignment uses `+= -= *= &=`.
-- `?. value;` (syntax.print): The `?.` operator prints with a newline, `?,` prints with a space, and `?:` prints with a tab. All three accept any value.
-- `fun f(a, b) result = a + b; end fun;` (syntax.function): A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. `result` is not reset on entry, so initialize it explicitly.
-- `f = a -> a * 2;` (syntax.lambda): A lambda `a -> expr` takes one argument; `(a, b) -> expr` takes several. A braced body is a block that must assign `result`.
-- `if c then ... elsif c2 then ... else ... end if;` (syntax.if): The form `if c then ... elsif c2 then ... else ... end if;` uses Fun truthiness; use explicit comparisons for clarity.
+- `? value; ?. value;` (syntax.print): Bare `?` prints with no separator, `?.` with a newline, `?,` with a space, and `?:` with a tab. All four accept any value.
+- `fun f(a, b) result = a + b; end fun;` (syntax.function): A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. A one-expression function can also be written `var name(a, b) = expr;`. `result` is not reset on entry, so initialize it explicitly.
+- `f = a -> a * 2;` (syntax.lambda): The arrow forms `a -> expr` and `(a, b) -> expr` return an expression. For a block body use `fun (a, b) { ... }` with `return` or `result`; a bare `{ ... }` is a zero-argument block function.
+- `if c then ... end if; / if c { ... }` (syntax.if): The form `if c then ... elsif c2 then ... else ... end if;` supports branches. The shorthand `if c { ... }` is a single branch only and takes no `elsif` or `else`.
 - `case x is when 1 do ... else ... end case;` (syntax.case): The form `case expr is when v do ... else ... end case;` matches values.
-- `for i = 1 to 3 do ... end do;` (syntax.loop): Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `next when c;` skips.
+- `for i = 1 to 3 do ... end do;` (syntax.loop): Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `while c { ... }` and `for ... { ... }` are shorthands. `next when c;` skips.
 - `try ... except ... end try;` (syntax.try): The form `try ... except ... finally ... end try;` catches `raise` and runtime errors. `runtime.lastError()` exposes message, file, line and stack.
 - `class C(x) var x = x; fun get() result = x; end fun; end class;` (syntax.class): A `class Name(params) ... end class;` body runs as the constructor; `var` fields become members, `fun` declarations become methods, `this` is the instance and `base` the parent. Inherit with `class Child = Parent()`.
 - `use 'lib-set.fun';` (syntax.use): The statement `use 'lib-set.fun';` links a module by file name; `use 'x.fun' as ns;` namespaces it. Paths resolve relative to the script and the runtime `lib/` directory.
