@@ -146,6 +146,26 @@ s.run();                                             // or s.tick() in a loop
 - Callback errors are not actively reported without `onError`, but the failure
   statistics remain visible in `jobs()`.
 
+## URL parsing
+
+`lib-url` splits and rebuilds URLs without decoding components:
+
+```fun
+use 'lib-url.fun';
+
+var u = UrlParse('https://user:pass@example.com:8080/a/b?x=1#frag');
+u['scheme'];    // https
+u['host'];      // example.com
+u['port'];      // 8080
+u['path'];      // /a/b
+u['query'];     // x=1
+u['fragment'];  // frag
+UrlBuild(u);    // the same URL
+```
+
+Query and fragment are raw strings; use `PercentEncode`/`UrlEncode` when building
+components. `UrlBuild` accepts the same fields and preserves empty `?`/`#`.
+
 ## HTTP helpers
 
 Uploaded forms are available directly; `HttpMultipartWriter` builds the same

@@ -14,3 +14,33 @@ PASS two-byte UTF-8
 PASS high-bit byte
 PASS hex table independent of uuid
 PASS uuid still loads after lib-url
+PASS parse: scheme
+PASS parse: user
+PASS parse: password
+PASS parse: host
+PASS parse: port
+PASS parse: path
+PASS parse: query
+PASS parse: fragment
+PASS build: full round-trip
+PASS parse: relative
+PASS parse: relative parts
+PASS build: relative
+PASS parse: network path
+PASS build: network path
+PASS parse: mailto
+PASS parse: mailto path
+PASS build: mailto
+PASS parse: empty host
+PASS parse: file path
+PASS build: file
+PASS parse: ipv6
+PASS build: ipv6
+PASS parse: empty query
+PASS parse: empty fragment
+PASS build: empty delimiters
+PASS parse: keep percent text
+PASS build: keep percent text
+PASS parse: lower scheme only
+PASS parse: empty url
+PASS build: empty url
