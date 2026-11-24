@@ -36,20 +36,22 @@ Output:
 3
 ```
 
-## No backslash escapes (pit.backslash-escape)
+## Literals do not decode backslash escapes (pit.backslash-escape)
 
-The literal `'\n'` is a backslash followed by `n`, not a newline. Use `10.toChar()` or a multiline backtick string.
+The literal `'\n'` is a backslash followed by `n`, not a newline. Call `.escape()` to decode it, or use `10.toChar()` or a multiline backtick string.
 
-- Do not: `'a' & 10.toChar() & 'b'`
+- Do not: `'a\nb'.escape()`
 
 ```fun
 ?. 'a\nb'.length();
+?. 'a\nb'.escape().length();
 ?. ('a' & 10.toChar() & 'b').length();
 ```
 Output:
 
 ```text
 4
+3
 3
 ```
 

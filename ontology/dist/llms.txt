@@ -14,8 +14,8 @@ Ontology v0.1.0 for Fun 9.5.7.
 ## Core concepts
 
 - [syntax.hello](https://funlang.org/ontology/#syntax.hello): Hello world. A Fun script is a sequence of statements; `?.` prints a value and a newline.
-- [syntax.statement](https://funlang.org/ontology/#syntax.statement): Statements and semicolons. Statements end with `;`. Block closers (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) may omit the following `;`. Newlines are not statement boundaries.
-- [syntax.comment](https://funlang.org/ontology/#syntax.comment): Comments. Both `#` and `//` start a line comment. `#* ... *#` is a block comment.
+- [syntax.statement](https://funlang.org/ontology/#syntax.statement): Statements and semicolons. Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional. Newlines are not statement boundaries.
+- [syntax.comment](https://funlang.org/ontology/#syntax.comment): Comments. Both `#` and `//` start a line comment. `#* ... #` is a block comment; the next `#` closes it.
 - [syntax.var](https://funlang.org/ontology/#syntax.var): Variables. Declare with `var name = expr;` or `var name;` (nil). There is no `let` or `const`; identifiers are case-insensitive.
 - [syntax.assignment](https://funlang.org/ontology/#syntax.assignment): Assignment and equality. A statement `x = expr;` assigns; the same `=` inside an expression compares. `<>` and `!=` both mean not-equal. Compound assignment uses `+= -= *= &=`.
 - [syntax.print](https://funlang.org/ontology/#syntax.print): Print and output. The `?.` operator prints with a newline, `?,` prints with a space, and `?:` prints with a tab. All three accept any value.
@@ -31,7 +31,7 @@ Ontology v0.1.0 for Fun 9.5.7.
 - [syntax.member](https://funlang.org/ontology/#syntax.member): Member access. Forms `obj.key`, `obj['key']` and `obj.['1']` read members; a missing member compares equal to nil. Postfix `?` makes a member or its base optional: `x?.k?`.
 - [syntax.method](https://funlang.org/ontology/#syntax.method): Built-in methods. Engine-provided methods use `@`: `x.@toJson()`, `s.@count()`, `m.@('group')`. Methods you write in a class are called without `@`.
 - [syntax.pipe](https://funlang.org/ontology/#syntax.pipe): Pipe. The pipe `value | f` passes the value as the last argument of `f`. `map(f)` takes the list last, so it composes; `filter(list, f)` takes the list first, so call it directly.
-- [syntax.string](https://funlang.org/ontology/#syntax.string): Strings. Single, double and backtick quotes all delimit strings. There are no backslash escapes such as `\n`; use `10.toChar()` for a newline or a multiline backtick string. `$name` interpolation is done by `.eval()`.
+- [syntax.string](https://funlang.org/ontology/#syntax.string): Strings. Single, double and backtick quotes all delimit strings. Literals do not decode backslash escapes; call `.escape()` to decode `\n`, `\t`, etc., use `10.toChar()`, or use a multiline backtick string. `$name` interpolation is done by `.eval()`.
 - [syntax.regex](https://funlang.org/ontology/#syntax.regex): Regular expressions. Regex literals are `/pattern/flags`, `%pattern%flags` or `$'pattern'flags`. Use `=~` / `!~` to test, `.match()` to extract, `.replace()` to rewrite.
 - [syntax.json](https://funlang.org/ontology/#syntax.json): JSON. The built-in `value.@toJson()` emits JSON; `value.@toJson(json: true)` quotes keys. Parse with `text.getJson(json: true)`. `text.getJson(fd: true)` parses FD.
 - [syntax.fd](https://funlang.org/ontology/#syntax.fd): FD data. FD is Fun's indentation data notation: `key value` lines, `- item` lists, no braces. `text.getJson(fd: true)` parses it and `value.@toJson(fd: true)` emits it.
@@ -47,7 +47,7 @@ Ontology v0.1.0 for Fun 9.5.7.
 - [idiom.json-roundtrip](https://funlang.org/ontology/#idiom.json-roundtrip): JSON round trip. Parse with `.getJson(json: true)`, inspect with member access, emit with `.@toJson(json: true)`.
 - [pit.double-equals](https://funlang.org/ontology/#pit.double-equals): There is no ==. Use `=` for equality inside an expression, and `<>` or `!=` for inequality. `==` is not Fun.
 - [pit.newline-is-not-a-statement](https://funlang.org/ontology/#pit.newline-is-not-a-statement): Newlines do not end statements. A newline is whitespace. Put `;` between statements; a continuation line can silently join the previous expression.
-- [pit.backslash-escape](https://funlang.org/ontology/#pit.backslash-escape): No backslash escapes. The literal `'\n'` is a backslash followed by `n`, not a newline. Use `10.toChar()` or a multiline backtick string.
+- [pit.backslash-escape](https://funlang.org/ontology/#pit.backslash-escape): Literals do not decode backslash escapes. The literal `'\n'` is a backslash followed by `n`, not a newline. Call `.escape()` to decode it, or use `10.toChar()` or a multiline backtick string.
 - [pit.missing-key-accumulate](https://funlang.org/ontology/#pit.missing-key-accumulate): A missing value also equals zero. A missing value compares equal to nil and to 0, so `if x = 0` cannot tell "absent" from "zero". Use `.@has(key)` when presence matters.
 - [pit.array-vs-map](https://funlang.org/ontology/#pit.array-vs-map): [] is a list, new [] is a map. A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map. Do not use `{}` for either.
 - [pit.return-keyword](https://funlang.org/ontology/#pit.return-keyword): result vs return. Inside `fun`, assigning `result` sets the return value; `return expr;` returns immediately. A bare `return;` returns the current `result`, which may be stale.
@@ -55,6 +55,7 @@ Ontology v0.1.0 for Fun 9.5.7.
 - [module.lib-set](https://funlang.org/ontology/#module.lib-set): lib-set. Collection helpers in pure Fun: `map`, `filter`, `find`, `sort`, `compose`, `range`, `@clone`, and more.
 - [module.lib-json](https://funlang.org/ontology/#module.lib-json): lib-json. JSON and FD parse/stringify helpers. The underlying built-ins are `.getJson()` and `.@toJson()`, documented in `lib-json.fun`.
 - [builtin.tojson](https://funlang.org/ontology/#builtin.tojson): @toJson. The built-in serializer. Default output is JSON-like with bare keys; `json: true` quotes keys, and `fd: true` emits FD.
+- [builtin.escape](https://funlang.org/ontology/#builtin.escape): .escape(). Decodes backslash escapes in a string: `'\n'.escape()` is a newline, `'\t'.escape()` a tab. Literals keep the backslash until `.escape()` is called.
 - [task.json-transform](https://funlang.org/ontology/#task.json-transform): Transform JSON. Parse a JSON document, update a nested value, and emit JSON again.
 
 The full index is in llms-full.txt.

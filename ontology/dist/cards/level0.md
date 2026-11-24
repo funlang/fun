@@ -5,8 +5,8 @@ Fun 9.5.7, ontology v0.1.0.
 ## Syntax
 
 - `?. 'Hello, Fun!';` (syntax.hello): A Fun script is a sequence of statements; `?.` prints a value and a newline.
-- `stmt; block ... end block;` (syntax.statement): Statements end with `;`. Block closers (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) may omit the following `;`. Newlines are not statement boundaries.
-- `# line comment / // line comment / #* block *#` (syntax.comment): Both `#` and `//` start a line comment. `#* ... *#` is a block comment.
+- `stmt; block ... end block` (syntax.statement): Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional. Newlines are not statement boundaries.
+- `# line / // line / #* block #` (syntax.comment): Both `#` and `//` start a line comment. `#* ... #` is a block comment; the next `#` closes it.
 - `var x = expr;` (syntax.var): Declare with `var name = expr;` or `var name;` (nil). There is no `let` or `const`; identifiers are case-insensitive.
 - `x = value; if a = b then ...` (syntax.assignment): A statement `x = expr;` assigns; the same `=` inside an expression compares. `<>` and `!=` both mean not-equal. Compound assignment uses `+= -= *= &=`.
 - `?. value;` (syntax.print): The `?.` operator prints with a newline, `?,` prints with a space, and `?:` prints with a tab. All three accept any value.
@@ -22,7 +22,7 @@ Fun 9.5.7, ontology v0.1.0.
 - `obj.key / obj['key'] / a?.k?` (syntax.member): Forms `obj.key`, `obj['key']` and `obj.['1']` read members; a missing member compares equal to nil. Postfix `?` makes a member or its base optional: `x?.k?`.
 - `value.@builtin(); obj.userMethod();` (syntax.method): Engine-provided methods use `@`: `x.@toJson()`, `s.@count()`, `m.@('group')`. Methods you write in a class are called without `@`.
 - `xs | map(f) | filter(p)` (syntax.pipe): The pipe `value | f` passes the value as the last argument of `f`. `map(f)` takes the list last, so it composes; `filter(list, f)` takes the list first, so call it directly.
-- `text / "text" / backtick multiline` (syntax.string): Single, double and backtick quotes all delimit strings. There are no backslash escapes such as `\n`; use `10.toChar()` for a newline or a multiline backtick string. `$name` interpolation is done by `.eval()`.
+- `'a\nb'.escape() / backtick multiline` (syntax.string): Single, double and backtick quotes all delimit strings. Literals do not decode backslash escapes; call `.escape()` to decode `\n`, `\t`, etc., use `10.toChar()`, or use a multiline backtick string. `$name` interpolation is done by `.eval()`.
 - `s.match(/\d+/g); s.replace(/\d+/g, fn); s =~ /^a/` (syntax.regex): Regex literals are `/pattern/flags`, `%pattern%flags` or `$'pattern'flags`. Use `=~` / `!~` to test, `.match()` to extract, `.replace()` to rewrite.
 - `s.getJson(json: true); v.@toJson(json: true);` (syntax.json): The built-in `value.@toJson()` emits JSON; `value.@toJson(json: true)` quotes keys. Parse with `text.getJson(json: true)`. `text.getJson(fd: true)` parses FD.
 - `s.getJson(fd: true); v.@toJson(fd: true);` (syntax.fd): FD is Fun's indentation data notation: `key value` lines, `- item` lists, no braces. `text.getJson(fd: true)` parses it and `value.@toJson(fd: true)` emits it.
@@ -39,6 +39,7 @@ Fun 9.5.7, ontology v0.1.0.
 ## Built-ins
 
 - `value.@toJson(json: true);` (builtin.tojson): The built-in serializer. Default output is JSON-like with bare keys; `json: true` quotes keys, and `fd: true` emits FD.
+- `'a\nb'.escape()` (builtin.escape): Decodes backslash escapes in a string: `'\n'.escape()` is a newline, `'\t'.escape()` a tab. Literals keep the backslash until `.escape()` is called.
 
 ## Modules
 
@@ -56,7 +57,7 @@ Fun 9.5.7, ontology v0.1.0.
 
 - `if a = b then ...; if a <> b then ...;` (pit.double-equals): Use `=` for equality inside an expression, and `<>` or `!=` for inequality. `==` is not Fun.
 - `a = 1; b = 2;` (pit.newline-is-not-a-statement): A newline is whitespace. Put `;` between statements; a continuation line can silently join the previous expression.
-- `'a' & 10.toChar() & 'b'` (pit.backslash-escape): The literal `'\n'` is a backslash followed by `n`, not a newline. Use `10.toChar()` or a multiline backtick string.
+- `'a\nb'.escape()` (pit.backslash-escape): The literal `'\n'` is a backslash followed by `n`, not a newline. Call `.escape()` to decode it, or use `10.toChar()` or a multiline backtick string.
 - `m.@has('k')` (pit.missing-key-accumulate): A missing value compares equal to nil and to 0, so `if x = 0` cannot tell "absent" from "zero". Use `.@has(key)` when presence matters.
 - `[1,2,3] / new [k: v]` (pit.array-vs-map): A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map. Do not use `{}` for either.
 - `result = expr; or return expr;` (pit.return-keyword): Inside `fun`, assigning `result` sets the return value; `return expr;` returns immediately. A bare `return;` returns the current `result`, which may be stale.

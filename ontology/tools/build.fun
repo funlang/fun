@@ -285,7 +285,7 @@ fun renderAgents(o)
   out &= 'Use this block in an agent instruction file, a system prompt, or a tool description.' & 10.toChar() & 10.toChar();
   out &= '```text' & 10.toChar();
   out &= 'When writing Fun (files end in .fun, .foo or .fxx):' & 10.toChar();
-  out &= '- Statements end with `;`. Blocks end with `end if;`, `end fun;`, `end class;`, `end do;`, `end loop;`, `end try;`.' & 10.toChar();
+  out &= '- Statements end with `;`. The `;` after a block closer is optional: `end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`.' & 10.toChar();
   out &= '- `?.` prints a line; `var x = 1;` declares; `fun f(a) result = a; end fun;` returns.' & 10.toChar();
   out &= '- `[1,2]` is a list; `new [k: v]` is a string-keyed map; missing keys compare equal to nil.' & 10.toChar();
   out &= '- Nil enters arithmetic as 0, and a missing value also compares equal to 0. Use `m.@has(k)` when presence matters.' & 10.toChar();

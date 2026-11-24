@@ -20,7 +20,7 @@ Hello, Fun!
 
 ### Statements and semicolons (`syntax.statement`)
 
-Statements end with `;`. Block closers (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) may omit the following `;`. Newlines are not statement boundaries.
+Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional. Newlines are not statement boundaries.
 
 Transfer: js `statement;`; py `one statement per line (Fun does not use indentation)`;
 
@@ -34,10 +34,21 @@ Expected output:
 ```text
 3
 ```
+```fun
+if true then
+  ?. 'ok';
+end if
+?. 'done';
+```
+Expected output:
+```text
+ok
+done
+```
 
 ### Comments (`syntax.comment`)
 
-Both `#` and `//` start a line comment. `#* ... *#` is a block comment.
+Both `#` and `//` start a line comment. `#* ... #` is a block comment; the next `#` closes it.
 
 Transfer: js `// comment`; py `# comment`;
 
@@ -45,7 +56,7 @@ Transfer: js `// comment`; py `# comment`;
 # a hash comment
 // a slash comment
 #* a block
-   comment *#
+   comment #
 ?. 1;
 ```
 Expected output:
@@ -345,12 +356,12 @@ Expected output:
 
 ### Strings (`syntax.string`)
 
-Single, double and backtick quotes all delimit strings. There are no backslash escapes such as `\n`; use `10.toChar()` for a newline or a multiline backtick string. `$name` interpolation is done by `.eval()`.
+Single, double and backtick quotes all delimit strings. Literals do not decode backslash escapes; call `.escape()` to decode `\n`, `\t`, etc., use `10.toChar()`, or use a multiline backtick string. `$name` interpolation is done by `.eval()`.
 
 Transfer: js `"a\nb"`; py `"a\nb"`;
 
 ```fun
-var a = 'x' & 10.toChar() & 'y';
+var a = 'x\ny'.escape();
 ?. a.length();
 var b = 'hello';
 ?. 'say $b'.eval();
@@ -648,6 +659,24 @@ var m = new [a: 1, b: [2]];
 Expected output:
 ```text
 {"a":1,"b":[2]}
+```
+
+### .escape() (`builtin.escape`)
+
+Decodes backslash escapes in a string: `'\n'.escape()` is a newline, `'\t'.escape()` a tab. Literals keep the backslash until `.escape()` is called.
+
+Transfer: js `"a\nb"`; py `"a\nb"`; c `"a\nb"`;
+
+```fun
+?. 'a\nb'.length();
+?. 'a\nb'.escape().length();
+?. 'x\ty'.escape().length();
+```
+Expected output:
+```text
+4
+3
+3
 ```
 
 ## Modules
@@ -995,19 +1024,21 @@ Expected output:
 3
 ```
 
-### No backslash escapes (`pit.backslash-escape`)
+### Literals do not decode backslash escapes (`pit.backslash-escape`)
 
-The literal `'\n'` is a backslash followed by `n`, not a newline. Use `10.toChar()` or a multiline backtick string.
+The literal `'\n'` is a backslash followed by `n`, not a newline. Call `.escape()` to decode it, or use `10.toChar()` or a multiline backtick string.
 
 Transfer: js `"a\nb"`; py `"a\nb"`;
 
 ```fun
 ?. 'a\nb'.length();
+?. 'a\nb'.escape().length();
 ?. ('a' & 10.toChar() & 'b').length();
 ```
 Expected output:
 ```text
 4
+3
 3
 ```
 

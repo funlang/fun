@@ -4,7 +4,7 @@ Use this block in an agent instruction file, a system prompt, or a tool descript
 
 ```text
 When writing Fun (files end in .fun, .foo or .fxx):
-- Statements end with `;`. Blocks end with `end if;`, `end fun;`, `end class;`, `end do;`, `end loop;`, `end try;`.
+- Statements end with `;`. The `;` after a block closer is optional: `end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`.
 - `?.` prints a line; `var x = 1;` declares; `fun f(a) result = a; end fun;` returns.
 - `[1,2]` is a list; `new [k: v]` is a string-keyed map; missing keys compare equal to nil.
 - Nil enters arithmetic as 0, and a missing value also compares equal to 0. Use `m.@has(k)` when presence matters.
@@ -21,7 +21,7 @@ When writing Fun (files end in .fun, .foo or .fxx):
 
 > Fun Language AI Ontology v0.1.0 for Fun 9.5.7
 
-Fun is a ~0.3 MB, zero-dependency scripting language. Statements end with `;`. Blocks end with `end if;`, `end fun;`, `end class;`, `end do;`. `?.` prints. `fun f(a) result = a; end fun;` returns. `[1,2]` is a list; `new [k: v]` is a map. Missing values compare equal to nil and to 0, so use `m.@has(k)` when presence matters.
+Fun is a ~0.3 MB, zero-dependency scripting language. Statements end with `;`. Blocks end with `end if`, `end fun`, `end class`, `end do`; the `;` after a block closer is optional. `?.` prints. `fun f(a) result = a; end fun;` returns. `[1,2]` is a list; `new [k: v]` is a map. Missing values compare equal to nil and to 0, so use `m.@has(k)` when presence matters.
 
 ## Task
 
@@ -87,7 +87,7 @@ A Fun script is a sequence of statements; `?.` prints a value and a newline.
 Transfer: js `console.log('Hello')`; py `print('Hello')`; c `puts("Hello");`;
 
 
-- `stmt; block ... end block;` (syntax.statement)
+- `stmt; block ... end block` (syntax.statement)
 
 ### Lambdas (`syntax.lambda`)
 
@@ -98,8 +98,6 @@ f = a -> a * 2;```
 
 Transfer: js `a => a * 2`; py `lambda a: a * 2`;
 
-
-- `use 'lib-set.fun';` (syntax.use)
 
 ## Pitfalls
 

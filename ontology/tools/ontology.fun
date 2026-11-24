@@ -144,7 +144,7 @@ fun header(o)
   result = '# Fun language context' & 10.toChar() & 10.toChar();
   result &= '> ' & o.meta.name & ' v' & o.meta.version & ' for Fun ' & o.meta.funVersion & 10.toChar() & 10.toChar();
   result &= 'Fun is a ~0.3 MB, zero-dependency scripting language. Statements end with `;`. ' &
-    'Blocks end with `end if;`, `end fun;`, `end class;`, `end do;`. ' &
+    'Blocks end with `end if`, `end fun`, `end class`, `end do`; the `;` after a block closer is optional. ' &
     '`?.` prints. `fun f(a) result = a; end fun;` returns. ' &
     '`[1,2]` is a list; `new [k: v]` is a map. ' &
     'Missing values compare equal to nil and to 0, so use `m.@has(k)` when presence matters.' & 10.toChar() & 10.toChar();

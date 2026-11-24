@@ -9,7 +9,7 @@ Fun 9.5.7, ontology v0.1.0.
 ```fun
 ?. 'Hello, Fun!';
 ```
-- `stmt; block ... end block;` (syntax.statement): Statements end with `;`. Block closers (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) may omit the following `;`. Newlines are not statement boundaries.
+- `stmt; block ... end block` (syntax.statement): Statements end with `;`. The `;` after a block closer (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) is optional. Newlines are not statement boundaries.
 
 ```fun
 var a = 1;
@@ -17,13 +17,13 @@ var b = a
   + 2;
 ?. b;
 ```
-- `# line comment / // line comment / #* block *#` (syntax.comment): Both `#` and `//` start a line comment. `#* ... *#` is a block comment.
+- `# line / // line / #* block #` (syntax.comment): Both `#` and `//` start a line comment. `#* ... #` is a block comment; the next `#` closes it.
 
 ```fun
 # a hash comment
 // a slash comment
 #* a block
-   comment *#
+   comment #
 ?. 1;
 ```
 - `var x = expr;` (syntax.var): Declare with `var name = expr;` or `var name;` (nil). There is no `let` or `const`; identifiers are case-insensitive.
@@ -168,10 +168,10 @@ var xs = [1, 2, 3, 4];
 var ys = xs | map(a -> a * 10);
 ?. ys.@toJson();
 ```
-- `text / "text" / backtick multiline` (syntax.string): Single, double and backtick quotes all delimit strings. There are no backslash escapes such as `\n`; use `10.toChar()` for a newline or a multiline backtick string. `$name` interpolation is done by `.eval()`.
+- `'a\nb'.escape() / backtick multiline` (syntax.string): Single, double and backtick quotes all delimit strings. Literals do not decode backslash escapes; call `.escape()` to decode `\n`, `\t`, etc., use `10.toChar()`, or use a multiline backtick string. `$name` interpolation is done by `.eval()`.
 
 ```fun
-var a = 'x' & 10.toChar() & 'y';
+var a = 'x\ny'.escape();
 ?. a.length();
 var b = 'hello';
 ?. 'say $b'.eval();
@@ -309,6 +309,13 @@ var b = Box(7);
 var m = new [a: 1, b: [2]];
 ?. m.@toJson(json: true);
 ```
+- `'a\nb'.escape()` (builtin.escape): Decodes backslash escapes in a string: `'\n'.escape()` is a newline, `'\t'.escape()` a tab. Literals keep the backslash until `.escape()` is called.
+
+```fun
+?. 'a\nb'.length();
+?. 'a\nb'.escape().length();
+?. 'x\ty'.escape().length();
+```
 
 ## Modules
 
@@ -433,10 +440,11 @@ var a = 1
   + 2;
 ?. a;
 ```
-- `'a' & 10.toChar() & 'b'` (pit.backslash-escape): The literal `'\n'` is a backslash followed by `n`, not a newline. Use `10.toChar()` or a multiline backtick string.
+- `'a\nb'.escape()` (pit.backslash-escape): The literal `'\n'` is a backslash followed by `n`, not a newline. Call `.escape()` to decode it, or use `10.toChar()` or a multiline backtick string.
 
 ```fun
 ?. 'a\nb'.length();
+?. 'a\nb'.escape().length();
 ?. ('a' & 10.toChar() & 'b').length();
 ```
 - `a?.k? only` (pit.optional-chain): The form `x?.k?` makes the base and the member optional. It does not make a following call optional, and `f()?.x` is not the JS form; assign to a variable first.
