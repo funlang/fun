@@ -107,13 +107,14 @@ begin
     end;
   end;
 
-  {$IfNDef WinNT35}
-  f.Html := NewKOLWebBrowser(f.Form);
-  with PKOLWebBrowser(f.Html)^ do
-  begin
-    SetAlign(caClient);
+  try
+    f.Html := NewKOLWebBrowser(f.Form);
+    with PKOLWebBrowser(f.Html)^ do
+    begin
+      SetAlign(caClient);
+    end;
+  except
   end;
-  {$EndIf}
 
   base.setObj(val, f, VarObjNew); del(f);
 end;
@@ -122,9 +123,12 @@ end;
 // ui.dialog(save = 'All files|*.*', file = '...', defext = '...')
 // ui.dialog(path = '...')
 procedure _dialog(env: CEnv; exp: CExp; exps: CExps; val: PValue);
-{$IfNDef WinNT35}
-// NT 3.5 has no SHGetPathFromIDListA (introduced in NT 4.0). Define WinNT35
+{$IfDef WinNT35} {$Define NoDialog} {$EndIf}
+{$IfDef NoDialog}
+// NT 3.5 has no SHGetPathFromIDListA (introduced in NT 4.0). Define WinNT35/NoDialog
 // to omit this dialog and its static shell32 import, so Fun can start on NT 3.5.
+begin
+{$Else}
 var
   s, f, ret: fun.str;
   isOpen, isSave, multi: fun.bool;
@@ -187,8 +191,6 @@ begin
   end;
 
   val^ := ret;
-{$Else}
-begin
 {$EndIf}
 end;
 
