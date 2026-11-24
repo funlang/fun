@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://funlang.org/ontology/schema/ontology.schema.json",
+  "title": "Fun Language AI Ontology",
+  "description": "A versioned, executable knowledge graph that teaches an AI how to write Fun. Every concept should point at runnable evidence.",
+  "type": "object",
+  "required": ["meta", "concepts"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["name", "version", "funVersion"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "funVersion": { "type": "string" },
+        "license": { "type": "string" },
+        "updated": { "type": "string" },
+        "repository": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "concepts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/concept" }
+    }
+  },
+  "$defs": {
+    "concept": {
+      "type": "object",
+      "required": ["id", "type", "name", "summary", "level", "tags"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(\\.[a-z0-9][a-z0-9-]*)+$",
+          "description": "Stable, dotted IRI local name. Never reuse an id for a different meaning."
+        },
+        "type": {
+          "enum": [
+            "construct", "semantic", "type", "builtin", "module", "symbol",
+            "idiom", "pitfall", "error", "tool", "platform", "capability", "task"
+          ]
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "0 = must know, 1 = common, 2 = specialist."
+        },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "aliases": { "type": "array", "items": { "type": "string" } },
+        "intent": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Natural-language tasks this concept answers, in English and Chinese."
+        },
+        "card": {
+          "type": "string",
+          "description": "One-line canonical form used by the level-0/1 context projections."
+        },
+        "syntax": { "type": "string" },
+        "notes": { "type": "string" },
+        "from": {
+          "type": "object",
+          "description": "Cross-language transfer anchors. Keys are source languages.",
+          "additionalProperties": { "type": "string" }
+        },
+        "relations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "description": "Edges to other concept ids: partOf, requires, seeAlso, replaces, conflictsWith, hasExample, failsWhen, fixedBy, teaches."
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code"],
+            "properties": {
+              "code": { "type": "string" },
+              "expect": { "type": "string" },
+              "expectError": { "type": "boolean" },
+              "runnable": { "type": "boolean", "default": true },
+              "kind": { "enum": ["good", "bad"] },
+              "note": { "type": "string" }
+            }
+          }
+        },
+        "since": { "type": "string" },
+        "status": { "enum": ["stable", "experimental", "deprecated"] }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,93 @@
+# FunBench seed tasks.
+#
+# A task has a prompt, a level, and one or more tests. The runner concatenates
+# a candidate solution with each test, executes it, and compares stdout byte
+# for byte with `expect`. Reference solutions live in solutions/<id>.fun and
+# must pass with `run.fun --all`.
+
+tasks
+  -
+    id hello
+    level 0
+    prompt Write `fun greet(name)` that returns `Hello, <name>!`.
+    tests
+      -
+        code `?. greet('Ada');
+`
+        expect `Hello, Ada!
+`
+      -
+        code `?. greet('Fun');
+`
+        expect `Hello, Fun!
+`
+  -
+    id sum
+    level 0
+    prompt Write `fun sum(xs)` that returns the total of a numeric list; an empty list returns 0.
+    tests
+      -
+        code `?. sum([1, 2, 3]);
+`
+        expect `6
+`
+      -
+        code `?. sum([]);
+`
+        expect `0
+`
+  -
+    id json-names
+    level 0
+    prompt Write `fun names(text)` that parses JSON with a `users` array and returns the list of `name` values in order.
+    tests
+      -
+        code `var r = names('{"users":[{"name":"Ada"},{"name":"Bob"}]}');
+?. r.@toJson();
+`
+        expect `["Ada","Bob"]
+`
+      -
+        code `var r = names('{"users":[]}');
+?. r.@toJson();
+`
+        expect `[]
+`
+  -
+    id word-count
+    level 1
+    prompt Write `fun countWords(text)` that returns a map from each whitespace-separated word to its count.
+    tests
+      -
+        code `var m = countWords('a b a');
+?. m.a;
+?. m.b;
+`
+        expect `2
+1
+`
+      -
+        code `var m = countWords('one');
+?. m.@has('one');
+?. m.@has('two');
+`
+        expect `True
+False
+`
+  -
+    id class-point
+    level 1
+    prompt Define a class `Point(x, y)` with a method `sum()` returning `x + y`.
+    tests
+      -
+        code `var p = Point(2, 3);
+?. p.sum();
+`
+        expect `5
+`
+      -
+        code `var p = Point(-1, 1);
+?. p.sum();
+`
+        expect `0
+`

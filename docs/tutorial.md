@@ -181,7 +181,7 @@ chapter 4. Custom operators are just fields, for example
 Whole-file helpers are built in:
 
 ```fun
-save('out.txt', 'hello');
+'out.txt'.save('hello');
 var text = 'out.txt'.load();
 ```
 

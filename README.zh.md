@@ -27,6 +27,10 @@ var n = Number(2);
 ?. n .# 3;              # 30
 ```
 
+**面向 AI。** 机器可读的本体层在 [`ontology/`](ontology/README.md)：稳定概念 ID、可运行示例、
+按 token 预算生成的卡片、`llms.txt`，以及提供检索、上下文、检查和运行的 MCP 服务。
+设计说明见 [docs/ai-ontology.zh.md](docs/ai-ontology.zh.md)。
+
 ---
 
 ## 亮点

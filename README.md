@@ -28,6 +28,11 @@ var n = Number(2);
 ?. n .# 3;              # 30
 ```
 
+**For AI agents.** A machine-facing ontology lives in [`ontology/`](ontology/README.md):
+stable concept ids, runnable examples, token-budgeted cards, `llms.txt`, and an
+MCP server with search, context, check and run. Design notes:
+[docs/ai-ontology.md](docs/ai-ontology.md).
+
 ---
 
 ## Highlights

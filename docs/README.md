@@ -10,6 +10,7 @@ contents list.
 | Installing | [install.md](install.md) | [install.zh.md](install.zh.md) | Release archives, one-line installer, Windows installer and runtime requirements. |
 | Building | [building.md](building.md) | [building.zh.md](building.zh.md) | Native builds, cross builds, capability matrix, third-party dependencies, safe builds and CI. |
 | Tooling | [tooling.md](tooling.md) | [tooling.zh.md](tooling.zh.md) | `package.fun`, `fun package`, `fun run`, `fun test` and `fun pack`. |
+| AI ontology | [ai-ontology.md](ai-ontology.md) | [ai-ontology.zh.md](ai-ontology.zh.md) | The executable knowledge graph, context packs, MCP tools and evaluation plan that teach an AI to write Fun. |
 
 Reference material maintained on the website:
 

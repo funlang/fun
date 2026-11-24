@@ -1,0 +1,1238 @@
+# Fun language, full AI context
+
+Ontology v0.1.0 for Fun 9.5.7. Every example below is executed by `fun ontology/tools/build.fun --check`.
+
+## Syntax
+
+### Hello world (`syntax.hello`)
+
+A Fun script is a sequence of statements; `?.` prints a value and a newline.
+
+Transfer: js `console.log('Hello')`; py `print('Hello')`; c `puts("Hello");`;
+
+```fun
+?. 'Hello, Fun!';
+```
+Expected output:
+```text
+Hello, Fun!
+```
+
+### Statements and semicolons (`syntax.statement`)
+
+Statements end with `;`. Block closers (`end if`, `end fun`, `end class`, `end do`, `end loop`, `end try`) may omit the following `;`. Newlines are not statement boundaries.
+
+Transfer: js `statement;`; py `one statement per line (Fun does not use indentation)`;
+
+```fun
+var a = 1;
+var b = a
+  + 2;
+?. b;
+```
+Expected output:
+```text
+3
+```
+
+### Comments (`syntax.comment`)
+
+Both `#` and `//` start a line comment. `#* ... *#` is a block comment.
+
+Transfer: js `// comment`; py `# comment`;
+
+```fun
+# a hash comment
+// a slash comment
+#* a block
+   comment *#
+?. 1;
+```
+Expected output:
+```text
+1
+```
+
+### Variables (`syntax.var`)
+
+Declare with `var name = expr;` or `var name;` (nil). There is no `let` or `const`; identifiers are case-insensitive.
+
+Transfer: js `let x = 1; const y = 2;`; py `x = 1`; c `int x = 1;`;
+
+```fun
+var x = 1;
+var y;
+?. x;
+?. y = nil;
+```
+Expected output:
+```text
+1
+True
+```
+
+### Assignment and equality (`syntax.assignment`)
+
+A statement `x = expr;` assigns; the same `=` inside an expression compares. `<>` and `!=` both mean not-equal. Compound assignment uses `+= -= *= &=`.
+
+Transfer: js `x = 1; if (a === b)`; py `x = 1; if a == b:`; c `x = 1; if (a == b)`;
+
+```fun
+var x = 1;
+x = x + 2;
+?. x;
+?. x = 3;
+?. x <> 4;
+```
+Expected output:
+```text
+3
+True
+True
+```
+
+### Print and output (`syntax.print`)
+
+The `?.` operator prints with a newline, `?,` prints with a space, and `?:` prints with a tab. All three accept any value.
+
+Transfer: js `console.log(value)`; py `print(value)`; c `printf("%v\n", value);`;
+
+```fun
+?, 'a';
+?: 'b';
+?. 'c';
+```
+Expected output:
+```text
+a b	c
+```
+
+### Named functions (`syntax.function`)
+
+A `fun name(params) ... end fun;` returns the value assigned to `result`; `return expr;` exits early. `result` is not reset on entry, so initialize it explicitly.
+
+Transfer: js `function f(a, b) { return a + b; }`; py `def f(a, b): return a + b`; c `int f(int a, int b) { return a + b; }`;
+
+```fun
+fun add(a, b)
+  result = a + b;
+end fun;
+?. add(2, 3);
+```
+Expected output:
+```text
+5
+```
+
+### Lambdas (`syntax.lambda`)
+
+A lambda `a -> expr` takes one argument; `(a, b) -> expr` takes several. A braced body is a block that must assign `result`.
+
+Transfer: js `a => a * 2`; py `lambda a: a * 2`;
+
+```fun
+use 'lib-set.fun';
+var f = a -> a * 2;
+?. f(3);
+var nums = [1, 2, 3];
+?. (nums | map(a -> a + 1)).@toJson();
+```
+Expected output:
+```text
+6
+[2,3,4]
+```
+
+### Conditionals (`syntax.if`)
+
+The form `if c then ... elsif c2 then ... else ... end if;` uses Fun truthiness; use explicit comparisons for clarity.
+
+Transfer: js `if (c) { } else { }`; py `if c: ... else: ...`;
+
+```fun
+var n = 2;
+if n = 1 then
+  ?. 'one';
+elsif n = 2 then
+  ?. 'two';
+else
+  ?. 'other';
+end if;
+```
+Expected output:
+```text
+two
+```
+
+### Case (`syntax.case`)
+
+The form `case expr is when v do ... else ... end case;` matches values.
+
+Transfer: js `switch (x) { case 1: ... }`; py `match x: case 1: ...`;
+
+```fun
+var x = 2;
+case x is
+  when 1 do ?. 'one';
+  when 2 do ?. 'two';
+  else ?. 'other';
+end case;
+```
+Expected output:
+```text
+two
+```
+
+### Loops (`syntax.loop`)
+
+Forms: `for i = a to b do ... end do;`, `for k: v in set do ... end do;`, `while c do ... end do;`, and `loop ... exit when c; ... end loop;`. `next when c;` skips.
+
+Transfer: js `for (let i = 0; i < n; i++) {}`; py `for i in range(n):`;
+
+```fun
+var total = 0;
+for i = 1 to 3 do
+  total += i;
+end do;
+?. total;
+var m = 0;
+loop
+  m += 1;
+  exit when m >= 2;
+end loop;
+?. m;
+```
+Expected output:
+```text
+6
+2
+```
+
+### Errors (`syntax.try`)
+
+The form `try ... except ... finally ... end try;` catches `raise` and runtime errors. `runtime.lastError()` exposes message, file, line and stack.
+
+Transfer: js `try { } catch (e) { }`; py `try: ... except Exception as e: ...`;
+
+```fun
+try
+  raise 'boom';
+except
+  ?. 'caught';
+end try;
+```
+Expected output:
+```text
+caught
+```
+
+### Classes (`syntax.class`)
+
+A `class Name(params) ... end class;` body runs as the constructor; `var` fields become members, `fun` declarations become methods, `this` is the instance and `base` the parent. Inherit with `class Child = Parent()`.
+
+Transfer: js `class C { constructor(x) { this.x = x; } }`; py `class C: def __init__(self, x): self.x = x`;
+
+```fun
+class Point(x, y)
+  var x = x;
+  var y = y;
+  fun sum() result = x + y; end fun;
+end class;
+var p = Point(2, 3);
+?. p.sum();
+?. p.x;
+```
+Expected output:
+```text
+5
+2
+```
+
+### Modules (`syntax.use`)
+
+The statement `use 'lib-set.fun';` links a module by file name; `use 'x.fun' as ns;` namespaces it. Paths resolve relative to the script and the runtime `lib/` directory.
+
+Transfer: js `import x from './x.js'`; py `import x`; c `#include "x.h"`;
+
+```fun
+use 'lib-set.fun';
+var xs = [1, 2, 3];
+?. (xs | map(a -> a * 2)).@toJson();
+```
+Expected output:
+```text
+[2,4,6]
+```
+
+### Lists and maps (`syntax.collection`)
+
+A list literal `[1, 2, 3]` is a list. `new [k: v]` is a string-keyed map (called a set in Fun). Both support `@count`, `@has`, `@add`, and JSON conversion.
+
+Transfer: js `[1, 2]; {a: 1}`; py `[1, 2]; {'a': 1}`; c `int a[2] = {1, 2};`;
+
+```fun
+var xs = [1, 2, 3];
+var m = new [name: 'Ada'];
+?. xs.@count();
+?. m.name;
+?. m['name'];
+xs.@add(4);
+?. xs.@toJson();
+```
+Expected output:
+```text
+3
+Ada
+Ada
+[1,2,3,4]
+```
+
+### Member access (`syntax.member`)
+
+Forms `obj.key`, `obj['key']` and `obj.['1']` read members; a missing member compares equal to nil. Postfix `?` makes a member or its base optional: `x?.k?`.
+
+Transfer: js `obj.key; obj['key']; a?.k`; py `obj.key; obj['key']`;
+
+```fun
+var m = new [name: 'Ada'];
+?. m.name;
+?. m['name'];
+?. m.missing = nil;
+var none = nil;
+?. none?.name? = nil;
+```
+Expected output:
+```text
+Ada
+Ada
+True
+True
+```
+
+### Built-in methods (`syntax.method`)
+
+Engine-provided methods use `@`: `x.@toJson()`, `s.@count()`, `m.@('group')`. Methods you write in a class are called without `@`.
+
+Transfer: js `value.toString()`; py `len(value)`;
+
+```fun
+var xs = [1, 2, 3];
+?. xs.@count();
+?. xs.@toJson();
+```
+Expected output:
+```text
+3
+[1,2,3]
+```
+
+### Pipe (`syntax.pipe`)
+
+The pipe `value | f` passes the value as the last argument of `f`. `map(f)` takes the list last, so it composes; `filter(list, f)` takes the list first, so call it directly.
+
+Transfer: js `xs.map(f).filter(p)`; py `filter(p, map(f, xs))`;
+
+```fun
+use 'lib-set.fun';
+var xs = [1, 2, 3, 4];
+var ys = xs | map(a -> a * 10);
+?. ys.@toJson();
+```
+Expected output:
+```text
+[10,20,30,40]
+```
+
+### Strings (`syntax.string`)
+
+Single, double and backtick quotes all delimit strings. There are no backslash escapes such as `\n`; use `10.toChar()` for a newline or a multiline backtick string. `$name` interpolation is done by `.eval()`.
+
+Transfer: js `"a\nb"`; py `"a\nb"`;
+
+```fun
+var a = 'x' & 10.toChar() & 'y';
+?. a.length();
+var b = 'hello';
+?. 'say $b'.eval();
+var c = 'one' & 10.toChar() & 'two';
+?. c;
+```
+Expected output:
+```text
+3
+say hello
+one
+two
+```
+
+### Regular expressions (`syntax.regex`)
+
+Regex literals are `/pattern/flags`, `%pattern%flags` or `$'pattern'flags`. Use `=~` / `!~` to test, `.match()` to extract, `.replace()` to rewrite.
+
+Transfer: js `s.match(/\d+/g)`; py `re.findall(r'\d+', s)`;
+
+```fun
+var s = 'a1b22';
+?. s.match(/\d+/g).@toJson();
+?. s.replace(/\d+/g, (m) -> '[' & m.@(0) & ']');
+?. (s =~ /^a/) <> nil;
+```
+Expected output:
+```text
+["1","22"]
+a[1]b[22]
+True
+```
+
+### JSON (`syntax.json`)
+
+The built-in `value.@toJson()` emits JSON; `value.@toJson(json: true)` quotes keys. Parse with `text.getJson(json: true)`. `text.getJson(fd: true)` parses FD.
+
+Transfer: js `JSON.parse(s); JSON.stringify(v)`; py `json.loads(s); json.dumps(v)`;
+
+```fun
+var m = '{"a": 1, "b": [2, 3]}'.getJson(json: true);
+?. m.a;
+?. m.b[1];
+?. m.@toJson(json: true);
+```
+Expected output:
+```text
+1
+3
+{"a":1,"b":[2,3]}
+```
+
+### FD data (`syntax.fd`)
+
+FD is Fun's indentation data notation: `key value` lines, `- item` lists, no braces. `text.getJson(fd: true)` parses it and `value.@toJson(fd: true)` emits it.
+
+Transfer: js `YAML-like nested objects`; py `dict / list`;
+
+```fun
+var s = 'name Ada' & 10.toChar() & 'tags' & 10.toChar() & '  - math' & 10.toChar() & '  - code';
+var m = s.getJson(fd: true);
+?. m.name;
+?. m.tags.@count();
+```
+Expected output:
+```text
+Ada
+2
+```
+
+### Operator overloading (`syntax.operator`)
+
+An operator is a field keyed by its symbol. In `this['#'] = you -> ...`, `me` is the receiver and `you` the right operand.
+
+Transfer: js `Symbol.toPrimitive`; py `__add__`;
+
+```fun
+class Num(me)
+  this['#'] = you -> (me + you) * me * you;
+end class;
+var n = Num(2);
+?. n .# 3;
+```
+Expected output:
+```text
+30
+```
+
+## Semantics
+
+### Missing values compare to nil (`sem.missing-is-nil`)
+
+Reading a missing member, key or index yields a value that compares equal to nil. This makes `if x = nil then x = init; end if` safe.
+
+Transfer: js `undefined == null`; py `None`;
+
+```fun
+var m = new [];
+?. m.nope = nil;
+?. m['nope'] = nil;
+?. m[0] = nil;
+```
+Expected output:
+```text
+True
+True
+True
+```
+
+### nil acts as zero in arithmetic (`sem.nil-arithmetic`)
+
+A nil operand in `+ - * / div mod` is treated as 0, and as '' for strings. `x += 1` therefore works on a fresh key. The flip side is that a missing value also compares equal to 0.
+
+Transfer: js `undefined + 1 -> NaN`; py `None + 1 -> TypeError`;
+
+```fun
+var m = new [];
+m.k += 1;
+?. m.k;
+var z;
+?. z + 1;
+?. m.@has('k');
+?. m.@has('no');
+```
+Expected output:
+```text
+1
+1
+True
+False
+```
+
+### or/and return values (`sem.or-value`)
+
+Operators `or` and `and` return one of their operands, Lua style: `nil or 5` is 5, `7 or 5` is 7. This powers default values.
+
+Transfer: js `x ?? default`; py `x if x is not None else default`;
+
+```fun
+?. (nil or 5);
+?. (7 or 5);
+?. (nil and 5) = nil;
+```
+Expected output:
+```text
+5
+7
+True
+```
+
+### result is not reset (`sem.result`)
+
+Each function has one `result` slot. It is not cleared on entry, so a call at the same stack depth can see the previous value. Always initialize `result`.
+
+Transfer: js `return undefined by default`; py `return None by default`;
+
+```fun
+fun f(n)
+  if n > 0 then result = n; end if;
+end fun;
+?. f(1);
+?. f(0);
+fun g(n)
+  result = 0;
+  if n > 0 then result = n; end if;
+end fun;
+?. g(1);
+?. g(0);
+```
+Expected output:
+```text
+1
+1
+1
+0
+```
+
+### Identifiers are case-insensitive (`sem.case-insensitive`)
+
+Variables, functions, members and built-in method names all fold case. Avoid local names that differ from another symbol only by case.
+
+Transfer: js `case-sensitive`; py `case-sensitive`;
+
+```fun
+var Foo = 1;
+?. foo;
+var m = new [name: 'Ada'];
+?. m.NAME;
+?. 'Hi'.UPPER();
+```
+Expected output:
+```text
+1
+Ada
+HI
+```
+
+### Named arguments (`sem.named-args`)
+
+Call sites may name arguments: `f(b: 2, a: 1)`. Missing arguments are nil, so defaults are written as `if p = nil then p = default; end if`.
+
+Transfer: js `f({a: 1, b: 2})`; py `f(a=1, b=2)`;
+
+```fun
+fun greet(name, punct)
+  if punct = nil then punct = '!'; end if;
+  result = 'Hi ' & name & punct;
+end fun;
+?. greet('Ada');
+?. greet(punct: '?', name: 'Bob');
+```
+Expected output:
+```text
+Hi Ada!
+Hi Bob?
+```
+
+### Value types (`sem.type`)
+
+The method `.type()` returns 0 nil, 3 int, 5 real, 6 currency, 7 time, 8 string, 11 bool, -1 other. Integers are 32-bit unless explicitly 64-bit.
+
+Transfer: js `typeof x`; py `type(x)`;
+
+```fun
+var n = 1;
+var s = 'x';
+var z;
+var b = true;
+?. n.type();
+?. s.type();
+?. z.type();
+?. b.type();
+```
+Expected output:
+```text
+3
+8
+0
+11
+```
+
+### Maps and lists are references (`sem.reference`)
+
+Assigning a map or list copies the reference. Mutating one alias is visible through the other; use `@clone()` for an independent copy.
+
+Transfer: js `objects are references`; py `lists/dicts are references`;
+
+```fun
+use 'lib-set.fun';
+var a = [x: 1];
+var b = a;
+b.x = 2;
+?. a.x;
+var c = a.@clone();
+c.x = 3;
+?. a.x;
+?. c.x;
+```
+Expected output:
+```text
+2
+2
+3
+```
+
+### User methods vs built-in methods (`sem.user-vs-builtin`)
+
+Methods declared with `fun` inside a class are called as `obj.method()`. Engine methods are called as `obj.@method()`. The `@` is the dispatch marker, not part of the name.
+
+```fun
+class Box(v)
+  var v = v;
+  fun get() result = v; end fun;
+end class;
+var b = Box(7);
+?. b.get();
+```
+Expected output:
+```text
+7
+```
+
+## Built-ins
+
+### @toJson (`builtin.tojson`)
+
+The built-in serializer. Default output is JSON-like with bare keys; `json: true` quotes keys, and `fd: true` emits FD.
+
+Transfer: js `JSON.stringify(value)`; py `json.dumps(value)`;
+
+```fun
+var m = new [a: 1, b: [2]];
+?. m.@toJson(json: true);
+```
+Expected output:
+```text
+{"a":1,"b":[2]}
+```
+
+## Modules
+
+### lib-set (`module.lib-set`)
+
+Collection helpers in pure Fun: `map`, `filter`, `find`, `sort`, `compose`, `range`, `@clone`, and more.
+
+Transfer: js `Array.prototype.map/filter`; py `map/filter`;
+
+```fun
+use 'lib-set.fun';
+?. ([1, 2, 3] | map(a -> a * 2)).@toJson();
+```
+Expected output:
+```text
+[2,4,6]
+```
+
+### lib-json (`module.lib-json`)
+
+JSON and FD parse/stringify helpers. The underlying built-ins are `.getJson()` and `.@toJson()`, documented in `lib-json.fun`.
+
+```fun
+var m = '{"a": 1}'.getJson(json: true);
+?. m.@toJson(json: true);
+```
+Expected output:
+```text
+{"a":1}
+```
+
+### runtime (`module.runtime`)
+
+The calls `runtime.source()`, `runtime.stack()`, `runtime.lastError()` expose source locations, call stacks and the last caught error.
+
+Transfer: js `new Error().stack`; py `traceback`;
+
+```fun
+use 'runtime.fun';
+try
+  raise 'boom';
+except
+  var e = runtime.lastError();
+  ?. e.message = 'boom';
+end try;
+```
+Expected output:
+```text
+True
+```
+
+### fs (`module.fs`)
+
+Portable filesystem helpers: `mkdirAll`, `list`, `walk`, `removeAll`, `tempFile`, `tempDir`, `atomicWrite` and byte streams.
+
+```fun
+use 'fs.fun';
+var d = fs.tempDir('fun-ontology-');
+?. d <> '';
+fs.removeAll(d);
+```
+Expected output:
+```text
+True
+```
+
+### cli (`module.cli`)
+
+A command-line framework: subcommands, flags, aliases, env fallback, required flags, hooks and help.
+
+```fun
+?. 'See fun/lib/cli.fun';
+```
+Expected output:
+```text
+See fun/lib/cli.fun
+```
+
+### http-server (`module.http-server`)
+
+An HTTP server with routing, path parameters, middleware, static files and a blocking poll loop. Handlers are `fun(req, res)`.
+
+```fun
+?. 'See fun/lib/http-server.fun';
+```
+Expected output:
+```text
+See fun/lib/http-server.fun
+```
+
+### http-client (`module.http-client`)
+
+An HTTP client with helpers for JSON, headers, timeouts and TLS. `use 'http-client.fun';`.
+
+Transfer: js `fetch(url)`; py `requests.get(url)`;
+
+```fun
+?. 'See fun/lib/http-client.fun';
+```
+Expected output:
+```text
+See fun/lib/http-client.fun
+```
+
+### lib-fd (`module.lib-fd`)
+
+FD parse and emit helpers. The underlying built-ins are `text.getJson(fd: true)` and `value.@toJson(fd: true)`.
+
+```fun
+var m = 'a 1'.getJson(fd: true);
+?. m.a;
+```
+Expected output:
+```text
+1
+```
+
+### lib-type (`module.lib-type`)
+
+Type conversion helpers: `toStr`, `toNum`, `toTime`, `toByte`, `toChar`, `fromByte`, `eq` and `type`.
+
+```fun
+var n = 1;
+?. n.type();
+```
+Expected output:
+```text
+3
+```
+
+### lib-host (`module.lib-host`)
+
+Host detection and libc binding: `LibC()`, `IsWindows()`, `HostCurrPath()`, and the `'host'.arg()` facts.
+
+```fun
+use 'lib-host.fun';
+var getpid = LibC().getapi('getpid', ':i');
+?. getpid() > 0;
+```
+Expected output:
+```text
+True
+```
+
+### lib-cwinapi (`module.lib-cwinapi`)
+
+Windows helper: `CWin32API('user32.dll', 'int MessageBoxA(HWND, LPCSTR, LPCSTR, UINT);')` parses a C prototype and exposes named arguments.
+
+```fun
+?. 'Windows only: use CWin32API(dll, prototype)';
+```
+Expected output:
+```text
+Windows only: use CWin32API(dll, prototype)
+```
+
+### lib-cstruct (`module.lib-cstruct`)
+
+The call `CStruct('struct Point { int x; int y; };', [x: 3, y: 4])` computes offsets and padding and exposes a pointer-addressable buffer.
+
+```fun
+?. 'Use CStruct(declaration, values) for C layouts';
+```
+Expected output:
+```text
+Use CStruct(declaration, values) for C layouts
+```
+
+## Idioms
+
+### Default value (`idiom.default`)
+
+Use `or` to supply a default for nil or false. `x = x or default;`.
+
+Transfer: js `name = name || 'anonymous'`; py `name = name or 'anonymous'`;
+
+```fun
+fun greet(name)
+  name = name or 'anonymous';
+  result = 'Hi ' & name;
+end fun;
+?. greet(nil);
+?. greet('Ada');
+```
+Expected output:
+```text
+Hi anonymous
+Hi Ada
+```
+
+### Safe accumulator (`idiom.accumulator`)
+
+Seed a counter explicitly when you want the intent to be obvious across builds: `m.k = (m.k or 0) + 1;`. On 9.5.7, `m.k += 1` also yields 1.
+
+Transfer: js `m[k] = (m[k] || 0) + 1`; py `m[k] = m.get(k, 0) + 1`;
+
+```fun
+var m = new [];
+m.k = (m.k or 0) + 1;
+m.k = (m.k or 0) + 1;
+?. m.k;
+```
+Expected output:
+```text
+2
+```
+
+### Data pipeline (`idiom.pipeline`)
+
+The pipeline `xs | map(f)` reads left to right. Add `use 'lib-set.fun';` first. `map` takes the list last and composes; `filter` takes the list first.
+
+Transfer: js `xs.map(f).filter(p)`; py `[...]`;
+
+```fun
+use 'lib-set.fun';
+var xs = [1, 2, 3, 4];
+?. (xs | map(a -> a * a)).@toJson();
+?. filter(xs, a -> a > 2).@toJson();
+```
+Expected output:
+```text
+[1,4,9,16]
+[3,4]
+```
+
+### Closure counter (`idiom.closure`)
+
+A function value captures its defining scope. Capture an argument to build a specialized function without a class.
+
+Transfer: js `let n = 0; return () => ++n`; py `def counter(): n = 0; ...`;
+
+```fun
+fun adder(n)
+  result = a -> a + n;
+end fun;
+var add2 = adder(2);
+?. add2(3);
+?. add2(10);
+```
+Expected output:
+```text
+5
+12
+```
+
+### JSON round trip (`idiom.json-roundtrip`)
+
+Parse with `.getJson(json: true)`, inspect with member access, emit with `.@toJson(json: true)`.
+
+Transfer: js `JSON.parse / JSON.stringify`; py `json.loads / json.dumps`;
+
+```fun
+var s = '{"users": [{"name": "Ada"}]}';
+var m = s.getJson(json: true);
+?. m.users[0].name;
+m.users[0].active = true;
+?. m.@toJson(json: true);
+```
+Expected output:
+```text
+Ada
+{"users":[{"name":"Ada","active":true}]}
+```
+
+### Read and write files (`idiom.file-io`)
+
+The built-in `'path'.load()` reads a whole file; `'path'.save(text)` writes one. For directories, atomic writes and walking use `use 'fs.fun';`.
+
+Transfer: js `fs.readFileSync(p, 'utf8')`; py `open(p).read()`;
+
+```fun
+use 'fs.fun';
+var p = fs.tempFile('fun-ontology-');
+p.save('hello');
+?. p.load();
+fs.removeAll(p);
+```
+Expected output:
+```text
+hello
+```
+
+### Command-line arguments (`idiom.cli`)
+
+The expression `i.arg()` reads argv by position; `Argv()` (from `lib-cmdline`) returns the list. `use 'cli.fun';` gives flags, subcommands and help.
+
+Transfer: js `process.argv`; py `sys.argv`;
+
+```fun
+?. 0.arg().length() > 0;
+```
+Expected output:
+```text
+True
+```
+
+### Call native code (`idiom.ffi`)
+
+The call `LibC().getapi(name, signature)` or `'libname'.getapi(...)` binds a native function. The signature is `argtypes:rettype`, e.g. `':i'` for no args returning int.
+
+Transfer: c `#include <unistd.h>; getpid();`; js `native addon`;
+
+```fun
+use 'lib-host.fun';
+var getpid = LibC().getapi('getpid', ':i');
+?. getpid() > 0;
+```
+Expected output:
+```text
+True
+```
+
+## Pitfalls
+
+### There is no == (`pit.double-equals`)
+
+Use `=` for equality inside an expression, and `<>` or `!=` for inequality. `==` is not Fun.
+
+Transfer: js `===`; py `==`; c `==`;
+
+```fun
+?. (1 = 1);
+?. (1 <> 2);
+```
+Expected output:
+```text
+True
+True
+```
+
+### Newlines do not end statements (`pit.newline-is-not-a-statement`)
+
+A newline is whitespace. Put `;` between statements; a continuation line can silently join the previous expression.
+
+Transfer: js `automatic semicolon insertion`; py `indentation ends statements`;
+
+```fun
+var a = 1
+  + 2;
+?. a;
+```
+Expected output:
+```text
+3
+```
+
+### No backslash escapes (`pit.backslash-escape`)
+
+The literal `'\n'` is a backslash followed by `n`, not a newline. Use `10.toChar()` or a multiline backtick string.
+
+Transfer: js `"a\nb"`; py `"a\nb"`;
+
+```fun
+?. 'a\nb'.length();
+?. ('a' & 10.toChar() & 'b').length();
+```
+Expected output:
+```text
+4
+3
+```
+
+### Optional chaining is limited (`pit.optional-chain`)
+
+The form `x?.k?` makes the base and the member optional. It does not make a following call optional, and `f()?.x` is not the JS form; assign to a variable first.
+
+Transfer: js `a?.k?.()`;
+
+```fun
+fun pick(o, k) result = o?.k?; end fun;
+?. pick(new [k: 7], 'k');
+?. pick(nil, 'k') = nil;
+```
+Expected output:
+```text
+7
+True
+```
+
+### Regex match group access (`pit.match-group`)
+
+In a match object, `m.@(0)` is the whole match and `m.@('name')` a named group; `m.@@()` is also the whole match. `m.@()` with no argument is not valid.
+
+Transfer: js `m[0]`; py `m.group(0)`;
+
+```fun
+var m = 'a12'.match(/(\d+)/);
+?. m.@(0);
+?. m.@(1);
+```
+Expected output:
+```text
+12
+12
+```
+
+### A missing value also equals zero (`pit.missing-key-accumulate`)
+
+A missing value compares equal to nil and to 0, so `if x = 0` cannot tell "absent" from "zero". Use `.@has(key)` when presence matters.
+
+Transfer: js `Object.hasOwn(m, k)`; py `k in m`;
+
+```fun
+var m = new [];
+?. m.k = nil;
+?. m.k = 0;
+?. m.@has('k');
+m.k = 0;
+?. m.@has('k');
+```
+Expected output:
+```text
+True
+True
+False
+True
+```
+
+### [] is a list, new [] is a map (`pit.array-vs-map`)
+
+A list literal `[1, 2]` is ordered; `new [a: 1]` is a string-keyed map. Do not use `{}` for either.
+
+Transfer: js `[] / {}`; py `[] / {}`;
+
+```fun
+var xs = [10, 20];
+var m = new [a: 10];
+?. xs[1];
+?. m.a;
+```
+Expected output:
+```text
+20
+10
+```
+
+### result vs return (`pit.return-keyword`)
+
+Inside `fun`, assigning `result` sets the return value; `return expr;` returns immediately. A bare `return;` returns the current `result`, which may be stale.
+
+Transfer: js `return x`; py `return x`;
+
+```fun
+fun f()
+  result = 1;
+  return 2;
+  result = 3;
+end fun;
+?. f();
+```
+Expected output:
+```text
+2
+```
+
+## Tooling
+
+### The fun command (`tool.funcmd`)
+
+The command `fun file.fun` runs a script; `fun test` runs a package's tests; `fun pack` builds one executable; `fun package init` creates a manifest.
+
+Transfer: js `node hello.js`; py `python hello.py`;
+
+```fun
+?. 'Use: fun hello.fun';
+```
+Expected output:
+```text
+Use: fun hello.fun
+```
+
+### Tests (`tool.test`)
+
+Test files are `*_test.fun`; import `test.fun` and call `test('name', { assert.equal(a, b); });`. `fun test` runs each file in a child process.
+
+Transfer: js `test('name', () => expect(a).toBe(b))`; py `def test_name(): assert a == b`;
+
+```fun
+?. 'Write this in a *_test.fun file, then run: fun test';
+```
+Expected output:
+```text
+Write this in a *_test.fun file, then run: fun test
+```
+
+### Packages (`tool.package`)
+
+A project has a `package.fun` manifest. `fun package init/tidy/add/remove` creates and maintains it; `fun run` runs the manifest bin.
+
+Transfer: js `package.json / npm`; py `pyproject.toml / pip`;
+
+```fun
+?. 'fun package init myapp';
+```
+Expected output:
+```text
+fun package init myapp
+```
+
+### fun-safe (`tool.fun-safe`)
+
+A restricted build with native code, arbitrary memory access, and file/compile access removed. Use it for plugins and untrusted scripts.
+
+```fun
+?. 'fun-safe script.fun';
+```
+Expected output:
+```text
+fun-safe script.fun
+```
+
+### fun-mt and workers (`tool.mt`)
+
+The `fun-mt` build is the opt-in multi-threaded build. A worker parses its own module and heap; results cross as strings, with `Shared` and `Channel` for named stores.
+
+```fun
+?. 'Requires fun-mt and use lib-worker.fun';
+```
+Expected output:
+```text
+Requires fun-mt and use lib-worker.fun
+```
+
+## Platforms
+
+### Platforms (`platform.matrix`)
+
+Windows 95 through Windows 11, Linux x64/arm64 (glibc 2.17+), macOS x64/arm64, and nightly LoongArch64/riscv64 builds. About 0.3 MB, zero external dependencies.
+
+```fun
+var h = 'host'.arg().getJson(fd: true);
+?. h.os <> '';
+```
+Expected output:
+```text
+True
+```
+
+## Tasks
+
+### Transform JSON (`task.json-transform`)
+
+Parse a JSON document, update a nested value, and emit JSON again.
+
+```fun
+var doc = '{"items": [{"n": 1}, {"n": 2}]}'.getJson(json: true);
+for i = 0 to doc.items.@count() - 1 do
+  doc.items[i].n *= 10;
+end do;
+?. doc.@toJson(json: true);
+```
+Expected output:
+```text
+{"items":[{"n":10},{"n":20}]}
+```
+
+### A tiny HTTP JSON endpoint (`task.hello-server`)
+
+Create `HttpServer(port)`, register a handler that writes JSON, and call `run()`. Requires a listening socket; not executed by the ontology checker.
+
+
+### Call a C function (`task.ffi-libc`)
+
+Bind a libc function by name and signature, then call it from Fun. Use CStruct/CWin32API when a struct or a Windows prototype is involved.
+
+```fun
+use 'lib-host.fun';
+var getpid = LibC().getapi('getpid', ':i');
+?. getpid() > 0;
+```
+Expected output:
+```text
+True
+```
+
+### Parse argv (`task.cli-args`)
+
+Read positional arguments with `i.arg()`, or use `Argv()`/`cli.fun` for flags and subcommands.
+
+```fun
+?. 0.arg().length() > 0;
+```
+Expected output:
+```text
+True
+```
+
