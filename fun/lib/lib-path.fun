@@ -7,6 +7,7 @@
 //     PathClean('a/./b/../c')             // a/c
 //     PathToSlash(nativePath)              // internal/URL path (always '/')
 //     PathFromSlash('a/b')                // native path at an OS boundary
+//     PathMatch('src/*/test.fun', p)      // glob match without touching the FS
 //
 // Output uses HostSep(). Windows accepts both '/' and '\'; POSIX treats only
 // '/' as a separator, so '\' stays a normal filename character. PathJoin takes
@@ -318,4 +319,152 @@ fun PathFromSlash(p)
   else
     result = p;
   end if;
+end fun;
+
+// Parse one character (with POSIX escape) from a character class.
+fun _pathClassChar(pattern, i)
+  var r = new [];
+  r['ok'] = false;
+  r['ch'] = '';
+  r['nextPos'] = i;
+  if i >= pattern.length() then result = r; return; end if;
+  var c = pattern.substr(i, 1);
+  if (not _pathWin) and c.eq(_pathBackslash) then
+    i += 1;
+    if i >= pattern.length() then result = r; return; end if;
+    c = pattern.substr(i, 1);
+  end if;
+  r['ok'] = true;
+  r['ch'] = c;
+  r['nextPos'] = i + 1;
+  result = r;
+end fun;
+
+// Match one character set starting at '['. Returns [ok, nextPos, match].
+fun _pathClass(pattern, start, ch)
+  var res = new [];
+  res['ok'] = false;
+  res['nextPos'] = start;
+  res['match'] = false;
+  var i = start + 1;
+  var neg = false;
+  if i < pattern.length() then
+    var first = pattern.substr(i, 1);
+    if first = '!' or first = '^' then neg = true; i += 1; end if;
+  end if;
+  var matched = false;
+  var firstItem = true;
+  var closed = false;
+  var done = false;
+  var cb = ch.toByte(0);
+  while i < pattern.length() and not done do
+    var c = pattern.substr(i, 1);
+    if c = ']' and not firstItem then
+      closed = true;
+      i += 1;
+      done = true;
+    else
+      var lo = _pathClassChar(pattern, i);
+      if not lo['ok'] then
+        done = true;
+      else
+        firstItem = false;
+        var after = lo['nextPos'];
+        if after < pattern.length() and pattern.substr(after, 1) = '-' and
+           after + 1 < pattern.length() and pattern.substr(after + 1, 1) <> ']' then
+          var hi = _pathClassChar(pattern, after + 1);
+          if not hi['ok'] then
+            done = true;
+          elsif lo['ch'].toByte(0) > hi['ch'].toByte(0) then
+            done = true;
+          else
+            if cb >= lo['ch'].toByte(0) and cb <= hi['ch'].toByte(0) then matched = true; end if;
+            i = hi['nextPos'];
+          end if;
+        else
+          if ch.eq(lo['ch']) then matched = true; end if;
+          i = after;
+        end if;
+      end if;
+    end if;
+  end do;
+  if closed then
+    res['ok'] = true;
+    res['nextPos'] = i;
+    if neg then res['match'] = not matched; else res['match'] = matched; end if;
+  end if;
+  result = res;
+end fun;
+
+// Iterative glob matcher; only the last '*' is retried on mismatch.
+fun _pathGlobMatch(pattern, name)
+  var pi = 0;
+  var ni = 0;
+  var starPi = -1;
+  var starNi = 0;
+  while ni < name.length() do
+    var ok = false;
+    if pi < pattern.length() then
+      var pc = pattern.substr(pi, 1);
+      if pc = '*' then
+        while pi < pattern.length() and pattern.substr(pi, 1) = '*' do pi += 1; end do;
+        starPi = pi;
+        starNi = ni;
+        ok = true;
+      elsif pc = '?' then
+        if not _pathIsSep(name.substr(ni, 1)) then
+          pi += 1;
+          ni += 1;
+          ok = true;
+        end if;
+      elsif pc = '[' then
+        if not _pathIsSep(name.substr(ni, 1)) then
+          var cls = _pathClass(pattern, pi, name.substr(ni, 1));
+          if cls['ok'] and cls['match'] then
+            pi = cls['nextPos'];
+            ni += 1;
+            ok = true;
+          end if;
+        end if;
+      elsif _pathIsSep(pc) then
+        if _pathIsSep(name.substr(ni, 1)) then
+          pi += 1;
+          ni += 1;
+          ok = true;
+        end if;
+      elsif (not _pathWin) and pc.eq(_pathBackslash) then
+        var nextPi = pi + 1;
+        if nextPi < pattern.length() then
+          if name.substr(ni, 1).eq(pattern.substr(nextPi, 1)) then
+            pi = nextPi + 1;
+            ni += 1;
+            ok = true;
+          end if;
+        end if;
+      else
+        if name.substr(ni, 1).eq(pc) then
+          pi += 1;
+          ni += 1;
+          ok = true;
+        end if;
+      end if;
+    end if;
+    if not ok then
+      if starPi < 0 or starNi >= name.length() or _pathIsSep(name.substr(starNi, 1)) then
+        result = false;
+        return;
+      end if;
+      starNi += 1;
+      pi = starPi;
+      ni = starNi;
+    end if;
+  end do;
+  while pi < pattern.length() and pattern.substr(pi, 1) = '*' do pi += 1; end do;
+  result = pi = pattern.length();
+end fun;
+
+// Glob-match a path without touching the filesystem. `*`/`?` do not cross a
+// separator; `**` is not recursive here. Invalid patterns return false.
+fun PathMatch(pattern, name)
+  result = _pathGlobMatch('' & pattern, '' & name);
 end fun;

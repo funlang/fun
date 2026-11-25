@@ -372,6 +372,22 @@ link itself, including broken links); `exists/isDir/isFile` follow them.
 Whole-file create/read/append stays on the built-ins — `save(data)`,
 `save(data, append: true)` and `load()`.
 
+Lexical path helpers live in `lib-path`; `PathMatch` does case-sensitive,
+whole-string glob matching without touching the filesystem:
+
+```fun
+use 'lib-path.fun';
+PathMatch('src/*/test.fun', 'src/a/test.fun');  // true
+PathMatch('*.json', 'a.txt');                   // false
+```
+
+`*`/`?` do not cross separators; `**` is just repeated `*` (not recursive).
+Character classes support `[a-z]` and `[!...]`/`[^...]`; POSIX `\` escapes,
+while Windows treats `/` and `\` as separators and does not escape with `\`.
+Invalid patterns return false. Matching is lexical (no `PathClean`), and the
+matching unit follows the Fun string unit, so non-ASCII `?`/classes are
+byte-oriented on UTF-8 builds; prefer `*` for non-ASCII names.
+
 For segmented or binary I/O, `fs.open` returns a byte-oriented file handle:
 
 ```fun
