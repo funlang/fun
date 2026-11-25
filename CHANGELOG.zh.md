@@ -6,6 +6,9 @@
 
 ## [Unreleased]
 
+- `lib-path` 新增 `PathMatch()`，支持 `*`、`?`、字符集和 POSIX 转义；不访问
+  文件系统，也不依赖正则引擎。
+
 - `lib-url` 新增 `UrlParse()` 与 `UrlBuild()`，支持绝对/相对 URL、userinfo、
   端口、IPv6、原始 query/fragment 保留，以及 `file:///` 这类空 authority URL。
 

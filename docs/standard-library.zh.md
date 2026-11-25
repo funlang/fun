@@ -336,6 +336,21 @@ fs.atomicWrite('build/out/config.json', data);
 `exists/isDir/isFile` 跟随目标。整文件的创建/读取/追加仍用 built-in：
 `save(data)`、`save(data, append: true)`、`load()`。
 
+词法路径辅助在 `lib-path`；`PathMatch` 做大小写敏感、整串 glob 匹配，不访问
+文件系统：
+
+```fun
+use 'lib-path.fun';
+PathMatch('src/*/test.fun', 'src/a/test.fun');  // true
+PathMatch('*.json', 'a.txt');                   // false
+```
+
+`*`/`?` 不跨分隔符；`**` 只是连续 `*`，不做递归。字符集支持 `[a-z]` 和
+`[!...]`/`[^...]`；POSIX 下 `\` 转义，Windows 下 `/`/`\` 都是分隔符且 `\`
+不作转义。非法 pattern 返回 false；匹配是词法的，不先 `PathClean`。匹配单元
+跟随 Fun 字符串单元，UTF-8 构建下非 ASCII 的 `?`/字符集按字节处理；非 ASCII
+文件名建议用 `*`。
+
 分段/二进制读写用 `fs.open`，返回按字节操作的文件对象：
 
 ```fun

@@ -6,6 +6,10 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `lib-path` gains `PathMatch()` for glob matching (`*`, `?`, character
+  classes and POSIX escapes) without touching the filesystem or depending on
+  the regex engine.
+
 - `lib-url` gains `UrlParse()` and `UrlBuild()` for absolute and relative URLs,
   including userinfo, ports, IPv6 hosts, raw query/fragment preservation and
   empty-authority URLs such as `file:///`.

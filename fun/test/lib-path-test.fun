@@ -78,3 +78,65 @@ else
   ?. true;
   ?. true;
 end if;
+
+//--- PathMatch: glob matching without filesystem access ---
+?. PathMatch('*.fun', 'a.fun');
+?. not PathMatch('*.fun', 'a.txt');
+?. PathMatch('*', 'a');
+?. not PathMatch('*', 'a' & S & 'b');
+?. PathMatch('*/*', 'a' & S & 'b');
+?. PathMatch('a?c', 'abc');
+?. not PathMatch('a?c', 'a' & S & 'c');
+?. PathMatch('[a-c].txt', 'b.txt');
+?. not PathMatch('[a-c].txt', 'd.txt');
+?. PathMatch('[!a-c].txt', 'd.txt');
+?. PathMatch('[^a-c].txt', 'd.txt');
+?. not PathMatch('[!a-c].txt', 'b.txt');
+?. PathMatch('a*b', 'ab');
+?. PathMatch('a*b', 'axxb');
+?. not PathMatch('a*b', 'a' & S & 'b');
+?. PathMatch('', '');
+?. not PathMatch('', 'a');
+?. not PathMatch('[abc', 'a');
+?. not PathMatch('[z-a]', 'a');
+?. PathMatch('[[]', '[');
+?. PathMatch('**', 'abc');
+?. not PathMatch('**', 'a' & S & 'b');
+?. PathMatch('*' & S & '*', 'a' & S & 'b');
+
+if IsWindows() then
+  ?. PathMatch('a' & B & '*', 'a' & B & 'b');
+  ?. not PathMatch('a' & B & '*', 'a*');
+else
+  ?. PathMatch('a' & B & '*', 'a*');
+  ?. not PathMatch('a' & B, 'a');
+end if;
+
+//--- PathMatch: case, empty, classes, invalid patterns ---
+?. not PathMatch('A', 'a');
+?. not PathMatch('*.FUN', 'a.fun');
+?. not PathMatch('[a-z]', 'B');
+?. PathMatch('[A-Z]', 'B');
+?. PathMatch('[!a-z]', 'B');
+?. not PathMatch('[a-Z]', 'b');
+?. PathMatch('[B-a]', 'B');
+?. PathMatch('[a]', '/') = false;
+?. PathMatch('[!a]', '/') = false;
+?. PathMatch('?', '/') = false;
+?. PathMatch('*', '');
+?. not PathMatch('a', '');
+?. PathMatch('[]]', ']');
+?. PathMatch('[!]]', 'a');
+?. PathMatch('[a-]', '-');
+?. PathMatch('**/a', 'x/a');
+?. not PathMatch('**/a', 'a');
+?. PathMatch(nil, nil);
+?. PathMatch('*', nil);
+
+if '中'.length() = 3 then
+  ?. PathMatch('???', '中');
+  ?. not PathMatch('?', '中');
+else
+  ?. PathMatch('?', '中');
+  ?. true;
+end if;
