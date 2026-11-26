@@ -14,6 +14,7 @@ Windows、raw socket 或仅 macOS 的后端。
 - [Worker 与 `fun-mt` 构建](#worker-与-fun-mt-构建)
 - [日志](#日志)
 - [运行时诊断](#运行时诊断)
+- [UUID](#uuid)
 - [Cron 调度](#cron-调度)
 - [HTTP 辅助](#http-辅助)
 - [环境变量](#环境变量)
@@ -104,6 +105,34 @@ except
   var e = runtime.lastError(); // message、file、path、line、function、stack
 end try;
 ```
+
+## UUID
+
+`uuid` 按操作系统的 CSPRNG 生成 RFC 9562 UUID。不播种、无全局状态、无用户
+态备用源：读取失败直接 raise，不会静默降级到更弱的随机源。
+
+```fun
+use 'uuid.fun';
+
+UUID();                      // 4f3c2b1a-9d8e-4f7a-8b6c-0123456789ab（version 4）
+UUID7();                     // 0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b（version 7）
+UUID7(1700000000123);        // version 7，用指定的毫秒打时间戳
+```
+
+- `UUID()` 是 version 4：122 个可变动位全部来自 Unix 的 `getentropy()` 和
+  Windows 的 `RtlGenRandom`；只有在不提供 `getentropy()` 的老 libc 上才会
+  fallback 到 `/dev/urandom`。
+- `UUID7([unixMs])` 是 version 7：前 48 位是大端序的 Unix 毫秒时间戳，所以
+  生成值大致按时间有序；剩余 74 位仍然随机，且与 `UUID()` 同源。省略
+  `unixMs` 时通过 `lib-host` 的 `HostUnixMs()` 读宿主墙钟，所以显式时间戳
+  不会触碰时钟；随机源仍与 `UUID()` 一样要求 OS CSPRNG。
+- `unixMs` 必须是 `0 .. 2^48 - 1` 范围内的整数，否则 raise。传入 `0` 会
+  把 UUID 的时间戳打成纪元时刻。省略参数在运行时等于 `nil`，两者无法区
+  分，所以 `UUID7(nil)` 与 `UUID7()` 是同一个调用。
+- 时间戳直接取墙钟读数，墙钟回拨时后续 UUID 会排到更早的位置；同一毫秒内
+  生成的顺序任意：没有毫秒级计数器、不会等到下一毫秒、也没有跨线程/跨进程
+  协调的全局状态。需要毫秒内严格有序的调用方，请把自己的序号通过 `unixMs`
+  传进来。
 
 ## Cron 调度
 

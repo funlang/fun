@@ -6,6 +6,14 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `uuid` gains `UUID7([unixMs])`, an RFC 9562 version-7 UUID whose leading 48
+  bits hold the big-endian Unix timestamp in milliseconds, so the values are
+  roughly ordered by generation time. The remaining 74 bits come from the same
+  OS CSPRNG as `UUID()`; `unixMs` is optional and defaults to the host wall
+  clock, and must be an integer in `0 .. 2^48 - 1`. UUIDs generated within the
+  same millisecond keep random, unordered entropy instead of a per-millisecond
+  counter.
+
 - `lib-path` gains `PathMatch()` for glob matching (`*`, `?`, character
   classes and POSIX escapes) without touching the filesystem or depending on
   the regex engine.

@@ -114,6 +114,7 @@ var _hostGetTempPath;   // Windows: kernel32.GetTempPath
 var _hostGetFullPath;   // Windows: kernel32.GetFullPathName
 var _hostGetCmdLine;    // Windows: kernel32.GetCommandLine
 var _hostGetCwd;        // Unix: LibC().getcwd
+var _hostGetTimeOfDay;  // Unix: LibC().gettimeofday
 var _hostGetenv;        // Unix: LibC().getenv
 var _hostSetenv;        // Unix: LibC().setenv
 var _hostUnsetenv;      // Unix: LibC().unsetenv
@@ -124,6 +125,7 @@ var _hostSetEnvA;       // Windows: SetEnvironmentVariableA
 var _hostSetEnvW;       // Windows: SetEnvironmentVariableW
 var _hostGetLastError;  // Windows: GetLastError
 var _hostSetLastError;  // Windows: SetLastError
+var _hostFileTime;      // Windows: kernel32.GetSystemTimeAsFileTime
 
 if not _isUnix then _hostSep = '\'; end if;
 try
@@ -133,6 +135,7 @@ try
     _hostSetenv  = LibC().getapi('setenv',  'ssi:i');
     _hostUnsetenv = LibC().getapi('unsetenv', 's:i');
     _hostStrlen  = LibC().getapi('strlen',  'p:i');
+    _hostGetTimeOfDay = LibC().getapi('gettimeofday', 'ipi:i');
   else
     _hostGetCmdLine  = 'kernel32'.getapi('GetCommandLine',       ':s');
     _hostGetCurrPath = 'kernel32'.getapi('GetCurrentDirectory', 'ip:i');
@@ -144,6 +147,7 @@ try
     _hostSetEnvW     = 'kernel32'.getapi('SetEnvironmentVariableW', 'ss:i');
     _hostGetLastError = 'kernel32'.getapi('GetLastError', ':i');
     _hostSetLastError = 'kernel32'.getapi('SetLastError', 'i:');
+    _hostFileTime = 'kernel32'.getapi('GetSystemTimeAsFileTime', 'p:');
   end if;
 except
   // Safe builds and hosts without FFI keep native handles nil; lexical helpers
@@ -350,5 +354,50 @@ fun HostEnvUnset(name)
     result = _hostSetEnvW(name, nil) <> 0;
   else
     result = _hostSetEnvA(name, nil) <> 0;
+  end if;
+end fun;
+
+//--------------------------------------------------------------
+// host clock
+//--------------------------------------------------------------
+
+// Little-endian integer of W bytes from BUF at OFF. The width is the host's
+// pointer size, so the same reader handles both struct timeval and FILETIME.
+fun _hostInt(buf, off, w)
+  result = 0;
+  var m = 1;
+  for i = 0 to w - 1 do
+    result += buf.toByte(off + i) * m;
+    m *= 256;
+  end do;
+end fun;
+
+// Milliseconds since the Unix epoch, read from the host wall clock.
+//
+//   Unix:    struct timeval { long tv_sec; long tv_usec; }
+//   Windows: FILETIME, 100 ns intervals since 1601-01-01 UTC
+//
+// The handle is resolved with the module and stays nil when FFI is unavailable,
+// so the module still loads and only this call raises. UUID7(unixMs) never
+// touches it.
+fun HostUnixMs()
+  if _isUnix then
+    if _hostGetTimeOfDay = nil then
+      raise 'lib-host: host clock is not available';
+    end if;
+    // long follows the host's pointer width: 4 bytes on 32-bit hosts.
+    var w = _hostFacts.bits div 8;
+    var tv = 0.toChar().x(w * 2);
+    if _hostGetTimeOfDay(tv.toNum(-1), 0) <> 0 then
+      raise 'lib-host: gettimeofday failed';
+    end if;
+    result = _hostInt(tv, 0, w) * 1000 + _hostInt(tv, w, w) div 1000;
+  else
+    if _hostFileTime = nil then
+      raise 'lib-host: host clock is not available';
+    end if;
+    var ft = 0.toChar().x(8);
+    _hostFileTime(ft.toNum(-1));
+    result = _hostInt(ft, 0, 8) div 10000 - 11644473600000;
   end if;
 end fun;
