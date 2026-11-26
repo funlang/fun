@@ -78,8 +78,8 @@ var log = base & 'run.log';
 var rc = runIn(proj, funcmd & ' test', log);
 var out = loadIf(log);
 var okRun = rc = 0;
-var okPass = has(out, 'PASS (3)');
-var okSum = has(out, '1 file, 3 tests: all passed');
+var okPass = has(out, 'PASS (9)');
+var okSum = has(out, '1 file, 9 tests: all passed');
 
 ?. 'uuid project runs: ' & okRun;
 ?. 'uuid tests pass: ' & okPass;

@@ -17,6 +17,7 @@ to get wrong. For syntax and language semantics, see the
 - [Workers and the `fun-mt` build](#workers-and-the-fun-mt-build)
 - [Logging](#logging)
 - [Runtime diagnostics](#runtime-diagnostics)
+- [UUIDs](#uuids)
 - [Cron scheduling](#cron-scheduling)
 - [HTTP helpers](#http-helpers)
 - [Environment variables](#environment-variables)
@@ -111,6 +112,40 @@ except
   var e = runtime.lastError(); // message, file, path, line, function, stack
 end try;
 ```
+
+## UUIDs
+
+`uuid` generates RFC 9562 UUIDs from the operating system's CSPRNG. There is no
+seeding, no global state and no userspace fallback: a failed read raises instead
+of silently degrading to a weaker source.
+
+```fun
+use 'uuid.fun';
+
+UUID();                      // 4f3c2b1a-9d8e-4f7a-8b6c-0123456789ab (version 4)
+UUID7();                     // 0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b (version 7)
+UUID7(1700000000123);        // version 7, stamped with a specific millisecond
+```
+
+- `UUID()` is version 4: all 122 non-fixed bits come from `getentropy()` on
+  Unix and `RtlGenRandom` on Windows, falling back to `/dev/urandom` only on a
+  libc old enough not to export `getentropy()`.
+- `UUID7([unixMs])` is version 7: the leading 48 bits hold the Unix timestamp
+  in milliseconds, big-endian, so the values are roughly ordered by generation
+  time; the remaining 74 bits are random and come from the same source as
+  `UUID()`. The clock is consulted only when `unixMs` is omitted, by way of
+  `HostUnixMs()` in `lib-host`, so an explicit timestamp never touches the
+  clock; the OS CSPRNG is still required, exactly as for `UUID()`.
+- `unixMs` must be an integer in `0 .. 2^48 - 1`; anything else raises. Passing
+  `0` stamps the UUID with the epoch. An omitted argument is `nil` at runtime
+  and cannot be told apart from one, so `UUID7(nil)` is the same call as
+  `UUID7()`.
+- The timestamp is whatever the wall clock reports, so a clock adjusted
+  backwards makes later UUIDs sort earlier; UUIDs produced within the same
+  millisecond keep arbitrary relative order: there is no per-millisecond
+  counter, no waiting for the next millisecond and no global state to
+  coordinate across threads or processes. Callers that need strict ordering
+  inside a millisecond should carry their own sequence in `unixMs`.
 
 ## Cron scheduling
 
