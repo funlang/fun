@@ -6,6 +6,12 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `tls` adds TLS client streams over the host library: `tls.connect(host, port,
+  opts)` and `tls.wrap(fd, opts)` for STARTTLS upgrades, with chain and
+  hostname verification on by default, SNI for DNS names, and the
+  `io.Reader`/`io.Writer` contract. fun still bundles no crypto: Linux/macOS use
+  the system libssl, and Windows has no backend yet.
+
 - `uuid` gains `UUID7([unixMs])`, an RFC 9562 version-7 UUID whose leading 48
   bits hold the big-endian Unix timestamp in milliseconds, so the values are
   roughly ordered by generation time. The remaining 74 bits come from the same

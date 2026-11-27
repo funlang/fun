@@ -1,0 +1,26 @@
+PASS implicit connect roundtrip
+PASS write returns the byte count
+PASS close returns true
+PASS close is idempotent
+PASS read size required
+PASS read size negative rejected
+PASS read zero returns empty
+PASS verify on: CA + hostname + SNI
+PASS verify on: IP subjectAltName
+PASS hostname mismatch rejected
+PASS self-signed chain rejected
+PASS wrap upgrades the connection in place
+PASS wrap rejects unread data
+PASS wrap requires opts.host
+PASS refused connection names the connect stage
+PASS unresolved host names the resolve stage
+PASS plain-text server names the handshake stage
+PASS handshake honours the timeout
+PASS read returns the payload
+PASS read returns empty at EOF
+PASS io.copy drains a tls stream
+PASS io.scanner reads a tls line
+PASS io.scanner at eof
+PASS read after close raises
+PASS write after close raises
+done

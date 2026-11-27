@@ -223,6 +223,42 @@ var token = jwt.sign([sub: 'u1', exp: jwt.now() + 3600], secret);
 var v = jwt.verify(token, secret, [issuer: 'app']);
 ```
 
+## TLS streams
+
+`tls` adds TLS to any TCP conversation. Certificate chain and hostname checks
+are on by default (the CA store is the system's); the stream satisfies the
+`io.Reader`/`io.Writer` contract:
+
+```fun
+use 'tls.fun';
+
+var cr = 13.toChar();
+var nl = 10.toChar();
+var s = tls.connect('example.com', 443, [timeout: 10000]);
+s.write('GET / HTTP/1.0' & cr & nl & 'Host: example.com' & cr & nl & cr & nl);
+var response = s.read(16384);
+s.close();
+```
+
+`tls.wrap` upgrades a socket that has already been talking plain text — the
+STARTTLS shape. The connection must have no unread data:
+
+```fun
+use 'lib-winsock.fun';
+var fd = ConnectSocket('smtp.example.com', 587);
+SendAll(fd, 'EHLO me\r\n');
+... read the greeting, send STARTTLS ...
+var s = tls.wrap(fd, [host: 'smtp.example.com']);
+```
+
+`verify: false` skips certificate checks. `opts.timeout` (ms) covers TCP
+connect and the handshake; reads and writes block. TLS itself always comes
+from the host system (libssl on Linux/macOS) — fun ships no crypto library.
+`close()` sends TLS `close_notify`. On POSIX the first call ignores `SIGPIPE`
+for the process, so a peer that disappears mid-write surfaces as a normal
+error instead of terminating the interpreter. (The Windows SChannel backend
+is still to come; calls raise there.)
+
 ## Environment variables
 
 Environment variables need no platform-specific FFI:
