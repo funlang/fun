@@ -1,6 +1,7 @@
 // tls-demo: fetch a page over TLS. Verification (certificate chain, hostname)
 // is on by default and the CA store is the system's; TLS itself comes from the
-// host system library, so this needs libssl (Linux/macOS) or SChannel.
+// host system library, so this needs libssl (Linux/macOS; Windows has no TLS
+// backend yet).
 use '../../../lib/tls.fun';
 
 var cr = 13.toChar();

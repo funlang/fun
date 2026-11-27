@@ -233,8 +233,10 @@ var s = tls.wrap(fd, [host: 'smtp.example.com']);
 ```
 
 `verify: false` 跳过证书校验。`opts.timeout`（毫秒）覆盖 TCP 连接与握手阶段；
-读写阻塞。TLS 本体一律来自宿主系统（Linux/macOS 用 libssl，Windows 用
-SChannel）——fun 自身不带任何密码学库。`close()` 发送 TLS `close_notify`。
+读写阻塞。TLS 本体一律来自宿主系统（Linux/macOS 用 libssl）——fun 自身不带
+任何密码学库。`close()` 发送 TLS `close_notify`。
+在 POSIX 上首次调用会为本进程忽略 `SIGPIPE`，对端中途消失时表现为普通错误，
+而不是终止解释器。（Windows 的 SChannel 后端尚未实现，调用会报错。）
 
 ## 环境变量
 

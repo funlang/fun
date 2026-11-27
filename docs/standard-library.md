@@ -253,8 +253,11 @@ var s = tls.wrap(fd, [host: 'smtp.example.com']);
 
 `verify: false` skips certificate checks. `opts.timeout` (ms) covers TCP
 connect and the handshake; reads and writes block. TLS itself always comes
-from the host system (libssl on Linux/macOS, SChannel on Windows) — fun ships
-no crypto library. `close()` sends TLS `close_notify`.
+from the host system (libssl on Linux/macOS) — fun ships no crypto library.
+`close()` sends TLS `close_notify`. On POSIX the first call ignores `SIGPIPE`
+for the process, so a peer that disappears mid-write surfaces as a normal
+error instead of terminating the interpreter. (The Windows SChannel backend
+is still to come; calls raise there.)
 
 ## Environment variables
 

@@ -8,5 +8,5 @@ default certificate verification (system CA store), SNI, and the
 fun src/main.fun
 ```
 
-TLS comes from the host system — libssl on Linux/macOS, SChannel on Windows.
-fun ships no crypto library of its own.
+TLS comes from the host system — libssl on Linux/macOS. fun ships no crypto
+library of its own. (The Windows SChannel backend is still to come.)

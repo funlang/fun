@@ -25,6 +25,8 @@
 // fewer bytes than asked and '' at EOF; write(data) writes everything.
 // close() sends TLS close_notify and closes the socket. opts.timeout (ms)
 // covers TCP connect and the TLS handshake; read/write are blocking.
+// The first call ignores SIGPIPE for the process: a peer that has gone away
+// then surfaces as a normal stream error instead of killing the interpreter.
 
 use 'lib-host.fun';
 use 'lib-utils.fun';
@@ -32,7 +34,7 @@ use 'lib-utils.fun';
 // platform socket constants (DyLib(lnx, mac)); see lib-winsock-unx for the
 // SOL_SOCKET precedent
 var _SOL_SOCKET   = DyLib(1, 0xffff);
-var _SO_ERROR     = DyLib(3, 0x1007);
+var _SO_ERROR     = DyLib(4, 0x1007);
 var _SO_RCVTIMEO  = DyLib(20, 0x1006);
 var _SO_SNDTIMEO  = DyLib(21, 0x1005);
 var _O_NONBLOCK   = DyLib(0x800, 4);
@@ -81,6 +83,7 @@ var _tlsState = new [
   closeFd: nil,
   strerror: nil,
   errnoFn: nil,
+  signal: nil,
   memcpy: nil
 ];
 
@@ -135,9 +138,13 @@ fun _tlsAddr2IP(addr)
   result = int2ip(str2int(addr.substr(4, 4)));
 end fun;
 
+fun _tlsIsIP(host)
+  result = host =~ %^\d+\.\d+\.\d+\.\d+$%;
+end fun;
+
 // getaddrinfo; returns the numeric IPv4 address or raises
 fun _tlsGetHostByName(name)
-  if name =~ %^\d+\.\d+\.\d+\.\d+$% then
+  if _tlsIsIP(name) then
     result = name;
     return;
   end if;
@@ -196,8 +203,11 @@ end fun;
 
 fun _tlsBind()
   if _tlsState.bound then result = true; return; end if;
-  _tlsHost();
   try
+    // _tlsHost raises on a host without a Unix libssl (Windows); keep it
+    // inside this try so every failure carries the "tls: TLS is unavailable"
+    // prefix the safe-mode contract (and its test) relies on.
+    _tlsHost();
     var lib = _tlsFindLib();
     if lib = '' then
       raise 'the system libssl is required (install OpenSSL; on macOS point DYLD_LIBRARY_PATH at the Homebrew lib dir)';
@@ -233,6 +243,7 @@ fun _tlsBind()
     _tlsState.freeaddrinfo = sys.getapi('freeaddrinfo', 'i:i');
     _tlsState.strtoull   = sys.getapi('strtoull', 'pii:l');
     _tlsState.closeFd    = sys.getapi('close', 'i:i');
+    _tlsState.signal     = sys.getapi('signal', 'ii:p');
     try
       _tlsState.strerror = sys.getapi('strerror', 'i:s');
     except
@@ -245,6 +256,12 @@ fun _tlsBind()
       _tlsState.errnoFn = sys.getapi('__errno_location', ':p');
       _tlsState.memcpy  = sys.getapi('memcpy', 'ppn:p');
     end if;
+    // libssl writes with write(2). When the peer has gone away, the kernel
+    // raises SIGPIPE and the default action kills the interpreter before
+    // SSL_read/SSL_write can return the EPIPE error, so read()/write()/close()
+    // could never report it. Ignore SIGPIPE process-wide (Python and Node make
+    // the same choice for socket I/O); callers see a normal Fun error instead.
+    _tlsState.signal(13, 1);
     _tlsState.bound = true;
     result = true;
   except
@@ -362,7 +379,11 @@ fun _tlsHandshake(fd, host, verify, timeout)
     raise 'tls: handshake: SSL_set_fd failed';
   end if;
   _tlsState.set1Host(ssl, host);
-  _tlsState.ctrl(ssl, _CTRL_SNI, 0, host.toNum(-1));
+  // RFC 6066 forbids an IP literal in the SNI extension; send it only for
+  // DNS names. Hostname verification above still applies to both.
+  if not _tlsIsIP(host) then
+    _tlsState.ctrl(ssl, _CTRL_SNI, 0, host.toNum(-1));
+  end if;
   if timeout <> nil then _tlsSetTimeout(fd, timeout); end if;
   var rc = _tlsState.connect(ssl);
   if timeout <> nil then _tlsClearTimeout(fd); end if;

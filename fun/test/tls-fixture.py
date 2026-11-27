@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Loopback TLS fixture for fun/test/lib-tls-test.fun.
 
-Listens on six 127.0.0.1 ports, each exercising one behaviour the test
+Listens on seven 127.0.0.1 ports, each exercising one behaviour the test
 asserts on. All TLS servers use the committed test PKI in fun/test/tls
 (100-year certs, test-only CA):
 
@@ -13,7 +13,9 @@ asserts on. All TLS servers use the committed test PKI in fun/test/tls
   18746  srv cert    sends 'bye' and closes (EOF / io.copy / scanner)
   18747  ss cert     self-signed chain (verify rejection target)
 
-Writes the ready marker given as argv[1] once every listener is bound.
+Every listener is bound before the ready marker (argv[1]) is written, so a
+port that is still held by a stale fixture fails startup instead of leaving
+run-tls.sh to connect to the wrong server.
 """
 
 import os
@@ -50,133 +52,109 @@ def listener(port):
     return s
 
 
-def http_server(port, cert):
-    ctx = server_ctx(cert)
-
-    def run():
-        s = listener(port)
-        while True:
-            try:
-                c, _ = s.accept()
-            except OSError:
-                return
-            try:
-                t = ctx.wrap_socket(c, server_side=True)
-                t.recv(4096)
-                t.sendall(b'HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok')
-                t.close()
-            except Exception:
-                try:
-                    c.close()
-                except Exception:
-                    pass
-
-    return run
-
-
-def starttls_server(port):
-    ctx = server_ctx('srv')
-
-    def run():
-        s = listener(port)
-        while True:
-            try:
-                c, _ = s.accept()
-            except OSError:
-                return
-            try:
-                c.recv(1024)
-                t = ctx.wrap_socket(c, server_side=True)
-                t.recv(4096)
-                t.sendall(b'tls-ok')
-                t.close()
-            except Exception:
-                try:
-                    c.close()
-                except Exception:
-                    pass
-
-    return run
-
-
-def early_server(port):
-    def run():
-        s = listener(port)
-        while True:
-            try:
-                c, _ = s.accept()
-            except OSError:
-                return
-            try:
-                c.sendall(b'early-data')
-                time.sleep(5)
-                c.close()
-            except Exception:
-                pass
-
-    return run
-
-
-def blackhole_server(port):
-    def run():
-        s = listener(port)
-        while True:
-            try:
-                c, _ = s.accept()
-            except OSError:
-                return
-            threading.Thread(target=_sleep_on, args=(c,), daemon=True).start()
-
-    return run
-
-
-def _sleep_on(c):
-    time.sleep(300)
+def _close(c):
     try:
         c.close()
     except Exception:
         pass
 
 
-def eof_server(port):
-    ctx = server_ctx('srv')
+def http_handler(ctx):
+    def handle(c):
+        try:
+            t = ctx.wrap_socket(c, server_side=True)
+            t.recv(4096)
+            t.sendall(b'HTTP/1.0 200 OK\r\nContent-Length: 2\r\n\r\nok')
+            t.close()
+        except Exception:
+            _close(c)
+    return handle
 
-    def run():
-        s = listener(port)
-        while True:
-            try:
-                c, _ = s.accept()
-            except OSError:
-                return
-            try:
-                t = ctx.wrap_socket(c, server_side=True)
-                t.sendall(b'bye')
-                t.close()
-            except Exception:
-                try:
-                    c.close()
-                except Exception:
-                    pass
 
-    return run
+def _read_line(c):
+    """Read up to and including the newline, one byte at a time.
+
+    A buffered recv here would read ahead into the TLS ClientHello: the client
+    starts the handshake as soon as the plain line is sent, so the two can
+    arrive together. Reading exactly one line leaves the rest queued for
+    ctx.wrap_socket(); the old single recv(1024) made the STARTTLS case race
+    (observed as a macOS CI failure).
+    """
+    buf = b''
+    while not buf.endswith(b'\n'):
+        b = c.recv(1)
+        if not b:
+            break
+        buf += b
+    return buf
+
+
+def starttls_handler(ctx):
+    def handle(c):
+        try:
+            _read_line(c)
+            t = ctx.wrap_socket(c, server_side=True)
+            t.recv(4096)
+            t.sendall(b'tls-ok')
+            t.close()
+        except Exception:
+            _close(c)
+    return handle
+
+
+def early_handler(c):
+    try:
+        c.sendall(b'early-data')
+        time.sleep(5)
+        c.close()
+    except Exception:
+        _close(c)
+
+
+def blackhole_handler(c):
+    threading.Thread(target=_sleep_on, args=(c,), daemon=True).start()
+
+
+def _sleep_on(c):
+    time.sleep(300)
+    _close(c)
+
+
+def eof_handler(ctx):
+    def handle(c):
+        try:
+            t = ctx.wrap_socket(c, server_side=True)
+            t.sendall(b'bye')
+            t.close()
+        except Exception:
+            _close(c)
+    return handle
+
+
+def serve(s, handle):
+    while True:
+        try:
+            c, _ = s.accept()
+        except OSError:
+            return
+        handle(c)
 
 
 def main():
     marker = sys.argv[1] if len(sys.argv) > 1 else None
+    srv_ctx = server_ctx('srv')
     plans = [
-        (P_HTTP, http_server(P_HTTP, 'srv')),
-        (P_OTHER, http_server(P_OTHER, 'other')),
-        (P_STARTTLS, starttls_server(P_STARTTLS)),
-        (P_EARLY, early_server(P_EARLY)),
-        (P_BLACKHOLE, blackhole_server(P_BLACKHOLE)),
-        (P_EOF, eof_server(P_EOF)),
-        (P_SELF, http_server(P_SELF, 'ss')),
+        (P_HTTP, http_handler(srv_ctx)),
+        (P_OTHER, http_handler(server_ctx('other'))),
+        (P_STARTTLS, starttls_handler(srv_ctx)),
+        (P_EARLY, early_handler),
+        (P_BLACKHOLE, blackhole_handler),
+        (P_EOF, eof_handler(srv_ctx)),
+        (P_SELF, http_handler(server_ctx('ss'))),
     ]
-    threads = []
-    for port, run in plans:
-        t = threading.Thread(target=run, daemon=True)
-        t.start()
-        threads.append(t)
+    listeners = [(listener(port), handle) for port, handle in plans]
+    for s, handle in listeners:
+        threading.Thread(target=serve, args=(s, handle), daemon=True).start()
     if marker:
         with open(marker, 'w') as f:
             f.write('ready\n')
