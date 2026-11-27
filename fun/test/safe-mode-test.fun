@@ -5,6 +5,7 @@
 use 'fun/lib/test.fun';
 use 'fun/lib/io.fun';
 use 'fun/lib/process.fun';
+use 'fun/lib/tls.fun';
 
 fun identity(x)
   result = x;
@@ -118,6 +119,10 @@ test('io.pipe requires native code', {
 test('process.run requires native code', {
   if not _hasNative then test.skip('build has no getapi'); end if;
   assert.raises({ process.run('echo', []); }, 'process.run: native process execution is disabled in safe mode');
+});
+
+test('tls requires native code', {
+  assert.raises({ tls.connect('127.0.0.1', 1, [timeout: 100]); }, 'tls: TLS is unavailable');
 });
 
 runTests();

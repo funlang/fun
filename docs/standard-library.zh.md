@@ -205,6 +205,37 @@ var token = jwt.sign([sub: 'u1', exp: jwt.now() + 3600], secret);
 var v = jwt.verify(token, secret, [issuer: 'app']);
 ```
 
+## TLS 流
+
+`tls` 给任意 TCP 对话加上 TLS。证书链与主机名校验默认开启（CA 库用系统自带的），
+流对象满足 `io.Reader`/`io.Writer` 契约：
+
+```fun
+use 'tls.fun';
+
+var cr = 13.toChar();
+var nl = 10.toChar();
+var s = tls.connect('example.com', 443, [timeout: 10000]);
+s.write('GET / HTTP/1.0' & cr & nl & 'Host: example.com' & cr & nl & cr & nl);
+var response = s.read(16384);
+s.close();
+```
+
+`tls.wrap` 把已经跑了明文协议的连接原地升级——即 STARTTLS 形态。要求连接上
+没有未读数据：
+
+```fun
+use 'lib-winsock.fun';
+var fd = ConnectSocket('smtp.example.com', 587);
+SendAll(fd, 'EHLO me\r\n');
+... 读欢迎语、发 STARTTLS ...
+var s = tls.wrap(fd, [host: 'smtp.example.com']);
+```
+
+`verify: false` 跳过证书校验。`opts.timeout`（毫秒）覆盖 TCP 连接与握手阶段；
+读写阻塞。TLS 本体一律来自宿主系统（Linux/macOS 用 libssl，Windows 用
+SChannel）——fun 自身不带任何密码学库。`close()` 发送 TLS `close_notify`。
+
 ## 环境变量
 
 环境变量也可以直接读取，不需要自己写平台 FFI：

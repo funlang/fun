@@ -86,7 +86,8 @@ LOAD  logging
 LOAD  process
 LOAD  runtime
 LOAD  test
+LOAD  tls
 LOAD  toml
 LOAD  uuid
 
-loaded=84 failed=6
+loaded=85 failed=6
