@@ -426,7 +426,7 @@ macOS、Linux aarch64、龙芯与 riscv64 这几行在 Linux x86_64 上用引导
 ## 标准库
 
 标准库位于 [`fun/lib`](fun/lib)，以纯 Fun 编写：约 90 个公开模块（含平台变体
-与内部辅助模块共 140 个 `.fun` 文件）。完整模块地图与用法说明见
+与内部辅助模块共 141 个 `.fun` 文件）。完整模块地图与用法说明见
 [标准库指南](docs/standard-library.zh.md)。
 
 - **数据**：`lib-json`、`lib-fd`、`csv`、`toml`、`jsonschema`、`lib-yaml`、`lib-xml`、`lib-base64`、`lib-cstruct`、`lib-md5`、`lib-crypt`、`lib-hmac`、`lib-url`
@@ -434,7 +434,7 @@ macOS、Linux aarch64、龙芯与 riscv64 这几行在 Linux x86_64 上用引导
 - **集合 / 算法**：`lib-set`、`lib-tree`、`lib-stack`、`lib-dyns`、`lib-math`、`lib-bnf`
 - **文本**：`lib-string`、`lib-regex`、`lib-match`、`lib-unicode`
 - **系统 / IO**：`lib-file`、`lib-os`、`lib-host`、`lib-path`、`lib-stream`、`lib-input`、`lib-zlib`、`lib-sse-compress`、`env`、`cli`、`fs`、`io`、`process`、`logging`、`runtime`、`cron`、`lib-time`、`lib-cmdline`、`lib-proc`
-- **网络**：`lib-winsock`、`lib-netif`、`lib-icmp`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-multipart`、`http-session`、`jwt`、`tls`
+- **网络**：`lib-winsock`、`lib-netif`、`lib-icmp`、`lib-ajax`、`lib-jsonrpc`、`http-server`、`http-client`、`http-auth`、`http-bearer`、`http-cors`、`http-multipart`、`http-session`、`jwt`、`tls`、`smtp`
 - **数据库**：`lib-orm`、`lib-orm-pro`、`lib-orm-gen`、`lib-orm-rpc`、`lib-orm-cte`、`lib-ado`、`lib-ado-schema`
 - **原生 / 底层**：`lib-winapi`、`lib-winole`、`lib-registry`、`lib-cwinapi`、`lib-cstruct`、`lib-tcc`（C 编译）、`lib-jit`、`lib-asm`、`lib-asm-pro`、`lib-eval`
 - **UI**：`lib-ui`、`lib-ui-base`、`lib-dialog`、`lib-trayicon`

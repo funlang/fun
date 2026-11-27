@@ -1,0 +1,47 @@
+PASS plain session exposes the EHLO capabilities
+PASS capability values are parsed
+PASS plain send returns true
+PASS envelope MAIL FROM is recorded
+PASS envelope RCPT TO is recorded
+PASS message To header present
+PASS ASCII subject passes through
+PASS Date header present
+PASS Message-ID header present
+PASS ASCII body is 7bit
+PASS body lines are CRLF
+PASS all envelope recipients confirmed
+PASS To header joins recipients
+PASS Cc header present
+PASS dot-stuffing is undone by the server
+PASS Bcc goes into the envelope
+PASS Bcc never becomes a header
+PASS refused connection names the connect stage
+PASS non-220 greeting names the greet stage
+PASS silent server hits the reply timeout
+PASS capabilities reset after the upgrade
+PASS STARTTLS session delivers mail
+PASS STARTTLS payload arrives intact
+PASS tls none still delivers on an advertising server
+PASS implicit TLS session delivers mail
+PASS implicit TLS payload arrives intact
+PASS failed auth names the stage and the reply
+PASS rejected recipient names the address
+PASS close returns true
+PASS close is idempotent
+PASS send after close raises
+PASS builder starts with From
+PASS headers end with a blank line
+PASS ASCII subject stays literal
+PASS ASCII body stays literal
+PASS MIME-Version present
+PASS Chinese subject becomes an encoded word
+PASS Chinese body is base64
+PASS base64 body decodes back to the original
+PASS bare LF is normalized to CRLF
+PASS attachments make multipart/mixed
+PASS attachment filename is declared
+PASS attachment content is base64
+PASS attachment decodes byte-for-byte
+PASS second attachment decodes byte-for-byte
+PASS closing boundary present
+done

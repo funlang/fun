@@ -6,6 +6,7 @@ use 'fun/lib/test.fun';
 use 'fun/lib/io.fun';
 use 'fun/lib/process.fun';
 use 'fun/lib/tls.fun';
+use 'fun/lib/smtp.fun';
 
 fun identity(x)
   result = x;
@@ -123,6 +124,10 @@ test('process.run requires native code', {
 
 test('tls requires native code', {
   assert.raises({ tls.connect('127.0.0.1', 1, [timeout: 100]); }, 'tls: TLS is unavailable');
+});
+
+test('smtp requires native code', {
+  assert.raises({ smtp.open('127.0.0.1', 1, [timeout: 100]); }, 'smtp: SMTP is unavailable');
 });
 
 runTests();

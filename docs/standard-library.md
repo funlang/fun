@@ -259,6 +259,39 @@ for the process, so a peer that disappears mid-write surfaces as a normal
 error instead of terminating the interpreter. (The Windows SChannel backend
 is still to come; calls raise there.)
 
+## Sending mail
+
+`smtp` is an RFC 5321 client for sending mail — the protocol state machine
+and the MIME builder are written in Fun on top of the `tls` module, the same
+split Python's smtplib or Go's net/smtp use. Port 465 uses implicit TLS;
+587/25 connect plain and upgrade with STARTTLS when the server advertises it
+(`opts.tls: 'auto'` is the default, `'implicit'` and `'none'` override).
+AUTH PLAIN/LOGIN is chosen from the server's EHLO advertisement:
+
+```fun
+use 'smtp.fun';
+
+var s = smtp.open('smtp.example.com', 587,
+                  [user: 'me@example.com', pass: 'secret', timeout: 10000]);
+var msg = smtp.message([from: 'me@example.com',
+                        'to': ['you@example.com'],
+                        subject: 'report',
+                        body: 'numbers attached',
+                        attachments: [[name: 'data.csv', data: csvText]]]);
+s.send('me@example.com', ['you@example.com'], msg);  // envelope; Bcc here only
+s.close();
+```
+
+`smtp.message` builds the RFC 5322/MIME message as a pure function: CRLF
+lines, RFC 2047 encoded words for non-ASCII subjects, base64 bodies for
+non-ASCII content, `multipart/mixed` with base64 attachments. Envelope
+addresses (the `send` arguments) are separate from the headers — Bcc
+recipients go into the envelope only. Every failure raises
+`smtp: <stage>: <reply code> <text>` with the stage named (connect, greet,
+ehlo, starttls, auth, mail, rcpt, data, quit); `opts.timeout` covers the TCP
+connect and every command's reply. Header lines are not folded. (The Windows
+backend is still to come; the module loads there and calls raise.)
+
 ## Environment variables
 
 Environment variables need no platform-specific FFI:

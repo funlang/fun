@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+- 新增 `smtp`：发信客户端。`smtp.open(host, port, opts)` 建立会话（EHLO、经
+  `tls` 模块的 STARTTLS 升级、按服务端通告选择 AUTH PLAIN/LOGIN），
+  `session.send(from, tos, msg)` 投递信封与 DATA，`smtp.message(opts)` 以纯函数
+  构造 RFC 5322/MIME 消息——CRLF 行尾、RFC 2047 编码词、base64 正文与附件。
+  端口 465 即隐式 TLS；失败按阶段报错。协议与 MIME 在 Fun 层实现，传输加密用
+  宿主 TLS 库；Windows 暂无后端。
+
 - 新增 `tls`：在宿主 TLS 库之上提供客户端流，`tls.connect(host, port, opts)`
   用于新建连接，`tls.wrap(fd, opts)` 用于 STARTTLS 原地升级；默认校验证书链与
   主机名，DNS 名称会发送 SNI，流满足 `io.Reader`/`io.Writer` 契约。fun 仍不
