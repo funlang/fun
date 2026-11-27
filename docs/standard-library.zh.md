@@ -238,6 +238,35 @@ var s = tls.wrap(fd, [host: 'smtp.example.com']);
 在 POSIX 上首次调用会为本进程忽略 `SIGPIPE`，对端中途消失时表现为普通错误，
 而不是终止解释器。（Windows 的 SChannel 后端尚未实现，调用会报错。）
 
+## 发邮件
+
+`smtp` 是 RFC 5321 发信客户端——协议状态机与 MIME 构造都在 Fun 层实现，
+传输加密走 `tls` 模块，与 Python smtplib / Go net/smtp 的分层一致。
+端口 465 用隐式 TLS；587/25 先明文连接，服务端通告 STARTTLS 时自动升级
+（`opts.tls: 'auto'` 默认，`'implicit'` 与 `'none'` 可覆盖）。AUTH PLAIN/LOGIN
+按服务端 EHLO 通告自动选择：
+
+```fun
+use 'smtp.fun';
+
+var s = smtp.open('smtp.example.com', 587,
+                  [user: 'me@example.com', pass: 'secret', timeout: 10000]);
+var msg = smtp.message([from: 'me@example.com',
+                        'to': ['you@example.com'],
+                        subject: '报告',
+                        body: '数据见附件',
+                        attachments: [[name: 'data.csv', data: csvText]]]);
+s.send('me@example.com', ['you@example.com'], msg);  // 信封；Bcc 只写在这里
+s.close();
+```
+
+`smtp.message` 是纯函数，构造 RFC 5322/MIME 消息：CRLF 行尾、非 ASCII 主题用
+RFC 2047 编码词、非 ASCII 正文用 base64、附件为 `multipart/mixed` 的 base64
+part。信封地址（`send` 的参数）与消息头分离——Bcc 收件人只进信封。任何一步
+失败都 raise `smtp: <阶段>: <应答码> <文本>`，阶段包括 connect、greet、ehlo、
+starttls、auth、mail、rcpt、data、quit；`opts.timeout` 覆盖 TCP 连接与每条
+命令的应答等待。头行不做折叠。（Windows 后端尚未实现，模块可加载、调用报错。）
+
 ## 环境变量
 
 环境变量也可以直接读取，不需要自己写平台 FFI：

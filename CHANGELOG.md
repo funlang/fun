@@ -6,6 +6,15 @@ This project records notable changes in the style of [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- `smtp` adds a mail-sending client: `smtp.open(host, port, opts)` builds a
+  session (EHLO, STARTTLS via the `tls` module, AUTH PLAIN/LOGIN chosen from
+  the server's advertisement), `session.send(from, tos, msg)` delivers the
+  envelope and DATA, and `smtp.message(opts)` builds RFC 5322/MIME messages as
+  a pure function — CRLF lines, RFC 2047 encoded words, base64 bodies and
+  attachments. Port 465 implies implicit TLS; failures raise with the stage
+  named. The protocol and MIME builder are written in Fun, the transport
+  encryption comes from the host TLS library; Windows has no backend yet.
+
 - `tls` adds TLS client streams over the host library: `tls.connect(host, port,
   opts)` and `tls.wrap(fd, opts)` for STARTTLS upgrades, with chain and
   hostname verification on by default, SNI for DNS names, and the

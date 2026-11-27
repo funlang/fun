@@ -85,9 +85,10 @@ LOAD  lib-zlib
 LOAD  logging
 LOAD  process
 LOAD  runtime
+LOAD  smtp
 LOAD  test
 LOAD  tls
 LOAD  toml
 LOAD  uuid
 
-loaded=85 failed=6
+loaded=86 failed=6

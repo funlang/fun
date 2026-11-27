@@ -442,7 +442,7 @@ requirements, dependency layout, safe builds and CI details.
 ## Standard library
 
 The standard library in [`fun/lib`](fun/lib) is written in pure Fun: about 90
-public modules (140 `.fun` files including platform variants and internal
+public modules (141 `.fun` files including platform variants and internal
 helpers). The full module map and usage notes live in the
 [standard library guide](docs/standard-library.md).
 
@@ -451,7 +451,7 @@ helpers). The full module map and usage notes live in the
 - **Collections / algorithms**: `lib-set`, `lib-tree`, `lib-stack`, `lib-dyns`, `lib-math`, `lib-bnf`
 - **Text**: `lib-string`, `lib-regex`, `lib-match`, `lib-unicode`
 - **System / IO**: `lib-file`, `lib-os`, `lib-host`, `lib-path`, `lib-stream`, `lib-input`, `lib-zlib`, `lib-sse-compress`, `env`, `cli`, `fs`, `io`, `process`, `logging`, `runtime`, `cron`, `lib-time`, `lib-cmdline`, `lib-proc`
-- **Network**: `lib-winsock`, `lib-netif`, `lib-icmp`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`, `http-multipart`, `http-session`, `jwt`, `tls`
+- **Network**: `lib-winsock`, `lib-netif`, `lib-icmp`, `lib-ajax`, `lib-jsonrpc`, `http-server`, `http-client`, `http-auth`, `http-bearer`, `http-cors`, `http-multipart`, `http-session`, `jwt`, `tls`, `smtp`
 - **Databases**: `lib-orm`, `lib-orm-pro`, `lib-orm-gen`, `lib-orm-rpc`, `lib-orm-cte`, `lib-ado`, `lib-ado-schema`
 - **Native / low-level**: `lib-winapi`, `lib-winole`, `lib-registry`, `lib-cwinapi`, `lib-cstruct`, `lib-tcc` (C compile), `lib-jit`, `lib-asm`, `lib-asm-pro`, `lib-eval`
 - **UI**: `lib-ui`, `lib-ui-base`, `lib-dialog`, `lib-trayicon`
