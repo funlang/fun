@@ -6,6 +6,11 @@
 
 ## [Unreleased]
 
+- 新增 `tls`：在宿主 TLS 库之上提供客户端流，`tls.connect(host, port, opts)`
+  用于新建连接，`tls.wrap(fd, opts)` 用于 STARTTLS 原地升级；默认校验证书链与
+  主机名，DNS 名称会发送 SNI，流满足 `io.Reader`/`io.Writer` 契约。fun 仍不
+  自带密码学实现：Linux/macOS 使用系统 libssl，Windows 暂无后端。
+
 - `uuid` 新增 `UUID7([unixMs])`，生成 RFC 9562 version 7 UUID：前 48 位是大端序
   的 Unix 毫秒时间戳，因此生成值大致按时间有序；剩余 74 位与 `UUID()` 同源，
   来自操作系统的 CSPRNG。`unixMs` 省略时取宿主墙钟，必须是 `0 .. 2^48 - 1`
