@@ -31,7 +31,8 @@ unit worker;
 
 interface
 
-uses fun, base, core, Classes;
+uses fun, base, core, Classes
+  {$IfDef IDE2}, debugger{$EndIf};
 
 type
   // One evaluation thread with its own module and environment.
@@ -49,6 +50,11 @@ type
     FEvent: PRTLEvent;
     FThreadId: TThreadID;
     FEnv: CEnv;
+    {$IfDef IDE2}
+    FDebug: TDebugSession;
+    FDebugMode: Boolean;
+    FSourceName: fun.str;
+    {$EndIf}
     // Cooperative cancellation. checkCancelled reads this through the worker
     // thread's _cancelFlag pointer at loop/call safe points.
     FCancel: LongInt;
@@ -59,7 +65,9 @@ type
   public
     constructor Create;
     destructor Destroy; override;
-    procedure Start(env: CEnv; const source, entry, payload: fun.str; isFile: Boolean);
+    procedure Start(env: CEnv; const source, entry, payload: fun.str;
+                    isFile: Boolean; const srcName: fun.str = '';
+                    debug: Boolean = False; const breakpoints: fun.str = '');
     // Wait for completion. timeout < 0 waits forever. Returns False on timeout.
     function Join(timeout: fun.int): Boolean;
     function ResultText: fun.str;
@@ -67,6 +75,11 @@ type
     function HasError: Boolean;
     function Alive: Boolean;
     procedure Cancel;
+    {$IfDef IDE2}
+    function DebugPoll: fun.str;
+    function DebugCommand(const cmd: fun.str): fun.bool;
+    function DebugStateName: fun.str;
+    {$EndIf}
     property ThreadId: TThreadID read FThreadId;
   end;
 
@@ -148,6 +161,11 @@ type
 
 // 'Worker'.start(source, entry, payload, file = true)
 procedure _workerStart(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+
+{$IfDef IDE2}
+// 'Worker'.debug(source, sourceName, entry, payload, breakpoints)
+procedure _workerDebugStart(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+{$EndIf}
 
 // 'Pool'.open(source, size, file = true)
 procedure _poolOpen(env: CEnv; exp: CExp; exps: CExps; val: PValue);
@@ -260,20 +278,34 @@ begin
   // leaving the worker with a dangling pointer, so there is no use-after-free.
   if FStarted and not FDone then Join(-1);
   if FEnv <> nil then del(FEnv);
+  {$IfDef IDE2}
+  if FDebug <> nil then del(FDebug);
+  {$EndIf}
   if FEvent <> nil then RTLEventDestroy(FEvent);
   DoneCriticalSection(FLock);
   inherited Destroy;
 end;
 
-procedure CWorker.Start(env: CEnv; const source, entry, payload: fun.str; isFile: Boolean);
+procedure CWorker.Start(env: CEnv; const source, entry, payload: fun.str;
+                        isFile: Boolean; const srcName: fun.str = '';
+                        debug: Boolean = False; const breakpoints: fun.str = '');
 begin
   if FStarted then raise EBase.Create('worker already started');
   if source = '' then raise EBase.Create('worker source is empty');
-  if entry = '' then raise EBase.Create('worker entry is empty');
+  if (entry = '') and not debug then raise EBase.Create('worker entry is empty');
   FSource := source;
   FEntry := entry;
   FPayload := payload;
   FIsFile := isFile;
+  {$IfDef IDE2}
+  FDebugMode := debug;
+  FSourceName := srcName;
+  if debug then
+  begin
+    FDebug := TDebugSession.Create;
+    FDebug.LoadBreakpoints(breakpoints);
+  end;
+  {$EndIf}
   // Clone before the thread exists: the worker never reads the caller's env.
   FEnv := env.clone;
   FThreadId := BeginThread(@WorkerMain, Pointer(Self), FThreadId);
@@ -326,6 +358,9 @@ begin
   env := FEnv;
   modu := nil;
   args := nil;
+  {$IfDef IDE2}
+  if FDebug <> nil then FDebug.Attach(env);
+  {$EndIf}
   try
     try
       _ENV := env;
@@ -333,25 +368,46 @@ begin
       _cancelFlag := @FCancel;
       if FIsFile then
         modu := CRun(CParser.ParseOrLoad(FSource, nil, CWorkerParser))
+      {$IfDef IDE2}
+      else if FSourceName <> '' then
+        modu := CParser.Parse(FSource, CWorkerParser, FSourceName, nil)
+      {$EndIf}
       else
         modu := CParser.Parse(FSource, CWorkerParser, '', nil);
       modu.run(env);
-      v := modu.UID(FEntry);
-      if (v = nil) or not (v.asObj is CFun) then
-        raise EBase.Create('worker entry not found: ' + FEntry);
-      args := CExps.Create();
-      e := CExp.new(nil);
-      e.assign(FPayload);
-      args.Add(e);
-      rv := CFun(v.asObj).call(env, args);
-      if rv = nil then
-        s := ''
-      else if isStr(rv) or isNum(rv) then
-        s := fun.str(rv^)
+      if FEntry = '' then
+        SetResult('')
       else
-        raise EBase.Create('worker result must be a string or number (use .toJson(fd: true))');
-      SetResult(s);
+      begin
+        v := modu.UID(FEntry);
+        if (v = nil) or not (v.asObj is CFun) then
+          raise EBase.Create('worker entry not found: ' + FEntry);
+        args := CExps.Create();
+        e := CExp.new(nil);
+        e.assign(FPayload);
+        args.Add(e);
+        rv := CFun(v.asObj).call(env, args);
+        if rv = nil then
+          s := ''
+        else if isStr(rv) or isNum(rv) then
+          s := fun.str(rv^)
+        else
+          raise EBase.Create('worker result must be a string or number (use .toJson(fd: true))');
+        SetResult(s);
+      end;
+      {$IfDef IDE2}
+      if FDebug <> nil then FDebug.Finish(dsDone);
+      {$EndIf}
     except
+      {$IfDef IDE2}
+      on E: ECancelled do
+      begin
+        if FDebug <> nil then
+          FDebug.Finish(dsStopped)
+        else
+          SetError('worker cancelled');
+      end;
+      {$EndIf}
       on E: EBase do
       begin
         s := E.Message;
@@ -362,9 +418,19 @@ begin
         end;
         {$EndIf}
         SetError(s);
+        {$IfDef IDE2}
+        if FDebug <> nil then FDebug.Finish(dsError, s);
+        {$EndIf}
       end;
     end;
   finally
+    {$IfDef IDE2}
+    if FDebug <> nil then
+    begin
+      FDebug.Finish(dsDone);
+      FDebug.Detach;
+    end;
+    {$EndIf}
     _cancelFlag := nil;
     _ENV := nil;
     del(args);
@@ -445,6 +511,39 @@ begin
   // worker reads it through checkCancelled at its next safe point.
   InterLockedExchange(FCancel, 1);
 end;
+
+{$IfDef IDE2}
+function CWorker.DebugPoll: fun.str;
+begin
+  if FDebug = nil then result := '' else result := FDebug.Poll;
+end;
+
+function CWorker.DebugCommand(const cmd: fun.str): fun.bool;
+var
+  p: fun.int;
+  op: fun.str;
+begin
+  if FDebug = nil then exit(False);
+  p := Pos(#9, cmd);
+  if p > 0 then op := Copy(cmd, 1, p - 1) else op := cmd;
+  // Stop must wake both the pause loop and any running loop/function body.
+  if op = 'stop' then Cancel;
+  result := FDebug.Command(cmd);
+end;
+
+function CWorker.DebugStateName: fun.str;
+begin
+  if FDebug = nil then
+    result := 'off'
+  else
+  begin
+    result := FDebug.StateName;
+    // Start() has created the thread but the session attaches on it. Report
+    // running during that window so the UI does not flash back to idle.
+    if (result = 'idle') and FStarted and not FDone then result := 'running';
+  end;
+end;
+{$EndIf}
 
 //==============================================================
 // Resident worker pool
@@ -1264,6 +1363,38 @@ begin
     del(w);
   end;
 end;
+
+{$IfDef IDE2}
+procedure _workerDebugStart(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  source, srcName, entry, payload, bps: fun.str;
+  e: CExp;
+  w: CWorker;
+begin
+  source  := '';
+  srcName := '';
+  entry   := '';
+  payload := '';
+  bps     := '';
+  e := CExps.Find(exps, '', 0);
+  if e <> nil then source := e.asStr;
+  e := CExps.Find(exps, '', 1);
+  if e <> nil then srcName := e.asStr;
+  e := CExps.Find(exps, '', 2);
+  if e <> nil then entry := e.asStr;
+  e := CExps.Find(exps, '', 3);
+  if e <> nil then payload := e.asStr;
+  e := CExps.Find(exps, '', 4);
+  if e <> nil then bps := e.asStr;
+  w := CWorker.Create;
+  try
+    w.Start(env, source, entry, payload, False, srcName, True, bps);
+    setObj(val, w, VarObjNew);
+  finally
+    del(w);
+  end;
+end;
+{$EndIf}
 
 {$EndIf}
 

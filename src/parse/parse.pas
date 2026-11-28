@@ -77,7 +77,7 @@ type
   public
     class function ParseOrLoad(const fn: fun.str; prev: fun.ptr = nil; CCParser: CParserClass = nil): fun.ptr;
     class function Parse(const s: fun.str; CCParser: CParserClass; const fn: fun.str = ''; prev: fun.ptr = nil): CRun;
-    {$IfDef IDE}
+    {$If Defined(IDE) or Defined(IDE2)}
     // Parse a single expression against an existing scope. `s` is the raw
     // expression text (no leading '?'); it is wrapped as the echo command
     // `?'+s` so the normal grammar accepts it, then the expression node is
@@ -1055,7 +1055,7 @@ begin
   end;
 end;
 
-{$IfDef IDE}
+{$If Defined(IDE) or Defined(IDE2)}
 type
   // Parse errors must reach the caller of ParseExp; the base CParser.DoError
   // is a no-op (drivers report errors through their own override).

@@ -47,9 +47,11 @@
 src/prj/fun/funcmd
 src/prj/fun/funcmd-safe
 src/prj/fun/funcmd-mt
+src/prj/fun/funcmd-ide2
 src/prj/fun/units/
 src/prj/fun/units-safe/
 src/prj/fun/units-mt/
+src/prj/fun/units-ide2/
 src/prj/fun/.ffi/
 src/prj/fun/.libffi-static/
 
@@ -58,6 +60,7 @@ src/prj/fun/.libffi-static/
 /fun/funcmd
 /fun/funcmd-safe
 /fun/funcmd-mt
+/fun/funcmd-ide2
 /fun/fun-mt
 /fun/funcmd[0-9]*
 

@@ -1982,6 +1982,10 @@ begin
   {$IfDef FunThreads}
   // 'Worker'.start(source, entry, payload, file = true)
   ids['start'] := CExp.new(nil).parse(Int64(fun.uintptr(@_workerStart)));
+  {$IfDef IDE2}
+  // 'Worker'.debug(source, sourceName, entry, payload, breakpoints)
+  ids['debug'] := CExp.new(nil).parse(Int64(fun.uintptr(@_workerDebugStart)));
+  {$EndIf}
   // 'Shared'.open(name) / 'Channel'.open(name)
   ids['open']  := CExp.new(nil).parse(Int64(fun.uintptr(@_openNamed)));
   {$EndIf}

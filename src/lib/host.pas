@@ -359,6 +359,29 @@ begin
   val^ := true;
 end;
 
+{$IfDef IDE2}
+procedure _workerDbgPoll(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedWorker(exp);
+  val^ := CWorker(exp.asObj).DebugPoll;
+end;
+
+procedure _workerDbgCmd(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+var
+  e: CExp;
+begin
+  NeedWorker(exp);
+  e := CExps.Find(exps, '', 0);
+  if e = nil then val^ := False else val^ := CWorker(exp.asObj).DebugCommand(e.asStr);
+end;
+
+procedure _workerDbgState(env: CEnv; exp: CExp; exps: CExps; val: PValue);
+begin
+  NeedWorker(exp);
+  val^ := CWorker(exp.asObj).DebugStateName;
+end;
+{$EndIf}
+
 procedure _sharedGet(env: CEnv; exp: CExp; exps: CExps; val: PValue);
 var
   e: CExp;
@@ -455,6 +478,11 @@ begin
   ids['alive']  := CExp.new(nil).parse(Int64(fun.uintptr(@_workerAlive)));
   ids['id']     := CExp.new(nil).parse(Int64(fun.uintptr(@_workerId)));
   ids['cancel'] := CExp.new(nil).parse(Int64(fun.uintptr(@_workerCancel)));
+  {$IfDef IDE2}
+  ids['dbgPoll']  := CExp.new(nil).parse(Int64(fun.uintptr(@_workerDbgPoll)));
+  ids['dbgCmd']   := CExp.new(nil).parse(Int64(fun.uintptr(@_workerDbgCmd)));
+  ids['dbgState'] := CExp.new(nil).parse(Int64(fun.uintptr(@_workerDbgState)));
+  {$EndIf}
   ids['get']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedGet)));
   ids['set']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedSet)));
   ids['has']    := CExp.new(nil).parse(Int64(fun.uintptr(@_sharedHas)));

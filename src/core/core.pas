@@ -125,9 +125,9 @@ type
     destructor Destroy; override;
     function parse(aexp: CExp): CNode;
     procedure run(env: CEnv); override;
-    {$IfDef IDE}
+    {$If Defined(IDE) or Defined(IDE2)}
     property Expr: CExp read exp;
-    {$EndIf}
+    {$IfEnd}
   end;
   
   CEcho = class(CCall)
@@ -487,6 +487,18 @@ type
     procedure traceErrorNode(const msg: fun.str = ''; const cls: fun.str = '');
   end;
 
+{$IfDef IDE2}
+// The IDE2 debugger attaches one sink per evaluation thread. The core only
+// forwards the existing generic hooks, so the default build stays untouched
+// and the debugger implementation lives in lib/debugger.pas.
+type
+  IDebugSink = interface
+    procedure DebugTrace(env: CEnv; n: CNode);
+    procedure DebugTraced(env: CEnv; n: CNode; tracing: fun.bool);
+    procedure DebugEcho(const s: fun.str);
+  end;
+{$EndIf}
+
 {$IfDef FunTraceback}
 // Resolve raw frame pointers on demand. Kept here so the runtime builtins and
 // the driver share one implementation without storing strings per frame.
@@ -505,6 +517,9 @@ threadvar _ENV: CEnv;
 // A worker thread points this at its job's cancel flag while evaluating. It
 // stays nil on the main thread, so checkCancelled() costs one pointer test.
 threadvar _cancelFlag: PLongInt;
+{$IfDef IDE2}
+threadvar debugSink: IDebugSink;
+{$EndIf}
 procedure checkCancelled;
 {$Else}
 var _ENV: CEnv;
@@ -829,7 +844,7 @@ begin
     env.trace(n);
     n.run(env);
   
-  {$IfDef IDE}
+  {$If Defined(IDE) or Defined(IDE2)}
     env.traced(n);
   {$EndIf}
   
@@ -1022,7 +1037,7 @@ begin
     end;
   end;
 
-  {$IfDef IDE}
+  {$If Defined(IDE) or Defined(IDE2)}
   env.traced(self);
   {$EndIf}
 end;
@@ -2170,7 +2185,9 @@ end;
 
 procedure CEnv.echo(const s: fun.str);
 begin
-  // no action
+  {$IfDef IDE2}
+  if debugSink <> nil then debugSink.DebugEcho(s);
+  {$EndIf}
 end;
 
 function CEnv.isCase: fun.bool;
@@ -2467,11 +2484,16 @@ end;
 procedure CEnv.trace(n: CNode);
 begin
   lastNode := n;
+  {$IfDef IDE2}
+  if debugSink <> nil then debugSink.DebugTrace(self, n);
+  {$EndIf}
 end;
 
 procedure CEnv.traced(n: CNode; tracing: fun.bool = false);
 begin
-  // no action
+  {$IfDef IDE2}
+  if debugSink <> nil then debugSink.DebugTraced(self, n, tracing);
+  {$EndIf}
 end;
 
 procedure CEnv.traceErrorNode(const msg: fun.str; const cls: fun.str);

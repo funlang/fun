@@ -317,11 +317,29 @@ if [ "${FUN_THREADS:-0}" = "1" ]; then
     MT_FLAGS="-dFunThreads -dUseCThreads"
     MT_OUT="-o$HERE/funcmd-mt"
 fi
+# IDE2: the debugger-enabled worker build. It is a separate binary so the
+# default interpreter keeps its exact defines, heap and startup cost.
+IDE2_FLAGS=""
+IDE2_OUT=""
+if [ "${FUN_IDE2:-0}" = "1" ]; then
+    if [ -n "$SAFE_LEVEL" ] || [ "${FUN_THREADS:-0}" = "1" ]; then
+        echo "FUN_IDE2=1 is its own mode; do not combine it with SAFE=... or FUN_THREADS=1." >&2
+        exit 2
+    fi
+    IDE2_FLAGS="-dIDE2 -dFunThreads -dUseCThreads"
+    IDE2_OUT="-o$HERE/funcmd-ide2"
+    if [ -z "$TRACEBACK_FLAGS" ]; then
+        echo "FUN_IDE2=1 needs the call ring; enabling FunTraceback." >&2
+        TRACEBACK_FLAGS="-dFunTraceback"
+    fi
+fi
 # Keep the two modes' .ppu/.o files apart. FPC otherwise writes units into the
 # current directory, and a later build of the other mode can silently reuse
 # them (normal code leaking into safe, or safe checks leaking into normal).
 if [ -n "$SAFE_LEVEL" ]; then
     UNITS="$HERE/units-safe"
+elif [ -n "$IDE2_FLAGS" ]; then
+    UNITS="$HERE/units-ide2"
 elif [ -n "$MT_FLAGS" ]; then
     UNITS="$HERE/units-mt"
 else
@@ -335,7 +353,7 @@ UNIT_FLAGS="-FU$UNITS"
 # build is about a second.
 rm -f "$UNITS"/*.ppu "$UNITS"/*.o "$UNITS"/*.or 2>/dev/null || true
 # shellcheck disable=SC2086
-"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $TRACEBACK_FLAGS $SAFE_FLAGS $SAFE_OUT $MT_FLAGS $MT_OUT $UNIT_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
+"$FPC_BIN" funcmd.dpr -B -Sd -O2 -Xs -XX -CX -Tlinux -dLinux -dMD5 $PACK_FLAGS $CALC_FLAGS $TRACEBACK_FLAGS $SAFE_FLAGS $SAFE_OUT $MT_FLAGS $MT_OUT $IDE2_FLAGS $IDE2_OUT $UNIT_FLAGS $PCRE_FLAGS $TCC_FLAGS $FFI_FLAGS "$@"
 
 # --- Convenience copy into fun/ (the runtime folder) -------------
 # Refresh fun/funcmd on every build, so a run from the repo root is just
@@ -347,6 +365,9 @@ ROOT="$(cd "$HERE/../../.." && pwd)"
 if [ -n "$SAFE_LEVEL" ]; then
     BUILD_BIN="$HERE/funcmd-safe"
     TARGET_BIN="$ROOT/fun/funcmd-safe"
+elif [ -n "$IDE2_FLAGS" ]; then
+    BUILD_BIN="$HERE/funcmd-ide2"
+    TARGET_BIN="$ROOT/fun/funcmd-ide2"
 elif [ -n "$MT_FLAGS" ]; then
     BUILD_BIN="$HERE/funcmd-mt"
     TARGET_BIN="$ROOT/fun/funcmd-mt"

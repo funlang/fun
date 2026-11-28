@@ -69,6 +69,9 @@ uses
 {$IfDef FunThreads}
   worker in '..\..\lib\worker.pas',
 {$EndIf}
+{$IfDef IDE2}
+  debugger in '..\..\lib\debugger.pas',
+{$EndIf}
 {$IfDef WinAPI}
   winapi in '..\..\lib\winapi.pas',
 {$EndIf}
@@ -212,6 +215,13 @@ end;
 // CFunRunner
 procedure CFunRunner.echo(const s: fun.str);
 begin
+  {$IfDef IDE2}
+  if debugSink <> nil then
+  begin
+    debugSink.DebugEcho(s);
+    exit;
+  end;
+  {$EndIf}
   Print(s);
 end;
 

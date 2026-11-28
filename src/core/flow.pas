@@ -151,7 +151,7 @@ begin
   begin
     if isTrue(env, i) then
     begin
-  {$IfDef IDE}
+  {$If Defined(IDE) or Defined(IDE2)}
       env.traced(self, true);
   {$EndIf}
       all[i].run(env);
@@ -161,7 +161,7 @@ begin
   
   if nelse <> nil then
   begin
-  {$IfDef IDE}
+  {$If Defined(IDE) or Defined(IDE2)}
     env.traced(self, true);
   {$EndIf}
     nelse.run(env);
@@ -239,7 +239,7 @@ begin
   {$IfDef FunThreads}
     checkCancelled;
   {$EndIf}
-  {$IfDef IDE}
+  {$If Defined(IDE) or Defined(IDE2)}
     env.traced(self, true);
   {$EndIf}
     all.run(env);
@@ -295,7 +295,7 @@ begin
     // CData
     vv.VInteger := vi;
     evar.assign(CValue(vv));
-  {$IfDef IDE}
+  {$If Defined(IDE) or Defined(IDE2)}
     env.traced(self, true);
   {$EndIf}
     all.run(env);
@@ -343,7 +343,7 @@ begin
       {$EndIf}
         try
           evar.assign(v);
-        {$IfDef IDE}
+        {$If Defined(IDE) or Defined(IDE2)}
           env.traced(self, true);
         {$EndIf}
           all.run(env);
@@ -378,7 +378,7 @@ begin
     ;
     if ekey <> nil then ekey.assign(e.name);
     if eidx <> nil then eidx.assign(i);
-  {$IfDef IDE}
+  {$If Defined(IDE) or Defined(IDE2)}
     env.traced(self, true);
   {$EndIf}
     all.run(env);
@@ -424,7 +424,7 @@ procedure CTry.run(env: CEnv);
 begin
   try
     try
-  {$IfDef IDE}
+  {$If Defined(IDE) or Defined(IDE2)}
       env.traced(self, true);
   {$EndIf}
       all.run(env);
