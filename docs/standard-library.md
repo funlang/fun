@@ -47,7 +47,7 @@ to get wrong. For syntax and language semantics, see the
 - **UI**: `lib-ui`, `lib-ui-base`, `lib-dialog`, `lib-trayicon`
 - **Concurrency / async**: `lib-async`, `lib-jsasync`, `lib-bind`, `lib-message`, `lib-worker`
 - **Sandbox**: `lib-jsbox`
-- **Testing**: `test` (registration and assertions for `fun test`)
+- **Testing**: `test` (registration, assertions and benchmarks for `fun test`)
 
 ## Workers and the `fun-mt` build
 

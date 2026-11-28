@@ -112,6 +112,11 @@ manifest dependencies are available through the same launcher as `fun run`.
   `test.todo('name', { ... }, 'reason')` runs the body and treats a failure as
   expected. A todo body that passes prints `todo passed: ... (remove todo)`.
   Todos are counted separately and do not fail the run.
+- `bench('name', { ... })` registers a benchmark; `fun test -bench` runs them
+  after the tests: each is warmed up once, then calibrated with doubling N
+  until a round takes ≥1s, and printed as `bench: name  N  ns/op`. A benchmark
+  that raises fails the file like a test; without `-bench` benchmarks never
+  run.
 - `test.fun`, the globals `test`/`assert`/`runTests`, the aliases `as test` /
   `as assert`, and dependency keys `test`/`assert` are reserved. A third-party
   test library can be imported under another alias.
