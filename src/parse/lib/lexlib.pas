@@ -30,6 +30,11 @@ procedure unget_char(c: char);
 begin
   Dec(yyindex);
   Dec(yycolno);
+  // get_char() counts a newline when it reads it. A lexer rule that peeks
+  // past the end of a line and then pushes it back must undo that count, or
+  // the first token on the next line is reported one row too far. Debugger
+  // breakpoints depend on CRune.row, so keep rows honest here.
+  if c = nl then Dec(yylineno);
   if c = #0 then
   begin
     yyretval := 0;
