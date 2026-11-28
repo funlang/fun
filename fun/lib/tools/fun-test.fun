@@ -19,6 +19,7 @@ if _isWin then _eol = 13.toChar() & _nl; end if;
 var _pid = UtilPid();
 var _root = '';
 var _tmp = '';
+var _bench = false;
 var _files = new [];
 var _depDirs = new [];
 var _report = new [];
@@ -28,11 +29,14 @@ var _total = 0;
 var _failed = 0;
 var _fileFails = 0;
 var _crashed = 0;
+var _benchFails = 0;
 var _sumOk = false;
 var _sumTotal = 0;
 var _sumFailed = 0;
 var _sumSkipped = 0;
 var _sumTodo = 0;
+var _sumBenches = 0;
+var _sumBenchFailed = 0;
 var _skipped = 0;
 var _todo = 0;
 
@@ -275,6 +279,7 @@ fun writeDriver(rel)
   var body = "use 'test.fun';" & _nl &
              "use '" & p & "';" & _nl &
              'runTests();' & _nl;
+  if _bench then body &= 'runBenches();' & _nl; end if;
   (_tmp & '/driver.fun').save(body);
 end fun;
 
@@ -300,6 +305,8 @@ fun parseSummary(text)
   _sumFailed = 0;
   _sumSkipped = 0;
   _sumTodo = 0;
+  _sumBenches = 0;
+  _sumBenchFailed = 0;
   var pos = 0;
   while pos < text.length() do
     var e = text.substr(pos).subpos(_nl);
@@ -351,6 +358,20 @@ fun parseSummary(text)
         end if;
       end if;
     end if;
+    if line.substr(0, 11) = '# benches: ' then
+      var brest = line.substr(11);
+      var pb = brest.subpos(' failed: ');
+      if pb >= 0 then
+        _sumBenches = brest.substr(0, pb).toNum();
+        _sumBenchFailed = brest.substr(pb + 9).toNum();
+      else
+        _sumBenches = brest.toNum();
+        _sumBenchFailed = 0;
+      end if;
+      if _sumBenches < 0 or _sumBenchFailed < 0 or _sumBenchFailed > _sumBenches then
+        _sumOk = false;
+      end if;
+    end if;
   end do;
 end fun;
 
@@ -367,6 +388,8 @@ fun addStatusLines(text)
     end if;
     var p6 = line.substr(0, 6);
     if p6 = 'skip: ' or p6 = 'todo: ' or line.substr(0, 13) = 'todo passed: ' then
+      _report.@add('  ' & line);
+    elsif _bench and line.substr(0, 7) = 'bench: ' then
       _report.@add('  ' & line);
     end if;
   end do;
@@ -403,7 +426,7 @@ fun runTestFile(rel)
   var text = '';
   if UtilExists(log) then text = log.load().replace(13.toChar(), ''); end if;
   parseSummary(text);
-  if rc <> 0 or not _sumOk or _sumFailed > 0 then
+  if rc <> 0 or not _sumOk or _sumFailed > 0 or _sumBenchFailed > 0 then
     _fileFails += 1;
     if not _sumOk then _crashed += 1; end if;
     _report.@add(padTo(rel, _maxLen) & '   FAIL');
@@ -412,6 +435,7 @@ fun runTestFile(rel)
       _failed += _sumFailed;
       _skipped += _sumSkipped;
       _todo += _sumTodo;
+      _benchFails += _sumBenchFailed;
     end if;
     addFailureLines(text);
     if text = '' then
@@ -422,10 +446,11 @@ fun runTestFile(rel)
     _skipped += _sumSkipped;
     _todo += _sumTodo;
     var pass = padTo(rel, _maxLen) & '   PASS (' & _sumTotal;
+    if _sumBenches > 0 then pass &= ', ' & _sumBenches & ' benches'; end if;
     if _sumSkipped > 0 then pass &= ', ' & _sumSkipped & ' skipped'; end if;
     if _sumTodo > 0 then pass &= ', ' & _sumTodo & ' todo'; end if;
     _report.@add(pass & ')');
-    if _sumSkipped > 0 or _sumTodo > 0 then addStatusLines(text); end if;
+    if _sumSkipped > 0 or _sumTodo > 0 or (_bench and _sumBenches > 0) then addStatusLines(text); end if;
   end if;
 end fun;
 
@@ -446,7 +471,7 @@ fun finishReport()
     end if;
     return;
   end if;
-  if _failed = 0 then
+  if _failed = 0 and _benchFails = 0 then
     var c = _crashed;
     if c = 0 then c = _fileFails; end if;
     var crashMsg = head & ': ' & pluralWord(c, 'file') & ' failed to run';
@@ -455,7 +480,9 @@ fun finishReport()
     _report.@add(crashMsg);
     return;
   end if;
-  var msg = head & ': ' & (_total - _failed - _skipped - _todo) & ' passed, ' & _failed & ' failed';
+  var msg = head & ': ' & (_total - _failed - _skipped - _todo) & ' passed';
+  if _failed > 0 then msg &= ', ' & _failed & ' failed'; end if;
+  if _benchFails > 0 then msg &= ', ' & _benchFails & ' benchmarks failed'; end if;
   if _skipped > 0 then msg &= ', ' & _skipped & ' skipped'; end if;
   if _todo > 0 then msg &= ', ' & _todo & ' todo'; end if;
   if _crashed > 0 then msg &= '; ' & pluralWord(_crashed, 'file') & ' failed to run'; end if;
@@ -497,9 +524,13 @@ end fun;
 fun runMain()
   var a = 2.arg();
   if a = '-h' or a = '--help' then
-    ?. 'usage: fun test';
+    ?. 'usage: fun test [-bench]';
     result = false;
     return;
+  end if;
+  if a = '-bench' then
+    _bench = true;
+    a = 3.arg();
   end if;
   if a <> '' then raise "test: unknown argument '" & a & "'"; end if;
 

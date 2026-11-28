@@ -602,3 +602,32 @@ check('pack ignores tests', pk1 = 0);
 var prlog = base & 'packrun.log';
 var pr1 = runIn('', q(packed), prlog);
 check('packed app runs', pr1 = 0 and line(loadIf(prlog)) = 'packed-ok');
+
+// --- bench: registered benches run only with -bench -----------------------
+var benchp = base & 'benching' & sep;
+(benchp & 'package.fun').save(
+  'fun package()' & nl &
+  '  result = [name: ' & "'benching', version: '0.1.0', bin: '', lib: '', dependencies: [], resolved: []];" & nl &
+  'end fun;' & nl);
+(benchp & 'tests' & sep & 'a_test.fun').save(
+  "use 'test.fun';" & nl &
+  "test('plain', { assert.equal(1, 1); });" & nl &
+  "bench('fast', { var s = 0; s += 1; });" & nl);
+(benchp & 'tests' & sep & 'b_test.fun').save(
+  "use 'test.fun';" & nl &
+  "test('other', { assert.is_true(2 > 1); });" & nl &
+  "bench('bad', { raise 'bench boom'; });" & nl);
+var blog = base & 'bench.log';
+var b1 = runIn(benchp, funcmd & ' test', blog);
+var bo = loadIf(blog);
+check('bench default not run', b1 = 0 and has(bo, 'PASS (1)') and
+  not has(bo, 'bench: ') and not has(bo, '# benches:'));
+var bl2 = base & 'bench-b.log';
+var b2 = runIn(benchp, funcmd & ' test -bench', bl2);
+var bo2 = loadIf(bl2);
+check('bench flag fails file', b2 = 1);
+check('bench line shown', has(bo2, 'bench: fast  ') and has(bo2, ' ns/op'));
+check('bench fail shown', has(bo2, 'not ok bench: bad') and has(bo2, 'bench boom'));
+check('bench summary', has(bo2, '# benches: 1 failed: 1'));
+check('bench pass line', has(bo2, 'PASS (1, 1 benches)'));
+check('bench final summary', has(bo2, '2 files, 2 tests: 2 passed, 1 benchmarks failed'));

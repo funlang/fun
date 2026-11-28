@@ -44,7 +44,7 @@ Windows、raw socket 或仅 macOS 的后端。
 - **UI**：`lib-ui`、`lib-ui-base`、`lib-dialog`、`lib-trayicon`
 - **并发 / 异步**：`lib-async`、`lib-jsasync`、`lib-bind`、`lib-message`、`lib-worker`
 - **沙箱**：`lib-jsbox`
-- **测试**：`test`（`fun test` 的注册与断言库）
+- **测试**：`test`（`fun test` 的注册、断言与基准库）
 
 ## Worker 与 `fun-mt` 构建
 

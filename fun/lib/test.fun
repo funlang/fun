@@ -8,6 +8,8 @@
 // Inside a body, test.skip('reason') ends the test as skipped.
 // test.todo(name, body, reason) marks an expected failure; test.todo(name, reason)
 // is a placeholder. Todo tests do not fail the run.
+// Benchmarks: bench('name', { ... }) registers one; runBenches() calibrates
+// and prints ns/op. The runner runs them only with `fun test -bench`.
 // Assertions: equal, not_equal, is_true, is_false, match (regex), contains
 // (substring), greater, less, is_nil, not_nil, raises, fail; each takes an
 // optional trailing message.
@@ -266,5 +268,72 @@ fun runTests()
   var summary = '# tests: ' & total & ' passed: ' & (total - failed - skipped - todo) & ' failed: ' & failed;
   if skipped > 0 or todo > 0 then summary &= ' skipped: ' & skipped; end if;
   if todo > 0 then summary &= ' todo: ' & todo; end if;
+  ?. summary;
+end fun;
+
+// ---- bench --------------------------------------------------------------
+
+var _benches = new [];
+
+fun bench(name, body)
+  // Function-body array literals are singletons; allocate per bench.
+  var t = new [];
+  t.@add(name);
+  t.@add(body);
+  _benches.@add(t);
+end fun;
+
+// One benchmark: warm up once, then double N from 10 until a round takes
+// >= 1s (capped at N=10^8 or 5s total) and report ns/op from that round.
+fun _runOneBench(b)
+  var name = b[0];
+  var body = b[1];
+  var fail = '';
+  try
+    body();
+  except
+    fail = _str(@);
+  end try;
+  var el = 0;
+  var n = 10;
+  if fail = '' then
+    var qpf = 1000 / -1.time();
+    var totalMs = 0;
+    while true do
+      var t0 = -2.time();
+      var i = 0;
+      try
+        while i < n do
+          body();
+          i += 1;
+        end do;
+      except
+        fail = _str(@);
+      end try;
+      if fail <> '' then exit; end if;
+      el = (-2.time() - t0) * qpf;
+      totalMs += el;
+      if el >= 1000 or n >= 100000000 or totalMs >= 5000 then exit; end if;
+      n *= 10;
+    end do;
+  end if;
+  if fail <> '' then
+    ?. 'not ok bench: ' & name;
+    ?. '  ' & fail;
+    return 1;
+  end if;
+  ?. 'bench: ' & name & '  ' & n & '  ' & (el * 1000000 / n div 1) & ' ns/op';
+  return 0;
+end fun;
+
+fun runBenches()
+  var failed = 0;
+  var i = 0;
+  while i < _benches.@count() do
+    failed += _runOneBench(_benches[i]);
+    i += 1;
+  end do;
+  var summary = '# benches: ' & _benches.@count();
+  if failed > 0 then summary &= ' failed: ' & failed; end if;
   ?. summary;
 end fun;

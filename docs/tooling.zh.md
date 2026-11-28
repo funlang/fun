@@ -102,6 +102,10 @@ fun test
   `test.todo('name', { ... }, 'reason')` 执行测试体，失败视为预期。
   预期失败的测试体通过时会打印 `todo passed: ... (remove todo)`。
   todo 单独计数，不影响套件通过。
+- `bench('name', { ... })` 登记基准；`fun test -bench` 会在测试之后运行它们：
+  每条先预热一次，再以倍增 N 校准（直到单轮累计 ≥1s），输出
+  `bench: name  N  ns/op`。基准体抛错与测试失败同样按文件失败计；
+  不带 `-bench` 时基准不会运行。
 - `test.fun`、全局名 `test`/`assert`/`runTests`、别名 `as test`/`as assert`、
   依赖键 `test`/`assert` 为保留名；三方测试库请换别名导入。
 - `dist/`、`.` 开头目录和 path 依赖目录不会参与发现。
