@@ -846,7 +846,7 @@ begin
   
   {$If Defined(IDE) or Defined(IDE2)}
     env.traced(n);
-  {$EndIf}
+  {$IfEnd}
   
     if isExit then begin
       isExit := false;
@@ -1039,7 +1039,7 @@ begin
 
   {$If Defined(IDE) or Defined(IDE2)}
   env.traced(self);
-  {$EndIf}
+  {$IfEnd}
 end;
 
 procedure CFun.doCall(env: CEnv; exps: CExps);

@@ -153,7 +153,7 @@ begin
     begin
   {$If Defined(IDE) or Defined(IDE2)}
       env.traced(self, true);
-  {$EndIf}
+  {$IfEnd}
       all[i].run(env);
       exit;
     end;
@@ -163,7 +163,7 @@ begin
   begin
   {$If Defined(IDE) or Defined(IDE2)}
     env.traced(self, true);
-  {$EndIf}
+  {$IfEnd}
     nelse.run(env);
   end;
 end;
@@ -241,7 +241,7 @@ begin
   {$EndIf}
   {$If Defined(IDE) or Defined(IDE2)}
     env.traced(self, true);
-  {$EndIf}
+  {$IfEnd}
     all.run(env);
   
     if isExit then begin
@@ -297,7 +297,7 @@ begin
     evar.assign(CValue(vv));
   {$If Defined(IDE) or Defined(IDE2)}
     env.traced(self, true);
-  {$EndIf}
+  {$IfEnd}
     all.run(env);
   
     if isExit then begin
@@ -345,7 +345,7 @@ begin
           evar.assign(v);
         {$If Defined(IDE) or Defined(IDE2)}
           env.traced(self, true);
-        {$EndIf}
+        {$IfEnd}
           all.run(env);
         finally
           v := NullValue;
@@ -380,7 +380,7 @@ begin
     if eidx <> nil then eidx.assign(i);
   {$If Defined(IDE) or Defined(IDE2)}
     env.traced(self, true);
-  {$EndIf}
+  {$IfEnd}
     all.run(env);
   
     if isExit then begin
@@ -426,7 +426,7 @@ begin
     try
   {$If Defined(IDE) or Defined(IDE2)}
       env.traced(self, true);
-  {$EndIf}
+  {$IfEnd}
       all.run(env);
     except
       on e: ECancelled do

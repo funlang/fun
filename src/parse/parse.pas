@@ -86,7 +86,7 @@ type
     // throwaway parse tree the caller must free; on a parse error it stays nil
     // and the exception propagates.
     class function ParseExp(const s: fun.str; scope: CNode; out root: CRun): CExp;
-    {$EndIf}
+    {$IfEnd}
     function DoParse(const s: fun.str; prev: fun.ptr = nil): CNode;
     procedure DoError(const s: fun.str); overload; virtual;
     procedure BuildError(const a1: YYSType);
@@ -1082,7 +1082,7 @@ begin
   if CRuns(n)[0] is CCall then
     result := CCall(CRuns(n)[0]).Expr;
 end;
-{$EndIf}
+{$IfEnd}
 
 class function CParser.ParseFileName(const fn: fun.str; prev: CNode): fun.str;
 var
