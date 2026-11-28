@@ -64,3 +64,10 @@ help: True
 unknown argument: True
 pack ignores tests: True
 packed app runs: True
+bench default not run: True
+bench flag fails file: True
+bench line shown: True
+bench fail shown: True
+bench summary: True
+bench pass line: True
+bench final summary: True
